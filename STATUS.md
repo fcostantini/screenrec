@@ -5,11 +5,11 @@
 
 ## Now
 
-- **Current milestone:** M1 — Capture engine (M0 done; M1-T1–T4 done, G1 §2 passed)
-- **Next task:** M1-T5 (`SleepGuard`: `ProcessInfo.beginActivity` while capturing,
-  wired to engine start/stop; verify via `pmset -g assertions` during engine-smoke — see
-  M1-T5 checklist). Last M1 task.
-- **Blockers:** none
+- **Current milestone:** M2 — MovieRecorder, the real writer (M1 complete, G1 passed)
+- **Next task:** M2-T1 (`BitrateModel` + tests: 02 §3 presets — pixels×fps×BPP with the
+  HEVC discount; monotone efficient<balanced<high). Then M2-T2 is the writer skeleton.
+- **Blockers:** none — the M1-T4 finding (mic 24k/48k mono vs system 48k stereo) is the
+  key input to M2's two-separate-audio-tracks design.
 
 ## Needs Franco (human-only items)
 
@@ -31,6 +31,7 @@
 | Gate | Status | Evidence |
 |------|--------|----------|
 | G0   | ✅ passed 2026-07-14 | build+test(23)+bundle green; Identifier=dev.fcostantini.screenrec.app, Authority=screenrec-dev, designated requirement stable across rebuilds |
+| M1   | ✅ complete 2026-07-14 | all 5 tasks done; capture engine + router + probe + sleep guard, 41 tests |
 | G1   | ✅ passed 2026-07-14 | probe-stream: all 3 sources flowing. video 4112×2570 420v (PTS Δ 0.008–0.09s, frame-on-change); system audio 48kHz/2ch/32-bit (Δ 0.02s); mic native format device-dependent — AirPods 24kHz/1ch, built-in 48kHz/1ch (both differ from system audio → separate tracks required, M2) |
 | G2   | ⬜ not run | — |
 | G3   | ⬜ not run | — |

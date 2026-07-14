@@ -18,6 +18,7 @@ public actor CaptureEngine {
     public nonisolated let router: SampleRouter
 
     private let configuration: CaptureConfiguration
+    private let sleepGuard = SleepGuard()
     private var stream: SCStream?
     private var handler: StreamHandler?
 
@@ -83,6 +84,7 @@ public actor CaptureEngine {
             self.stream = stream
             self.handler = handler
             state = .running
+            sleepGuard.begin(reason: "Recording the screen")
         } catch {
             failToStart(Self.startErrorMessage(error))
         }
@@ -110,6 +112,7 @@ public actor CaptureEngine {
     private func failToStart(_ message: String) {
         guard state != .terminated else { return }
         state = .terminated
+        sleepGuard.end()  // idempotent; failToStart precedes begin(), kept for symmetry
         continuation.yield(.failed(message: message))
         continuation.finish()
     }
@@ -117,6 +120,7 @@ public actor CaptureEngine {
     private func terminate(_ reason: EndReason) {
         guard state != .terminated else { return }
         state = .terminated
+        sleepGuard.end()
         continuation.yield(.stopped(reason))
         continuation.finish()
         stream = nil

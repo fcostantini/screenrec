@@ -103,9 +103,10 @@ consumers. No writing yet.
       device connected **(human/device present)**; paste output + mic format into
       STATUS.md. ✅ 2026-07-14 (all 3 streams flowing; mic native format varies by
       device — see STATUS)
-- [ ] M1-T5 `SleepGuard` (02 §7) wired to engine start/stop.
+- [x] M1-T5 `SleepGuard` (02 §7) wired to engine start/stop.
       **Verify:** during `engine-smoke --duration 10`, `pmset -g assertions` shows
-      PreventUserIdleSystemSleep held by our process; released after exit.
+      PreventUserIdleSystemSleep held by our process; released after exit. ✅ 2026-07-14
+      (pid …(screenrec-cli) held "Recording the screen"; released after exit)
 
 **Gate G1**: 04-testing §2 (probe-stream shows all three types flowing, PTS sane,
 mic format captured and documented in STATUS.md).
