@@ -72,6 +72,22 @@ public final class RecordingSession: @unchecked Sendable {
         await engine.start()
     }
 
+    /// Pause the recording: the output timeline stops advancing and the paused span is removed
+    /// (docs/02 §5). The stream keeps running; resume with `resume()`. The engine's `.paused`
+    /// event fires only if the recorder actually froze the timeline — pausing in the startup
+    /// window before the first frame is a no-op, and must not emit a pause that didn't happen.
+    public func pause() async {
+        guard recorder.pause() else { return }
+        await engine.pause()
+    }
+
+    /// Resume a paused recording; the timeline re-anchors on the next complete video frame.
+    /// `.resumed` fires only if the recorder was actually paused.
+    public func resume() async {
+        guard recorder.resume() else { return }
+        await engine.resume()
+    }
+
     /// Clean, user-initiated stop; the file is finalized and a `finished` event follows.
     public func stop() async {
         await engine.stop()

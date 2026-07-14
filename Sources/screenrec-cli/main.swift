@@ -17,13 +17,16 @@ func printUsage() {
       screenrec-cli --help
 
     record options:
-      --duration <sec>   Stop after N seconds (else Return on a terminal, or stream end)
+      --duration <sec>   Stop after N seconds (else p/r/Return on a terminal, or stream end)
       --preset <name>    efficient | balanced | high   (default: balanced)
       --mic <id>         Use a specific microphone (see list-mics)
       --no-mic           Record without a microphone
       --output <dir>     Output directory when no [path] is given (default: ~/Movies)
+      --script <steps>   Unattended pause timeline, e.g. rec10,pause5,rec10 (seconds each)
       --dry-run          Print the config that would be used, without capturing
       [path]             Explicit output file, or an existing directory to write into
+
+    While recording on a terminal: 'p'+Return pauses, 'r'+Return resumes, Return stops.
     """)
 }
 
@@ -133,6 +136,13 @@ func listMics() {
     }
 }
 
+/// One step of a `--script` timeline: record for N seconds, or pause for N seconds (a pause
+/// step brackets its wait with pause/resume). Drives the unattended pause-math gate (04 §4.1).
+enum ScriptStep {
+    case record(Double)
+    case pause(Double)
+}
+
 struct RecordOptions {
     var duration: Double?
     var preset: QualityPreset = .balanced
@@ -141,6 +151,24 @@ struct RecordOptions {
     var outputDir = OutputLocation.defaultDirectory()
     var path: String?
     var dryRun = false
+    var script: [ScriptStep]?
+}
+
+/// Parses `rec10,pause5,rec10` into steps. Each token is `rec<seconds>` or `pause<seconds>`
+/// with a finite, non-negative count; anything else is a usage error.
+func parseScript(_ raw: String) -> [ScriptStep] {
+    let steps = raw.split(separator: ",").map { token -> ScriptStep in
+        let text = token.trimmingCharacters(in: .whitespaces)
+        if text.hasPrefix("rec"), let seconds = Double(text.dropFirst(3)), seconds.isFinite, seconds >= 0 {
+            return .record(seconds)
+        }
+        if text.hasPrefix("pause"), let seconds = Double(text.dropFirst(5)), seconds.isFinite, seconds >= 0 {
+            return .pause(seconds)
+        }
+        die("--script step must be rec<seconds> or pause<seconds>, got: \(text)")
+    }
+    guard !steps.isEmpty else { die("--script needs at least one step, e.g. rec10,pause5,rec10") }
+    return steps
 }
 
 func parseRecordOptions(_ args: [String]) -> RecordOptions {
@@ -169,6 +197,9 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
         case "--output":
             guard let value = iterator.next() else { die("--output needs a path") }
             options.outputDir = URL(fileURLWithPath: (value as NSString).expandingTildeInPath, isDirectory: true)
+        case "--script":
+            guard let value = iterator.next() else { die("--script needs a value like rec10,pause5,rec10") }
+            options.script = parseScript(value)
         case "--dry-run":
             options.dryRun = true
         default:
@@ -176,6 +207,11 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
             guard options.path == nil else { die("Unexpected extra argument: \(arg)") }
             options.path = arg     // positional: an explicit output file, or a directory
         }
+    }
+    // A script owns the whole timeline (its own pauses and stop), so a duration bound would
+    // just race it — reject the ambiguous combination rather than silently pick one.
+    if options.script != nil, options.duration != nil {
+        die("--script and --duration can't be combined (the script controls timing)")
     }
     return options
 }
@@ -290,9 +326,58 @@ func runProgressTicker(_ session: RecordingSession, outputURL: URL) async {
     }
 }
 
+/// Sleeps `seconds` with a tight tolerance. The default `Task.sleep` grants the scheduler
+/// generous wake-up slack, which — under the capture's CPU load — inflates the measured file
+/// duration; over a script's two record segments that overshoot pushed past the ±0.2 s
+/// pause-math gate (04 §4.1). A 2 ms tolerance keeps the `--script` and `--duration` stop
+/// boundaries honest.
+func preciseSleep(_ seconds: Double) async {
+    let clock = ContinuousClock()
+    try? await clock.sleep(until: clock.now.advanced(by: .seconds(seconds)), tolerance: .milliseconds(2))
+}
+
+/// Runs a `--script` timeline against a live session, then stops it. A record step is just a
+/// wait (capture continues); a pause step brackets its wait with `pause()`/`resume()`.
+func runScript(_ steps: [ScriptStep], session: RecordingSession) async {
+    // Anchor the timeline to the first captured frame, not to start() returning: SCK startup
+    // latency (the first frame lands ~0.1–0.5 s after capture begins, more on a cold start)
+    // would otherwise shorten the file below the ±0.2 s gate. recordedDuration is NaN until the
+    // session starts. Bounded (~5 s) so a stream that never starts can't hang the script.
+    var waited = 0
+    while session.recordedDuration.seconds.isNaN, waited < 1000 {
+        await preciseSleep(0.005)
+        waited += 1
+    }
+    for step in steps {
+        switch step {
+        case .record(let seconds):
+            await preciseSleep(seconds)
+        case .pause(let seconds):
+            await session.pause()
+            await preciseSleep(seconds)
+            await session.resume()
+        }
+    }
+    await session.stop()
+}
+
+/// Interactive stdin control on a TTY: `p`+Return pauses, `r`+Return resumes, any other line
+/// (a bare Return, `q`, EOF, …) stops — matching the pre-pause "Return to stop" behavior.
+/// Line-based, so no raw-terminal handling is needed.
+func runInteractiveControls(_ session: RecordingSession) async {
+    while let line = readLine() {
+        switch line.trimmingCharacters(in: .whitespaces).lowercased() {
+        case "p": await session.pause()
+        case "r": await session.resume()
+        default: await session.stop(); return
+        }
+    }
+    await session.stop()   // EOF
+}
+
 /// Real capture: reserve the output file, run a `RecordingSession` with a live progress ticker,
-/// stop on `--duration`, on Return (interactive TTY), or when the stream ends, then report the
-/// finalized file.
+/// drive it via `--script`, `--duration`, or interactive p/r/Return on a TTY (else stream end),
+/// then report the finalized file.
 func performRecording(_ options: RecordOptions) async {
     let outputURL: URL
     do {
@@ -316,24 +401,46 @@ func performRecording(_ options: RecordOptions) async {
         die("Couldn't set up the recorder: \(error.localizedDescription)", code: 74)
     }
 
-    let interactive = isatty(STDIN_FILENO) != 0
-    let stopHint = options.duration.map { "\(Int($0))s" } ?? (interactive ? "Return to stop" : "until the stream ends")
+    // A script drives its own stop, so interactive keys are off in that mode.
+    let interactive = options.script == nil && isatty(STDIN_FILENO) != 0
+    let stopHint: String
+    if options.script != nil {
+        stopHint = "scripted"
+    } else if let duration = options.duration {
+        stopHint = "\(Int(duration))s"
+    } else {
+        stopHint = interactive ? "p pause · r resume · Return stop" : "until the stream ends"
+    }
     print("record: \(options.preset.rawValue) → \(outputURL.path)  (\(stopHint))")
 
     await session.start()
     let ticker = Task { await runProgressTicker(session, outputURL: outputURL) }
-    let stopTimer = Task {
-        guard let duration = options.duration else { return }
-        try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
-        await session.stop()
+
+    // Control tasks: a script owns the whole timeline; otherwise a `--duration` timer and/or
+    // interactive keys. All are cancelled once the session finishes.
+    var controls: [Task<Void, Never>] = []
+    if let steps = options.script {
+        controls.append(Task { await runScript(steps, session: session) })
+    } else {
+        if let duration = options.duration {
+            controls.append(Task {
+                await preciseSleep(duration)
+                await session.stop()
+            })
+        }
+        // Only when stdin is a terminal, so a piped/automated run isn't stopped by stdin EOF.
+        if interactive {
+            controls.append(Task.detached { await runInteractiveControls(session) })
+        }
     }
-    // Return stops early — only when stdin is a terminal, so a piped/automated run isn't
-    // stopped instantly by stdin EOF.
-    let stdinStop = interactive ? Task.detached { _ = readLine(); await session.stop() } : nil
 
     var exitCode: Int32 = 0
     for await event in session.events {
         switch event {
+        case .paused:
+            print("\n  ⏸  paused")
+        case .resumed:
+            print("\n  ▶  resumed")
         case .finished(let url, let reason, let dropped):
             ticker.cancel()
             print("\n  ✓ finished (\(describe(reason))), dropped frames: \(dropped)")
@@ -347,8 +454,7 @@ func performRecording(_ options: RecordOptions) async {
         }
     }
     ticker.cancel()
-    stopTimer.cancel()
-    stdinStop?.cancel()
+    controls.forEach { $0.cancel() }
     exit(exitCode)
 }
 

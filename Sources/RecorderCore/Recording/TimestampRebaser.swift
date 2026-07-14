@@ -64,18 +64,27 @@ public struct TimestampRebaser {
         return .emit(presentationTimeStamp: rebased)
     }
 
-    /// Note the pause instant (raw capture PTS). No-op unless recording is underway; a second
-    /// pause while already paused is ignored.
-    public mutating func pause(atRawPTS pts: CMTime) {
-        guard epoch != nil, !isPaused, pts.isNumeric else { return }
+    /// Note the pause instant (raw capture PTS). Returns whether it took effect: `false`
+    /// before the timeline has started (no epoch yet), when already paused, or on a
+    /// non-numeric PTS — callers gate a user-visible "paused" signal on this so the event
+    /// can't claim a pause the timeline didn't actually take.
+    @discardableResult
+    public mutating func pause(atRawPTS pts: CMTime) -> Bool {
+        guard epoch != nil, !isPaused, pts.isNumeric else { return false }
         isPaused = true
         awaitingResumeFrame = false
         pauseStartPTS = pts
+        return true
     }
 
     /// Arm resume: the next complete video frame re-anchors the timeline and reopens the gate.
-    public mutating func resume() {
-        guard isPaused else { return }
+    /// Returns whether it took effect — `false` if not paused, or if resume is already armed
+    /// (`isPaused` stays true until a video frame completes it, so a redundant resume before
+    /// that frame is a no-op) — so a caller can keep a user-visible "resumed" signal honest.
+    @discardableResult
+    public mutating func resume() -> Bool {
+        guard isPaused, !awaitingResumeFrame else { return false }
         awaitingResumeFrame = true
+        return true
     }
 }

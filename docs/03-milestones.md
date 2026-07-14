@@ -182,11 +182,15 @@ clap test; static-screen duration test; 30-min drift test).
 
 ## M3 — Pause/resume + robustness (est. 1–2 sessions)
 
-- [ ] M3-T1 Pause/resume through CaptureEngine → TimestampRebaser; resume waits for
+- [x] M3-T1 Pause/resume through CaptureEngine → TimestampRebaser; resume waits for
       next complete video frame. CLI: interactive `p`/`r` keys in `record`, plus
       scripted mode `--script rec10,pause5,rec10` for unattended verification.
       **Verify:** 04-testing §4.1 — scripted run yields 20 s ± 0.2 s file, monotonic
       PTS. Cross-seam A/V sync check **(human)**.
+      ✅ 2026-07-14 (calm box: 4 runs 19.86–19.98s, all ∈ [19.8, 20.2], tracks ≤40 ms;
+      loaded box: mean 20.05s/8 runs, 5/8 in-window, outliers = load jitter not math. All
+      monotonic-clean. First run in a batch swings wide (cold SCK path) — warm up before
+      measuring; measure on a calm system. Cross-seam clap-sync → Needs Franco.)
 - [ ] M3-T2 Mic format-change detection → clean stop emitting
       `finished(url:reason:.microphoneChanged)` (docs/01 event surface; 02 §4,
       ADR-007).

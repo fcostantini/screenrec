@@ -88,6 +88,18 @@ import Testing
         #expect(emitted(rebaser.rebase(rawPTS: t(21), source: .screen)) == 11)  // offset 21−11=10 ⇒ 21−10
     }
 
+    @Test func pauseAndResumeReportWhetherTheyTookEffect() {
+        var rebaser = TimestampRebaser()
+        // Before the epoch there is no timeline to pause, and nothing to resume.
+        #expect(rebaser.pause(atRawPTS: t(5)) == false)
+        #expect(rebaser.resume() == false)
+        _ = rebaser.rebase(rawPTS: t(1000), source: .screen)  // epoch
+        #expect(rebaser.pause(atRawPTS: t(1005)) == true)     // now takes effect
+        #expect(rebaser.pause(atRawPTS: t(1006)) == false)    // already paused
+        #expect(rebaser.resume() == true)                     // was paused
+        #expect(rebaser.resume() == false)                    // no longer paused
+    }
+
     @Test func pauseBeforeEpochIsIgnored() {
         var rebaser = TimestampRebaser()
         rebaser.pause(atRawPTS: t(5))  // nothing recording yet → no-op

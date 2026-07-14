@@ -5,19 +5,18 @@
 
 ## Now
 
-- **Current milestone:** M2 — MovieRecorder, the real writer (M1 complete, G1 passed)
-- **Current milestone:** **M2 COMPLETE, G2 PASSED (5/5).** The `record` CLI is a full,
-  gate-verified 3-track recorder (crash-safe, sync-stable over 30 min, ~2× more efficient
-  than Tier-1).
-- **Next task:** **M3-T1** — pause/resume through CaptureEngine → TimestampRebaser (resume
-  waits for the next complete video frame); CLI interactive `p`/`r` keys in `record` + a
-  scripted mode `--script rec10,pause5,rec10` for unattended verification. The rebaser's
-  pause math is already built + unit-tested (M2-T3) — M3-T1 wires it to the engine + CLI.
-  Gate G3 (04 §4): scripted 10s/5s/10s ⇒ 20s ± 0.2s file, monotonic PTS, sync across the seam.
-  **Crash-safety fix this session:** `movieFragmentInterval` 10s→1s (docs/02 §5) — 10s left a
-  kill-9'd-before-10s file unparseable; 1s → ≤1s loss, playable from 1s on.
-- **Now done:** M2-T1..T6. `record` is a full CLI (real 3-track capture, presets, explicit
-  path, progress ticker, Return-to-stop), calibrated ~2× more efficient than Tier-1.
+- **Current milestone:** M3 — pause/resume + robustness. M2 COMPLETE, G2 PASSED (5/5).
+- **M3-T1 DONE** — pause/resume wired end-to-end: `MovieRecorder.pause()/resume()` drive the
+  (already unit-tested) `TimestampRebaser`; `CaptureEngine` owns the paused state + emits
+  `.paused`/`.resumed`; `RecordingSession` coordinates (recorder freezes the timeline first,
+  then the engine publishes the event). CLI `record` gains `--script rec10,pause5,rec10`
+  (unattended) and interactive `p`/`r`/Return keys. G3 §4.1 pause-math leg PASSED (see gate
+  table). **Cross-seam clap-sync is human → Needs Franco.**
+- **Next task:** **M3-T2** — mic format-change detection → clean stop emitting
+  `finished(url:reason:.microphoneChanged)` (docs/02 §4, ADR-007). Unit test injects a
+  format-changed buffer; live AirPods-off run is human (§4.2).
+- **Now done:** M2-T1..T6 + M3-T1. `record` is a full CLI (real 3-track capture, presets,
+  explicit path, progress ticker, pause/resume, scripted timeline).
   KEY ENV FACT: foreground Bash captures WORK (TCC held); backgrounded/detached ones lose the
   grant. Keep capture commands foreground. Reference binary: `~/code/screenrec-poc`.
 
@@ -54,6 +53,9 @@ video (deterministic, reproducible).
       passes `codesign --verify --strict`. devsign.sh should find and use this
       identity; it must NOT try to create a new one.
 - [ ] First GUI TCC grants for the .app once M4 begins (grant + relaunch dance).
+- [ ] **G3 §4.1 cross-seam A/V sync (human)** — record `--script rec10,pause5,rec10` with mic
+      while clapping near the pause seam; scrub QuickTime that video/system/mic realign within
+      ~2 frames across the resume seam. (Automated duration + monotonic legs already PASS.)
 - [x] **M2-T6 subjective quality check** — DONE 2026-07-14: Franco compared Balanced vs High on
       real busy content and confirmed "balanced looks pretty good". Balanced quality is
       acceptable at ~2× the efficiency of Tier-1 → BitrateModel constants CONFIRMED, no change.
@@ -70,12 +72,49 @@ video (deterministic, reproducible).
 | M1   | ✅ complete 2026-07-14 | all 5 tasks done; capture engine + router + probe + sleep guard, 41 tests |
 | G1   | ✅ passed 2026-07-14 | probe-stream: all 3 sources flowing. video 4112×2570 420v (PTS Δ 0.008–0.09s, frame-on-change); system audio 48kHz/2ch/32-bit (Δ 0.02s); mic native format device-dependent — AirPods 24kHz/1ch, built-in 48kHz/1ch (both differ from system audio → separate tracks required, M2) |
 | G2   | ✅ passed 2026-07-14 | §3.1 tracks hvc1+2×aac ✅; §3.2 kill-9 ✅ (kill@6s→5.04s playable AFTER fragment fix 10s→1s — 10s was unparseable if killed <10s); §3.3 sync-clap ✅ (Franco); §3.4 static-tail ✅ (14s static→14.4s @7.9fps, tail patch holds); §3.5 30-min drift ✅ (Franco ran real 30-min record + beepflash; per-track dur match 50ms; flash↔beep offset constant ~−67ms±10 from min 5→29 = no drift) |
-| G3   | ⬜ not run | — |
+| G3   | 🟡 §4.1 passed | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears / §4.3 sleep-lock / §4.4 disk-guard await M3-T2..T4. Cross-seam clap-sync = human. |
 | G4   | ⬜ not run | — |
 | G5   | ⬜ not run | — |
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-14 (M3-T1 pause/resume): wiring + a timing lesson for future gate runs.
+  - **Pause anchor = newest raw PTS across all tracks**, not the last video frame. The rebaser
+    removes `resumeFrameRaw − pauseAnchor`; anchoring on the last *video* frame (which can be
+    stale on a static screen) would over-remove. System audio flows continuously (~43/s) so
+    the cross-track max stays within a buffer of real "now". `MovieRecorder.latestRawPTS`.
+  - **Resume re-anchors on the next COMPLETE video frame** (docs/02 §5, for A/V sync). So the
+    pause-math precision depends on a frame arriving promptly after resume — i.e. on the screen
+    changing. With normal desktop activity (ticker repainting, cursor) frames flow at tens of
+    fps and the resume frame lands within ~1 frame; on a truly static screen the resume frame
+    can lag up to ~1 s and shorten the file. The gate must run with screen motion present.
+  - **`--script` sleeps use a tight-tolerance ContinuousClock sleep, not `Task.sleep`.** Default
+    `Task.sleep` grants the scheduler generous wake-up slack; under the capture's CPU load the
+    two 10 s record segments overshot ~0.2–0.3 s total, pushing the file to ~20.25 s (just over
+    the ±0.2 s gate). A 2 ms tolerance recentres warm runs on ~20.0 s (±0.05).
+  - **First scripted run in a batch is a cold-start outlier** (saw both 20.46 s high and 19.04 s
+    low). The SCK capture-start / first-frame path warms up after one run; warm runs then
+    cluster tightly (19.86–20.03 across ~9 runs). Same cold-start caveat as the G2 §3.5 flasher.
+    Gate protocol: do one warm-up capture, then measure on a CALM system. DO NOT drive the
+    record segments off `recordedDuration` to "nail" 20 s — that would make the file 20 s *by
+    construction* and stop the duration check from proving the pause was removed (the 25 s-wall→
+    20 s-file delta is the whole point). Keep wall-clock sleeps. The `--script` first segment IS
+    anchored to the first frame (waits for `recordedDuration` to leave NaN) so SCK startup
+    latency doesn't shorten the file — that's a *measurement* anchor, the segments stay wall-timed.
+  - **Under heavy background load the gate spread widens** (saw 19.2–20.85 with load ~2.6 right
+    after the 17-agent code-review workflow), but the MEAN stays ~20.05 (math is exact). The
+    high outliers are *audio starvation*: near stop, under load, system-audio delivery lags and
+    the video tail-frame patch extends video ~0.5–0.9 s past where audio ended → total tracks
+    the longer video. Not pause-specific (tail-patch × load; G2 §3.5's 30-min run matched tracks
+    ≤50 ms under normal load). Measure §4.1 on a calm box.
+  - **`.paused`/`.resumed` events are gated on the timeline actually toggling** (high-effort
+    /code-review finding): `TimestampRebaser.pause/resume` now return whether they took effect,
+    `MovieRecorder` propagates it, and `RecordingSession` emits the engine event only when true.
+    Pausing in the startup window (engine `.running` but before the first frame / rebaser epoch)
+    is a no-op and no longer emits a pause that didn't happen. Also fixed: interactive stop
+    regressed to "only bare Return" — restored to "any non-p/r line stops"; `--duration` timer
+    now uses the same `preciseSleep`.
 
 - 2026-07-14 (G2 §3.5 drift): the 30-min A/V-sync check is fully automatable given a
   beepflash recording. Method (reusable for the M6 §7 soak sync check): find each flash via

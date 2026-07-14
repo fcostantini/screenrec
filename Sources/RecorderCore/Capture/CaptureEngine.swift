@@ -27,6 +27,9 @@ public actor CaptureEngine {
     /// Set if stop() arrives while start() is still suspended (actor reentrancy); start()
     /// honors it when it resumes rather than bringing up an unstoppable stream.
     private var stopRequested = false
+    /// Orthogonal to `state` (the stream stays `.running` while paused, still delivering
+    /// buffers that the recorder drops); gates `pause`/`resume` so each event fires once.
+    private var isPaused = false
 
     // One serial queue per output type per engine — SCK requires per-output sample-handler
     // queues, and handlers must stay light (docs/01 concurrency rules). Instance-scoped so
@@ -105,6 +108,23 @@ public actor CaptureEngine {
             }
             terminate(.userStopped)
         }
+    }
+
+    /// Pause the recording. The `SCStream` keeps running (SCK still delivers buffers, the
+    /// recorder drops them) and the paused span is removed from the output timeline (docs/02
+    /// §5). Emits `.paused`. No-op unless actively running and not already paused.
+    public func pause() {
+        guard state == .running, !isPaused else { return }
+        isPaused = true
+        continuation.yield(.paused)
+    }
+
+    /// Resume after `pause()`; the recorder re-anchors on the next complete video frame.
+    /// Emits `.resumed`. No-op unless currently paused.
+    public func resume() {
+        guard state == .running, isPaused else { return }
+        isPaused = false
+        continuation.yield(.resumed)
     }
 
     // MARK: - Single termination authority (state-guarded, actor-isolated)

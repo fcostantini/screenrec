@@ -59,6 +59,9 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     private var firstVideoRawPTS: CMTime?
     private static let microphoneGrace = CMTime(seconds: 0.75, preferredTimescale: 600)
 
+    /// Newest raw PTS seen on any track — the anchor a `pause()` hands the rebaser (docs/02 §5).
+    private var latestRawPTS: CMTime = .invalid
+
     public init(
         outputURL: URL,
         frameRate: Int,
@@ -108,6 +111,14 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         defer { lock.unlock() }
         guard !isFinished else { return }
 
+        // Newest raw PTS on any track = the pause anchor (docs/02 §5). System audio flows
+        // continuously (~43 buffers/s), so this stays within a buffer of real time even while
+        // video (frame-on-change) is momentarily idle.
+        let rawPTS = bufferPTS(buffer)
+        if rawPTS.isNumeric, !latestRawPTS.isNumeric || CMTimeCompare(rawPTS, latestRawPTS) > 0 {
+            latestRawPTS = rawPTS
+        }
+
         // Build this track's input from its first buffer, if it isn't up yet.
         switch type {
         case .screen where videoInput == nil:
@@ -126,7 +137,7 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
             break
         }
 
-        if type == .screen, firstVideoRawPTS == nil { firstVideoRawPTS = bufferPTS(buffer) }
+        if type == .screen, firstVideoRawPTS == nil { firstVideoRawPTS = rawPTS }
 
         // Start writing once every expected input exists (video always; mic if enabled; system
         // already added). Until then, drop — these are startup frames, not encoder drops. A
@@ -134,11 +145,11 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         // after a short grace past the first video frame, proceed WITHOUT the mic track rather
         // than discard the screen+system capture entirely.
         let micSettled = !includesMicrophone || microphoneInput != nil
-            || microphoneGraceExpired(now: bufferPTS(buffer))
+            || microphoneGraceExpired(now: rawPTS)
         if !didStartWriting, videoInput != nil, micSettled { beginWriting() }
         guard didStartWriting else { return }
 
-        guard case .emit(let rebasedPTS) = rebaser.rebase(rawPTS: bufferPTS(buffer), source: type)
+        guard case .emit(let rebasedPTS) = rebaser.rebase(rawPTS: rawPTS, source: type)
         else { return }
 
         if !didStartSession {
@@ -174,6 +185,28 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
             lastVideoRebasedPTS = rebasedPTS
         }
         if CMTimeCompare(rebasedPTS, latestRebasedPTS) > 0 { latestRebasedPTS = rebasedPTS }
+    }
+
+    // MARK: - Pause / resume
+
+    /// Pause the recording timeline: incoming buffers are dropped until `resume()`, and the
+    /// paused span is removed from the output (docs/02 §5), anchored at the newest raw PTS seen.
+    /// Returns whether it took effect — `false` before the first frame, when already paused, or
+    /// after finishing — so a caller can keep a user-visible "paused" signal honest.
+    @discardableResult
+    public func pause() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard !isFinished else { return false }
+        return rebaser.pause(atRawPTS: latestRawPTS)
+    }
+
+    /// Resume after `pause()`: the next complete video frame re-anchors the timeline (docs/02
+    /// §5). Returns whether it took effect (`false` when not paused or after finishing).
+    @discardableResult
+    public func resume() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard !isFinished else { return false }
+        return rebaser.resume()
     }
 
     // MARK: - Finish
