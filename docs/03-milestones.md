@@ -52,11 +52,12 @@ Goal: `swift build` + `swift test` green; stable signing; CLI skeleton runs.
       02 §6). Design both so decision logic is pure/injectable.
       **Verify:** `swift test` — OutputLocation naming/collision/preflight-failure
       cases; Permissions decision table with injected TCC/device states. ✅ 2026-07-14
-- [ ] M0-T5 CLI skeleton: `screenrec-cli record --duration N` prints config it WOULD
+- [x] M0-T5 CLI skeleton: `screenrec-cli record --duration N` prints config it WOULD
       use (no capture yet); `--list-mics`; unbuffered stdout (02 §10).
       **Verify:** `--list-mics` lists real devices; dry-run `record` prints resolved
       config (incl. explicit mic ID, output path preflight result); output intact
-      when piped to a file (buffering test).
+      when piped to a file (buffering test). ✅ 2026-07-14 (subcommands `record` /
+      `list-mics`; `AudioInputs` helper added to RecorderCore for device enumeration)
 - [ ] M0-T6 CI-less verification loop documented in STATUS.md: build, test, bundle
       commands an agent runs after every change.
       **Verify:** execute the documented loop verbatim top to bottom; it passes.

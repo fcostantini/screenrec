@@ -5,9 +5,9 @@
 
 ## Now
 
-- **Current milestone:** M0 — Scaffolding & prerequisites (in progress; T1–T4 done)
-- **Next task:** M0-T5 (CLI skeleton: `record --duration N` dry-run printing resolved
-  config, `--list-mics`, unbuffered stdout — see M0-T5 checklist)
+- **Current milestone:** M0 — Scaffolding & prerequisites (in progress; T1–T5 done)
+- **Next task:** M0-T6 (document the CI-less verify loop — build/test/bundle commands
+  an agent runs after every change — in STATUS.md; then G0 gate)
 - **Blockers:** none
 
 ## Needs Franco (human-only items)
@@ -34,6 +34,16 @@
 
 ## Field notes (append; things learned that docs don't cover yet)
 
+- 2026-07-14 (M0-T5): CLI dry-run + list-mics work. TWO things to watch in M1:
+  (1) `CGPreflightScreenCaptureAccess()` returns false ("not determined") for the
+  freshly-built Tier-2 CLI even though this terminal records fine via the Tier-1 PoC —
+  TCC screen-recording grants attach to the responsible binary's code identity, so the
+  new binary may need its own grant, or preflight is just conservative. M1-T2's
+  engine-smoke will settle whether capture actually works from the terminal or needs a
+  grant. (2) Desktop preflight now reports OK because this terminal currently CAN write
+  there (the write-probe tests reality) — so the old "Desktop always fails" is
+  environment-specific, not universal; ~/Movies default still stands as the no-grant-
+  needed choice.
 - 2026-07-14 (M0-T4): Permissions.swift + OutputLocation.swift in RecorderCore, 23
   tests green. Ran /code-review (xhigh workflow) on the diff; fixed 5 of 6 findings:
   preflight now probes WRITE access (opendir only proved read/execute) and distinguishes
