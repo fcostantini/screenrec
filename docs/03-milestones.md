@@ -117,9 +117,10 @@ mic format captured and documented in STATUS.md).
 
 Goal: three-track `.mov` with tuned HEVC, crash-safe, from the CLI.
 
-- [ ] M2-T1 `BitrateModel` (02 §3 presets).
+- [x] M2-T1 `BitrateModel` (02 §3 presets).
       **Verify:** unit tests — preset math, pixel-count edge cases, monotone ordering
-      Efficient < Balanced < High at fixed resolution.
+      Efficient < Balanced < High at fixed resolution. ✅ 2026-07-14 (9 tests; reference
+      figures ~5/~19 Mbps, ratios, fps/pixel proportionality, zero-dim guard)
 - [ ] M2-T2 `MovieRecorder` skeleton: writer + 3 inputs (video HEVC from preset; system
       AAC; mic input built lazily from first mic buffer's format — 02 §4),
       `expectsMediaDataInRealTime`, fragment interval 10 s (02 §5).

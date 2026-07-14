@@ -6,8 +6,10 @@
 ## Now
 
 - **Current milestone:** M2 — MovieRecorder, the real writer (M1 complete, G1 passed)
-- **Next task:** M2-T1 (`BitrateModel` + tests: 02 §3 presets — pixels×fps×BPP with the
-  HEVC discount; monotone efficient<balanced<high). Then M2-T2 is the writer skeleton.
+- **Next task:** M2-T2 (`MovieRecorder` skeleton: AVAssetWriter + 3 inputs — video HEVC
+  via BitrateModel, system AAC, mic input built lazily from first mic buffer's format;
+  `expectsMediaDataInRealTime`, fragment interval 10 s. 02 §3–§5). M2-T1 (`BitrateModel`)
+  done. Remember: M2-T4 must close the OutputLocation TOCTOU with exclusive create.
 - **Blockers:** none — the M1-T4 finding (mic 24k/48k mono vs system 48k stereo) is the
   key input to M2's two-separate-audio-tracks design.
 
