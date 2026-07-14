@@ -10,6 +10,10 @@ implementing that task alone. A task is NOT done (and must not be ticked) until 
 Verify passes; paste non-trivial Verify output into STATUS.md. Verify steps marked
 **(human)** go to STATUS.md → "Needs Franco" instead of blocking the next task.
 
+Task completion order is: implement → Verify passes → **quality pass over the diff**
+(see CLAUDE.md "Quality pass" — architecture, Swift practice, concurrency, cleanliness,
+scope) → re-Verify if the pass changed code → tick box → commit.
+
 Estimates assume one focused agent session ≈ half a day of human-equivalent work.
 
 ---

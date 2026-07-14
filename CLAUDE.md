@@ -29,6 +29,35 @@ Reference implementation: `~/code/screenrec-poc` (our working Tier-1; same autho
   Swift language mode v5 (see 02 §10). Read GPL reference repos for patterns only —
   never copy code.
 
+## Quality pass (mandatory after every task, before its commit)
+
+When the task's Verify passes, you are not done. Review the full diff (`git diff` plus
+untracked files) as a critical senior Swift reviewer:
+
+- **Architecture** — code lives in the right module per docs/01 (capture vs recording vs
+  replay vs CLI vs app); no layering violations (RecorderCore importing UI, CLI reaching
+  into another module's internals); new seams match the documented design instead of
+  bypassing it (e.g. consumers go through SampleRouter, timing math through
+  TimestampRebaser).
+- **Swift practice** — Swift API Design Guidelines naming; value types where natural;
+  access control as tight as possible (`public` only for genuine cross-module surface);
+  no force-unwraps or `try!` outside tests (an invariant-based exception needs a comment
+  stating the invariant); errors handled or propagated, never swallowed; guard-based
+  early exits over nesting.
+- **Concurrency** — docs/01 rules hold: sample-path code uses locks not actors, never
+  blocks an SCK callback queue, no unbounded buffer retention; anything crossing threads
+  is actually safe, not just quiet under language-mode v5.
+- **Cleanliness** — no dead code, commented-out code, stray debug prints, or leftover
+  TODO scaffolding; no duplication of an existing helper; comments state non-obvious
+  constraints only; style matches the surrounding file.
+- **Scope** — the diff contains this task only. Unrelated improvements you noticed go to
+  STATUS.md field notes (or a separate `docs:`/follow-up commit), not smuggled in.
+
+Fix what the review finds, re-run the task's Verify, then commit. If the harness offers
+a /code-review or /simplify skill, run it on the diff as part of this pass — the
+checklist above still applies on top. Genuine findings that are out of scope for the
+task: record them in STATUS.md field notes rather than fixing silently.
+
 ## Version control
 
 Commit after every completed task (its Verify must pass first), message prefixed with
