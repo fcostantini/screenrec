@@ -13,6 +13,10 @@ public actor CaptureEngine {
     public nonisolated let events: AsyncStream<EngineEvent>
     private nonisolated let continuation: AsyncStream<EngineEvent>.Continuation
 
+    /// Fan-out for captured buffers. Consumers (MovieRecorder, ReplayEncoder) attach here;
+    /// the engine attaches its own started-detector. Thread-safe, so `nonisolated`.
+    public nonisolated let router: SampleRouter
+
     private let configuration: CaptureConfiguration
     private var stream: SCStream?
     private var handler: StreamHandler?
@@ -33,6 +37,10 @@ public actor CaptureEngine {
     public init(configuration: CaptureConfiguration) {
         self.configuration = configuration
         (self.events, self.continuation) = AsyncStream.makeStream(of: EngineEvent.self)
+        self.router = SampleRouter()
+        // `.started` = first complete video frame. The router already drops incomplete
+        // frames, so the first `.screen` buffer the detector sees is exactly that.
+        router.attach(StartedDetector(continuation: continuation))
     }
 
     public func start() async {
@@ -56,7 +64,7 @@ public actor CaptureEngine {
                 return failToStart("No display matched the requested selection.")
             }
 
-            let handler = StreamHandler(continuation: continuation) { [weak self] error in
+            let handler = StreamHandler(router: router) { [weak self] error in
                 Task { await self?.terminate(.streamError(error.localizedDescription)) }
             }
             let (filter, streamConfig) = makeStreamConfiguration(for: display)
@@ -185,48 +193,53 @@ public actor CaptureEngine {
 }
 
 /// SCK delegate + output sink. A separate `@unchecked Sendable` class because SCK
-/// callbacks arrive on background queues; it emits `.started` on the first complete
-/// video frame and forwards unexpected stream death to the actor (which owns
-/// termination). Its only mutable state is `startedEmitted`, lock-guarded.
+/// callbacks arrive on background queues; it maps the SCK output type to `SourceType`,
+/// forwards every buffer to the router, and hands unexpected stream death to the actor
+/// (which owns termination). Stateless beyond its injected dependencies.
 private final class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput, @unchecked Sendable {
-    private let continuation: AsyncStream<EngineEvent>.Continuation
+    private let router: SampleRouter
     private let onStreamStopped: @Sendable (Error) -> Void
-    private let lock = NSLock()
-    private var startedEmitted = false
 
-    init(
-        continuation: AsyncStream<EngineEvent>.Continuation,
-        onStreamStopped: @escaping @Sendable (Error) -> Void
-    ) {
-        self.continuation = continuation
+    init(router: SampleRouter, onStreamStopped: @escaping @Sendable (Error) -> Void) {
+        self.router = router
         self.onStreamStopped = onStreamStopped
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        // M1-T3 routes .audio/.microphone; here we only need the first complete frame.
-        guard type == .screen, Self.isComplete(sampleBuffer) else { return }
-        lock.lock()
-        let isFirst = !startedEmitted
-        startedEmitted = true
-        lock.unlock()
-        // A .started yielded after the actor has finished the stream is a harmless no-op
-        // (AsyncStream drops post-finish yields), so no cross-thread termination check.
-        if isFirst { continuation.yield(.started) }
+        let source: SourceType
+        switch type {
+        case .screen: source = .screen
+        case .audio: source = .systemAudio
+        case .microphone: source = .microphone
+        @unknown default: return
+        }
+        router.route(sampleBuffer, type: source)
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         onStreamStopped(error)
     }
+}
 
-    /// A frame SCK marks `.complete` carries real pixels; `.idle`/incomplete frames are
-    /// screen-unchanged ticks and must not start the session (docs/02 §1).
-    static func isComplete(_ buffer: CMSampleBuffer) -> Bool {
-        guard let attachments = CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: false)
-                as? [[SCStreamFrameInfo: Any]],
-              let statusValue = attachments.first?[.status] as? Int,
-              let status = SCFrameStatus(rawValue: statusValue) else {
-            return false
-        }
-        return status == .complete
+/// Emits `.started` on the first complete video frame it sees. Attached to the engine's
+/// router; the router has already dropped incomplete frames, so the first `.screen`
+/// buffer here is the first real frame. A `.started` yielded after the stream finished is
+/// a harmless no-op (AsyncStream drops post-finish yields).
+private final class StartedDetector: SampleConsumer, @unchecked Sendable {
+    private let continuation: AsyncStream<EngineEvent>.Continuation
+    private let lock = NSLock()
+    private var emitted = false
+
+    init(continuation: AsyncStream<EngineEvent>.Continuation) {
+        self.continuation = continuation
+    }
+
+    func consume(_ buffer: CMSampleBuffer, type: SourceType) {
+        guard type == .screen else { return }
+        lock.lock()
+        let isFirst = !emitted
+        emitted = true
+        lock.unlock()
+        if isFirst { continuation.yield(.started) }
     }
 }

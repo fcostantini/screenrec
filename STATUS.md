@@ -5,11 +5,11 @@
 
 ## Now
 
-- **Current milestone:** M1 — Capture engine (M0 complete, G0 passed; M1-T1, T2 done)
-- **Next task:** M1-T3 (`SampleRouter`: three serial queues, `SampleConsumer` protocol,
-  attach/detach under lock, video frame-status filtering; TSan test — see M1-T3
-  checklist). CaptureEngine's StreamHandler currently only taps `.screen` for `.started`;
-  M1-T3 makes it forward all three types to the router.
+- **Current milestone:** M1 — Capture engine (M0 complete, G0 passed; M1-T1–T3 done)
+- **Next task:** M1-T4 (`probe-stream --duration 5 [--mic <id>]` CLI: counts buffers per
+  type, prints format descriptions esp. mic native format, min/max PTS deltas — attach a
+  counting/printing SampleConsumer to engine.router; run 04-testing §2, paste output +
+  mic format into STATUS). This is the instrumentation everything after depends on.
 - **Blockers:** none
 
 ## Needs Franco (human-only items)

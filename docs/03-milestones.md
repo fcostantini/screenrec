@@ -89,11 +89,13 @@ consumers. No writing yet.
       (NEVER revoke live: `tccutil reset ScreenCapture` would destroy this terminal's
       own grant and block all capture testing — 02 §2). ✅ 2026-07-14 (started →
       stopped(userStopped), exit 0; 4 injected-state start-decision tests)
-- [ ] M1-T3 `SampleRouter`: three serial queues; consumer protocol
+- [x] M1-T3 `SampleRouter`: three serial queues; consumer protocol
       `SampleConsumer { func consume(_ buffer: CMSampleBuffer, type: SourceType) }`;
       attach/detach under lock; frame-status filtering for video (02 §1).
       **Verify:** unit tests with synthetic CMSampleBuffers — two consumers both
-      receive; detach mid-stream safe under `swift test --sanitize=thread`.
+      receive; detach mid-stream safe under `swift test --sanitize=thread`. ✅ 2026-07-14
+      (4 router tests pass under TSan; .started now via a StartedDetector consumer; the
+      per-output serial queues live on CaptureEngine from M1-T2)
 - [ ] M1-T4 CLI: `screenrec-cli probe-stream --duration 5 [--mic <uniqueID>]` — counts
       buffers per type, prints format descriptions (esp. mic native format — we need to
       SEE it), min/max PTS deltas. This is our instrumentation for everything after.
