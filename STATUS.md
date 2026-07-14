@@ -48,6 +48,12 @@
 
 ## Field notes (append; things learned that docs don't cover yet)
 
+- 2026-07-14 (human-verified): Franco ran `record` in his OWN terminal (not the agent
+  runtime) and it worked perfectly — real capture, plays back, produced file good. Confirms
+  the record pipeline works for a real user outside the agent's TCC grant, and the documented
+  first-run permission dance holds. NOT a formal G2 pass (kill-9 / sync-clap / static-tail /
+  drift still unrun), but de-risks G2 §3.1 track layout.
+
 - 2026-07-14 (M2-T5): full `record` CLI UX. Notes:
   - **Progress ticker** = `\r  ⏺ MM:SS  <size>` every 0.5 s to stdout, guarding
     `recordedDuration.seconds` with `.isFinite` (the recorder returns `.invalid`/NaN before
