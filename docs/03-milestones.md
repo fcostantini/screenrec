@@ -44,14 +44,14 @@ Goal: `swift build` + `swift test` green; stable signing; CLI skeleton runs.
       Authority "screenrec-dev"; two consecutive bundle.sh runs → byte-identical output
       from `codesign -d -r- dist/ScreenRec.app 2>&1` (designated requirement = TCC
       stability); `open dist/ScreenRec.app` launches without crash. ✅ 2026-07-14
-- [ ] M0-T4 Port from PoC into `RecorderCore/Support` + `Capture`: `Permissions.swift`
+- [x] M0-T4 Port from PoC into `RecorderCore/Support` + `Capture`: `Permissions.swift`
       (preflights incl. ⚠️ output-dir lesson, 02 §2; owns default-mic resolution:
       `resolvedMicrophoneID()` returns an explicit uniqueID or a human reason — the
       ⚠️ nil-mic-ID lesson lives HERE; CaptureConfiguration only ever stores an
       already-explicit ID), `OutputLocation.swift` (naming + ` 2`/` 3` collision policy,
       02 §6). Design both so decision logic is pure/injectable.
       **Verify:** `swift test` — OutputLocation naming/collision/preflight-failure
-      cases; Permissions decision table with injected TCC/device states.
+      cases; Permissions decision table with injected TCC/device states. ✅ 2026-07-14
 - [ ] M0-T5 CLI skeleton: `screenrec-cli record --duration N` prints config it WOULD
       use (no capture yet); `--list-mics`; unbuffered stdout (02 §10).
       **Verify:** `--list-mics` lists real devices; dry-run `record` prints resolved
@@ -132,7 +132,9 @@ Goal: three-track `.mov` with tuned HEVC, crash-safe, from the CLI.
       existing `record` subcommand (a dry-run since M0-T5) now performs real capture;
       the old behavior moves behind `--dry-run`. Also extend `tools/probe.swift` with
       per-track durations and a monotonic-PTS warning — 04 §3.5 and §4.1 depend on
-      those probe features.
+      those probe features. Close the OutputLocation TOCTOU (M0-T4 field note): create
+      the output file exclusively (AVAssetWriter errors if it exists) and bump the ` 2`
+      suffix on collision so two same-second recordings can't overwrite each other.
       **Verify:** `screenrec-cli record --duration 5` → probe: 3 tracks at full pixel
       res, duration 5 ± 0.5 s, per-track durations shown, reported dropped-frames = 0
       on an idle machine; `record --dry-run` still prints config without capturing.

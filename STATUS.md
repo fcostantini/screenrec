@@ -5,10 +5,9 @@
 
 ## Now
 
-- **Current milestone:** M0 — Scaffolding & prerequisites (in progress; T1–T3 done)
-- **Next task:** M0-T4 (port `Permissions.swift` + `OutputLocation.swift` from the PoC
-  into RecorderCore; Permissions owns default-mic resolution, unit tests via injected
-  state — see the M0-T4 checklist)
+- **Current milestone:** M0 — Scaffolding & prerequisites (in progress; T1–T4 done)
+- **Next task:** M0-T5 (CLI skeleton: `record --duration N` dry-run printing resolved
+  config, `--list-mics`, unbuffered stdout — see M0-T5 checklist)
 - **Blockers:** none
 
 ## Needs Franco (human-only items)
@@ -35,6 +34,16 @@
 
 ## Field notes (append; things learned that docs don't cover yet)
 
+- 2026-07-14 (M0-T4): Permissions.swift + OutputLocation.swift in RecorderCore, 23
+  tests green. Ran /code-review (xhigh workflow) on the diff; fixed 5 of 6 findings:
+  preflight now probes WRITE access (opendir only proved read/execute) and distinguishes
+  a missing folder from a permission denial; mic resolution rejects a stale/unplugged
+  preferred ID and an empty default; timestamp/resolvedFileName made internal.
+  **Deferred to M2 (open item):** newRecordingURL collision resolution is check-then-act
+  (TOCTOU) — two recordings started in the same clock second could resolve to the same
+  name. Real fix = the writer creating the file with `O_EXCL` and retrying the suffix on
+  EEXIST. Low risk now (manual recording is single-instance; replay uses a "Replay"
+  prefix). MovieRecorder (M2-T2/T4) MUST use exclusive create — add to that task's work.
 - 2026-07-14 (M0-T3): bundle.sh assembles/signs dist/ScreenRec.app. Verified:
   Identifier=dev.fcostantini.screenrec.app, Authority=screenrec-dev; designated
   requirement byte-identical across two rebuilds (`identifier "…" and certificate leaf
