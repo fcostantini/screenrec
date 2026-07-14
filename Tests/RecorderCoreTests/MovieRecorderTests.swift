@@ -23,8 +23,7 @@ import Testing
         defer { if !keep { try? FileManager.default.removeItem(at: url) } }
 
         let recorder = try MovieRecorder(
-            outputURL: url, width: Self.width, height: Self.height,
-            frameRate: Self.fps, preset: .balanced, includesMicrophone: true)
+            outputURL: url, frameRate: Self.fps, preset: .balanced, includesMicrophone: true)
 
         // System audio: 48 kHz stereo. Mic: 24 kHz mono — a deliberately different format,
         // so the lazily-built mic input can't share the system input (docs/02 §4).
@@ -33,7 +32,7 @@ import Testing
 
         // Prime the lazy mic input with one throwaway buffer so the writer can start before
         // the first video frame; it's pre-epoch (no session yet) and is dropped by design.
-        recorder.append(
+        recorder.consume(
             Self.audioSample(format: micFormat, sampleRate: 24_000, channels: 1,
                              frames: 800, pts: .zero),
             type: .microphone)
@@ -42,15 +41,15 @@ import Testing
         for index in 0..<frameCount {
             let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
             let frameDuration = CMTime(value: 1, timescale: CMTimeScale(Self.fps))
-            recorder.append(
+            recorder.consume(
                 Self.videoSample(width: Self.width, height: Self.height,
                                  pts: pts, duration: frameDuration),
                 type: .screen)
-            recorder.append(
+            recorder.consume(
                 Self.audioSample(format: systemFormat, sampleRate: 48_000, channels: 2,
                                  frames: 48_000 / Self.fps, pts: pts),
                 type: .systemAudio)
-            recorder.append(
+            recorder.consume(
                 Self.audioSample(format: micFormat, sampleRate: 24_000, channels: 1,
                                  frames: 24_000 / Self.fps, pts: pts),
                 type: .microphone)
@@ -86,16 +85,15 @@ import Testing
         // includesMicrophone: false ⇒ every input exists at init, so writing starts eagerly
         // and no mic track appears (the M2-T5 `--no-mic` path).
         let recorder = try MovieRecorder(
-            outputURL: url, width: Self.width, height: Self.height,
-            frameRate: Self.fps, preset: .balanced, includesMicrophone: false)
+            outputURL: url, frameRate: Self.fps, preset: .balanced, includesMicrophone: false)
         let systemFormat = Self.audioFormat(sampleRate: 48_000, channels: 2)
         for index in 0..<(Self.fps * Self.seconds) {
             let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
-            recorder.append(
+            recorder.consume(
                 Self.videoSample(width: Self.width, height: Self.height, pts: pts,
                                  duration: CMTime(value: 1, timescale: CMTimeScale(Self.fps))),
                 type: .screen)
-            recorder.append(
+            recorder.consume(
                 Self.audioSample(format: systemFormat, sampleRate: 48_000, channels: 2,
                                  frames: 48_000 / Self.fps, pts: pts),
                 type: .systemAudio)
@@ -113,12 +111,11 @@ import Testing
         defer { try? FileManager.default.removeItem(at: url) }
 
         let recorder = try MovieRecorder(
-            outputURL: url, width: Self.width, height: Self.height,
-            frameRate: Self.fps, preset: .efficient, includesMicrophone: false)
+            outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: false)
 
         // Only audio was fed — no video frame ever started the session, so there is nothing
         // to finalize and finish() reports it rather than emitting an empty file.
-        recorder.append(
+        recorder.consume(
             Self.audioSample(format: Self.audioFormat(sampleRate: 48_000, channels: 2),
                              sampleRate: 48_000, channels: 2, frames: 1600, pts: .zero),
             type: .systemAudio)

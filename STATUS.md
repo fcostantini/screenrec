@@ -6,15 +6,11 @@
 ## Now
 
 - **Current milestone:** M2 — MovieRecorder, the real writer (M1 complete, G1 passed)
-- **Next task:** M2-T4 (wire `MovieRecorder` as a `SampleConsumer` through
-  `TimestampRebaser`; readiness = drop + count; stop path = tail-frame patch,
-  `markAsFinished` ×3, `finishWriting`, emit `finished(url:reason:droppedFrames:)`; the
-  `record` subcommand does real capture, old behavior → `--dry-run`; extend tools/probe
-  with per-track durations + monotonic-PTS warning. 02 §5, docs/01). M2-T1/T2/T3 done.
-  Carry into M2-T4: (a) close the OutputLocation TOCTOU with exclusive create; (b) fix the
-  mic-never-arrives gap (field note 2026-07-14 M2-T2); (c) pass the engine's resolved pixel
-  dims + clamped fps into MovieRecorder; (d) the rebaser gives PTS — retime buffers via
-  `CMSampleBufferCreateCopyWithNewTiming` before append.
+- **Next task:** M2-T5 (full `record` CLI UX: progress ticker with NaN guard, preset
+  literals, explicit path arg, `--no-mic` → 2 tracks; matrix verify. 02 §3). M2-T1..T4
+  done — `record` does real 3-track capture end-to-end via `RecordingSession`.
+  A high-effort /code-review of the M2-T4 diff ran; all confirmed findings fixed (see
+  2026-07-14 M2-T4 review note). No known correctness gaps carried into M2-T5.
 - **Blockers:** none — the M1-T4 finding (mic 24k/48k mono vs system 48k stereo) is the
   key input to M2's two-separate-audio-tracks design (confirmed working in M2-T2).
 
@@ -47,6 +43,46 @@
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-14 (M2-T4): `record` does real 3-track capture. Design + gotchas future agents need:
+  - **MovieRecorder self-configures from buffers.** It's now a `SampleConsumer`; the video
+    input is built lazily from the FIRST frame's format (dimensions), like the mic input from
+    the first mic buffer. This removed all pixel-dimension plumbing (the CLI can't resolve the
+    display size without capturing) — the recorder just needs fps + preset + mic on/off. Every
+    buffer is rebased via `TimestampRebaser` and retimed with
+    `CMSampleBufferCreateCopyWithNewTiming` before append, so the file is zero-based & monotonic.
+  - **`RecordingSession`** (new, RecorderCore/Recording) composes engine+recorder and emits the
+    unified event stream incl. `finished` — the CLI and (later) the app share it.
+  - **Probe monotonic check must use DTS, not PTS.** HEVC B-frames make PRESENTATION timestamps
+    legitimately non-monotonic in storage order (probe saw "61/122 out of order" — all false).
+    DTS (decode order) is the real invariant. Also: encoders emit a benign equal-timestamp edit
+    at the very start (priming) and an invalid (nan-PTS) trailing packet — flag only STRICTLY
+    backward steps and skip non-numeric stamps, or the probe cries wolf on clean files.
+  - **Synthetic-buffer tests can't verify the tail-frame patch's extension.** `expectsMedia
+    DataInRealTime = true` (required so SCK callbacks never block) makes the writer DROP buffers
+    fed faster than real time; a burst-fed test drops most frames so durations are unreliable.
+    The tail-patch code runs in the live path; its EXTENSION behavior is a G2 §3.4 (static
+    screen) gate item. Don't add synthetic duration-assert tests for it.
+  - **OutputLocation.reserveRecordingURL** closes the TOCTOU by `O_EXCL`-creating each
+    candidate name and KEEPING the placeholder (holds the name); `MovieRecorder.beginWriting`
+    removes it in the same synchronous breath as `startWriting()` creates the real file
+    (`AVAssetWriter` init is fine with a pre-existing file but `startWriting` fails on one —
+    verified), so the name is free for microseconds, not the whole startup window.
+
+- 2026-07-14 (M2-T4 review): high-effort /code-review found real bugs; all fixed this task:
+  - **Mic-never-arrives no longer discards the recording.** A selected-but-silent mic used to
+    block `startWriting` forever (whole capture lost). Now `MovieRecorder` gives the mic a
+    0.75 s grace past the first video frame, then proceeds WITHOUT the mic track. (M3-T2 can
+    refine — e.g. surface a "mic unavailable" event.)
+  - **TOCTOU actually closed** — the first pass deleted the placeholder before returning,
+    reopening the race; now the placeholder is held until the writer (see above).
+  - **`--duration` capped at 86400 s** — `UInt64(seconds * 1e9)` trapped on huge values.
+  - **CLI mic resolution made pure + deduped** (dry-run and capture share one resolver).
+  - **probe monotonic check now single-pass** across all tracks (was one full file pass per
+    track — slow on the 30-min gate files).
+  - Left as-is (low value): the lazy video input can't throw a precise `cannotAddInput(.screen)`
+    at init like the old eager path — a bad first-frame format would fail late with
+    `noFramesWritten`. SCK always delivers a valid video format on this hardware.
 
 - 2026-07-14 (M2-T2): MovieRecorder skeleton lands (3-track .mov, HEVC + 2×AAC).
   TWO things worth carrying forward:

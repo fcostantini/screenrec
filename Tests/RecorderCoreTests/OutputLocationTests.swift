@@ -80,4 +80,20 @@ import Testing
         #expect(url.lastPathComponent == "Recording 2026-07-14 at 10.12.34.mov")
         #expect(url.path.hasPrefix(dir.path))
     }
+
+    @Test func reserveKeepsPlaceholderSoSameSecondNamesDontCollide() throws {
+        let fileManager = FileManager.default
+        let dir = fileManager.temporaryDirectory.appendingPathComponent("reserve-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: dir) }
+        let location = OutputLocation(directory: dir)
+
+        // Same timestamp both times: the kept O_EXCL placeholder from the first reservation
+        // forces the second to the ` 2` suffix instead of handing back the same path.
+        let first = try location.reserveRecordingURL(date: Self.fixedDate, timeZone: Self.utc)
+        let second = try location.reserveRecordingURL(date: Self.fixedDate, timeZone: Self.utc)
+        #expect(first.lastPathComponent == "Recording 2026-07-14 at 10.12.34.mov")
+        #expect(second.lastPathComponent == "Recording 2026-07-14 at 10.12.34 2.mov")
+        #expect(fileManager.fileExists(atPath: first.path))   // placeholder held until the writer
+    }
 }

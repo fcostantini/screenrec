@@ -86,8 +86,8 @@ public struct OutputLocation: Sendable {
     // MARK: - Compose
 
     /// Full URL for a new recording, resolving collisions against the real filesystem.
-    /// Collision resolution here is check-then-act; the writer (M2) creates the file
-    /// with `O_EXCL` to close the same-instant race for good (see STATUS field notes).
+    /// Check-then-act — for display only (the dry-run). Real recording uses
+    /// `reserveRecordingURL`, which reserves the name atomically.
     public func newRecordingURL(
         prefix: String = "Recording",
         ext: String = "mov",
@@ -99,5 +99,42 @@ public struct OutputLocation: Sendable {
             FileManager.default.fileExists(atPath: directory.appendingPathComponent(candidate).path)
         }
         return directory.appendingPathComponent(name)
+    }
+
+    public enum ReservationError: Error, Equatable {
+        /// Creating the placeholder failed for a reason other than a name collision
+        /// (e.g. the directory is unwritable). `code` is the POSIX errno.
+        case cannotCreate(path: String, code: Int32)
+    }
+
+    /// Atomically reserves the first non-colliding recording URL. Each candidate name is
+    /// `O_EXCL`-created and the empty placeholder is **kept**, so the name stays claimed until
+    /// the writer replaces it: two recordings started the same second get different names
+    /// (`… 2.mov`), which check-then-act `newRecordingURL` couldn't guarantee (STATUS field
+    /// note). `MovieRecorder` removes the placeholder in the same synchronous breath as
+    /// `startWriting()` creates the real file (`AVAssetWriter` refuses a pre-existing file), so
+    /// the name is free for only microseconds rather than the whole capture-startup window.
+    public func reserveRecordingURL(
+        prefix: String = "Recording",
+        ext: String = "mov",
+        date: Date,
+        timeZone: TimeZone = .current
+    ) throws -> URL {
+        let base = "\(prefix) \(Self.timestamp(for: date, timeZone: timeZone))"
+        var suffix = 1
+        while true {
+            let name = suffix == 1 ? "\(base).\(ext)" : "\(base) \(suffix).\(ext)"
+            let url = directory.appendingPathComponent(name)
+            let descriptor = open(url.path, O_CREAT | O_EXCL | O_WRONLY, 0o644)
+            if descriptor >= 0 {
+                close(descriptor)
+                return url
+            }
+            switch errno {
+            case EEXIST: suffix += 1                 // name taken → try the next suffix
+            case EINTR: continue                     // interrupted syscall → retry the same name
+            default: throw ReservationError.cannotCreate(path: url.path, code: errno)
+            }
+        }
     }
 }

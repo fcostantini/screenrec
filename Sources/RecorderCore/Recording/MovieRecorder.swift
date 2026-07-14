@@ -15,46 +15,59 @@ public enum MovieRecorderError: Error, Equatable {
 }
 
 /// Writes captured sample buffers to a three-track `.mov` (HEVC video + two AAC audio
-/// tracks) via a single `AVAssetWriter`. This is the M2-T2 skeleton: it owns the writer,
-/// its inputs, and the session lifecycle. Timestamp rebasing (`TimestampRebaser`, M2-T3),
-/// `SampleConsumer` wiring, the tail-frame patch, dropped-frame reporting, and event
-/// emission (M2-T4) are layered on later — callers here drive `append(_:type:)` directly.
+/// tracks) via a single `AVAssetWriter`. Attach it to a `SampleRouter` and it self-configures
+/// from the buffers it receives: the video input is built from the first frame's format
+/// (dimensions), the mic input from the first mic buffer's format (docs/02 §4), and the
+/// system-audio input up front. Every buffer is rebased through a `TimestampRebaser` and
+/// retimed before it is appended, so the file starts at zero and stays monotonic (docs/02 §5).
 ///
 /// Concurrency: buffers arrive on ScreenCaptureKit's three serial output queues, so every
 /// mutable field is guarded by `lock` rather than actor isolation (docs/01) — appends stay
 /// on the calling queue with no async hop.
-public final class MovieRecorder: @unchecked Sendable {
+public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     /// The `.mov` this recorder writes. Stable for the recorder's lifetime.
     public let outputURL: URL
 
-    private let lock = NSLock()
-    private let writer: AVAssetWriter
-    private let videoInput: AVAssetWriterInput
-    private let systemAudioInput: AVAssetWriterInput
+    private let frameRate: Int
+    private let preset: QualityPreset
     private let includesMicrophone: Bool
 
-    /// Built from the first microphone buffer's format description — device-native audio
-    /// format varies (docs/02 §4), and inputs can't be added after `startWriting()`, which
-    /// is why writing is deferred until this exists when a mic is in play.
+    private let lock = NSLock()
+    private let writer: AVAssetWriter
+    private let systemAudioInput: AVAssetWriterInput
+    /// Built lazily from the first buffer of each kind — inputs can't be added after
+    /// `startWriting()`, so writing is deferred until every expected input exists.
+    private var videoInput: AVAssetWriterInput?
     private var microphoneInput: AVAssetWriterInput?
 
+    private var rebaser = TimestampRebaser()
     private var didStartWriting = false
     private var didStartSession = false
     private var isFinished = false
+    private var droppedFrames = 0
 
-    /// - Parameters:
-    ///   - width/height: capture pixel dimensions (`CaptureConfiguration.pixelDimensions`).
-    ///   - frameRate: the fps cap, for the bitrate model and the encoder's source-rate hint.
-    ///   - includesMicrophone: whether a mic track is expected; gates when writing starts.
+    /// The most recent raw video buffer and its rebased PTS, plus the latest rebased PTS on
+    /// any track — retained for the stop-time tail-frame patch (docs/02 §5): a static screen
+    /// stops delivering frames, so on finish the last frame is re-appended at the end time to
+    /// keep the video track as long as the audio.
+    private var lastVideoBuffer: CMSampleBuffer?
+    private var lastVideoRebasedPTS: CMTime?
+    private var latestRebasedPTS: CMTime = .zero
+
+    /// Raw PTS of the first video frame, and how long to wait past it for a selected mic's
+    /// first buffer before giving up on the mic track (below).
+    private var firstVideoRawPTS: CMTime?
+    private static let microphoneGrace = CMTime(seconds: 0.75, preferredTimescale: 600)
+
     public init(
         outputURL: URL,
-        width: Int,
-        height: Int,
         frameRate: Int,
         preset: QualityPreset,
         includesMicrophone: Bool
     ) throws {
         self.outputURL = outputURL
+        self.frameRate = frameRate
+        self.preset = preset
         self.includesMicrophone = includesMicrophone
 
         writer = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
@@ -62,98 +75,102 @@ public final class MovieRecorder: @unchecked Sendable {
         // whole file (docs/02 §5). Must be set before startWriting.
         writer.movieFragmentInterval = CMTime(seconds: 10, preferredTimescale: 600)
 
-        videoInput = AVAssetWriterInput(
-            mediaType: .video,
-            outputSettings: Self.videoSettings(
-                width: width, height: height, frameRate: frameRate, preset: preset))
-        videoInput.expectsMediaDataInRealTime = true
-
         systemAudioInput = AVAssetWriterInput(
             mediaType: .audio,
             outputSettings: Self.audioSettings(sampleRate: 48_000, channels: 2, bitRate: 192_000))
         systemAudioInput.expectsMediaDataInRealTime = true
-
-        guard writer.canAdd(videoInput) else { throw MovieRecorderError.cannotAddInput(.screen) }
-        writer.add(videoInput)
         guard writer.canAdd(systemAudioInput) else { throw MovieRecorderError.cannotAddInput(.systemAudio) }
         writer.add(systemAudioInput)
-
-        // Without a mic, every input exists now, so writing can begin. With a mic we wait
-        // for its first buffer to build that input (see `appendMicrophoneLocked`).
-        if !includesMicrophone {
-            startWritingIfNeeded()
-        }
     }
 
-    // MARK: - Append
+    /// Video frames dropped because the encoder wasn't ready — reported at stop (docs/01).
+    public var droppedFrameCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return droppedFrames
+    }
 
-    /// Hand a captured buffer to the matching track. Safe to call from the separate screen /
-    /// system-audio / microphone capture queues concurrently. Buffers that can't yet be
-    /// written (pre-session audio, an input that isn't ready) are dropped — M2-T4 counts them.
-    public func append(_ buffer: CMSampleBuffer, type: SourceType) {
+    // MARK: - Consume
+
+    /// Route a captured buffer to its track (`SampleConsumer`). Safe to call from the separate
+    /// screen / system-audio / microphone capture queues concurrently.
+    public func consume(_ buffer: CMSampleBuffer, type: SourceType) {
         lock.lock()
         defer { lock.unlock() }
         guard !isFinished else { return }
 
+        // Build this track's input from its first buffer, if it isn't up yet.
         switch type {
-        case .screen:
-            appendVideoLocked(buffer)
-        case .systemAudio:
-            appendAudioLocked(buffer, to: systemAudioInput)
-        case .microphone:
-            appendMicrophoneLocked(buffer)
-        }
-    }
-
-    private func appendVideoLocked(_ buffer: CMSampleBuffer) {
-        // The session epoch is the first video frame's PTS (docs/02 §5). It needs the writer
-        // started; with a mic that only happens once the mic input exists, so the earliest
-        // frames may be dropped until the mic's first buffer arrives.
-        if !didStartSession {
-            guard didStartWriting else { return }
-            writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(buffer))
-            didStartSession = true
-        }
-        appendIfReadyLocked(buffer, to: videoInput)
-    }
-
-    private func appendAudioLocked(_ buffer: CMSampleBuffer, to input: AVAssetWriterInput) {
-        // No session yet ⇒ audio would lead video (docs/02 §5) and can't be appended — drop it.
-        guard didStartSession else { return }
-        appendIfReadyLocked(buffer, to: input)
-    }
-
-    private func appendMicrophoneLocked(_ buffer: CMSampleBuffer) {
-        guard includesMicrophone else { return }
-        if microphoneInput == nil {
+        case .screen where videoInput == nil:
+            guard let format = CMSampleBufferGetFormatDescription(buffer),
+                  let input = Self.makeVideoInput(format: format, frameRate: frameRate, preset: preset),
+                  writer.canAdd(input) else { return }
+            writer.add(input)
+            videoInput = input
+        case .microphone where includesMicrophone && microphoneInput == nil:
             guard let format = CMSampleBufferGetFormatDescription(buffer),
                   let input = Self.makeMicrophoneInput(format: format),
                   writer.canAdd(input) else { return }
             writer.add(input)
             microphoneInput = input
-            startWritingIfNeeded()
+        default:
+            break
         }
-        guard didStartSession, let input = microphoneInput else { return }
-        appendIfReadyLocked(buffer, to: input)
+
+        if type == .screen, firstVideoRawPTS == nil { firstVideoRawPTS = bufferPTS(buffer) }
+
+        // Start writing once every expected input exists (video always; mic if enabled; system
+        // already added). Until then, drop — these are startup frames, not encoder drops. A
+        // selected mic that never delivers a buffer would otherwise block the whole recording;
+        // after a short grace past the first video frame, proceed WITHOUT the mic track rather
+        // than discard the screen+system capture entirely.
+        let micSettled = !includesMicrophone || microphoneInput != nil
+            || microphoneGraceExpired(now: bufferPTS(buffer))
+        if !didStartWriting, videoInput != nil, micSettled { beginWriting() }
+        guard didStartWriting else { return }
+
+        guard case .emit(let rebasedPTS) = rebaser.rebase(rawPTS: bufferPTS(buffer), source: type)
+        else { return }
+
+        if !didStartSession {
+            // The rebaser drops pre-epoch audio, so the first emitted buffer is the epoch
+            // video frame; anchor the session at zero on it.
+            guard type == .screen else { return }
+            writer.startSession(atSourceTime: rebasedPTS)
+            didStartSession = true
+        }
+
+        append(buffer, retimedTo: rebasedPTS, source: type)
     }
 
-    private func appendIfReadyLocked(_ buffer: CMSampleBuffer, to input: AVAssetWriterInput) {
-        guard writer.status == .writing, input.isReadyForMoreMediaData else { return }
-        input.append(buffer)
-    }
+    /// Retime `buffer` onto the recording timeline and append it, counting a video frame that
+    /// the encoder can't accept right now. Must hold `lock`.
+    private func append(_ buffer: CMSampleBuffer, retimedTo rebasedPTS: CMTime, source: SourceType) {
+        let input: AVAssetWriterInput?
+        switch source {
+        case .screen: input = videoInput
+        case .systemAudio: input = systemAudioInput
+        case .microphone: input = microphoneInput
+        }
+        guard let input else { return }
+        guard input.isReadyForMoreMediaData else {
+            if source == .screen { droppedFrames += 1 }
+            return
+        }
+        guard let retimed = Self.retimed(buffer, to: rebasedPTS) else { return }
+        input.append(retimed)
 
-    /// Begins writing once every input has been added. Call under `lock` (or from `init`,
-    /// before any concurrent access) — inputs can't be added after this point.
-    private func startWritingIfNeeded() {
-        guard !didStartWriting else { return }
-        didStartWriting = writer.startWriting()
+        if source == .screen {
+            lastVideoBuffer = buffer
+            lastVideoRebasedPTS = rebasedPTS
+        }
+        if CMTimeCompare(rebasedPTS, latestRebasedPTS) > 0 { latestRebasedPTS = rebasedPTS }
     }
 
     // MARK: - Finish
 
-    /// Finalizes the movie and returns its URL. Marks each input finished, flushes the
-    /// writer, and fails if the session never started or the writer didn't complete. The
-    /// tail-frame patch and `finished` event (docs/01) are added in M2-T4.
+    /// Finalizes the movie and returns its URL. Applies the tail-frame patch, marks each input
+    /// finished, flushes the writer, and fails if the session never started or the writer
+    /// didn't complete. `droppedFrameCount` holds the reported drop count.
     public func finish() async throws -> URL {
         guard try beginFinish() else {
             if writer.status == .writing { writer.cancelWriting() }
@@ -168,22 +185,108 @@ public final class MovieRecorder: @unchecked Sendable {
         return outputURL
     }
 
-    /// Synchronous, lock-guarded prologue to `finish()`: marks each input finished and
-    /// reports whether the session ever started. Split out so the lock is never held across
-    /// an `await` — `NSLock` is not async-safe.
+    /// Abort without finalizing — used when recording failed before any media was written.
+    public func cancel() {
+        lock.lock(); defer { lock.unlock() }
+        guard !isFinished else { return }
+        isFinished = true
+        if writer.status == .writing { writer.cancelWriting() }
+    }
+
+    /// Synchronous, lock-guarded prologue to `finish()`: applies the tail-frame patch, marks
+    /// each input finished, and reports whether the session ever started. Split out so the
+    /// lock is never held across an `await` — `NSLock` is not async-safe.
     private func beginFinish() throws -> Bool {
         lock.lock()
         defer { lock.unlock() }
         guard !isFinished else { throw MovieRecorderError.alreadyFinished }
         isFinished = true
         guard didStartSession else { return false }
-        videoInput.markAsFinished()
+
+        // Tail-frame patch: if audio ran past the last video frame (static screen), extend the
+        // video track by re-appending that frame at the end time.
+        if let buffer = lastVideoBuffer, let lastPTS = lastVideoRebasedPTS,
+           let input = videoInput, input.isReadyForMoreMediaData,
+           CMTimeCompare(latestRebasedPTS, lastPTS) > 0,
+           let tail = Self.retimed(buffer, to: latestRebasedPTS) {
+            input.append(tail)
+        }
+
+        videoInput?.markAsFinished()
         systemAudioInput.markAsFinished()
         microphoneInput?.markAsFinished()
         return true
     }
 
+    // MARK: - Timing helpers
+
+    private func bufferPTS(_ buffer: CMSampleBuffer) -> CMTime {
+        CMSampleBufferGetPresentationTimeStamp(buffer)
+    }
+
+    /// Whether the mic-wait grace has elapsed since the first video frame — after which a
+    /// selected-but-silent mic is abandoned so the rest of the capture is still saved.
+    private func microphoneGraceExpired(now: CMTime) -> Bool {
+        guard let first = firstVideoRawPTS, now.isNumeric else { return false }
+        return CMTimeCompare(CMTimeSubtract(now, first), Self.microphoneGrace) > 0
+    }
+
+    /// Starts the writer, dropping the O_EXCL reservation placeholder in the same synchronous
+    /// breath as `startWriting()` creates the real file — `AVAssetWriter` refuses a pre-existing
+    /// file, so the reserved name (`OutputLocation.reserveRecordingURL`) is free only for the
+    /// microseconds between the remove and the create, not the whole capture-startup window.
+    private func beginWriting() {
+        try? FileManager.default.removeItem(at: outputURL)
+        didStartWriting = writer.startWriting()
+    }
+
+    /// Copies `buffer` shifting every timing entry so its presentation timestamp becomes
+    /// `newPTS` — sample data is shared, not copied. Returns nil if the buffer has no numeric
+    /// timing or the copy fails.
+    private static func retimed(_ buffer: CMSampleBuffer, to newPTS: CMTime) -> CMSampleBuffer? {
+        let originalPTS = CMSampleBufferGetPresentationTimeStamp(buffer)
+        guard originalPTS.isNumeric else { return nil }
+        let delta = CMTimeSubtract(newPTS, originalPTS)
+
+        var count: CMItemCount = 0
+        guard CMSampleBufferGetSampleTimingInfoArray(
+            buffer, entryCount: 0, arrayToFill: nil, entriesNeededOut: &count) == noErr, count > 0
+        else { return nil }
+        var timings = [CMSampleTimingInfo](repeating: CMSampleTimingInfo(), count: count)
+        guard CMSampleBufferGetSampleTimingInfoArray(
+            buffer, entryCount: count, arrayToFill: &timings, entriesNeededOut: &count) == noErr
+        else { return nil }
+        for index in timings.indices {
+            if timings[index].presentationTimeStamp.isNumeric {
+                timings[index].presentationTimeStamp = CMTimeAdd(timings[index].presentationTimeStamp, delta)
+            }
+            if timings[index].decodeTimeStamp.isNumeric {
+                timings[index].decodeTimeStamp = CMTimeAdd(timings[index].decodeTimeStamp, delta)
+            }
+        }
+        var out: CMSampleBuffer?
+        guard CMSampleBufferCreateCopyWithNewTiming(
+            allocator: kCFAllocatorDefault, sampleBuffer: buffer,
+            sampleTimingEntryCount: count, sampleTimingArray: &timings, sampleBufferOut: &out) == noErr
+        else { return nil }
+        return out
+    }
+
     // MARK: - Encoder settings
+
+    private static func makeVideoInput(
+        format: CMFormatDescription, frameRate: Int, preset: QualityPreset
+    ) -> AVAssetWriterInput? {
+        let dimensions = CMVideoFormatDescriptionGetDimensions(format)
+        guard dimensions.width > 0, dimensions.height > 0 else { return nil }
+        let input = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: videoSettings(
+                width: Int(dimensions.width), height: Int(dimensions.height),
+                frameRate: frameRate, preset: preset))
+        input.expectsMediaDataInRealTime = true
+        return input
+    }
 
     private static func videoSettings(
         width: Int, height: Int, frameRate: Int, preset: QualityPreset

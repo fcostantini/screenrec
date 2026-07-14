@@ -9,7 +9,7 @@ func printUsage() {
     screenrec-cli — dev harness for screenrec (M0 skeleton)
 
     USAGE:
-      screenrec-cli record [options]   Dry-run: print the recording config that would be used
+      screenrec-cli record [options]   Record screen + audio to a .mov
       screenrec-cli list-mics          List audio input devices
       screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
       screenrec-cli probe-stream [--duration N] [--mic <id>] [--no-mic]
@@ -17,11 +17,12 @@ func printUsage() {
       screenrec-cli --help
 
     record options:
-      --duration <sec>   Stop after N seconds (config only; real capture lands in M2)
+      --duration <sec>   Stop after N seconds (otherwise runs until the stream ends)
       --preset <name>    efficient | balanced | high   (default: balanced)
       --mic <id>         Use a specific microphone (see list-mics)
       --no-mic           Record without a microphone
       --output <dir>     Output directory (default: ~/Movies)
+      --dry-run          Print the config that would be used, without capturing
     """)
 }
 
@@ -131,66 +132,148 @@ func listMics() {
     }
 }
 
-func runRecordDryRun(_ args: [String]) {
+struct RecordOptions {
     var duration: Double?
     var preset: QualityPreset = .balanced
     var micID: String?
     var micEnabled = true
     var outputDir = OutputLocation.defaultDirectory()
+    var dryRun = false
+}
 
+func parseRecordOptions(_ args: [String]) -> RecordOptions {
+    var options = RecordOptions()
     var iterator = args.makeIterator()
     while let arg = iterator.next() {
         switch arg {
         case "--duration":
-            guard let value = iterator.next(), let seconds = Double(value) else { die("--duration needs a number") }
-            duration = seconds
+            // Upper bound keeps `seconds * 1e9` well inside UInt64 for the sleep timer.
+            guard let value = iterator.next(), let seconds = Double(value),
+                  seconds.isFinite, seconds > 0, seconds <= 86_400 else {
+                die("--duration needs a positive number of seconds (max 86400)")
+            }
+            options.duration = seconds
         case "--preset":
             guard let value = iterator.next() else { die("--preset needs a value") }
             guard let parsed = QualityPreset(rawValue: value) else {
                 die("--preset must be one of: \(QualityPreset.allCases.map(\.rawValue).joined(separator: ", "))")
             }
-            preset = parsed
+            options.preset = parsed
         case "--mic":
             guard let value = iterator.next() else { die("--mic needs a device id") }
-            micID = value
+            options.micID = value
         case "--no-mic":
-            micEnabled = false
+            options.micEnabled = false
         case "--output":
             guard let value = iterator.next() else { die("--output needs a path") }
-            outputDir = URL(fileURLWithPath: (value as NSString).expandingTildeInPath, isDirectory: true)
+            options.outputDir = URL(fileURLWithPath: (value as NSString).expandingTildeInPath, isDirectory: true)
+        case "--dry-run":
+            options.dryRun = true
         default:
             die("Unknown option: \(arg)")
         }
     }
+    return options
+}
 
-    print("Recording configuration (dry-run — no capture yet):")
+/// Pure microphone resolution: the selection plus, when a mic was requested but no device is
+/// usable, the reason. Both the dry-run and real capture go through this so they can't disagree.
+func resolveMicrophone(_ options: RecordOptions) -> (selection: MicrophoneSelection, unavailable: String?) {
+    guard options.micEnabled else { return (.none, nil) }
+    switch Permissions.resolvedMicrophoneID(preferred: options.micID) {
+    case .explicit(let id): return (.device(id: id), nil)
+    case .noDevice(let reason): return (.none, reason)
+    }
+}
+
+func printRecordDryRun(_ options: RecordOptions) {
+    print("Recording configuration (dry-run — no capture):")
     print("  Screen recording permission: \(describe(Permissions.screenRecordingState()))")
-    print("  Preset:   \(preset.rawValue)")
-    print("  FPS cap:  60")
-    print("  Duration: \(duration.map { "\(Int($0))s" } ?? "until stopped")")
+    print("  Preset:   \(options.preset.rawValue)")
+    print("  FPS cap:  \(CaptureConfiguration().frameRateCap)")
+    print("  Duration: \(options.duration.map { "\(Int($0))s" } ?? "until stopped")")
 
-    if micEnabled {
+    if options.micEnabled {
         print("  Microphone permission: \(describe(Permissions.microphoneState()))")
-        switch Permissions.resolvedMicrophoneID(preferred: micID) {
-        case .explicit(let id):
+        let mic = resolveMicrophone(options)
+        switch mic.selection {
+        case .device(let id):
             let name = AudioInputs.available().first { $0.uniqueID == id }?.name ?? "unknown"
             print("  Microphone: \(name)  [\(id)]")
-        case .noDevice(let reason):
-            print("  Microphone: none — \(reason)")
+        case .none:
+            print("  Microphone: none — \(mic.unavailable ?? "unavailable")")
         }
     } else {
         print("  Microphone: off (--no-mic)")
     }
 
-    print("  Output dir: \(outputDir.path)")
-    switch OutputLocation.preflight(outputDir) {
+    print("  Output dir: \(options.outputDir.path)")
+    switch OutputLocation.preflight(options.outputDir) {
     case .accessible:
         print("  Output preflight: OK")
     case .inaccessible(let reason):
         print("  Output preflight: FAILED — \(reason)")
     }
-    let outputURL = OutputLocation(directory: outputDir).newRecordingURL(date: Date())
+    let outputURL = OutputLocation(directory: options.outputDir).newRecordingURL(date: Date())
     print("  Would write: \(outputURL.lastPathComponent)")
+}
+
+/// Real capture: preflight, reserve the output file, run a `RecordingSession` for `--duration`
+/// (or until the stream ends), and report the finalized file. Interactive stop and the
+/// progress ticker land in M2-T5.
+func performRecording(_ options: RecordOptions) async {
+    switch OutputLocation.preflight(options.outputDir) {
+    case .inaccessible(let reason): die(reason, code: 74)
+    case .accessible: break
+    }
+
+    let outputURL: URL
+    do {
+        outputURL = try OutputLocation(directory: options.outputDir).reserveRecordingURL(date: Date())
+    } catch {
+        die("Couldn't create the output file in \(options.outputDir.path): \(error)", code: 74)
+    }
+
+    let mic = resolveMicrophone(options)
+    if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
+    let configuration = CaptureConfiguration(microphone: mic.selection, quality: options.preset)
+    let session: RecordingSession
+    do {
+        session = try RecordingSession(configuration: configuration, outputURL: outputURL)
+    } catch {
+        die("Couldn't set up the recorder: \(error.localizedDescription)", code: 74)
+    }
+
+    print("record: capturing to \(outputURL.lastPathComponent)\(options.duration.map { " for \(Int($0))s" } ?? " (until the stream ends)")…")
+
+    let events = Task { () -> Int32 in
+        var exitCode: Int32 = 0
+        for await event in session.events {
+            switch event {
+            case .started:
+                print("  ● capturing")
+            case .finished(let url, let reason, let dropped):
+                print("  ✓ finished (\(describe(reason))), dropped frames: \(dropped)")
+                print("  \(url.path)")
+            case .failed(let message):
+                FileHandle.standardError.write(Data("  ✗ \(message)\n".utf8))
+                exitCode = 1
+            default:
+                break
+            }
+        }
+        return exitCode
+    }
+
+    await session.start()
+    let stopTimer = Task {
+        guard let duration = options.duration else { return }
+        try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+        await session.stop()
+    }
+    let exitCode = await events.value
+    stopTimer.cancel()
+    exit(exitCode)
 }
 
 // MARK: - Dispatch
@@ -203,7 +286,12 @@ guard let command = arguments.first else {
 
 switch command {
 case "record":
-    runRecordDryRun(Array(arguments.dropFirst()))
+    let options = parseRecordOptions(Array(arguments.dropFirst()))
+    if options.dryRun {
+        printRecordDryRun(options)
+    } else {
+        await performRecording(options)
+    }
 case "list-mics", "--list-mics":
     listMics()
 case "engine-smoke":

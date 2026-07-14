@@ -137,7 +137,7 @@ Goal: three-track `.mov` with tuned HEVC, crash-safe, from the CLI.
       but build the math now).
       **Verify:** pure unit tests — epoch rebase, pre-epoch drop, cumulative pause
       offsets, out-of-order rejection. ✅ 2026-07-14 (9 tests; pure value type, no AVF/clock)
-- [ ] M2-T4 Wire as SampleConsumer; readiness handling = drop + count (report dropped
+- [x] M2-T4 Wire as SampleConsumer; readiness handling = drop + count (report dropped
       frames at stop). Stop path: tail-frame patch (02 §5), `markAsFinished` ×3,
       `finishWriting`, emit `finished(url:reason:droppedFrames:)` (docs/01). The
       existing `record` subcommand (a dry-run since M0-T5) now performs real capture;
@@ -149,7 +149,10 @@ Goal: three-track `.mov` with tuned HEVC, crash-safe, from the CLI.
       **Verify:** `screenrec-cli record --duration 5` → probe: 3 tracks at full pixel
       res, duration 5 ± 0.5 s, per-track durations shown, reported dropped-frames = 0
       on an idle machine; `record --dry-run` still prints config without capturing.
-- [ ] M2-T5 CLI: full `record [--duration N] [--preset X] [--no-mic] [path]`
+      ✅ 2026-07-14 (live: hvc1 4112×2570 + aac 48k/2ch + aac 24k/1ch AirPods, dur 4.87s,
+      dropped 0, probe monotonic-clean. RecordingSession composes engine+recorder; probe
+      now checks DTS monotonicity + per-track durations. Tail-patch extension behavior
+      deferred to G2 §3.4 — synthetic bursts can't exercise it, real-time encoder drops.)
       — parity with the Tier-1 PoC UX (progress ticker with NaN guard!). Preset
       literals: `efficient` | `balanced` | `high` (02 §3).
       **Verify:** matrix — `--no-mic` → exactly 2 tracks; each preset → file sizes
