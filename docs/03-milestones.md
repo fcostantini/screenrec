@@ -96,12 +96,13 @@ consumers. No writing yet.
       receive; detach mid-stream safe under `swift test --sanitize=thread`. ✅ 2026-07-14
       (4 router tests pass under TSan; .started now via a StartedDetector consumer; the
       per-output serial queues live on CaptureEngine from M1-T2)
-- [ ] M1-T4 CLI: `screenrec-cli probe-stream --duration 5 [--mic <uniqueID>]` — counts
+- [x] M1-T4 CLI: `screenrec-cli probe-stream --duration 5 [--mic <uniqueID>]` — counts
       buffers per type, prints format descriptions (esp. mic native format — we need to
       SEE it), min/max PTS deltas. This is our instrumentation for everything after.
       **Verify:** run 04-testing §2 in full; the default-mic AirPods leg needs the
       device connected **(human/device present)**; paste output + mic format into
-      STATUS.md.
+      STATUS.md. ✅ 2026-07-14 (all 3 streams flowing; mic native format varies by
+      device — see STATUS)
 - [ ] M1-T5 `SleepGuard` (02 §7) wired to engine start/stop.
       **Verify:** during `engine-smoke --duration 10`, `pmset -g assertions` shows
       PreventUserIdleSystemSleep held by our process; released after exit.

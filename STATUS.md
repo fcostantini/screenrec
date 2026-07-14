@@ -5,19 +5,18 @@
 
 ## Now
 
-- **Current milestone:** M1 — Capture engine (M0 complete, G0 passed; M1-T1–T3 done)
-- **Next task:** M1-T4 (`probe-stream --duration 5 [--mic <id>]` CLI: counts buffers per
-  type, prints format descriptions esp. mic native format, min/max PTS deltas — attach a
-  counting/printing SampleConsumer to engine.router; run 04-testing §2, paste output +
-  mic format into STATUS). This is the instrumentation everything after depends on.
+- **Current milestone:** M1 — Capture engine (M0 done; M1-T1–T4 done, G1 §2 passed)
+- **Next task:** M1-T5 (`SleepGuard`: `ProcessInfo.beginActivity` while capturing,
+  wired to engine start/stop; verify via `pmset -g assertions` during engine-smoke — see
+  M1-T5 checklist). Last M1 task.
 - **Blockers:** none
 
 ## Needs Franco (human-only items)
 
 - [x] DONE 2026-07-14: Franco granted the Claude Code runtime ("2.1.209") Screen
-      Recording, so capture tests (engine-smoke/record/probe) run directly via the
-      agent's shell. Grant applied immediately, no restart. If Claude Code's identity
-      changes, the grant may need re-doing.
+      Recording AND Microphone, so capture tests (engine-smoke/record/probe) run directly
+      via the agent's shell. Both applied immediately, no restart. If Claude Code's
+      identity changes, the grants may need re-doing.
 
 - [x] M0-T2 prerequisite DONE (2026-07-14): self-signed Code Signing identity
       "screenrec-dev" created in login keychain and trusted for codeSign policy
@@ -32,7 +31,7 @@
 | Gate | Status | Evidence |
 |------|--------|----------|
 | G0   | ✅ passed 2026-07-14 | build+test(23)+bundle green; Identifier=dev.fcostantini.screenrec.app, Authority=screenrec-dev, designated requirement stable across rebuilds |
-| G1   | ⬜ not run | — |
+| G1   | ✅ passed 2026-07-14 | probe-stream: all 3 sources flowing. video 4112×2570 420v (PTS Δ 0.008–0.09s, frame-on-change); system audio 48kHz/2ch/32-bit (Δ 0.02s); mic native format device-dependent — AirPods 24kHz/1ch, built-in 48kHz/1ch (both differ from system audio → separate tracks required, M2) |
 | G2   | ⬜ not run | — |
 | G3   | ⬜ not run | — |
 | G4   | ⬜ not run | — |
@@ -41,6 +40,13 @@
 
 ## Field notes (append; things learned that docs don't cover yet)
 
+- 2026-07-14 (M1-T4): probe-stream confirms all three sources flow through the router.
+  KEY M2 INPUT — the mic's native format is device-dependent and differs from system
+  audio: AirPods = 24000 Hz/1ch/32-bit float, built-in = 48000 Hz/1ch/32-bit, system
+  audio = 48000 Hz/2ch/32-bit. Empirical proof the mic needs its own AVAssetWriterInput
+  (can't share the system-audio input — DTS finding now confirmed live). Screen frames
+  arrive as 4112×2570 `420v` (bi-planar YUV 4:2:0, NOT compressed — HEVC encode happens
+  in the writer). Mic capture required Franco to grant Claude Code Microphone TCC.
 - 2026-07-14 (M1-T2 review): xhigh code-review of the capture engine found real
   concurrency/robustness bugs — all fixed: (a) stop() during start()'s suspension was
   silently lost → added a state machine (idle/starting/running/terminated) + stopRequested

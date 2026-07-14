@@ -12,6 +12,8 @@ func printUsage() {
       screenrec-cli record [options]   Dry-run: print the recording config that would be used
       screenrec-cli list-mics          List audio input devices
       screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
+      screenrec-cli probe-stream [--duration N] [--mic <id>] [--no-mic]
+                                       Capture and report per-source buffers/formats/PTS
       screenrec-cli --help
 
     record options:
@@ -206,6 +208,8 @@ case "list-mics", "--list-mics":
     listMics()
 case "engine-smoke":
     await runEngineSmoke(Array(arguments.dropFirst()))
+case "probe-stream":
+    await runProbeStream(Array(arguments.dropFirst()))
 case "-h", "--help":
     printUsage()
 default:
