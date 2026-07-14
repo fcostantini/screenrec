@@ -71,9 +71,12 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         self.includesMicrophone = includesMicrophone
 
         writer = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
-        // Fragmented .mov: a kill -9 mid-recording loses at most the last fragment, not the
-        // whole file (docs/02 §5). Must be set before startWriting.
-        writer.movieFragmentInterval = CMTime(seconds: 10, preferredTimescale: 600)
+        // Fragmented .mov for crash safety: a fragment is flushed to disk every second, so a
+        // kill -9 loses at most ~1 s, not the whole recording, and the file is playable from
+        // the first flush on (docs/02 §5). A larger interval (the original 10 s) left anything
+        // killed before the first flush unparseable — the §3.2 kill test proved it. Must be set
+        // before startWriting.
+        writer.movieFragmentInterval = CMTime(seconds: 1, preferredTimescale: 600)
 
         systemAudioInput = AVAssetWriterInput(
             mediaType: .audio,

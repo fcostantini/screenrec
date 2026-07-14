@@ -6,10 +6,12 @@
 ## Now
 
 - **Current milestone:** M2 — MovieRecorder, the real writer (M1 complete, G1 passed)
-- **Next task:** run the **G2 gate** (04 §3) to close M2. Automatable now that captures work
-  in the foreground: kill-9 crash test (§3.2, required), static-screen tail (§3.4, use
-  `tools/busyscene.swift` then hold static). Human: sync-clap (§3.3), 30-min drift (§3.5,
-  run `record` + `tools/beepflash.sh`), M2-T6 subjective quality. After G2, M3 begins.
+- **Next task:** finish the **G2 gate** — only §3.5 (30-min drift) remains; §3.1–3.4 all pass.
+  Drift needs a long `record` + `tools/beepflash.sh` alongside, then check A/V sync at 0 vs
+  30 min (a 30-min capture auto-backgrounds on the agent side and loses TCC, so Franco likely
+  starts the run; the beepflash/flash analysis is automatable). Then M3 (pause/resume) begins.
+  **Crash-safety fix this session:** `movieFragmentInterval` 10s→1s (docs/02 §5) — 10s left a
+  kill-9'd-before-10s file unparseable; 1s → ≤1s loss, playable from 1s on.
 - **Now done:** M2-T1..T6. `record` is a full CLI (real 3-track capture, presets, explicit
   path, progress ticker, Return-to-stop), calibrated ~2× more efficient than Tier-1.
   KEY ENV FACT: foreground Bash captures WORK (TCC held); backgrounded/detached ones lose the
@@ -63,7 +65,7 @@ video (deterministic, reproducible).
 | G0   | ✅ passed 2026-07-14 | build+test(23)+bundle green; Identifier=dev.fcostantini.screenrec.app, Authority=screenrec-dev, designated requirement stable across rebuilds |
 | M1   | ✅ complete 2026-07-14 | all 5 tasks done; capture engine + router + probe + sleep guard, 41 tests |
 | G1   | ✅ passed 2026-07-14 | probe-stream: all 3 sources flowing. video 4112×2570 420v (PTS Δ 0.008–0.09s, frame-on-change); system audio 48kHz/2ch/32-bit (Δ 0.02s); mic native format device-dependent — AirPods 24kHz/1ch, built-in 48kHz/1ch (both differ from system audio → separate tracks required, M2) |
-| G2   | ⬜ not run | — |
+| G2   | 🟡 4/5 passed 2026-07-14 | §3.1 tracks hvc1+2×aac ✅; §3.2 kill-9 ✅ (kill@6s→5.04s playable AFTER fragment fix 10s→1s — 10s was unparseable if killed <10s); §3.3 sync-clap ✅ (Franco); §3.4 static-tail ✅ (14s static→14.4s @7.9fps, tail patch holds). §3.5 30-min drift ⬜ (needs a long run + beepflash) |
 | G3   | ⬜ not run | — |
 | G4   | ⬜ not run | — |
 | G5   | ⬜ not run | — |

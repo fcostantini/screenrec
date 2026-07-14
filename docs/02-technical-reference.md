@@ -112,9 +112,12 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   stopped after 30 static seconds would lose them. On stop, re-append the last video
   frame with PTS = stop time (fatbobman's fix). Keep (don't release) a reference to the
   most recent pixel buffer for this purpose only.
-- **Crash safety**: `writer.movieFragmentInterval = CMTime(seconds: 10)` on `.mov`.
-  Empirically (PoC, `kill -9`): SCRecordingOutput survived with sub-second loss; our
-  writer must match — the kill test in 04-testing is a **required** M2 acceptance gate.
+- **Crash safety**: `writer.movieFragmentInterval = CMTime(seconds: 1)` on `.mov`. A fragment
+  is flushed to disk each second, so a `kill -9` loses at most ~1 s and the file is playable
+  from the first flush on. ⚠️ **The interval directly bounds worst-case loss** — this was 10 s
+  originally, but the §3.2 kill test (M2/G2) proved that anything killed before the first
+  10 s flush was completely unparseable (media on disk, no fragment index). 1 s matches the
+  PoC's sub-second-loss behavior; the overhead (one small `moof` per second) is negligible.
   `shouldOptimizeForNetworkUse` is NOT crash safety (moov placement at finalize only).
 
 ## 6. File output
