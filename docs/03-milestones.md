@@ -79,7 +79,7 @@ consumers. No writing yet.
       preset enum. Pixel math from contentRect × pointPixelScale.
       **Verify:** unit tests with mocked rect/scale (e.g. 2056×1285 @2× → 4112×2570);
       preset/fps defaults. ✅ 2026-07-14 (29 tests; CLI now uses the QualityPreset enum)
-- [ ] M1-T2 `CaptureEngine` actor: build filter + SCStreamConfiguration (02 §1 values),
+- [x] M1-T2 `CaptureEngine` actor: build filter + SCStreamConfiguration (02 §1 values),
       start/stop, delegate for `didStopWithError`, `EngineEvent` AsyncStream (the enum
       defined in docs/01 — implement it exactly). Includes a `screenrec-cli
       engine-smoke [--duration N]` subcommand (default 2 s), its own verification
@@ -87,7 +87,8 @@ consumers. No writing yet.
       **Verify:** `engine-smoke` → prints `started` then `stopped(userStopped)`,
       exit 0. Denied-permission path = unit test with injected Permissions state
       (NEVER revoke live: `tccutil reset ScreenCapture` would destroy this terminal's
-      own grant and block all capture testing — 02 §2).
+      own grant and block all capture testing — 02 §2). ✅ 2026-07-14 (started →
+      stopped(userStopped), exit 0; 4 injected-state start-decision tests)
 - [ ] M1-T3 `SampleRouter`: three serial queues; consumer protocol
       `SampleConsumer { func consume(_ buffer: CMSampleBuffer, type: SourceType) }`;
       attach/detach under lock; frame-status filtering for video (02 §1).

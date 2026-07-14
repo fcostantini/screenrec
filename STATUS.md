@@ -5,15 +5,19 @@
 
 ## Now
 
-- **Current milestone:** M1 — Capture engine (M0 complete, G0 passed; M1-T1 done)
-- **Next task:** M1-T2 (`CaptureEngine` actor: SCStreamConfiguration from
-  CaptureConfiguration, start/stop, `EngineEvent` AsyncStream per docs/01,
-  `engine-smoke` CLI subcommand — see M1-T2 checklist). NOTE: watch the M0-T5 field note
-  — CGPreflightScreenCaptureAccess returned false for the CLI binary; engine-smoke will
-  reveal whether capture works from the terminal or needs its own grant.
+- **Current milestone:** M1 — Capture engine (M0 complete, G0 passed; M1-T1, T2 done)
+- **Next task:** M1-T3 (`SampleRouter`: three serial queues, `SampleConsumer` protocol,
+  attach/detach under lock, video frame-status filtering; TSan test — see M1-T3
+  checklist). CaptureEngine's StreamHandler currently only taps `.screen` for `.started`;
+  M1-T3 makes it forward all three types to the router.
 - **Blockers:** none
 
 ## Needs Franco (human-only items)
+
+- [x] DONE 2026-07-14: Franco granted the Claude Code runtime ("2.1.209") Screen
+      Recording, so capture tests (engine-smoke/record/probe) run directly via the
+      agent's shell. Grant applied immediately, no restart. If Claude Code's identity
+      changes, the grant may need re-doing.
 
 - [x] M0-T2 prerequisite DONE (2026-07-14): self-signed Code Signing identity
       "screenrec-dev" created in login keychain and trusted for codeSign policy
@@ -37,6 +41,16 @@
 
 ## Field notes (append; things learned that docs don't cover yet)
 
+- 2026-07-14 (M1-T2 review): xhigh code-review of the capture engine found real
+  concurrency/robustness bugs — all fixed: (a) stop() during start()'s suspension was
+  silently lost → added a state machine (idle/starting/running/terminated) + stopRequested
+  honored on resume; (b) fail()/didStopWithError could both emit → single termination
+  authority (failToStart/terminate, state-guarded; handler hops to the actor); (c) engine-
+  smoke reported streamError / no-frame as OK → now requires .started + clean stop;
+  (d) --duration nan/inf/neg trapped → validated; (e) unvalidated frameRateCap → clamped
+  [1,240]; (f) raw TCC error → mapped to permissionGuidance (tested); per-instance sample
+  queues; early-exit smoke on failure. Accepted as-is: startDecision.denied is defensive/
+  unreachable in prod; minor guidance-string duplication with Permissions.swift.
 - 2026-07-14 (M0 holistic review + M1-T1): Holistic M0 review passed from a fully clean
   state (`rm -rf .build dist` → build/test(23)/release/bundle all green; devsign
   idempotent; designated requirement stable across fresh rebuilds; CLI works). M0 is

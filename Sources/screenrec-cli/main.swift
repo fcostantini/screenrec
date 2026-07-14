@@ -11,6 +11,7 @@ func printUsage() {
     USAGE:
       screenrec-cli record [options]   Dry-run: print the recording config that would be used
       screenrec-cli list-mics          List audio input devices
+      screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
       screenrec-cli --help
 
     record options:
@@ -33,6 +34,88 @@ func describe(_ state: PermissionState) -> String {
     case .denied: return "denied"
     case .notDetermined: return "not determined"
     }
+}
+
+func describe(_ reason: EndReason) -> String {
+    switch reason {
+    case .userStopped: return "userStopped"
+    case .displayDisconnected: return "displayDisconnected"
+    case .microphoneChanged: return "microphoneChanged"
+    case .diskAlmostFull: return "diskAlmostFull"
+    case .systemSleep: return "systemSleep"
+    case .streamError(let message): return "streamError(\(message))"
+    }
+}
+
+func describe(_ event: EngineEvent) -> String {
+    switch event {
+    case .started: return "started"
+    case .paused: return "paused"
+    case .resumed: return "resumed"
+    case .fileProgress(let seconds, let bytes):
+        return "fileProgress(\(seconds.isFinite ? Int(seconds) : 0)s, \(bytes) bytes)"
+    case .stopped(let reason): return "stopped(\(describe(reason)))"
+    case .finished(let url, let reason, let dropped):
+        return "finished(\(url.lastPathComponent), \(describe(reason)), dropped \(dropped))"
+    case .failed(let message): return "failed: \(message)"
+    }
+}
+
+/// Starts the capture engine, prints each event, stops after `--duration` seconds.
+/// Instrument for M1-T2: proves the SCStream lifecycle works (and, from the CLI,
+/// whether capture runs under the terminal's grant).
+func runEngineSmoke(_ args: [String]) async {
+    var duration = 2.0
+    var iterator = args.makeIterator()
+    while let arg = iterator.next() {
+        switch arg {
+        case "--duration":
+            guard let value = iterator.next(), let seconds = Double(value), seconds.isFinite, seconds > 0 else {
+                die("--duration needs a positive number of seconds")
+            }
+            duration = seconds
+        default:
+            die("Unknown option: \(arg)")
+        }
+    }
+
+    let engine = CaptureEngine(configuration: CaptureConfiguration())
+    print("engine-smoke: starting (\(Int(duration))s)…")
+
+    // OK requires: a video frame captured (.started) AND a clean user stop, with no
+    // failure or stream error. The consumer completes when the event stream finishes.
+    let consumer = Task { () -> Bool in
+        var sawStarted = false
+        var cleanStop = false
+        var problem: String?
+        for await event in engine.events {
+            print("  event: \(describe(event))")
+            switch event {
+            case .started: sawStarted = true
+            case .stopped(.userStopped): cleanStop = true
+            case .stopped(let reason): problem = "stream ended: \(describe(reason))"
+            case .failed(let message): problem = message
+            default: break
+            }
+        }
+        if let problem { print("  ✗ \(problem)"); return false }
+        if !sawStarted { print("  ✗ no video frame captured (.started never fired)"); return false }
+        if !cleanStop { print("  ✗ did not stop cleanly"); return false }
+        return true
+    }
+
+    await engine.start()
+    // Stop after `duration`, but if the stream already ended (e.g. failed to start) the
+    // consumer completes immediately and we cancel the timer instead of waiting it out.
+    let stopTimer = Task {
+        try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+        await engine.stop()
+    }
+    let ok = await consumer.value
+    stopTimer.cancel()
+
+    print(ok ? "engine-smoke: OK" : "engine-smoke: FAILED")
+    exit(ok ? 0 : 1)
 }
 
 func listMics() {
@@ -121,6 +204,8 @@ case "record":
     runRecordDryRun(Array(arguments.dropFirst()))
 case "list-mics", "--list-mics":
     listMics()
+case "engine-smoke":
+    await runEngineSmoke(Array(arguments.dropFirst()))
 case "-h", "--help":
     printUsage()
 default:

@@ -178,6 +178,13 @@ approaches if it matters.
   so crashes can't eat diagnostics.
 - Bare executables get TCC attribution from the parent terminal; granting Screen
   Recording requires **quitting the whole terminal app** (all tabs = one process).
+- ⚠️ **Capture tests run via an agent's shell are attributed to the AGENT's runtime**,
+  not the terminal or the binary. When Claude Code runs `engine-smoke`/`record`, the
+  Screen Recording prompt names the Claude Code process (e.g. "2.1.209") — that process
+  must be granted, and the grant applied immediately (no restart needed, verified
+  2026-07-14). A different terminal/runtime = a separate grant. `SCShareableContent`
+  throws "The user declined TCCs…" when ungranted (not empty displays) — CaptureEngine
+  catches it and emits `.failed`.
 - Embed Info.plist into CLI binaries via `-sectcreate __TEXT __info_plist` (see PoC's
   Package.swift) for the mic usage description.
 - Swift 6 toolchain: use `swiftLanguageMode(.v5)` (PoC precedent) to avoid strict-
