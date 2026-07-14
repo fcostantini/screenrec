@@ -48,11 +48,10 @@ video (deterministic, reproducible).
       passes `codesign --verify --strict`. devsign.sh should find and use this
       identity; it must NOT try to create a new one.
 - [ ] First GUI TCC grants for the .app once M4 begins (grant + relaunch dance).
-- [ ] **M2-T6 subjective quality check**: play a Balanced recording of real busy content and
-      confirm it looks good enough (it's ~2× smaller than Tier-1 — is the quality acceptable?).
-      If it looks over-compressed, say so and I'll raise the Balanced multiplier; if it looks
-      fine, we're done. Quick way: `.build/release/screenrec-cli record --duration 20 --preset
-      balanced ~/Movies/q-balanced.mov` while doing real work, then watch it.
+- [x] **M2-T6 subjective quality check** — DONE 2026-07-14: Franco compared Balanced vs High on
+      real busy content and confirmed "balanced looks pretty good". Balanced quality is
+      acceptable at ~2× the efficiency of Tier-1 → BitrateModel constants CONFIRMED, no change.
+      M2-T6 fully complete.
 - [ ] **G2 human legs** (when we run G2): sync-clap A/V test (§3.3), 30-min drift test (§3.5,
       `record` + `tools/beepflash.sh` running alongside; scrub QuickTime for sync at 0 vs 30 min).
 - (gates marked "(human)" in docs/04 accumulate here as milestones close)
