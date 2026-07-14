@@ -153,10 +153,14 @@ Goal: three-track `.mov` with tuned HEVC, crash-safe, from the CLI.
       dropped 0, probe monotonic-clean. RecordingSession composes engine+recorder; probe
       now checks DTS monotonicity + per-track durations. Tail-patch extension behavior
       deferred to G2 §3.4 — synthetic bursts can't exercise it, real-time encoder drops.)
+- [x] M2-T5 CLI: full `record [--duration N] [--preset X] [--no-mic] [path]`
       — parity with the Tier-1 PoC UX (progress ticker with NaN guard!). Preset
       literals: `efficient` | `balanced` | `high` (02 §3).
       **Verify:** matrix — `--no-mic` → exactly 2 tracks; each preset → file sizes
       strictly ordered; explicit path honored; ticker never prints NaN (pipe run).
+      ✅ 2026-07-14 (live: no-mic→2 tracks; sizes efficient 4.28<balanced 4.96<high 5.25 MB;
+      exact path + positional dir honored; ticker 0 NaN piped. Return-to-stop on a TTY;
+      +failure-path placeholder cleanup, 65 tests.)
 - [ ] M2-T6 Quality calibration: record the same 30 s busy scene at each preset +
       Tier-1 (~/code/screenrec-poc binary) for comparison; adjust BitrateModel
       constants. Repeatable scene: loop one fixed local video file fullscreen in

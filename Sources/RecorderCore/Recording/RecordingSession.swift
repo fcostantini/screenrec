@@ -1,3 +1,4 @@
+import CoreMedia
 import Foundation
 
 /// Drives a full recording: it owns a `CaptureEngine` and a `MovieRecorder`, wires the
@@ -75,4 +76,7 @@ public final class RecordingSession: @unchecked Sendable {
     public func stop() async {
         await engine.stop()
     }
+
+    /// Media duration written so far, for a progress ticker; `.invalid` before capture starts.
+    public var recordedDuration: CMTime { recorder.recordedDuration }
 }

@@ -6,11 +6,15 @@
 ## Now
 
 - **Current milestone:** M2 — MovieRecorder, the real writer (M1 complete, G1 passed)
-- **Next task:** M2-T5 (full `record` CLI UX: progress ticker with NaN guard, preset
-  literals, explicit path arg, `--no-mic` → 2 tracks; matrix verify. 02 §3). M2-T1..T4
-  done — `record` does real 3-track capture end-to-end via `RecordingSession`.
-  A high-effort /code-review of the M2-T4 diff ran; all confirmed findings fixed (see
-  2026-07-14 M2-T4 review note). No known correctness gaps carried into M2-T5.
+- **Next task:** M2-T6 (quality calibration — record the same 30 s busy scene at each preset
+  + Tier-1 PoC binary, adjust BitrateModel constants; deliver `tools/beepflash.sh`. 04 §3.6).
+  Largely HUMAN-assisted: needs a repeatable scene (loop one fixed local video fullscreen in
+  QuickTime for all runs) + a subjective quality check → flag under "Needs Franco". Target:
+  Balanced ≤ 50% of Tier-1 size. After M2-T6, run the **G2 gate** (04 §3: kill-9, sync clap,
+  static-screen tail §3.4, 30-min drift §3.5) to close M2.
+- **Now done:** M2-T1..T5. `record` is a full CLI (real 3-track capture, presets, explicit
+  path, progress ticker, Return-to-stop). Two /code-reviews run across M2-T4/T5; all
+  confirmed findings fixed. Reference binary for M2-T6 comparison: `~/code/screenrec-poc`.
 - **Blockers:** none — the M1-T4 finding (mic 24k/48k mono vs system 48k stereo) is the
   key input to M2's two-separate-audio-tracks design (confirmed working in M2-T2).
 
@@ -43,6 +47,23 @@
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-14 (M2-T5): full `record` CLI UX. Notes:
+  - **Progress ticker** = `\r  ⏺ MM:SS  <size>` every 0.5 s to stdout, guarding
+    `recordedDuration.seconds` with `.isFinite` (the recorder returns `.invalid`/NaN before
+    the first frame — docs/02 §10). `RecordingSession.recordedDuration` exposes it.
+  - **Positional `[path]`**: an existing directory → auto-named inside; else an exact output
+    file (O_EXCL-reserved via `OutputLocation.reserveExact`, refuses to overwrite).
+  - **Return-to-stop** only when `isatty(STDIN_FILENO)` — a piped/automated run must NOT be
+    stopped by stdin EOF, so the reader is skipped there (`--duration` bounds those).
+  - **Preset size ordering IS testable live** with generated motion: a background mouse-mover
+    (`CGWarpMouseCursorPosition` in a loop — no Accessibility grant needed) gives enough
+    consistent frame change that efficient<balanced<high holds. Ambient static screen won't.
+  - **Backgrounded/detached Bash commands lose the Screen Recording TCC grant** → capture
+    fails "permission needed". Run capture tests in the FOREGROUND. (The failure did confirm
+    the placeholder cleanup: a failed record leaves no 0-byte litter.)
+  - Review fix: keeping the O_EXCL placeholder (M2-T4 TOCTOU) leaked a 0-byte file on failure
+    paths and blocked exact-path retry; `MovieRecorder` now removes it on cancel / no-frames.
 
 - 2026-07-14 (M2-T4): `record` does real 3-track capture. Design + gotchas future agents need:
   - **MovieRecorder self-configures from buffers.** It's now a `SampleConsumer`; the video

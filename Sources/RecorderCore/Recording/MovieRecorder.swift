@@ -89,6 +89,13 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         return droppedFrames
     }
 
+    /// Media duration written so far, for a progress ticker. `.invalid` (NaN seconds) until the
+    /// first frame starts the session, so callers must guard the conversion (docs/02 §10).
+    public var recordedDuration: CMTime {
+        lock.lock(); defer { lock.unlock() }
+        return didStartSession ? latestRebasedPTS : .invalid
+    }
+
     // MARK: - Consume
 
     /// Route a captured buffer to its track (`SampleConsumer`). Safe to call from the separate
@@ -191,6 +198,16 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         guard !isFinished else { return }
         isFinished = true
         if writer.status == .writing { writer.cancelWriting() }
+        removeReservationPlaceholderIfUnused()
+    }
+
+    /// If the writer never created the real file, the reservation placeholder
+    /// (`OutputLocation.reserveRecordingURL`/`reserveExact`) is still on disk — remove it so a
+    /// recording that failed before writing leaves no 0-byte litter, and an explicit output
+    /// path can be retried. Call under `lock`. When the writer did start, `cancelWriting()`
+    /// (not this) removes its own partial file.
+    private func removeReservationPlaceholderIfUnused() {
+        if !didStartWriting { try? FileManager.default.removeItem(at: outputURL) }
     }
 
     /// Synchronous, lock-guarded prologue to `finish()`: applies the tail-frame patch, marks
@@ -201,7 +218,10 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         defer { lock.unlock() }
         guard !isFinished else { throw MovieRecorderError.alreadyFinished }
         isFinished = true
-        guard didStartSession else { return false }
+        guard didStartSession else {
+            removeReservationPlaceholderIfUnused()
+            return false
+        }
 
         // Tail-frame patch: if audio ran past the last video frame (static screen), extend the
         // video track by re-appending that frame at the end time.

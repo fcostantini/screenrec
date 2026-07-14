@@ -125,6 +125,37 @@ import Testing
         }
     }
 
+    @Test func failedFinishRemovesReservationPlaceholder() async throws {
+        let fileManager = FileManager.default
+        let url = Self.temporaryOutputURL()
+        fileManager.createFile(atPath: url.path, contents: Data())  // OutputLocation's O_EXCL placeholder
+        defer { try? fileManager.removeItem(at: url) }
+
+        let recorder = try MovieRecorder(
+            outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: false)
+        // Only audio — no video frame ever starts the session, so nothing is written.
+        recorder.consume(
+            Self.audioSample(format: Self.audioFormat(sampleRate: 48_000, channels: 2),
+                             sampleRate: 48_000, channels: 2, frames: 1600, pts: .zero),
+            type: .systemAudio)
+        await #expect(throws: MovieRecorderError.noFramesWritten) { _ = try await recorder.finish() }
+        // The reservation placeholder must be cleaned up, not left as 0-byte litter that would
+        // block retrying an explicit output path.
+        #expect(!fileManager.fileExists(atPath: url.path))
+    }
+
+    @Test func cancelRemovesReservationPlaceholder() throws {
+        let fileManager = FileManager.default
+        let url = Self.temporaryOutputURL()
+        fileManager.createFile(atPath: url.path, contents: Data())
+        defer { try? fileManager.removeItem(at: url) }
+
+        let recorder = try MovieRecorder(
+            outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: false)
+        recorder.cancel()
+        #expect(!fileManager.fileExists(atPath: url.path))
+    }
+
     // MARK: - Synthetic buffer fixtures
 
     private static func temporaryOutputURL() -> URL {

@@ -9,7 +9,7 @@ func printUsage() {
     screenrec-cli — dev harness for screenrec (M0 skeleton)
 
     USAGE:
-      screenrec-cli record [options]   Record screen + audio to a .mov
+      screenrec-cli record [options] [path]   Record screen + audio to a .mov
       screenrec-cli list-mics          List audio input devices
       screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
       screenrec-cli probe-stream [--duration N] [--mic <id>] [--no-mic]
@@ -17,12 +17,13 @@ func printUsage() {
       screenrec-cli --help
 
     record options:
-      --duration <sec>   Stop after N seconds (otherwise runs until the stream ends)
+      --duration <sec>   Stop after N seconds (else Return on a terminal, or stream end)
       --preset <name>    efficient | balanced | high   (default: balanced)
       --mic <id>         Use a specific microphone (see list-mics)
       --no-mic           Record without a microphone
-      --output <dir>     Output directory (default: ~/Movies)
+      --output <dir>     Output directory when no [path] is given (default: ~/Movies)
       --dry-run          Print the config that would be used, without capturing
+      [path]             Explicit output file, or an existing directory to write into
     """)
 }
 
@@ -138,6 +139,7 @@ struct RecordOptions {
     var micID: String?
     var micEnabled = true
     var outputDir = OutputLocation.defaultDirectory()
+    var path: String?
     var dryRun = false
 }
 
@@ -170,10 +172,50 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
         case "--dry-run":
             options.dryRun = true
         default:
-            die("Unknown option: \(arg)")
+            guard !arg.hasPrefix("-") else { die("Unknown option: \(arg)") }
+            guard options.path == nil else { die("Unexpected extra argument: \(arg)") }
+            options.path = arg     // positional: an explicit output file, or a directory
         }
     }
     return options
+}
+
+enum CLIError: Error { case message(String) }
+
+/// Where a recording writes: an auto-named file in a directory, or an exact user-given file.
+/// An explicit positional path that is an existing directory means the former; otherwise the
+/// latter. With no path, the `--output` directory (default ~/Movies) is used.
+enum OutputTarget {
+    case directory(URL)
+    case file(URL)
+}
+
+func outputTarget(_ options: RecordOptions) -> OutputTarget {
+    guard let path = options.path else { return .directory(options.outputDir) }
+    let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+    var isDirectory: ObjCBool = false
+    if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue {
+        return .directory(url)
+    }
+    return .file(url)
+}
+
+/// Resolves and atomically reserves the output file for a real recording, running the write
+/// preflight on its directory first.
+func reserveOutputURL(_ options: RecordOptions) throws -> URL {
+    func preflight(_ directory: URL) throws {
+        if case .inaccessible(let reason) = OutputLocation.preflight(directory) {
+            throw CLIError.message(reason)
+        }
+    }
+    switch outputTarget(options) {
+    case .directory(let directory):
+        try preflight(directory)
+        return try OutputLocation(directory: directory).reserveRecordingURL(date: Date())
+    case .file(let url):
+        try preflight(url.deletingLastPathComponent())
+        return try OutputLocation.reserveExact(url)
+    }
 }
 
 /// Pure microphone resolution: the selection plus, when a mic was requested but no device is
@@ -207,31 +249,60 @@ func printRecordDryRun(_ options: RecordOptions) {
         print("  Microphone: off (--no-mic)")
     }
 
-    print("  Output dir: \(options.outputDir.path)")
-    switch OutputLocation.preflight(options.outputDir) {
+    let planned = plannedOutputURL(options)
+    let directory = planned.deletingLastPathComponent()
+    print("  Output dir: \(directory.path)")
+    switch OutputLocation.preflight(directory) {
     case .accessible:
         print("  Output preflight: OK")
     case .inaccessible(let reason):
         print("  Output preflight: FAILED — \(reason)")
     }
-    let outputURL = OutputLocation(directory: options.outputDir).newRecordingURL(date: Date())
-    print("  Would write: \(outputURL.lastPathComponent)")
+    print("  Would write: \(planned.lastPathComponent)")
 }
 
-/// Real capture: preflight, reserve the output file, run a `RecordingSession` for `--duration`
-/// (or until the stream ends), and report the finalized file. Interactive stop and the
-/// progress ticker land in M2-T5.
-func performRecording(_ options: RecordOptions) async {
-    switch OutputLocation.preflight(options.outputDir) {
-    case .inaccessible(let reason): die(reason, code: 74)
-    case .accessible: break
+/// The output URL a real recording WOULD use, for the dry-run — same resolution as
+/// `reserveOutputURL` but with no side effects (check-then-act naming, reserves nothing).
+func plannedOutputURL(_ options: RecordOptions) -> URL {
+    switch outputTarget(options) {
+    case .directory(let directory): return OutputLocation(directory: directory).newRecordingURL(date: Date())
+    case .file(let url): return url
     }
+}
 
+/// Current on-disk size of the growing recording (fragmented .mov grows as it's written).
+func recordingFileSize(_ url: URL) -> Int64 {
+    guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+          let size = attributes[.size] as? NSNumber else { return 0 }
+    return size.int64Value
+}
+
+/// In-place progress line: `⏺ MM:SS  <size>`, refreshed twice a second. Guards the duration
+/// against NaN seconds before the first frame (docs/02 §10) so it can never print "NaN".
+func runProgressTicker(_ session: RecordingSession, outputURL: URL) async {
+    while !Task.isCancelled {
+        let raw = session.recordedDuration.seconds
+        let seconds = raw.isFinite ? raw : 0
+        let size = ByteCountFormatter.string(fromByteCount: recordingFileSize(outputURL), countStyle: .file)
+        let line = String(format: "\r  ⏺ %02d:%02d   %@      ", Int(seconds) / 60, Int(seconds) % 60, size)
+        FileHandle.standardOutput.write(Data(line.utf8))
+        try? await Task.sleep(nanoseconds: 500_000_000)
+    }
+}
+
+/// Real capture: reserve the output file, run a `RecordingSession` with a live progress ticker,
+/// stop on `--duration`, on Return (interactive TTY), or when the stream ends, then report the
+/// finalized file.
+func performRecording(_ options: RecordOptions) async {
     let outputURL: URL
     do {
-        outputURL = try OutputLocation(directory: options.outputDir).reserveRecordingURL(date: Date())
+        outputURL = try reserveOutputURL(options)
+    } catch CLIError.message(let reason) {
+        die(reason, code: 74)
+    } catch OutputLocation.ReservationError.alreadyExists(let path) {
+        die("Output file already exists: \(path)", code: 74)
     } catch {
-        die("Couldn't create the output file in \(options.outputDir.path): \(error)", code: 74)
+        die("Couldn't create the output file: \(error.localizedDescription)", code: 74)
     }
 
     let mic = resolveMicrophone(options)
@@ -241,38 +312,43 @@ func performRecording(_ options: RecordOptions) async {
     do {
         session = try RecordingSession(configuration: configuration, outputURL: outputURL)
     } catch {
+        try? FileManager.default.removeItem(at: outputURL)  // drop the unused reservation placeholder
         die("Couldn't set up the recorder: \(error.localizedDescription)", code: 74)
     }
 
-    print("record: capturing to \(outputURL.lastPathComponent)\(options.duration.map { " for \(Int($0))s" } ?? " (until the stream ends)")…")
-
-    let events = Task { () -> Int32 in
-        var exitCode: Int32 = 0
-        for await event in session.events {
-            switch event {
-            case .started:
-                print("  ● capturing")
-            case .finished(let url, let reason, let dropped):
-                print("  ✓ finished (\(describe(reason))), dropped frames: \(dropped)")
-                print("  \(url.path)")
-            case .failed(let message):
-                FileHandle.standardError.write(Data("  ✗ \(message)\n".utf8))
-                exitCode = 1
-            default:
-                break
-            }
-        }
-        return exitCode
-    }
+    let interactive = isatty(STDIN_FILENO) != 0
+    let stopHint = options.duration.map { "\(Int($0))s" } ?? (interactive ? "Return to stop" : "until the stream ends")
+    print("record: \(options.preset.rawValue) → \(outputURL.path)  (\(stopHint))")
 
     await session.start()
+    let ticker = Task { await runProgressTicker(session, outputURL: outputURL) }
     let stopTimer = Task {
         guard let duration = options.duration else { return }
         try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
         await session.stop()
     }
-    let exitCode = await events.value
+    // Return stops early — only when stdin is a terminal, so a piped/automated run isn't
+    // stopped instantly by stdin EOF.
+    let stdinStop = interactive ? Task.detached { _ = readLine(); await session.stop() } : nil
+
+    var exitCode: Int32 = 0
+    for await event in session.events {
+        switch event {
+        case .finished(let url, let reason, let dropped):
+            ticker.cancel()
+            print("\n  ✓ finished (\(describe(reason))), dropped frames: \(dropped)")
+            print("  \(url.path)")
+        case .failed(let message):
+            ticker.cancel()
+            FileHandle.standardError.write(Data("\n  ✗ \(message)\n".utf8))
+            exitCode = 1
+        default:
+            break
+        }
+    }
+    ticker.cancel()
     stopTimer.cancel()
+    stdinStop?.cancel()
     exit(exitCode)
 }
 

@@ -105,15 +105,30 @@ public struct OutputLocation: Sendable {
         /// Creating the placeholder failed for a reason other than a name collision
         /// (e.g. the directory is unwritable). `code` is the POSIX errno.
         case cannotCreate(path: String, code: Int32)
+        /// An explicit user-specified output path already exists (we won't overwrite it).
+        case alreadyExists(path: String)
     }
 
-    /// Atomically reserves the first non-colliding recording URL. Each candidate name is
-    /// `O_EXCL`-created and the empty placeholder is **kept**, so the name stays claimed until
-    /// the writer replaces it: two recordings started the same second get different names
-    /// (`… 2.mov`), which check-then-act `newRecordingURL` couldn't guarantee (STATUS field
-    /// note). `MovieRecorder` removes the placeholder in the same synchronous breath as
-    /// `startWriting()` creates the real file (`AVAssetWriter` refuses a pre-existing file), so
-    /// the name is free for only microseconds rather than the whole capture-startup window.
+    /// `O_EXCL`-creates an empty placeholder at `url`, returning true if it claimed the name
+    /// and false if the name is already taken. Retries an interrupted syscall; throws on any
+    /// other error. The placeholder is **kept** — the writer removes it in the same breath as
+    /// it creates the real file (`AVAssetWriter` refuses a pre-existing file), so the name is
+    /// held from reservation until the file exists, not freed in between.
+    private static func claim(_ url: URL) throws -> Bool {
+        while true {
+            let descriptor = open(url.path, O_CREAT | O_EXCL | O_WRONLY, 0o644)
+            if descriptor >= 0 { close(descriptor); return true }
+            switch errno {
+            case EEXIST: return false
+            case EINTR: continue
+            default: throw ReservationError.cannotCreate(path: url.path, code: errno)
+            }
+        }
+    }
+
+    /// Atomically reserves the first non-colliding auto-named recording URL. Two recordings
+    /// started the same second get different names (`… 2.mov`), which check-then-act
+    /// `newRecordingURL` couldn't guarantee (STATUS field note).
     public func reserveRecordingURL(
         prefix: String = "Recording",
         ext: String = "mov",
@@ -125,16 +140,15 @@ public struct OutputLocation: Sendable {
         while true {
             let name = suffix == 1 ? "\(base).\(ext)" : "\(base) \(suffix).\(ext)"
             let url = directory.appendingPathComponent(name)
-            let descriptor = open(url.path, O_CREAT | O_EXCL | O_WRONLY, 0o644)
-            if descriptor >= 0 {
-                close(descriptor)
-                return url
-            }
-            switch errno {
-            case EEXIST: suffix += 1                 // name taken → try the next suffix
-            case EINTR: continue                     // interrupted syscall → retry the same name
-            default: throw ReservationError.cannotCreate(path: url.path, code: errno)
-            }
+            if try Self.claim(url) { return url }
+            suffix += 1                              // name taken → try the next suffix
         }
+    }
+
+    /// Reserves an exact, user-specified output path (the `record` positional argument).
+    /// Throws `.alreadyExists` instead of overwriting a file that's already there.
+    public static func reserveExact(_ url: URL) throws -> URL {
+        guard try claim(url) else { throw ReservationError.alreadyExists(path: url.path) }
+        return url
     }
 }
