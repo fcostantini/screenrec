@@ -27,12 +27,12 @@ Goal: `swift build` + `swift test` green; stable signing; CLI skeleton runs.
       `.macOS(.v15)`, `swiftLanguageMode(.v5)`, zero external dependencies.
       **Verify:** `swift build && swift test` green (one placeholder test). ✅ 2026-07-14
       — note: tests MUST use Swift Testing, not XCTest (02 §10).
-- [ ] M0-T2 `Scripts/devsign.sh`: locate a valid codesigning identity — prefer
+- [x] M0-T2 `Scripts/devsign.sh`: locate a valid codesigning identity — prefer
       "screenrec-dev" (already created & trusted 2026-07-14, see STATUS.md), else any
       "Apple Development"; print it; NEVER create certs itself (print manual Keychain
       instructions if none found). Idempotent.
       **Verify:** run twice → identical identity hash both times; exits nonzero with
-      instructions when given `--pretend-missing`.
+      instructions when given `--pretend-missing`. ✅ 2026-07-14
 - [ ] M0-T3 `Scripts/bundle.sh`: SPM release build → assemble
       `dist/ScreenRec.app` (Contents/MacOS binary, Info.plist with
       NSMicrophoneUsageDescription + LSUIElement=true, PkgInfo) → `codesign --force

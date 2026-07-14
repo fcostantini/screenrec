@@ -5,9 +5,9 @@
 
 ## Now
 
-- **Current milestone:** M0 — Scaffolding & prerequisites (in progress; T1 done)
-- **Next task:** M0-T2 (`Scripts/devsign.sh` — must FIND the existing "screenrec-dev"
-  identity, never create one)
+- **Current milestone:** M0 — Scaffolding & prerequisites (in progress; T1–T2 done)
+- **Next task:** M0-T3 (`Scripts/bundle.sh` — assemble + sign dist/ScreenRec.app using
+  the identity from devsign.sh)
 - **Blockers:** none
 
 ## Needs Franco (human-only items)
