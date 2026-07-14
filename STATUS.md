@@ -6,10 +6,14 @@
 ## Now
 
 - **Current milestone:** M2 — MovieRecorder, the real writer (M1 complete, G1 passed)
-- **Next task:** finish the **G2 gate** — only §3.5 (30-min drift) remains; §3.1–3.4 all pass.
-  Drift needs a long `record` + `tools/beepflash.sh` alongside, then check A/V sync at 0 vs
-  30 min (a 30-min capture auto-backgrounds on the agent side and loses TCC, so Franco likely
-  starts the run; the beepflash/flash analysis is automatable). Then M3 (pause/resume) begins.
+- **Current milestone:** **M2 COMPLETE, G2 PASSED (5/5).** The `record` CLI is a full,
+  gate-verified 3-track recorder (crash-safe, sync-stable over 30 min, ~2× more efficient
+  than Tier-1).
+- **Next task:** **M3-T1** — pause/resume through CaptureEngine → TimestampRebaser (resume
+  waits for the next complete video frame); CLI interactive `p`/`r` keys in `record` + a
+  scripted mode `--script rec10,pause5,rec10` for unattended verification. The rebaser's
+  pause math is already built + unit-tested (M2-T3) — M3-T1 wires it to the engine + CLI.
+  Gate G3 (04 §4): scripted 10s/5s/10s ⇒ 20s ± 0.2s file, monotonic PTS, sync across the seam.
   **Crash-safety fix this session:** `movieFragmentInterval` 10s→1s (docs/02 §5) — 10s left a
   kill-9'd-before-10s file unparseable; 1s → ≤1s loss, playable from 1s on.
 - **Now done:** M2-T1..T6. `record` is a full CLI (real 3-track capture, presets, explicit
@@ -65,13 +69,24 @@ video (deterministic, reproducible).
 | G0   | ✅ passed 2026-07-14 | build+test(23)+bundle green; Identifier=dev.fcostantini.screenrec.app, Authority=screenrec-dev, designated requirement stable across rebuilds |
 | M1   | ✅ complete 2026-07-14 | all 5 tasks done; capture engine + router + probe + sleep guard, 41 tests |
 | G1   | ✅ passed 2026-07-14 | probe-stream: all 3 sources flowing. video 4112×2570 420v (PTS Δ 0.008–0.09s, frame-on-change); system audio 48kHz/2ch/32-bit (Δ 0.02s); mic native format device-dependent — AirPods 24kHz/1ch, built-in 48kHz/1ch (both differ from system audio → separate tracks required, M2) |
-| G2   | 🟡 4/5 passed 2026-07-14 | §3.1 tracks hvc1+2×aac ✅; §3.2 kill-9 ✅ (kill@6s→5.04s playable AFTER fragment fix 10s→1s — 10s was unparseable if killed <10s); §3.3 sync-clap ✅ (Franco); §3.4 static-tail ✅ (14s static→14.4s @7.9fps, tail patch holds). §3.5 30-min drift ⬜ (needs a long run + beepflash) |
+| G2   | ✅ passed 2026-07-14 | §3.1 tracks hvc1+2×aac ✅; §3.2 kill-9 ✅ (kill@6s→5.04s playable AFTER fragment fix 10s→1s — 10s was unparseable if killed <10s); §3.3 sync-clap ✅ (Franco); §3.4 static-tail ✅ (14s static→14.4s @7.9fps, tail patch holds); §3.5 30-min drift ✅ (Franco ran real 30-min record + beepflash; per-track dur match 50ms; flash↔beep offset constant ~−67ms±10 from min 5→29 = no drift) |
 | G3   | ⬜ not run | — |
 | G4   | ⬜ not run | — |
 | G5   | ⬜ not run | — |
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-14 (G2 §3.5 drift): the 30-min A/V-sync check is fully automatable given a
+  beepflash recording. Method (reusable for the M6 §7 soak sync check): find each flash via
+  **AVAssetReader sequential decode** of the video track in a time window + sparse-pixel
+  brightness (NOT AVAssetImageGenerator random-access — it decodes from a keyframe per seek,
+  ~100× slower); find each beep via AVAssetReader LPCM peak amplitude in the same window;
+  compare flash-time − beep-time across markers. Result: constant ~−67 ms offset (fixed
+  pipeline latency), no drift over 30 min. GOTCHAS: (a) the flasher's FIRST invocation is a
+  cold-start → first marker's flash renders ~400 ms late; use markers 2+ for sync. (b) beepflash
+  markers are ~287 s apart (285 s sleep + ~2 s per marker), so estimated marker times drift
+  ~12 s by 30 min — center the search on observed flash times, not the nominal interval.
 
 - 2026-07-14 (M2-T6): calibration + tools. Big practical unlocks for future capture work:
   - **Foreground Bash captures WORK** (agent runtime holds the TCC grant); backgrounded/
