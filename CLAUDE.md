@@ -75,14 +75,24 @@ per-task audit trail — one task, one commit.
    human-only leftovers to "Needs Franco".
 4. Append anything surprising to "Field notes" — future agents only know what's written.
 
-## Build & verify
+## Dev loop (the CI-less verify loop — run after every change)
+
+There is no CI. This ordered loop IS the gate; run it top to bottom after any change,
+and a task is not done until it passes clean:
 
 ```sh
-swift build                      # debug
-swift test                       # unit tests
-swift build -c release           # before any capture timing/perf measurements
-Scripts/bundle.sh                # assemble + sign dist/ScreenRec.app (M0+)
-swift tools/probe.swift <file>   # inspect a recording's tracks
+swift build            # 1. debug build compiles
+swift test             # 2. all unit tests pass
+swift build -c release # 3. release build compiles
+Scripts/bundle.sh      # 4. assemble + sign dist/ScreenRec.app (must stay signable)
+```
+
+Then run the current task's **Verify** step (docs/03) on top of this loop.
+
+Other tools:
+```sh
+swift tools/probe.swift <file>   # inspect a recording's tracks/codecs/durations
+.build/debug/screenrec-cli --help
 ```
 
 ## Environment facts

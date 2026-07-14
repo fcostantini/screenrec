@@ -5,9 +5,10 @@
 
 ## Now
 
-- **Current milestone:** M0 — Scaffolding & prerequisites (in progress; T1–T5 done)
-- **Next task:** M0-T6 (document the CI-less verify loop — build/test/bundle commands
-  an agent runs after every change — in STATUS.md; then G0 gate)
+- **Current milestone:** M1 — Capture engine (M0 complete, G0 passed)
+- **Next task:** M1-T1 (`CaptureConfiguration`: display selection, mic device stored as
+  explicit ID, fps cap, quality preset enum; pixel math from contentRect × pointPixelScale
+  with unit tests — see M1-T1 checklist)
 - **Blockers:** none
 
 ## Needs Franco (human-only items)
@@ -24,7 +25,7 @@
 
 | Gate | Status | Evidence |
 |------|--------|----------|
-| G0   | ⬜ not run | — |
+| G0   | ✅ passed 2026-07-14 | build+test(23)+bundle green; Identifier=dev.fcostantini.screenrec.app, Authority=screenrec-dev, designated requirement stable across rebuilds |
 | G1   | ⬜ not run | — |
 | G2   | ⬜ not run | — |
 | G3   | ⬜ not run | — |

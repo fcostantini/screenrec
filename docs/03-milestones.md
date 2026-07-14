@@ -58,9 +58,11 @@ Goal: `swift build` + `swift test` green; stable signing; CLI skeleton runs.
       config (incl. explicit mic ID, output path preflight result); output intact
       when piped to a file (buffering test). ✅ 2026-07-14 (subcommands `record` /
       `list-mics`; `AudioInputs` helper added to RecorderCore for device enumeration)
-- [ ] M0-T6 CI-less verification loop documented in STATUS.md: build, test, bundle
-      commands an agent runs after every change.
+- [x] M0-T6 CI-less verification loop documented in CLAUDE.md ("Dev loop"): the ordered
+      build/test/release/bundle sequence an agent runs after every change (canonical home
+      is the always-read contract, not the volatile STATUS.md).
       **Verify:** execute the documented loop verbatim top to bottom; it passes.
+      ✅ 2026-07-14 (all four steps green)
 
 **Gate G0**: 04-testing §1 (build/test/bundle/sign all green; app launches, shows in
 menu bar as placeholder or CLI prints config).
