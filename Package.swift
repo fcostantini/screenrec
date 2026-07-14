@@ -17,9 +17,12 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         // Menu-bar app shell (fleshed out in M4).
+        // Info.plist is copied into the .app bundle by Scripts/bundle.sh, not compiled —
+        // exclude it so SPM doesn't treat it as an unhandled resource.
         .executableTarget(
             name: "ScreenRecApp",
             dependencies: ["RecorderCore"],
+            exclude: ["Resources/Info.plist"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(

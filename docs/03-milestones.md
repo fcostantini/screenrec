@@ -33,7 +33,7 @@ Goal: `swift build` + `swift test` green; stable signing; CLI skeleton runs.
       instructions if none found). Idempotent.
       **Verify:** run twice → identical identity hash both times; exits nonzero with
       instructions when given `--pretend-missing`. ✅ 2026-07-14
-- [ ] M0-T3 `Scripts/bundle.sh`: SPM release build → assemble `dist/ScreenRec.app`:
+- [x] M0-T3 `Scripts/bundle.sh`: SPM release build → assemble `dist/ScreenRec.app`:
       `Contents/MacOS/ScreenRec` = the `ScreenRecApp` product binary;
       `Contents/Info.plist` copied from `Sources/ScreenRecApp/Resources/Info.plist`
       (create it in this task: bundle id `dev.fcostantini.screenrec.app`,
@@ -43,7 +43,7 @@ Goal: `swift build` + `swift test` green; stable signing; CLI skeleton runs.
       **Verify:** `codesign -dvv dist/ScreenRec.app 2>&1` shows the Identifier and
       Authority "screenrec-dev"; two consecutive bundle.sh runs → byte-identical output
       from `codesign -d -r- dist/ScreenRec.app 2>&1` (designated requirement = TCC
-      stability); `open dist/ScreenRec.app` launches without crash.
+      stability); `open dist/ScreenRec.app` launches without crash. ✅ 2026-07-14
 - [ ] M0-T4 Port from PoC into `RecorderCore/Support` + `Capture`: `Permissions.swift`
       (preflights incl. ⚠️ output-dir lesson, 02 §2; owns default-mic resolution:
       `resolvedMicrophoneID()` returns an explicit uniqueID or a human reason — the

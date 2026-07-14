@@ -5,9 +5,10 @@
 
 ## Now
 
-- **Current milestone:** M0 — Scaffolding & prerequisites (in progress; T1–T2 done)
-- **Next task:** M0-T3 (`Scripts/bundle.sh` — assemble + sign dist/ScreenRec.app using
-  the identity from devsign.sh)
+- **Current milestone:** M0 — Scaffolding & prerequisites (in progress; T1–T3 done)
+- **Next task:** M0-T4 (port `Permissions.swift` + `OutputLocation.swift` from the PoC
+  into RecorderCore; Permissions owns default-mic resolution, unit tests via injected
+  state — see the M0-T4 checklist)
 - **Blockers:** none
 
 ## Needs Franco (human-only items)
@@ -34,6 +35,14 @@
 
 ## Field notes (append; things learned that docs don't cover yet)
 
+- 2026-07-14 (M0-T3): bundle.sh assembles/signs dist/ScreenRec.app. Verified:
+  Identifier=dev.fcostantini.screenrec.app, Authority=screenrec-dev; designated
+  requirement byte-identical across two rebuilds (`identifier "…" and certificate leaf
+  = H"62a8ac…"`) → TCC grants will survive rebuilds; `open` launches the LSUIElement
+  app, process stays alive, quits cleanly. `spctl -a -t exec` fails (not notarized) —
+  expected pre-M6, script reports it without failing. Info.plist lives at
+  Sources/ScreenRecApp/Resources/Info.plist and is `exclude`d in Package.swift so SPM
+  ignores it.
 - 2026-07-14 (M0-T1): Command Line Tools have NO XCTest — `import XCTest` fails to
   compile. Swift Testing (`import Testing`) works and is now the mandated framework
   (docs/02 §10 updated). Verify evidence: `swift build` links all 3 targets;
