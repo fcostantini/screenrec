@@ -6,15 +6,32 @@
 ## Now
 
 - **Current milestone:** M2 — MovieRecorder, the real writer (M1 complete, G1 passed)
-- **Next task:** M2-T6 (quality calibration — record the same 30 s busy scene at each preset
-  + Tier-1 PoC binary, adjust BitrateModel constants; deliver `tools/beepflash.sh`. 04 §3.6).
-  Largely HUMAN-assisted: needs a repeatable scene (loop one fixed local video fullscreen in
-  QuickTime for all runs) + a subjective quality check → flag under "Needs Franco". Target:
-  Balanced ≤ 50% of Tier-1 size. After M2-T6, run the **G2 gate** (04 §3: kill-9, sync clap,
-  static-screen tail §3.4, 30-min drift §3.5) to close M2.
-- **Now done:** M2-T1..T5. `record` is a full CLI (real 3-track capture, presets, explicit
-  path, progress ticker, Return-to-stop). Two /code-reviews run across M2-T4/T5; all
-  confirmed findings fixed. Reference binary for M2-T6 comparison: `~/code/screenrec-poc`.
+- **Next task:** run the **G2 gate** (04 §3) to close M2. Automatable now that captures work
+  in the foreground: kill-9 crash test (§3.2, required), static-screen tail (§3.4, use
+  `tools/busyscene.swift` then hold static). Human: sync-clap (§3.3), 30-min drift (§3.5,
+  run `record` + `tools/beepflash.sh`), M2-T6 subjective quality. After G2, M3 begins.
+- **Now done:** M2-T1..T6. `record` is a full CLI (real 3-track capture, presets, explicit
+  path, progress ticker, Return-to-stop), calibrated ~2× more efficient than Tier-1.
+  KEY ENV FACT: foreground Bash captures WORK (TCC held); backgrounded/detached ones lose the
+  grant. Keep capture commands foreground. Reference binary: `~/code/screenrec-poc`.
+
+## M2-T6 calibration comparison (6 s, `tools/busyscene.swift`, --no-mic, 4112×2570)
+
+| Source | Size | ~Mbps | vs Tier-1 |
+|--------|------|-------|-----------|
+| efficient | 12.0 MB | 16.8 | ~50% |
+| balanced  | 11.8 MB | 16.5 | ~49% |
+| high      | 16.1 MB | 22.5 | ~67% |
+| Tier-1 (PoC, SCRecordingOutput) | 24.2 MB | 33.8 | 100% |
+
+Balanced/Tier-1 over 3 rounds: **48.8% / 51% / 50% → ≈50%** (≈2× more efficient — target met, at
+the line). Notes: (1) **efficient ≈ balanced on busy content** — `AVVideoAverageBitRateKey` is a
+soft target the real-time HW HEVC encoder loosely respects; it floors at ~16 Mbps for this scene
+and won't crush quality to hit efficient's 4.76 Mbps cap. On LIGHT content presets DO order
+(M2-T5 mouse-mover: 4.28<4.96<5.25 MB). (2) Constants left UNCHANGED — they produce the intended
+targets; further gains need HARD data-rate limits (VideoToolbox `DataRateLimits`, not exposed via
+AVAssetWriter's AverageBitRate) — candidate M6 refinement. (3) Scene = generated, not a QuickTime
+video (deterministic, reproducible).
 - **Blockers:** none — the M1-T4 finding (mic 24k/48k mono vs system 48k stereo) is the
   key input to M2's two-separate-audio-tracks design (confirmed working in M2-T2).
 
@@ -31,6 +48,13 @@
       passes `codesign --verify --strict`. devsign.sh should find and use this
       identity; it must NOT try to create a new one.
 - [ ] First GUI TCC grants for the .app once M4 begins (grant + relaunch dance).
+- [ ] **M2-T6 subjective quality check**: play a Balanced recording of real busy content and
+      confirm it looks good enough (it's ~2× smaller than Tier-1 — is the quality acceptable?).
+      If it looks over-compressed, say so and I'll raise the Balanced multiplier; if it looks
+      fine, we're done. Quick way: `.build/release/screenrec-cli record --duration 20 --preset
+      balanced ~/Movies/q-balanced.mov` while doing real work, then watch it.
+- [ ] **G2 human legs** (when we run G2): sync-clap A/V test (§3.3), 30-min drift test (§3.5,
+      `record` + `tools/beepflash.sh` running alongside; scrub QuickTime for sync at 0 vs 30 min).
 - (gates marked "(human)" in docs/04 accumulate here as milestones close)
 
 ## Gate status
@@ -47,6 +71,22 @@
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-14 (M2-T6): calibration + tools. Big practical unlocks for future capture work:
+  - **Foreground Bash captures WORK** (agent runtime holds the TCC grant); backgrounded/
+    detached commands lose it and fail "permission needed". Keep capture commands foreground
+    and short-ish (a 28 s 4-way calibration loop stayed foreground; a `swift tools/probe.swift`
+    COMPILE inside a command can push it over the auto-background threshold — pre-compile).
+  - **I can drive a full-screen scene myself**: a `.screenSaver`-level `NSWindow` from a
+    swiftc-compiled CLI renders on the display and IS captured (verified via frame brightness:
+    a white flash reads 1.00 vs 0.22 baseline). `tools/busyscene.swift` (animated scene) and
+    `tools/beepflash.sh` (sync markers) both use this.
+  - **AVVideoAverageBitRateKey is a SOFT cap in real-time HEVC.** The HW encoder floors at the
+    content's "natural" bitrate and won't crush quality to hit a low target — so presets barely
+    separate on busy content (efficient≈balanced) and Balanced can't be pushed below ~50% of
+    Tier-1 on complex scenes. Hard control needs VideoToolbox `DataRateLimits` (a VTCompression
+    path), not AVAssetWriter — note for M6 if stronger preset differentiation is wanted.
+  - Comparison table + numbers are in the "M2-T6 calibration comparison" section above.
 
 - 2026-07-14 (human-verified): Franco ran `record` in his OWN terminal (not the agent
   runtime) and it worked perfectly — real capture, plays back, produced file good. Confirms

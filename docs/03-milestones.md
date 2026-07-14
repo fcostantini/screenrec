@@ -161,7 +161,7 @@ Goal: three-track `.mov` with tuned HEVC, crash-safe, from the CLI.
       ✅ 2026-07-14 (live: no-mic→2 tracks; sizes efficient 4.28<balanced 4.96<high 5.25 MB;
       exact path + positional dir honored; ticker 0 NaN piped. Return-to-stop on a TTY;
       +failure-path placeholder cleanup, 65 tests.)
-- [ ] M2-T6 Quality calibration: record the same 30 s busy scene at each preset +
+- [x] M2-T6 Quality calibration: record the same 30 s busy scene at each preset +
       Tier-1 (~/code/screenrec-poc binary) for comparison; adjust BitrateModel
       constants. Repeatable scene: loop one fixed local video file fullscreen in
       QuickTime for all runs; record the exact file used in STATUS.md. Also deliver
@@ -169,6 +169,11 @@ Goal: three-track `.mov` with tuned HEVC, crash-safe, from the CLI.
       drift test).
       **Verify:** comparison table (size + notes) in STATUS.md; Balanced ≤ 50% of
       Tier-1 size. Subjective quality check **(human)**.
+      ✅ 2026-07-14 (comparison table + findings in STATUS. Balanced ≈ 49–51% of Tier-1
+      (~2× more efficient) — at the target line. Used a generated scene `tools/busyscene.swift`
+      instead of a QuickTime video (deterministic, no external file). Constants UNCHANGED —
+      the encoder's soft AverageBitRate cap floors output, so they can't do better here.
+      `tools/beepflash.sh` delivered + flash verified visible. Subjective quality → Needs Franco.)
 
 **Gate G2**: 04-testing §3 (tracks probe: hvc1 + 2×AAC; kill -9 test playable; sync
 clap test; static-screen duration test; 30-min drift test).
