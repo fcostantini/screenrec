@@ -59,7 +59,8 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   caps at 4096×2304 — the dev display (4112×2570) already exceeds it. Offer H.264 only
   with a downscale, or not at all in v1.
 - Bitrate model (`BitrateModel`): `bits = width × height × fps × BPP`, with H.264-class
-  BPP ≈ 0.05 and an HEVC discount ≈ 0.6. Presets:
+  BPP ≈ 0.05 and an HEVC discount ≈ 0.6. Presets (CLI literals: `efficient` |
+  `balanced` | `high`, lowercase):
   - Efficient: ×0.5 → ~5 Mbps @ 4112×2570×30
   - Balanced (default): ×1.0 → ~19 Mbps @ 60 fps (≈8.5 GB/h worst case; VFR means far
     less in practice — PoC measured ~0.5 MB/s light use)
@@ -121,7 +122,8 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
 - Container: `.mov` (required for fragment intervals). Name: `Recording yyyy-MM-dd at
   HH.mm.ss.mov`; replays `Replay yyyy-MM-dd at HH.mm.ss.mov`. Default dir `~/Movies`
   (§2). User-configurable dir must pass the `opendir` preflight at selection time AND at
-  record time.
+  record time. Name collision (two recordings started the same second): append ` 2`,
+  ` 3`, … before the extension.
 
 ## 7. Long-recording robustness
 
@@ -133,8 +135,10 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
 - Disk-full: watch `recordedFileSize` growth vs `volumeAvailableCapacityForImportantUsage`;
   stop cleanly at < 2 GB free with notification.
 - OBS reports rare SCK stalls on multi-hour Sequoia sessions; our watchdog: if no video
-  buffer arrives for 30 s AND the screen isn't static (heuristic: any input event seen),
-  log it; do not auto-restart in v1.
+  buffer arrives for 30 s AND the user isn't idle — input activity via
+  `CGEventSource.secondsSinceLastEventType(_:eventType:)` (CoreGraphics,
+  RecorderCore-safe; NSEvent monitors are AppKit and permission-gated) — log it; do not
+  auto-restart in v1.
 
 ## 8. Echo cancellation — explicitly out (v1)
 
@@ -160,7 +164,8 @@ approaches if it matters.
   two AAC audio inputs encoded from PCM at mux time. Write on a utility queue; the ring
   keeps rolling. Duplicate-hotkey during mux: coalesce (ignore while mux in flight).
 - Hotkey: Carbon `RegisterEventHotKey` (works without Accessibility/Input-Monitoring
-  permission, unlike `NSEvent.addGlobalMonitor`). Default ⌥⌘R, configurable in M6.
+  permission, unlike `NSEvent.addGlobalMonitor`). Default ⌥⌘R, configurable in the
+  Settings window (M4-T4; keys in docs/06).
 - OS note: Apple ships `SCClipBufferingOutput` (native rolling buffer) in the macOS 27
   beta cycle — our design keeps `ReplayEncoder+RingBuffer` behind a small interface so it
   can be swapped for the OS implementation later (ADR-005).

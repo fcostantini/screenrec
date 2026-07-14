@@ -79,8 +79,11 @@ one button:
    we'll relaunch automatically." (Relaunch helper: spawn detached
    `/usr/bin/open -n` on self after grant detected.)
 2. **Microphone** — button `Grant…` → standard prompt; instant, no relaunch.
+3. **Notifications** (optional, never blocks): `UNUserNotificationCenter` authorization
+   request; row shows `✓` / `○ Skipped`; the app is fully functional without it.
 
-Recording controls stay disabled until both green (mic optional if user picks `None`).
+Recording controls stay disabled until rows 1–2 green (mic optional if user picks
+`None`; notifications never gate anything).
 Window never reappears once satisfied. No marketing copy, no multi-step wizard.
 
 ## Settings window (SwiftUI Form, UserDefaults-backed)
@@ -89,6 +92,11 @@ Window never reappears once satisfied. No marketing copy, no multi-step wizard.
 - Quality preset · Frame-rate cap (30/60)
 - Instant replay: buffer length 30 s / 60 s / 2 min · hotkey recorder (default ⌥⌘R)
 - Launch at login (`SMAppService`)
+
+UserDefaults keys (contractual — M4-T4 writes them, M5-T5 reads them; do not rename):
+`outputDirectory` (String path), `qualityPreset` (`efficient`|`balanced`|`high`),
+`fpsCap` (Int 30|60), `replayArmed` (Bool), `replaySeconds` (Int 30|60|120),
+`replayHotkey` (Dict: keyCode Int, modifiers Int), `launchAtLogin` (Bool).
 
 ## Copy rules
 

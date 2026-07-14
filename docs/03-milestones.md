@@ -33,16 +33,23 @@ Goal: `swift build` + `swift test` green; stable signing; CLI skeleton runs.
       instructions if none found). Idempotent.
       **Verify:** run twice → identical identity hash both times; exits nonzero with
       instructions when given `--pretend-missing`. ✅ 2026-07-14
-- [ ] M0-T3 `Scripts/bundle.sh`: SPM release build → assemble
-      `dist/ScreenRec.app` (Contents/MacOS binary, Info.plist with
-      NSMicrophoneUsageDescription + LSUIElement=true, PkgInfo) → `codesign --force
-      --sign <identity from devsign>`. (`spctl -a -v` failure is OK pre-notarization.)
-      **Verify:** `codesign -dv dist/ScreenRec.app` shows our identifier + authority
-      "screenrec-dev"; run bundle.sh twice → identical designated requirement (TCC
+- [ ] M0-T3 `Scripts/bundle.sh`: SPM release build → assemble `dist/ScreenRec.app`:
+      `Contents/MacOS/ScreenRec` = the `ScreenRecApp` product binary;
+      `Contents/Info.plist` copied from `Sources/ScreenRecApp/Resources/Info.plist`
+      (create it in this task: bundle id `dev.fcostantini.screenrec.app`,
+      NSMicrophoneUsageDescription, LSUIElement=true); `Contents/PkgInfo` = `APPL????`
+      → `codesign --force --sign "$(Scripts/devsign.sh)"`. (`spctl -a -v` failure is
+      OK pre-notarization.)
+      **Verify:** `codesign -dvv dist/ScreenRec.app 2>&1` shows the Identifier and
+      Authority "screenrec-dev"; two consecutive bundle.sh runs → byte-identical output
+      from `codesign -d -r- dist/ScreenRec.app 2>&1` (designated requirement = TCC
       stability); `open dist/ScreenRec.app` launches without crash.
 - [ ] M0-T4 Port from PoC into `RecorderCore/Support` + `Capture`: `Permissions.swift`
-      (preflights incl. ⚠️ mic-device-ID and ⚠️ output-dir lessons, 02 §1–2),
-      `OutputLocation.swift`. Design both so decision logic is pure/injectable.
+      (preflights incl. ⚠️ output-dir lesson, 02 §2; owns default-mic resolution:
+      `resolvedMicrophoneID()` returns an explicit uniqueID or a human reason — the
+      ⚠️ nil-mic-ID lesson lives HERE; CaptureConfiguration only ever stores an
+      already-explicit ID), `OutputLocation.swift` (naming + ` 2`/` 3` collision policy,
+      02 §6). Design both so decision logic is pure/injectable.
       **Verify:** `swift test` — OutputLocation naming/collision/preflight-failure
       cases; Permissions decision table with injected TCC/device states.
 - [ ] M0-T5 CLI skeleton: `screenrec-cli record --duration N` prints config it WOULD
@@ -65,24 +72,30 @@ Goal: RecorderCore starts an SCStream and delivers all three sample types to plu
 consumers. No writing yet.
 
 - [ ] M1-T1 `CaptureConfiguration`: display selection (default main), mic device
-      (explicit ID — 02 §1), fps cap, quality preset enum. Pixel math from
-      contentRect × pointPixelScale.
+      (stores the explicit ID resolved by Permissions/M0-T4 — 02 §1), fps cap, quality
+      preset enum. Pixel math from contentRect × pointPixelScale.
       **Verify:** unit tests with mocked rect/scale (e.g. 2056×1285 @2× → 4112×2570);
       preset/fps defaults.
 - [ ] M1-T2 `CaptureEngine` actor: build filter + SCStreamConfiguration (02 §1 values),
-      start/stop, delegate for `didStopWithError`, `EngineEvent` AsyncStream. Includes
-      a `screenrec-cli engine-smoke` subcommand (its own verification instrument).
-      **Verify:** `engine-smoke` → events `started` then clean `stopped` after 2 s,
-      exit 0; with Screen Recording revoked it must fail in preflight, not in SCK.
+      start/stop, delegate for `didStopWithError`, `EngineEvent` AsyncStream (the enum
+      defined in docs/01 — implement it exactly). Includes a `screenrec-cli
+      engine-smoke [--duration N]` subcommand (default 2 s), its own verification
+      instrument.
+      **Verify:** `engine-smoke` → prints `started` then `stopped(userStopped)`,
+      exit 0. Denied-permission path = unit test with injected Permissions state
+      (NEVER revoke live: `tccutil reset ScreenCapture` would destroy this terminal's
+      own grant and block all capture testing — 02 §2).
 - [ ] M1-T3 `SampleRouter`: three serial queues; consumer protocol
       `SampleConsumer { func consume(_ buffer: CMSampleBuffer, type: SourceType) }`;
       attach/detach under lock; frame-status filtering for video (02 §1).
       **Verify:** unit tests with synthetic CMSampleBuffers — two consumers both
       receive; detach mid-stream safe under `swift test --sanitize=thread`.
-- [ ] M1-T4 CLI: `screenrec-cli probe-stream --duration 5` — counts buffers per type,
-      prints format descriptions (esp. mic native format — we need to SEE it), min/max
-      PTS deltas. This is our instrumentation for everything after.
-      **Verify:** run 04-testing §2 in full; paste output + mic format into STATUS.md.
+- [ ] M1-T4 CLI: `screenrec-cli probe-stream --duration 5 [--mic <uniqueID>]` — counts
+      buffers per type, prints format descriptions (esp. mic native format — we need to
+      SEE it), min/max PTS deltas. This is our instrumentation for everything after.
+      **Verify:** run 04-testing §2 in full; the default-mic AirPods leg needs the
+      device connected **(human/device present)**; paste output + mic format into
+      STATUS.md.
 - [ ] M1-T5 `SleepGuard` (02 §7) wired to engine start/stop.
       **Verify:** during `engine-smoke --duration 10`, `pmset -g assertions` shows
       PreventUserIdleSystemSleep held by our process; released after exit.
@@ -102,10 +115,12 @@ Goal: three-track `.mov` with tuned HEVC, crash-safe, from the CLI.
 - [ ] M2-T2 `MovieRecorder` skeleton: writer + 3 inputs (video HEVC from preset; system
       AAC; mic input built lazily from first mic buffer's format — 02 §4),
       `expectsMediaDataInRealTime`, fragment interval 10 s (02 §5).
-      **Verify:** WITHOUT ScreenCaptureKit — integration test feeds 2 s of synthetic
-      buffers (solid-color CVPixelBuffers + PCM silence in two different audio formats)
-      → `finishWriting` → tools/probe shows hvc1 + two aac tracks, duration 2 ± 0.1 s.
-      Proves the writer independently of capture.
+      **Verify:** WITHOUT ScreenCaptureKit — a `swift test` integration test feeds 2 s
+      of synthetic buffers (solid-color CVPixelBuffers + PCM silence in two different
+      audio formats) → `finishWriting` to a temp path → the test itself asserts track
+      count/codecs/duration via AVAsset (hvc1 + two aac, 2 ± 0.1 s); run tools/probe on
+      the temp file once as a human-readable cross-check. Proves the writer
+      independently of capture.
 - [ ] M2-T3 `TimestampRebaser`: epoch at first complete video frame, drop
       pre-epoch audio, monotonic enforcement, pause offset accounting (pause used in M3
       but build the math now).
@@ -113,16 +128,25 @@ Goal: three-track `.mov` with tuned HEVC, crash-safe, from the CLI.
       offsets, out-of-order rejection.
 - [ ] M2-T4 Wire as SampleConsumer; readiness handling = drop + count (report dropped
       frames at stop). Stop path: tail-frame patch (02 §5), `markAsFinished` ×3,
-      `finishWriting`, emit `finished(URL, stats)`. Add bare `record` subcommand
-      (defaults only; flags arrive in T5).
+      `finishWriting`, emit `finished(url:reason:droppedFrames:)` (docs/01). The
+      existing `record` subcommand (a dry-run since M0-T5) now performs real capture;
+      the old behavior moves behind `--dry-run`. Also extend `tools/probe.swift` with
+      per-track durations and a monotonic-PTS warning — 04 §3.5 and §4.1 depend on
+      those probe features.
       **Verify:** `screenrec-cli record --duration 5` → probe: 3 tracks at full pixel
-      res, duration 5 ± 0.5 s, reported dropped-frames = 0 on an idle machine.
+      res, duration 5 ± 0.5 s, per-track durations shown, reported dropped-frames = 0
+      on an idle machine; `record --dry-run` still prints config without capturing.
 - [ ] M2-T5 CLI: full `record [--duration N] [--preset X] [--no-mic] [path]`
-      — parity with the Tier-1 PoC UX (progress ticker with NaN guard!).
+      — parity with the Tier-1 PoC UX (progress ticker with NaN guard!). Preset
+      literals: `efficient` | `balanced` | `high` (02 §3).
       **Verify:** matrix — `--no-mic` → exactly 2 tracks; each preset → file sizes
       strictly ordered; explicit path honored; ticker never prints NaN (pipe run).
-- [ ] M2-T6 Quality calibration: record same 30 s busy scene (video playing + scrolling)
-      at each preset + Tier-1 for comparison; adjust BitrateModel constants.
+- [ ] M2-T6 Quality calibration: record the same 30 s busy scene at each preset +
+      Tier-1 (~/code/screenrec-poc binary) for comparison; adjust BitrateModel
+      constants. Repeatable scene: loop one fixed local video file fullscreen in
+      QuickTime for all runs; record the exact file used in STATUS.md. Also deliver
+      `tools/beepflash.sh` (beep + full-screen flash every 5 min; used by 04 §3.5's
+      drift test).
       **Verify:** comparison table (size + notes) in STATUS.md; Balanced ≤ 50% of
       Tier-1 size. Subjective quality check **(human)**.
 
@@ -138,8 +162,9 @@ clap test; static-screen duration test; 30-min drift test).
       scripted mode `--script rec10,pause5,rec10` for unattended verification.
       **Verify:** 04-testing §4.1 — scripted run yields 20 s ± 0.2 s file, monotonic
       PTS. Cross-seam A/V sync check **(human)**.
-- [ ] M3-T2 Mic format-change detection → clean stop + `failed(reason:)` event with
-      human message (02 §4, ADR-007).
+- [ ] M3-T2 Mic format-change detection → clean stop emitting
+      `finished(url:reason:.microphoneChanged)` (docs/01 event surface; 02 §4,
+      ADR-007).
       **Verify:** unit test injects a format-changed buffer → clean-stop path taken.
       Live AirPods-off run per §4.2 **(human present for the device action)**;
       afterwards agent confirms playable file + causal message.
@@ -151,7 +176,8 @@ clap test; static-screen duration test; 30-min drift test).
       always a playable file + correct event. Document observed behaviors in 02.
       **Verify:** §4.3 **(human)** — both scenarios end in probe-clean files; observed
       SCK error codes recorded in docs/02 field additions.
-- [ ] M3-T5 Stall watchdog logging (02 §7), clock injectable.
+- [ ] M3-T5 Stall watchdog logging (02 §7; input-idle via
+      `CGEventSource.secondsSinceLastEventType` — not NSEvent), clock injectable.
       **Verify:** unit test with injected clock — 30 s of no video buffers fires
       exactly one log line; buffer arrival resets it.
 
@@ -167,28 +193,37 @@ UI layout, states, notification copy, and onboarding flow are specified in
 **docs/06-ui-spec.md** — build to that spec; don't improvise structure or copy.
 
 - [ ] M4-T1 `MenuBarExtra` app shell, LSUIElement, status icon states (idle/recording
-      pulse/paused), AppState consuming EngineEvents on MainActor.
-      **Verify:** `open dist/ScreenRec.app` → icon appears, no Dock icon; AppState unit
+      pulse/paused), AppState consuming EngineEvents on MainActor. `AppState` + view
+      models live in a NEW library target `AppCore` (depends on RecorderCore; no
+      AppKit/SwiftUI imports) so they're unit-testable — SwiftUI views stay in the
+      `ScreenRecApp` executable.
+      **Verify:** `open dist/ScreenRec.app` → icon appears, no Dock icon; AppCore unit
       tests map each EngineEvent to the right icon state. Visual check **(human)**.
 - [ ] M4-T2 Menu: Start/Stop/Pause, display picker (NSScreen list), mic picker
       (AVCaptureDevice list + "None"), preset picker, "Open Recordings Folder",
       recent-files submenu (last 5).
-      **Verify:** menu-driven 5 s recording produces a probe-clean 3-track file (needs
-      the app's own TCC grant — first time is a "Needs Franco" item); recent-files list
-      matches ~/Movies contents.
+      **Verify:** menu-driven 5 s recording **(human — menus can't be clicked
+      headlessly; first run also needs the app's own TCC grant)**; the agent's share:
+      probe the produced file (3 tracks, sane duration) and check the recent-files
+      logic via AppCore unit test against a fixture directory.
 - [ ] M4-T3 Onboarding: permission status view; request buttons; explains the
       restart-after-grant dance (02 §2); blocks record until green.
       **Verify:** unit tests render view model for every permission-state combination;
       fresh-account walkthrough per 04-testing §5.1 **(human)**.
 - [ ] M4-T4 Settings window (SwiftUI Form, UserDefaults): output dir (with preflight on
-      choose — 02 §2), preset, fps, replay duration (for M5), hotkey (for M5).
+      choose — 02 §2), preset, fps, replay duration (for M5), hotkey recorder (for M5).
+      UserDefaults key names are contractual — use exactly the list in docs/06
+      "Settings window" (M5-T5 reads `replayArmed`/`replaySeconds`/`replayHotkey`).
       **Verify:** change each setting, quit, relaunch → `defaults read
-      dev.fcostantini.screenrec.app` shows persisted values and UI reflects them;
-      choosing unreadable dir → immediate friendly error (§5.4).
+      dev.fcostantini.screenrec.app` shows the documented keys with persisted values
+      and UI reflects them; choosing unreadable dir → immediate friendly error (§5.4).
 - [ ] M4-T5 Notifications (UserNotifications): recording ended + reason; click →
-      reveal in Finder.
-      **Verify:** stop a recording → notification delivered (check via
-      `UNUserNotificationCenter` delivered list in a debug hook); click behavior
+      reveal in Finder. Notification authorization is requested per docs/06 onboarding
+      (optional row, non-blocking). Debug hook: the app accepts launch argument
+      `--print-delivered-notifications` (prints `UNUserNotificationCenter` delivered
+      list to stdout and exits).
+      **Verify:** stop a recording, relaunch with the debug argument → the finish
+      notification is in the delivered list with docs/06 copy; click behavior
       **(human)**.
 - [ ] M4-T6 Bundle polish: app icon (placeholder ok, iconutil-built .icns),
       `bundle.sh` produces the final artifact, version stamping.
@@ -207,6 +242,7 @@ TCC grants — app appears by name in System Settings, grants survive rebuild).
       concurrent append; clean under `swift test --sanitize=thread`.
 - [ ] M5-T2 `ReplayEncoder`: VTCompressionSession per 02 §9; consume `.screen` via
       SampleRouter; keyframe flag extraction; ring append. CLI `replay-arm --seconds 60`
+      boots the engine with ONLY the replay consumer attached (no MovieRecorder) and
       prints ring occupancy/memory every 2 s.
       **Verify:** 3-min `replay-arm` run — occupancy climbs then plateaus at ~60 s;
       keyframes counted ≈ 1/s; RSS stable (§6.1 short form).
@@ -214,10 +250,14 @@ TCC grants — app appears by name in System Settings, grants survive rebuild).
       **Verify:** `replay-arm` occupancy printout includes both audio rings; PCM byte
       counts match duration × format math; rings stay duration-aligned with video ring.
 - [ ] M5-T4 `ReplayMuxer`: snapshot → keyframe trim → rebase → passthrough video +
-      AAC audio → file. Coalesce concurrent saves. CLI `replay-save` command.
-      **Verify:** 04-testing §6.2 + §6.3 — save < 1 s, probe: hvc1 + 2 aac, duration
-      N + ≤ 1 s, starts on keyframe; rapid double-save → one clean file, no crash.
-      "Genuinely the last minute" content check **(human)**.
+      AAC audio → file. Coalesce concurrent saves. CLI trigger (the ring lives inside
+      the running `replay-arm` process — there is NO separate `replay-save`
+      subcommand): `replay-arm` saves a clip on SIGUSR1 or on `s` + Return on stdin;
+      document both in `--help`. The app path (M5-T5) uses the hotkey instead.
+      **Verify:** 04-testing §6.2 + §6.3 — `kill -USR1 <pid>` → file exists < 1 s
+      later; probe: hvc1 + 2 aac, duration N + ≤ 1 s, starts on keyframe; two rapid
+      signals → one clean file, no crash. "Genuinely the last minute" content check
+      **(human)**.
 - [ ] M5-T5 App integration: "Arm instant replay" toggle (persists), hotkey ⌥⌘R via
       Carbon (02 §9), menu item + notification on save.
       **Verify:** §6.4 — manual recording + armed replay + save simultaneously → both
@@ -234,7 +274,8 @@ while a manual recording runs; memory flat over 30 min).
 ## M6 — Ship-quality pass (est. 1–2 sessions)
 
 - [ ] M6-T1 Full acceptance run: every item in 00-product-brief "Success criteria".
-- [ ] M6-T2 The 2-hour soak test (04-testing §7) on battery.
+- [ ] M6-T2 The 2-hour soak test (04-testing §7) on battery **(human — physical
+      unplug)**.
 - [ ] M6-T3 Error-message audit: force each failure path; every message says what
       happened AND what to do.
 - [ ] M6-T4 Optional (decide then): Developer ID + notarization for distribution

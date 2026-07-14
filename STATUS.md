@@ -47,5 +47,12 @@
 
 ## History
 
+- 2026-07-14 — docs/06-ui-spec.md added (menu states, notification copy, onboarding,
+  contractual UserDefaults keys). Independent-agent audit of all milestones/tasks run;
+  fixes applied across docs/01–06 (EngineEvent surface defined in 01, replay-save
+  trigger = SIGUSR1/stdin on replay-arm, record subcommand lifecycle reconciled, probe
+  extensions assigned to M2-T4, unrunnable Verify steps fixed or marked human). See
+  git log for the diff.
+
 - 2026-07-13 — Research + Tier-1 PoC completed in ~/code/screenrec-poc. Tier-2 planning
   docs authored (docs/00–05, CLAUDE.md, this file). No Tier-2 code exists yet.

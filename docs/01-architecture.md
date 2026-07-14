@@ -84,9 +84,27 @@ is the seam that makes this trivial.
   pool == `queueDepth` (we use 5) — retaining buffers stalls capture.
 - `MovieRecorder` and `RingBuffer` guard state with `NSLock`/`os_unfair_lock`, not actors
   — actor hops are too slow/jittery for the per-frame path.
-- UI state flows: RecorderCore exposes an `AsyncStream<EngineEvent>` (started, paused,
-  fileProgress(duration,bytes), finished(URL), failed(Error)). `AppState` consumes it on
-  the MainActor.
+- UI state flows: RecorderCore exposes an `AsyncStream<EngineEvent>`; `AppState`
+  consumes it on the MainActor. This is the definitive event surface (M1-T2, M3-T2,
+  M4, and docs/06 notification copy all consume it — extend here, never fork):
+
+  ```swift
+  enum EndReason: Sendable {
+      case userStopped, displayDisconnected, microphoneChanged,
+           diskAlmostFull, systemSleep
+      case streamError(String)
+  }
+  enum EngineEvent: Sendable {
+      case started                                   // first complete video frame
+      case paused, resumed
+      case fileProgress(seconds: Double, bytes: Int64)
+      case stopped(EndReason)                        // engine ran with no writer (e.g. engine-smoke)
+      case finished(url: URL, reason: EndReason, droppedFrames: Int)  // file finalized, playable
+      case failed(message: String)                   // nothing playable exists (preflight/start)
+  }
+  ```
+  Fail-stop (ADR-007) is ALWAYS `finished` with a non-`userStopped` reason — a playable
+  file plus a cause. `failed` is reserved for failures before any media was written.
 
 ## Recorder state machine (enforced in CaptureEngine)
 

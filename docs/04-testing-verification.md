@@ -31,7 +31,8 @@ Pass criteria:
 - Mic format description printed; record it in STATUS.md (sample rate/channels vary by
   device — AirPods vs built-in).
 - PTS deltas positive and sane (no zero/negative video deltas).
-- Run twice: once AirPods, once `--mic BuiltInMicrophoneDevice`.
+- Run twice: once with the default mic (AirPods when connected — device-dependent),
+  once with `--mic BuiltInMicrophoneDevice`.
 
 ## §3 — G2: MovieRecorder (the big one)
 
@@ -43,11 +44,13 @@ Pass criteria:
 3. **Sync clap test (human)**: record while playing a video with a hard cut AND
    clapping near the mic; scrub in QuickTime: video event, system-audio event, and mic
    clap align within ~2 frames at start AND end of a 2-min recording.
-4. **Static-screen duration**: record 15 s where the last 10 s nothing moves. Pass:
-   file duration 15 s ± 0.5 s (tail-frame patch working), not ~5 s.
-5. **Drift test**: 30-min recording with periodic audible/visible events (e.g. a
-   script that beeps + flashes every 5 min — write `tools/beepflash.sh`). Pass: sync at
-   minute 30 as good as at minute 0; video/audio track durations within 100 ms.
+4. **Static-screen duration**: record 15 s where the last 10 s nothing moves — redirect
+   the CLI's stdout to a file, or its own progress ticker keeps repainting the screen
+   and nothing is ever static. Pass: file duration 15 s ± 0.5 s (tail-frame patch
+   working), not ~5 s.
+5. **Drift test**: 30-min recording with periodic audible/visible events via
+   `tools/beepflash.sh` (delivered in M2-T6). Pass: sync at minute 30 as good as at
+   minute 0; per-track durations (probe, extended in M2-T4) within 100 ms.
 6. **Quality/size calibration** (M2-T6): busy-content comparison table vs Tier-1 in
    STATUS.md; Balanced ≤ half of Tier-1 size at comparable subjective quality.
 
@@ -77,10 +80,11 @@ Pass criteria:
 
 1. `replay-arm --seconds 60` for 3 min: ring occupancy stabilizes at ~60 s; RSS plateau
    ≲ 200 MB (`footprint` or Activity Monitor); CPU < 10% average (`top -pid`).
-2. `replay-save` timing: `time` from hotkey/command to file-exists < 1 s. Probe: hvc1 +
-   2 AAC; duration 60 + ≤ 1 s; content is genuinely the LAST minute (human check:
-   on-screen clock visible in recording).
-3. Save twice rapidly: second either coalesced or queued; no crash, no torn file.
+2. Save timing: with `replay-arm` running, `kill -USR1 $PID`, then poll for the output
+   file — signal-to-file-exists < 1 s. Probe: hvc1 + 2 AAC; duration 60 + ≤ 1 s; starts
+   on a keyframe; content is genuinely the LAST minute (human check: on-screen clock
+   visible in recording).
+3. Two rapid SIGUSR1s: second coalesced or queued; no crash, no torn file.
 4. Simultaneity: manual recording running + replay armed + save → both files correct.
 5. Arm for 30 min: memory flat (no ring leak), then save still < 1 s.
 
