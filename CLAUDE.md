@@ -12,7 +12,8 @@ crash-safe long recordings, pause/resume, instant replay. Apple frameworks only.
    writing, timing, or TCC code. It encodes bugs we already hit; do not rediscover them.
 4. `docs/01-architecture.md` (module map, concurrency rules), `docs/05-decisions.md`
    (don't contradict ✅ ADRs), `docs/04-testing-verification.md` (gates),
-   `docs/00-product-brief.md` (scope; check non-goals before adding anything).
+   `docs/00-product-brief.md` (scope; check non-goals before adding anything),
+   `docs/06-ui-spec.md` (required before any M4/M5 UI work).
 
 Reference implementation: `~/code/screenrec-poc` (our working Tier-1; same author).
 

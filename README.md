@@ -19,6 +19,7 @@ This repo is documentation-first and built to be driven by coding agents:
 | `docs/03-milestones.md` | M0–M6 task breakdown with IDs, estimates, gates |
 | `docs/04-testing-verification.md` | Concrete pass/fail checks per gate |
 | `docs/05-decisions.md` | ADRs — the "why" behind every non-obvious choice |
+| `docs/06-ui-spec.md` | Menu-bar app UI spec: menu states, notifications, onboarding, settings |
 | `tools/probe.swift` | Inspect any recording's tracks/codecs/duration |
 
 Predecessor: `~/code/screenrec-poc` — the working Tier-1 proof of concept

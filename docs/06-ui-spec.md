@@ -1,0 +1,99 @@
+# 06 — UI Specification (menu-bar app, M4/M5)
+
+The authoritative description of the app's UI. Visual mockups exist in the plan
+artifact (Franco has the link); this doc is the buildable spec. Principle: every
+control maps 1:1 to a RecorderCore capability that already passed its CLI gate —
+the UI adds no behavior of its own.
+
+## Shell
+
+SwiftUI `MenuBarExtra` with `.menuBarExtraStyle(.menu)`. `LSUIElement = true` (no Dock
+icon, no main window). Windows that exist: Settings (⌘,) and Onboarding (first launch /
+missing permissions only).
+
+## Status item (the menu-bar icon)
+
+| State | Icon | Notes |
+|---|---|---|
+| idle | outline record circle (`record.circle`) | template image, adapts to menu bar |
+| recording | filled red circle | subtle pulse; respect Reduce Motion (static red) |
+| paused | half-filled circle, amber | |
+| replay armed (idle) | outline circle + small dot badge | armed is orthogonal to recording |
+
+## Menu — idle state
+
+Order and grouping (separators between groups):
+
+1. Header row (disabled): `ScreenRec` — right-aligned status `Ready` (or blocking
+   condition, e.g. `Permissions needed…` which opens Onboarding).
+2. **Start Recording** — primary action, bold.
+3. **Instant Replay armed** — checkmark toggle; right hint `⌥⌘R saves`. Persisted.
+4. — separator —
+5. `Display ▸` submenu: one entry per `NSScreen`, checkmark on current. Disabled while
+   recording.
+6. `Microphone ▸` submenu: AVCaptureDevice list + `None`. Checkmark on current.
+   Disabled while recording.
+7. `Quality ▸` submenu: Efficient / Balanced / High (docs/02 §3 presets).
+8. — separator —
+9. `Open Recordings Folder` — reveals output dir in Finder.
+10. Recent recordings: up to 5 most-recent files from the output dir, dimmed style;
+    click reveals in Finder.
+11. — separator —
+12. `Settings…` (⌘,) · `Quit` (⌘Q). Quit while recording → confirm, then clean
+    finalize before exit (never abandon a writer).
+
+## Menu — recording state
+
+1. Header row: pulsing red dot + elapsed `HH:MM:SS` (tabular numerals) + right-aligned
+   `<size> · HEVC`. Updates ≤ 1 Hz (menu open only; no timers while closed).
+2. **Pause** / **Resume** (swaps by state).
+3. **Stop & Save** — primary.
+4. — separator —
+5. Dimmed info rows: active mic + `separate track`; `Replay still armed · ⌥⌘R` when
+   armed.
+6. — separator —
+7. Dimmed: `Sources locked while recording` (pickers hidden, not disabled-but-present).
+8. Settings/Quit remain.
+
+Paused state: header dot goes amber, timer freezes, `Resume` primary.
+
+## Notifications (UserNotifications; click always reveals the file in Finder)
+
+Copy pattern — **outcome first, cause second, always a playable file** (ADR-007 in UI
+form). Never the word "error" for a fail-stop.
+
+| Event | Title | Body |
+|---|---|---|
+| Manual stop | `Recording saved · 00:12:34` | `Recording 2026-07-14 at 10.12.mov` |
+| Fail-stop (any cause) | `Recording saved · 00:12:34` | `Ended: <cause>. File is playable.` — causes: `display disconnected`, `microphone changed`, `disk almost full`, `Mac went to sleep` |
+| Replay saved | `Replay saved` | `Replay … .mov — last 60 s. Click to reveal.` |
+| Replay save failed | `Couldn't save replay` | one-line cause + what to do |
+
+## Onboarding window (first launch, or any missing permission)
+
+Single window, checklist of two rows, each with live status (✓ green / ○ pending) and
+one button:
+
+1. **Screen & System Audio Recording** — button `Grant…` → `CGRequestScreenCaptureAccess()`
+   + explainer: "macOS requires quitting and reopening ScreenRec after granting —
+   we'll relaunch automatically." (Relaunch helper: spawn detached
+   `/usr/bin/open -n` on self after grant detected.)
+2. **Microphone** — button `Grant…` → standard prompt; instant, no relaunch.
+
+Recording controls stay disabled until both green (mic optional if user picks `None`).
+Window never reappears once satisfied. No marketing copy, no multi-step wizard.
+
+## Settings window (SwiftUI Form, UserDefaults-backed)
+
+- Output folder (choose → `opendir` preflight immediately, friendly error per 02 §2)
+- Quality preset · Frame-rate cap (30/60)
+- Instant replay: buffer length 30 s / 60 s / 2 min · hotkey recorder (default ⌥⌘R)
+- Launch at login (`SMAppService`)
+
+## Copy rules
+
+- Verbs on buttons: `Start Recording`, `Stop & Save`, `Pause`, `Grant…`. No "OK".
+- File names shown exactly as on disk; durations `HH:MM:SS`; sizes via
+  `ByteCountFormatter`.
+- Blocking problems name the fix, not the API: "Your terminal has the permission but
+  ScreenRec doesn't" — never "TCC error -60005".

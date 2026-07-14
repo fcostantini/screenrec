@@ -163,6 +163,8 @@ file, A/V in sync across the seam; all three robustness scenarios end in playabl
 ## M4 — Menu-bar app (est. 2 sessions)
 
 Goal: ScreenRec.app is the daily driver; CLI demoted to debugging.
+UI layout, states, notification copy, and onboarding flow are specified in
+**docs/06-ui-spec.md** — build to that spec; don't improvise structure or copy.
 
 - [ ] M4-T1 `MenuBarExtra` app shell, LSUIElement, status icon states (idle/recording
       pulse/paused), AppState consuming EngineEvents on MainActor.
