@@ -6,11 +6,15 @@
 ## Now
 
 - **Current milestone:** M2 — MovieRecorder, the real writer (M1 complete, G1 passed)
-- **Next task:** M2-T3 (`TimestampRebaser`: epoch at first complete video frame, drop
-  pre-epoch audio, monotonic enforcement, pause-offset accounting — pure unit tests.
-  02 §5). M2-T1/T2 done: BitrateModel + MovieRecorder skeleton (3-track writer verified).
-  Reminders for M2-T4: close the OutputLocation TOCTOU with exclusive create, AND fix the
-  mic-never-arrives gap (see field note 2026-07-14 M2-T2).
+- **Next task:** M2-T4 (wire `MovieRecorder` as a `SampleConsumer` through
+  `TimestampRebaser`; readiness = drop + count; stop path = tail-frame patch,
+  `markAsFinished` ×3, `finishWriting`, emit `finished(url:reason:droppedFrames:)`; the
+  `record` subcommand does real capture, old behavior → `--dry-run`; extend tools/probe
+  with per-track durations + monotonic-PTS warning. 02 §5, docs/01). M2-T1/T2/T3 done.
+  Carry into M2-T4: (a) close the OutputLocation TOCTOU with exclusive create; (b) fix the
+  mic-never-arrives gap (field note 2026-07-14 M2-T2); (c) pass the engine's resolved pixel
+  dims + clamped fps into MovieRecorder; (d) the rebaser gives PTS — retime buffers via
+  `CMSampleBufferCreateCopyWithNewTiming` before append.
 - **Blockers:** none — the M1-T4 finding (mic 24k/48k mono vs system 48k stereo) is the
   key input to M2's two-separate-audio-tracks design (confirmed working in M2-T2).
 

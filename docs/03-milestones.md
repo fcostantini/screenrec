@@ -132,11 +132,11 @@ Goal: three-track `.mov` with tuned HEVC, crash-safe, from the CLI.
       independently of capture. ✅ 2026-07-14 (3 tests; probe: 2.00s, hvc1 640x360 +
       aac 48k/2ch + aac 24k/1ch. AAC bitrate must snap to the encoder's applicable set —
       see STATUS field note.)
-- [ ] M2-T3 `TimestampRebaser`: epoch at first complete video frame, drop
+- [x] M2-T3 `TimestampRebaser`: epoch at first complete video frame, drop
       pre-epoch audio, monotonic enforcement, pause offset accounting (pause used in M3
       but build the math now).
       **Verify:** pure unit tests — epoch rebase, pre-epoch drop, cumulative pause
-      offsets, out-of-order rejection.
+      offsets, out-of-order rejection. ✅ 2026-07-14 (9 tests; pure value type, no AVF/clock)
 - [ ] M2-T4 Wire as SampleConsumer; readiness handling = drop + count (report dropped
       frames at stop). Stop path: tail-frame patch (02 §5), `markAsFinished` ×3,
       `finishWriting`, emit `finished(url:reason:droppedFrames:)` (docs/01). The
