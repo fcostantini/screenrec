@@ -74,11 +74,11 @@ menu bar as placeholder or CLI prints config).
 Goal: RecorderCore starts an SCStream and delivers all three sample types to pluggable
 consumers. No writing yet.
 
-- [ ] M1-T1 `CaptureConfiguration`: display selection (default main), mic device
+- [x] M1-T1 `CaptureConfiguration`: display selection (default main), mic device
       (stores the explicit ID resolved by Permissions/M0-T4 — 02 §1), fps cap, quality
       preset enum. Pixel math from contentRect × pointPixelScale.
       **Verify:** unit tests with mocked rect/scale (e.g. 2056×1285 @2× → 4112×2570);
-      preset/fps defaults.
+      preset/fps defaults. ✅ 2026-07-14 (29 tests; CLI now uses the QualityPreset enum)
 - [ ] M1-T2 `CaptureEngine` actor: build filter + SCStreamConfiguration (02 §1 values),
       start/stop, delegate for `didStopWithError`, `EngineEvent` AsyncStream (the enum
       defined in docs/01 — implement it exactly). Includes a `screenrec-cli

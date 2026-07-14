@@ -4,9 +4,6 @@ import RecorderCore
 // Unbuffered stdout so diagnostics survive crashes and pipes (docs/02 §10).
 setvbuf(stdout, nil, _IONBF, 0)
 
-// M1-T1 replaces this with the shared quality-preset enum.
-let validPresets = ["efficient", "balanced", "high"]
-
 func printUsage() {
     print("""
     screenrec-cli — dev harness for screenrec (M0 skeleton)
@@ -51,7 +48,7 @@ func listMics() {
 
 func runRecordDryRun(_ args: [String]) {
     var duration: Double?
-    var preset = "balanced"
+    var preset: QualityPreset = .balanced
     var micID: String?
     var micEnabled = true
     var outputDir = OutputLocation.defaultDirectory()
@@ -64,10 +61,10 @@ func runRecordDryRun(_ args: [String]) {
             duration = seconds
         case "--preset":
             guard let value = iterator.next() else { die("--preset needs a value") }
-            guard validPresets.contains(value) else {
-                die("--preset must be one of: \(validPresets.joined(separator: ", "))")
+            guard let parsed = QualityPreset(rawValue: value) else {
+                die("--preset must be one of: \(QualityPreset.allCases.map(\.rawValue).joined(separator: ", "))")
             }
-            preset = value
+            preset = parsed
         case "--mic":
             guard let value = iterator.next() else { die("--mic needs a device id") }
             micID = value
@@ -83,7 +80,7 @@ func runRecordDryRun(_ args: [String]) {
 
     print("Recording configuration (dry-run — no capture yet):")
     print("  Screen recording permission: \(describe(Permissions.screenRecordingState()))")
-    print("  Preset:   \(preset)")
+    print("  Preset:   \(preset.rawValue)")
     print("  FPS cap:  60")
     print("  Duration: \(duration.map { "\(Int($0))s" } ?? "until stopped")")
 

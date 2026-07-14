@@ -5,10 +5,12 @@
 
 ## Now
 
-- **Current milestone:** M1 — Capture engine (M0 complete, G0 passed)
-- **Next task:** M1-T1 (`CaptureConfiguration`: display selection, mic device stored as
-  explicit ID, fps cap, quality preset enum; pixel math from contentRect × pointPixelScale
-  with unit tests — see M1-T1 checklist)
+- **Current milestone:** M1 — Capture engine (M0 complete, G0 passed; M1-T1 done)
+- **Next task:** M1-T2 (`CaptureEngine` actor: SCStreamConfiguration from
+  CaptureConfiguration, start/stop, `EngineEvent` AsyncStream per docs/01,
+  `engine-smoke` CLI subcommand — see M1-T2 checklist). NOTE: watch the M0-T5 field note
+  — CGPreflightScreenCaptureAccess returned false for the CLI binary; engine-smoke will
+  reveal whether capture works from the terminal or needs its own grant.
 - **Blockers:** none
 
 ## Needs Franco (human-only items)
@@ -35,6 +37,12 @@
 
 ## Field notes (append; things learned that docs don't cover yet)
 
+- 2026-07-14 (M0 holistic review + M1-T1): Holistic M0 review passed from a fully clean
+  state (`rm -rf .build dist` → build/test(23)/release/bundle all green; devsign
+  idempotent; designated requirement stable across fresh rebuilds; CLI works). M0 is
+  genuinely complete. M1-T1: CaptureConfiguration + QualityPreset/DisplaySelection/
+  MicrophoneSelection value types + pixel math, 29 tests. CLI now parses presets via
+  QualityPreset (placeholder array removed).
 - 2026-07-14 (M0-T5): CLI dry-run + list-mics work. TWO things to watch in M1:
   (1) `CGPreflightScreenCaptureAccess()` returns false ("not determined") for the
   freshly-built Tier-2 CLI even though this terminal records fine via the Tier-1 PoC —
