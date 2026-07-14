@@ -121,7 +121,7 @@ Goal: three-track `.mov` with tuned HEVC, crash-safe, from the CLI.
       **Verify:** unit tests — preset math, pixel-count edge cases, monotone ordering
       Efficient < Balanced < High at fixed resolution. ✅ 2026-07-14 (9 tests; reference
       figures ~5/~19 Mbps, ratios, fps/pixel proportionality, zero-dim guard)
-- [ ] M2-T2 `MovieRecorder` skeleton: writer + 3 inputs (video HEVC from preset; system
+- [x] M2-T2 `MovieRecorder` skeleton: writer + 3 inputs (video HEVC from preset; system
       AAC; mic input built lazily from first mic buffer's format — 02 §4),
       `expectsMediaDataInRealTime`, fragment interval 10 s (02 §5).
       **Verify:** WITHOUT ScreenCaptureKit — a `swift test` integration test feeds 2 s
@@ -129,7 +129,9 @@ Goal: three-track `.mov` with tuned HEVC, crash-safe, from the CLI.
       audio formats) → `finishWriting` to a temp path → the test itself asserts track
       count/codecs/duration via AVAsset (hvc1 + two aac, 2 ± 0.1 s); run tools/probe on
       the temp file once as a human-readable cross-check. Proves the writer
-      independently of capture.
+      independently of capture. ✅ 2026-07-14 (3 tests; probe: 2.00s, hvc1 640x360 +
+      aac 48k/2ch + aac 24k/1ch. AAC bitrate must snap to the encoder's applicable set —
+      see STATUS field note.)
 - [ ] M2-T3 `TimestampRebaser`: epoch at first complete video frame, drop
       pre-epoch audio, monotonic enforcement, pause offset accounting (pause used in M3
       but build the math now).

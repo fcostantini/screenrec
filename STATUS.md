@@ -6,12 +6,13 @@
 ## Now
 
 - **Current milestone:** M2 — MovieRecorder, the real writer (M1 complete, G1 passed)
-- **Next task:** M2-T2 (`MovieRecorder` skeleton: AVAssetWriter + 3 inputs — video HEVC
-  via BitrateModel, system AAC, mic input built lazily from first mic buffer's format;
-  `expectsMediaDataInRealTime`, fragment interval 10 s. 02 §3–§5). M2-T1 (`BitrateModel`)
-  done. Remember: M2-T4 must close the OutputLocation TOCTOU with exclusive create.
+- **Next task:** M2-T3 (`TimestampRebaser`: epoch at first complete video frame, drop
+  pre-epoch audio, monotonic enforcement, pause-offset accounting — pure unit tests.
+  02 §5). M2-T1/T2 done: BitrateModel + MovieRecorder skeleton (3-track writer verified).
+  Reminders for M2-T4: close the OutputLocation TOCTOU with exclusive create, AND fix the
+  mic-never-arrives gap (see field note 2026-07-14 M2-T2).
 - **Blockers:** none — the M1-T4 finding (mic 24k/48k mono vs system 48k stereo) is the
-  key input to M2's two-separate-audio-tracks design.
+  key input to M2's two-separate-audio-tracks design (confirmed working in M2-T2).
 
 ## Needs Franco (human-only items)
 
@@ -42,6 +43,28 @@
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-14 (M2-T2): MovieRecorder skeleton lands (3-track .mov, HEVC + 2×AAC).
+  TWO things worth carrying forward:
+  (1) **AAC bitrate must snap to the encoder's applicable set.** Apple's AAC encoder
+      accepts only a discrete bitrate set that shrinks with the format — 24 kHz mono
+      (AirPods!) tops out at 64 kbps: `[16,20,24,28,32,40,48,56,64]k`. Requesting the
+      nominal 160 kbps → `AVAssetWriter` fails at finish with -11861 / OSStatus -12651
+      "encoding parameters not supported." `MovieRecorder.supportedAACBitRate` now queries
+      `AVAudioConverter.applicableEncodeBitRates` and picks the highest ≤ target. This is
+      exactly the AirPods 24 kHz mono case from G1 — the docs/02 §4 "~160 kbps" is a target,
+      not a literal. (docs/02 §4 could note the discrete-set constraint.)
+  (2) **OPEN for M2-T4/M3-T2 — mic-enabled recording is hostage to the mic.** Because the
+      mic input is built lazily from the first mic buffer and inputs can't be added after
+      `startWriting()`, the writer defers `startWriting` until that first mic buffer. If a
+      mic is selected but never produces a usable buffer (silent/failed device, or a first
+      buffer with no ASBD), `startWriting` never fires, ALL video is dropped, and `finish()`
+      throws `noFramesWritten` — the whole screen recording is lost over a mic glitch. M2-T4
+      (readiness/robustness) or M3-T2 (mic handling) must add a fallback: e.g. after a short
+      grace period with no mic buffer, start writing video+system without the mic track.
+  Also: `MovieRecorder` needs the resolved PIXEL dimensions (not in CaptureConfiguration —
+  the engine computes them at start). M2-T4 must pass the engine's resolved width/height +
+  the clamped fps into the recorder.
 
 - 2026-07-14 (M1-T4): probe-stream confirms all three sources flow through the router.
   KEY M2 INPUT — the mic's native format is device-dependent and differs from system
