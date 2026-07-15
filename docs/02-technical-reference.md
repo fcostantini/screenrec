@@ -206,8 +206,12 @@ Consequences for anyone designing mic recovery:
 - **The display-gone error is `SCStreamErrorNoCaptureSource` (-3815)**, "Failed to find any
   displays or windows to capture" (measured 2026-07-15: `pmset displaysleepnow` mid-recording →
   -3815 → `finished(.displayDisconnected)` → playable file). ⚠️ SCK reports display **sleep**,
-  screen **lock**, and display **unplug** identically as -3815, so `EndReason.systemSleep` is
-  currently unreachable — do not invent a distinction the API doesn't give you.
+  screen **lock**, and **lid-close / system sleep** identically as -3815 — lid-close confirmed
+  2026-07-15 (§4.3: the machine slept mid-recording, the process was suspended, and it finalized
+  `displayDisconnected` + a playable 11.2 s file on wake). So **`EndReason.systemSleep` is
+  confirmed dead, not merely unused**: there is no signal to map it from, and every guess at
+  wiring it up would have been wrong. Do not invent a distinction the API doesn't give you.
+  (Monitor unplug stays untested — this machine has only a built-in display.)
   `CaptureEngine.endReason(forStreamError:)` maps it; unmapped SCK errors keep their code in the
   message, which is how -3815 was identified rather than guessed.
 - ⚠️ **Zero displays needs lock AND display-off — neither alone does it** (measured 2026-07-15,

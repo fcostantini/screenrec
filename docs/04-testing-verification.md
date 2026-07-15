@@ -66,8 +66,14 @@ Pass criteria:
    original wording here ("clean stop") assumed a built-in-mic takeover that does not happen
    — see 02 §4. Run 2026-07-15 against the pre-M3-T6 build recorded the loss correctly in the
    file (mic 22.6 s vs video 59.9 s) but emitted no event; the event is what M3-T6 adds.
-3. **Display sleep/lock** (human): close lid mid-recording. Pass: playable file to
-   that point.
+3. **Display sleep/lock**: Pass: playable file to that point + a sensible reason.
+   ✅ 2026-07-15. Two ways in, both landing on `-3815` → `finished(.displayDisconnected)`:
+   - **Display sleep — now HEADLESS**, no human needed: run a capture and fire
+     `pmset displaysleepnow` mid-recording (`( sleep 4; pmset displaysleepnow ) &` before a
+     foreground `record`), then `caffeinate -u -t 3` to wake. → playable 3.3 s file.
+   - **Lid close (system sleep)** (human): playable 11.2 s file finalized on wake.
+   - **Monitor unplug: N/A on this hardware** (built-in display only). Re-run if an external
+     display ever exists; it may reveal a code other than -3815 (02 §7).
 4. **Disk guard**: run with `--test-disk-floor <huge>` to trip the monitor. Pass:
    clean stop + message.
 

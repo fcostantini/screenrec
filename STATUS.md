@@ -39,11 +39,18 @@
   auto-restart. The idle cross-check IS the design: frame-on-change makes a static screen
   legitimately silent, so "no frames" alone would cry wolf on every coffee break. Shared
   `pollingTask(every:)` extracted here (rule of three: mic-loss, disk, stall).
-- **Next: GATE G3** (04 §4). Automated legs already pass (§4.1 pause math, §4.2 mic loss,
-  §4.4 disk guard); §4.3's display-sleep leg passes headlessly via `pmset`. Remaining before G3
-  can be called: the **human legs in "Needs Franco"** (cross-seam clap-sync; lid-close and
-  monitor-unplug). Offered and not yet run: a **`/simplify` sweep** over M3's code — nothing has
-  ever swept for cross-task drift, only per-diff correctness (see the 2026-07-15 note below).
+- **🎉 M3 COMPLETE — GATE G3 PASSED 2026-07-15 (all legs; see the gate table).** Pause/resume,
+  mic-loss reporting, disk guard, display-loss classification and the stall watchdog all land,
+  with every §4 leg verified. Only §4.3's monitor-unplug is N/A (hardware).
+- **Next: M4 — the menu-bar app** (docs/06 is required reading before any M4 work; build to that
+  spec, don't improvise structure or copy). Start at **M4-T1** (MenuBarExtra shell + `AppCore`
+  target). ⚠️ **M4-T3 now also owes an answer** the whole permission story rests on: does an
+  ungranted process *throw* or *enumerate zero displays*? 02 §1 and §10 contradicted each other,
+  §10 (measured) won, and `startDecision` assumes it — a fresh account is the only place to
+  settle it without destroying this machine's grant (02 §2).
+- **Offered, not yet run: a `/simplify` sweep over M3.** Nothing has ever swept this code for
+  cross-task drift — every review so far was per-diff correctness only (see the 2026-07-15
+  "review passes" note). G3 is the natural moment; M4 starts a new module (`AppCore`).
 - **Now done:** M2-T1..T6 + M3-T1..T2. `record` is a full CLI (real 3-track capture, presets,
   explicit path, progress ticker, pause/resume, scripted timeline, mic-change fail-stop).
   KEY ENV FACT: foreground Bash captures WORK (TCC held); backgrounded/detached ones lose the
@@ -82,21 +89,19 @@ video (deterministic, reproducible).
       passes `codesign --verify --strict`. devsign.sh should find and use this
       identity; it must NOT try to create a new one.
 - [ ] First GUI TCC grants for the .app once M4 begins (grant + relaunch dance).
-- [ ] **G3 §4.1 cross-seam A/V sync (human)** — record `--script rec10,pause5,rec10` with mic
-      while clapping near the pause seam; scrub QuickTime that video/system/mic realign within
-      ~2 frames across the resume seam. (Automated duration + monotonic legs already PASS.)
+- [x] **G3 §4.1 cross-seam A/V sync — PASSED 2026-07-15 (Franco).** Sync holds across the seam.
 - [x] **G3 §4.2 mic-disappears — PASSED 2026-07-15 (Franco).** Two runs: the first (pre-M3-T6)
       disproved the gate's premise (no takeover → docs/02 §4 corrected, ADR-012 written); the
       second (post-M3-T6) passed the redefined gate — loss reported, recording continued, file
       playable. A bonus reconnect run proved a lost mic never returns for the session.
 - [x] **M3-T7 spike — DONE 2026-07-15** (all legs run; findings in 02 §4).
-- [ ] **G3 §4.3 leftovers (human, physical)** — two scenarios still unobserved. Both should end
-      in a playable file with a sensible reason; paste the `finished (…)` line + probe output:
-      1. **Close the lid mid-recording** (system sleep — distinct from display sleep, which is
-         already verified). Note this differs again with an external display attached (clamshell
-         = no sleep). Expect `.displayDisconnected` or a new code worth recording.
-      2. **Unplug an external monitor mid-recording** while capturing *that* display.
-      Everything else in §4.3 is now covered headlessly via `pmset displaysleepnow` (02 §7).
+- [x] **G3 §4.3 lid-close — PASSED 2026-07-15 (Franco).** Machine slept mid-recording → suspended
+      → finalized `displayDisconnected` + playable 11.2 s file on wake. Confirms lid-close is the
+      same -3815 as display sleep, and that `.systemSleep` has no signal to map from.
+- [ ] **G3 §4.3 monitor unplug — N/A on this hardware** (built-in display only; no external ever
+      attached). Worth one run if an external display ever exists: unplug it mid-recording while
+      capturing *that* display. It could reveal a code other than -3815, which would need a new
+      `endReason` mapping (02 §7). Not blocking G3.
 - [x] **M2-T6 subjective quality check** — DONE 2026-07-14: Franco compared Balanced vs High on
       real busy content and confirmed "balanced looks pretty good". Balanced quality is
       acceptable at ~2× the efficiency of Tier-1 → BitrateModel constants CONFIRMED, no change.
@@ -113,7 +118,7 @@ video (deterministic, reproducible).
 | M1   | ✅ complete 2026-07-14 | all 5 tasks done; capture engine + router + probe + sleep guard, 41 tests |
 | G1   | ✅ passed 2026-07-14 | probe-stream: all 3 sources flowing. video 4112×2570 420v (PTS Δ 0.008–0.09s, frame-on-change); system audio 48kHz/2ch/32-bit (Δ 0.02s); mic native format device-dependent — AirPods 24kHz/1ch, built-in 48kHz/1ch (both differ from system audio → separate tracks required, M2) |
 | G2   | ✅ passed 2026-07-14 | §3.1 tracks hvc1+2×aac ✅; §3.2 kill-9 ✅ (kill@6s→5.04s playable AFTER fragment fix 10s→1s — 10s was unparseable if killed <10s); §3.3 sync-clap ✅ (Franco); §3.4 static-tail ✅ (14s static→14.4s @7.9fps, tail patch holds); §3.5 30-min drift ✅ (Franco ran real 30-min record + beepflash; per-track dur match 50ms; flash↔beep offset constant ~−67ms±10 from min 5→29 = no drift) |
-| G3   | 🟡 §4.1 passed | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears ✅ PASSED 2026-07-15 (Franco, post-M3-T6, per the ADR-012 definition): AirPods cased at ~22s of a 60s run → CLI printed `⚠️ microphone disconnected — still recording` at ~25s (≈3.2s latency = 3s timeout + ≤1s poll), recording ran to the end, `finished (userStopped)`, file playable, mic track 21.82s vs video 59.83s. First run (pre-M3-T6) disproved the gate's premise — no takeover, buffers just stop → docs/02 §4 corrected, ADR-012 written. Also proved: a reconnected device NEVER resumes (mic gone for the session). §4.4 disk-guard ✅ PASSED 2026-07-15: `--test-disk-floor 500000` (GB) vs 676 GiB free → `finished (diskAlmostFull)`, file playable (2.25s); negative verified on a real non-boot volume (4 GB HFS+ image, importantUsage reads 0 → records the full 8s, `userStopped`) after /code-review caught that the recommended capacity key reads 0 on every external volume. §4.3 sleep-lock awaits M3-T4 — though a mid-recording display sleep was already observed behaving correctly (streamError → playable 1.81s file). Cross-seam clap-sync = human. |
+| G3   | ✅ **PASSED 2026-07-15** | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears ✅ PASSED 2026-07-15 (Franco, post-M3-T6, per the ADR-012 definition): AirPods cased at ~22s of a 60s run → CLI printed `⚠️ microphone disconnected — still recording` at ~25s (≈3.2s latency = 3s timeout + ≤1s poll), recording ran to the end, `finished (userStopped)`, file playable, mic track 21.82s vs video 59.83s. First run (pre-M3-T6) disproved the gate's premise — no takeover, buffers just stop → docs/02 §4 corrected, ADR-012 written. Also proved: a reconnected device NEVER resumes (mic gone for the session). §4.4 disk-guard ✅ PASSED: `--test-disk-floor 500000` (GB) vs 676 GiB free → `finished (diskAlmostFull)`, file playable (2.25s); negative verified on a real non-boot volume (4 GB HFS+ image, importantUsage reads 0 → records the full 8s, `userStopped`) after /code-review caught that the recommended capacity key reads 0 on every external volume. §4.1 cross-seam clap-sync ✅ (Franco — sync holds across the seam). §4.3 ✅ both ways in: display sleep (headless via `pmset`) → playable 3.3s, and lid-close/system sleep (Franco) → `finished (displayDisconnected)` + playable 11.2s file finalized on wake, confirming lid-close is the same -3815 and that `.systemSleep` is genuinely unreachable. §4.3 monitor-unplug N/A — built-in display only. |
 | G4   | ⬜ not run | — |
 | G5   | ⬜ not run | — |
 | G6   | ⬜ not run | — |
