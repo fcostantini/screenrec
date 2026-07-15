@@ -117,7 +117,9 @@ Then run the current task's **Verify** step (docs/03) on top of this loop.
 
 Other tools:
 ```sh
-swift tools/probe.swift <file>   # inspect a recording's tracks/codecs/durations
+swift tools/probe.swift <file>          # inspect a recording's tracks/codecs/durations
+swift tools/menudriver.swift dump       # the menu-bar app's open menu, as assertable text
+swift tools/menudriver.swift click "Pause"
 .build/debug/screenrec-cli --help
 ```
 
@@ -127,6 +129,12 @@ swift tools/probe.swift <file>   # inspect a recording's tracks/codecs/durations
   mic is often AirPods Pro. Command Line Tools only — no Xcode, no xcodebuild.
 - This dev terminal already holds Screen Recording + Microphone TCC grants → CLI capture
   tests run headlessly. GUI/onboarding tests need the human.
+- **Terminal holds an Accessibility grant** (Franco, 2026-07-15) → `tools/menudriver.swift`
+  can open, read and click the menu-bar app's menu, so most docs/03 M4/M5 verifies marked
+  "(human)" for "menus can't be clicked headlessly" no longer are. Note the grant is on
+  **Terminal**, not a "Claude Code" entry — Claude Code here is a CLI hosted by Terminal.app,
+  so it never appears in the Accessibility list on its own. Taste calls and first-run TCC
+  grant dances still need the human.
 - Test recordings: use `~/Movies` or the session scratchpad. NEVER Desktop/Documents/
   Downloads (TCC → opaque "invalid parameter" failures — 02 §2). Clean up test files.
 - Real capture runs take real wall-clock seconds; use `--duration` flags, run in
