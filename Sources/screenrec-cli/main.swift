@@ -46,6 +46,22 @@ func die(_ message: String, code: Int32 = 64) -> Never {
     exit(code)
 }
 
+/// Parses a flag's positive, finite number, or dies with a usage error. Every numeric flag in
+/// this CLI wants exactly this and had grown its own copy.
+///
+/// `max` bounds the flags whose value later feeds a conversion that would trap on absurd input —
+/// `--duration` becomes `UInt64(seconds * 1e9)`, `--test-disk-floor` becomes a byte count — so
+/// the bound is load-bearing, not decoration.
+func parsePositive(
+    _ value: String?, flag: String, unit: String = "seconds", max: Double? = nil
+) -> Double {
+    guard let value, let parsed = Double(value), parsed.isFinite, parsed > 0,
+          max.map({ parsed <= $0 }) ?? true else {
+        die("\(flag) needs a positive number of \(unit)\(max.map { " (max \(Int($0)))" } ?? "")")
+    }
+    return parsed
+}
+
 func describe(_ state: PermissionState) -> String {
     switch state {
     case .granted: return "granted"
@@ -89,10 +105,7 @@ func runEngineSmoke(_ args: [String]) async {
     while let arg = iterator.next() {
         switch arg {
         case "--duration":
-            guard let value = iterator.next(), let seconds = Double(value), seconds.isFinite, seconds > 0 else {
-                die("--duration needs a positive number of seconds")
-            }
-            duration = seconds
+            duration = parsePositive(iterator.next(), flag: "--duration")
         default:
             die("Unknown option: \(arg)")
         }
@@ -191,11 +204,7 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
         switch arg {
         case "--duration":
             // Upper bound keeps `seconds * 1e9` well inside UInt64 for the sleep timer.
-            guard let value = iterator.next(), let seconds = Double(value),
-                  seconds.isFinite, seconds > 0, seconds <= 86_400 else {
-                die("--duration needs a positive number of seconds (max 86400)")
-            }
-            options.duration = seconds
+            options.duration = parsePositive(iterator.next(), flag: "--duration", max: 86_400)
         case "--preset":
             guard let value = iterator.next() else { die("--preset needs a value") }
             guard let parsed = QualityPreset(rawValue: value) else {
@@ -216,10 +225,8 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
         case "--test-disk-floor":
             // Test hook (04 §4.4): pass a floor above the volume's free space to trip the disk
             // guard on demand. Bounded at 1 PB so GB→bytes can't overflow Int64.
-            guard let value = iterator.next(), let gigabytes = Double(value),
-                  gigabytes.isFinite, gigabytes > 0, gigabytes <= 1_000_000 else {
-                die("--test-disk-floor needs a positive number of GB (max 1000000)")
-            }
+            let gigabytes = parsePositive(
+                iterator.next(), flag: "--test-disk-floor", unit: "GB", max: 1_000_000)
             options.diskFloorBytes = Int64(gigabytes * 1_073_741_824)
         case "--dry-run":
             options.dryRun = true

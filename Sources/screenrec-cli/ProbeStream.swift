@@ -83,10 +83,7 @@ func runProbeStream(_ args: [String]) async {
     while let arg = iterator.next() {
         switch arg {
         case "--duration":
-            guard let value = iterator.next(), let seconds = Double(value), seconds.isFinite, seconds > 0 else {
-                die("--duration needs a positive number of seconds")
-            }
-            duration = seconds
+            duration = parsePositive(iterator.next(), flag: "--duration")
         case "--mic":
             guard let value = iterator.next() else { die("--mic needs a device id") }
             micID = value

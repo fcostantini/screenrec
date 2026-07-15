@@ -102,7 +102,9 @@ private func spikeConfiguration(micID: String? = nil) -> SCStreamConfiguration {
     return config
 }
 
-private func startSpikeStream(micID: String, probe: MicFormatProbe) async -> SCStream {
+/// The display every leg captures. One copy: four identical preambles is four places to fix
+/// when the failure wording or exit code changes.
+private func firstSpikeDisplay() async -> SCDisplay {
     let content: SCShareableContent
     do {
         content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
@@ -110,13 +112,23 @@ private func startSpikeStream(micID: String, probe: MicFormatProbe) async -> SCS
         die("SCShareableContent failed: \(error.localizedDescription)", code: 74)
     }
     guard let display = content.displays.first else { die("no displays available", code: 74) }
+    return display
+}
+
+/// Attaches the probe to the outputs every mic leg needs.
+private func attachMicOutputs(_ stream: SCStream, probe: MicFormatProbe) throws {
+    try stream.addStreamOutput(probe, type: .screen, sampleHandlerQueue: DispatchQueue(label: "spike.screen"))
+    try stream.addStreamOutput(probe, type: .microphone, sampleHandlerQueue: DispatchQueue(label: "spike.mic"))
+}
+
+private func startSpikeStream(micID: String, probe: MicFormatProbe) async -> SCStream {
+    let display = await firstSpikeDisplay()
     let stream = SCStream(
         filter: SCContentFilter(display: display, excludingWindows: []),
         configuration: spikeConfiguration(micID: micID),
         delegate: probe)
     do {
-        try stream.addStreamOutput(probe, type: .screen, sampleHandlerQueue: DispatchQueue(label: "spike.screen"))
-        try stream.addStreamOutput(probe, type: .microphone, sampleHandlerQueue: DispatchQueue(label: "spike.mic"))
+        try attachMicOutputs(stream, probe: probe)
         try await stream.startCapture()
     } catch {
         die("startCapture failed: \(error.localizedDescription)", code: 74)
@@ -158,38 +170,39 @@ private func retryRepoint(
     return []
 }
 
+/// Which experiment to run. An enum, not a string: the dispatch switch below is then
+/// exhaustive, so a mistyped literal can't silently fall through to the swap leg.
+private enum SpikeMode { case swap, reconnect, fallback, nilDevice, nilFollow, twoStreams }
+
 func runMicSwapSpike(_ args: [String]) async {
     var seconds = 4.0
-    var mode = "swap"
+    var mode = SpikeMode.swap
     var iterator = args.makeIterator()
     while let arg = iterator.next() {
         switch arg {
         case "--reconnect":
-            mode = "reconnect"
+            mode = .reconnect
         case "--fallback":
-            mode = "fallback"
+            mode = .fallback
         case "--nil-device":
-            mode = "nil-device"
+            mode = .nilDevice
         case "--nil-follow":
-            mode = "nil-follow"
+            mode = .nilFollow
         case "--two-streams":
-            mode = "two-streams"
+            mode = .twoStreams
         case "--seconds":
-            guard let value = iterator.next(), let parsed = Double(value), parsed.isFinite, parsed > 0 else {
-                die("--seconds needs a positive number")
-            }
-            seconds = parsed
+            seconds = parsePositive(iterator.next(), flag: "--seconds")
         default:
             die("Unknown option: \(arg)")
         }
     }
     switch mode {
-    case "reconnect": await runMicReconnectSpike()
-    case "fallback": await runMicFallbackSpike()
-    case "nil-device": await runNilDeviceSpike(seconds: seconds)
-    case "nil-follow": await runNilFollowSpike()
-    case "two-streams": await runTwoStreamSpike(seconds: seconds)
-    default: await runMicDeviceSwapSpike(seconds: seconds)
+    case .swap: await runMicDeviceSwapSpike(seconds: seconds)
+    case .reconnect: await runMicReconnectSpike()
+    case .fallback: await runMicFallbackSpike()
+    case .nilDevice: await runNilDeviceSpike(seconds: seconds)
+    case .nilFollow: await runNilFollowSpike()
+    case .twoStreams: await runTwoStreamSpike(seconds: seconds)
     }
 }
 
@@ -199,13 +212,7 @@ func runMicSwapSpike(_ args: [String]) async {
 /// now means "follow the system default", a dying device could fall back with no work from us —
 /// macOS repoints its default to the built-in the moment AirPods vanish.
 private func runNilDeviceSpike(seconds: Double) async {
-    let content: SCShareableContent
-    do {
-        content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-    } catch {
-        die("SCShareableContent failed: \(error.localizedDescription)", code: 74)
-    }
-    guard let display = content.displays.first else { die("no displays available", code: 74) }
+    let display = await firstSpikeDisplay()
 
     let config = spikeConfiguration()
     let probe = MicFormatProbe()
@@ -214,8 +221,7 @@ private func runNilDeviceSpike(seconds: Double) async {
         configuration: config, delegate: probe)
     print("nil-device spike: captureMicrophone = true, microphoneCaptureDeviceID left nil")
     do {
-        try stream.addStreamOutput(probe, type: .screen, sampleHandlerQueue: DispatchQueue(label: "spike.screen"))
-        try stream.addStreamOutput(probe, type: .microphone, sampleHandlerQueue: DispatchQueue(label: "spike.mic"))
+        try attachMicOutputs(stream, probe: probe)
         try await stream.startCapture()
     } catch {
         print("    startCapture THREW: \(error.localizedDescription)")
@@ -246,21 +252,14 @@ private func runNilDeviceSpike(seconds: Double) async {
 /// re-point, no ADR change. If it merely resolves once, `nil` behaves exactly like pinning and
 /// buys nothing.
 private func runNilFollowSpike() async {
-    let content: SCShareableContent
-    do {
-        content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-    } catch {
-        die("SCShareableContent failed: \(error.localizedDescription)", code: 74)
-    }
-    guard let display = content.displays.first else { die("no displays available", code: 74) }
+    let display = await firstSpikeDisplay()
 
     let probe = MicFormatProbe()
     let stream = SCStream(
         filter: SCContentFilter(display: display, excludingWindows: []),
         configuration: spikeConfiguration(), delegate: probe)
     do {
-        try stream.addStreamOutput(probe, type: .screen, sampleHandlerQueue: DispatchQueue(label: "spike.screen"))
-        try stream.addStreamOutput(probe, type: .microphone, sampleHandlerQueue: DispatchQueue(label: "spike.mic"))
+        try attachMicOutputs(stream, probe: probe)
         try await stream.startCapture()
     } catch {
         die("startCapture failed: \(error.localizedDescription)", code: 74)
@@ -341,13 +340,7 @@ private func runTwoStreamSpike(seconds: Double) async {
         die("no input devices", code: 74)
     }
 
-    let content: SCShareableContent
-    do {
-        content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-    } catch {
-        die("SCShareableContent failed: \(error.localizedDescription)", code: 74)
-    }
-    guard let display = content.displays.first else { die("no displays available", code: 74) }
+    let display = await firstSpikeDisplay()
     let filter = SCContentFilter(display: display, excludingWindows: [])
 
     // Stream A — the "real recording": screen + system audio, no mic. Must stay untouched.
