@@ -43,7 +43,16 @@ public final class RecordingSession: @unchecked Sendable {
             frameRate: configuration.frameRateCap,
             preset: configuration.quality,
             includesMicrophone: configuration.microphone != .none,
-            onMicrophoneFormatChange: { Task { await engine.stop(reason: .microphoneChanged) } })
+            // ⚠️ `[weak engine]` is load-bearing, not caution. The engine holds the router, the
+            // router strongly retains its consumers (including this recorder, by contract), and
+            // the recorder holds this closure — so capturing `engine` strongly closes
+            // engine → router → recorder → engine and makes `CaptureEngine.deinit` unreachable,
+            // killing the very safety net it exists to be (a running engine dropped without a
+            // clean stop would keep its SCStream and both poll loops alive forever). A
+            // deallocated engine has nothing to stop, so weak costs nothing.
+            onMicrophoneFormatChange: { [weak engine] in
+                Task { await engine?.stop(reason: .microphoneChanged) }
+            })
         // Same fail-stop seam, different trigger: run out of room and we finalize what we have
         // rather than let the writer wedge against a full volume. Watches the output
         // DIRECTORY — same volume, but it exists before the file does, and probing a
@@ -73,8 +82,8 @@ public final class RecordingSession: @unchecked Sendable {
         // (first launch, Bluetooth mic binding), and a thrashing near-full volume is precisely
         // when it does. `recordedDuration` is NaN until the first frame starts the session.
         let diskMonitor = self.diskMonitor
-        let diskTask = pollingTask(every: DiskSpaceMonitor.checkInterval) { [recorder] in
-            guard !recorder.recordedDuration.seconds.isNaN else { return }
+        let diskTask = pollingTask(every: DiskSpaceMonitor.checkInterval) {
+            guard recorder.hasStartedSession else { return }
             diskMonitor.check()
         }
         self.diskTask = diskTask
@@ -135,9 +144,18 @@ public final class RecordingSession: @unchecked Sendable {
 
     /// Clean, user-initiated stop; the file is finalized and a `finished` event follows.
     public func stop() async {
+        // Disarm before teardown, matching the engine's discipline with its own monitors
+        // (see `pollingTask`): `engine.stop()` suspends for seconds on `stopCapture`, and the
+        // engine stays `.running` throughout — so a disk check landing in that window would
+        // terminate the recording as `.diskAlmostFull` instead of the `.userStopped` the user
+        // actually asked for. Benign only because `stop(reason:)` happens to be idempotent.
+        diskTask?.cancel()
         await engine.stop()
     }
 
     /// Media duration written so far, for a progress ticker; `.invalid` before capture starts.
     public var recordedDuration: CMTime { recorder.recordedDuration }
+
+    /// Whether the writer has a session yet — i.e. there is something worth saving.
+    public var hasStartedSession: Bool { recorder.hasStartedSession }
 }

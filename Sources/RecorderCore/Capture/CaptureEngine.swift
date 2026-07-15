@@ -39,9 +39,10 @@ public actor CaptureEngine {
     private var state: State = .idle
     /// Set if stop() arrives while start() is still suspended (actor reentrancy); start()
     /// honors it — with the requested reason — when it resumes, rather than bringing up an
-    /// unstoppable stream.
-    private var stopRequested = false
-    private var requestedStopReason: EndReason = .userStopped
+    /// unstoppable stream. One optional rather than a flag plus a reason: the reason is
+    /// meaningless unless a stop was asked for, so the pair can't fall out of sync if it can't
+    /// be spelled.
+    private var requestedStopReason: EndReason?
     /// Orthogonal to `state` (the stream stays `.running` while paused, still delivering
     /// buffers that the recorder drops); gates `pause`/`resume` so each event fires once.
     private var isPaused = false
@@ -83,7 +84,7 @@ public actor CaptureEngine {
         state = .starting
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-            if stopRequested { return terminate(requestedStopReason) }
+            if let requestedStopReason { return terminate(requestedStopReason) }
 
             switch Self.startDecision(
                 screenPermission: Permissions.screenRecordingState(),
@@ -111,7 +112,7 @@ public actor CaptureEngine {
             }
             try await stream.startCapture()
 
-            if stopRequested {
+            if let requestedStopReason {
                 try? await stream.stopCapture()
                 return terminate(requestedStopReason)
             }
@@ -141,7 +142,6 @@ public actor CaptureEngine {
         case .idle, .terminated:
             return
         case .starting:
-            stopRequested = true
             requestedStopReason = reason
         case .running:
             // Disarm BEFORE tearing the stream down. `stopCapture` halts delivery and can take

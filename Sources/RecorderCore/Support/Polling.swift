@@ -13,7 +13,15 @@ import Foundation
 ///   `let` compiles cleanly, so `pollingTask { self.watchdog.check() }` looks fine and creates
 ///   owner → task → closure → owner: `deinit` never runs, so the cancel in `deinit` never fires
 ///   and the loop wakes forever holding the owner alive — the second bullet's leak, reached
-///   through the door it doesn't mention. Bind the monitor to a local first.
+///   through the door it doesn't mention. Bind the monitor to a local first. (The same hazard
+///   reaches a monitor's *own* callbacks, not just this one: a `@Sendable` handler capturing the
+///   owner closes the identical cycle through whatever retains the monitor.)
+/// - ⚠️ **Disarm before teardown if the tick publishes anything.** Stopping a capture suspends
+///   for seconds (Bluetooth teardown) while the owner still looks alive, and buffer delivery has
+///   already ceased — so a monitor polling across that window reports on a recording that is
+///   perfectly complete. The rule: a tick that *publishes* (an event, a log line) must be
+///   cancelled before the owner starts tearing down; a tick that merely *requests an idempotent
+///   action* survives it, but relies on that idempotence and is one refactor from not.
 ///
 /// Deliberately a free (nonisolated) function: `Task {}` written inside an actor's method would
 /// *inherit* that actor's isolation, and every caller's `tick` is a lock-guarded `Sendable`

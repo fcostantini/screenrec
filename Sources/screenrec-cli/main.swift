@@ -362,10 +362,10 @@ func preciseSleep(_ seconds: Double) async {
 func runScript(_ steps: [ScriptStep], session: RecordingSession) async {
     // Anchor the timeline to the first captured frame, not to start() returning: SCK startup
     // latency (the first frame lands ~0.1–0.5 s after capture begins, more on a cold start)
-    // would otherwise shorten the file below the ±0.2 s gate. recordedDuration is NaN until the
-    // session starts. Bounded (~5 s) so a stream that never starts can't hang the script.
+    // would otherwise shorten the file below the ±0.2 s gate.
+    // Bounded (~5 s) so a stream that never starts can't hang the script.
     var waited = 0
-    while session.recordedDuration.seconds.isNaN, waited < 1000 {
+    while !session.hasStartedSession, waited < 1000 {
         await preciseSleep(0.005)
         waited += 1
     }

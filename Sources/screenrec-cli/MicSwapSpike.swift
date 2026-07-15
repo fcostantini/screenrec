@@ -83,8 +83,10 @@ private func summarize(_ formats: [(format: String, count: Int)]) -> String {
 }
 
 /// Mirrors CaptureEngine's audio setup exactly so findings generalize; only the video geometry
-/// is shrunk, since the spike is about the mic.
-private func spikeConfiguration(micID: String) -> SCStreamConfiguration {
+/// is shrunk, since the spike is about the mic. ⚠️ ONE builder on purpose: this invariant is
+/// what makes the legs' verdicts comparable, and a second copy is how it drifts unnoticed.
+/// `micID: nil` leaves `microphoneCaptureDeviceID` unset — Apple's "the default microphone".
+private func spikeConfiguration(micID: String? = nil) -> SCStreamConfiguration {
     let config = SCStreamConfiguration()
     config.width = 640
     config.height = 360
@@ -96,24 +98,7 @@ private func spikeConfiguration(micID: String) -> SCStreamConfiguration {
     config.channelCount = 2
     config.excludesCurrentProcessAudio = true
     config.captureMicrophone = true
-    config.microphoneCaptureDeviceID = micID
-    return config
-}
-
-/// As `spikeConfiguration`, but deliberately leaves `microphoneCaptureDeviceID` unset — which
-/// Apple documents as "capture the default microphone".
-private func defaultMicConfiguration() -> SCStreamConfiguration {
-    let config = SCStreamConfiguration()
-    config.width = 640
-    config.height = 360
-    config.minimumFrameInterval = CMTime(value: 1, timescale: 5)
-    config.queueDepth = 5
-    config.showsCursor = true
-    config.capturesAudio = true
-    config.sampleRate = 48_000
-    config.channelCount = 2
-    config.excludesCurrentProcessAudio = true
-    config.captureMicrophone = true
+    if let micID { config.microphoneCaptureDeviceID = micID }
     return config
 }
 
@@ -147,6 +132,30 @@ private func waitForMicSilence(_ probe: MicFormatProbe, quiet: TimeInterval, giv
         if let gap = probe.quietFor, gap >= quiet { return true }
     }
     return false
+}
+
+/// Retries `updateConfiguration` at `micID` and reports the mic formats that resume, if any.
+///
+/// ⚠️ ONE copy on purpose: legs 2 and 2b are meant to differ in exactly one variable (which
+/// device we re-point AT), so their NO/YES verdicts are only comparable while they share this
+/// retry policy. Hand-copying the loop is how tuning one leg silently changes what the other's
+/// verdict means.
+private func retryRepoint(
+    _ stream: SCStream, to micID: String, probe: MicFormatProbe
+) async -> [(format: String, count: Int)] {
+    probe.reset()
+    for attempt in 1...8 {
+        do {
+            try await stream.updateConfiguration(spikeConfiguration(micID: micID))
+            print("    attempt \(attempt): updateConfiguration OK")
+        } catch {
+            print("    attempt \(attempt): threw — \(error.localizedDescription)")
+        }
+        try? await Task.sleep(for: .seconds(2))
+        let now = probe.snapshot()
+        if !now.formats.isEmpty { return now.formats }
+    }
+    return []
 }
 
 func runMicSwapSpike(_ args: [String]) async {
@@ -198,7 +207,7 @@ private func runNilDeviceSpike(seconds: Double) async {
     }
     guard let display = content.displays.first else { die("no displays available", code: 74) }
 
-    let config = defaultMicConfiguration()
+    let config = spikeConfiguration()
     let probe = MicFormatProbe()
     let stream = SCStream(
         filter: SCContentFilter(display: display, excludingWindows: []),
@@ -248,7 +257,7 @@ private func runNilFollowSpike() async {
     let probe = MicFormatProbe()
     let stream = SCStream(
         filter: SCContentFilter(display: display, excludingWindows: []),
-        configuration: defaultMicConfiguration(), delegate: probe)
+        configuration: spikeConfiguration(), delegate: probe)
     do {
         try stream.addStreamOutput(probe, type: .screen, sampleHandlerQueue: DispatchQueue(label: "spike.screen"))
         try stream.addStreamOutput(probe, type: .microphone, sampleHandlerQueue: DispatchQueue(label: "spike.mic"))
@@ -502,19 +511,7 @@ private func runMicReconnectSpike() async {
 
     // Phase B: active. Same device id — SCK may re-resolve it to the new CoreAudio object.
     print("  phase B — retrying updateConfiguration with the SAME device id every 2s…")
-    probe.reset()
-    var resumed: [(format: String, count: Int)] = []
-    for attempt in 1...8 {
-        do {
-            try await stream.updateConfiguration(spikeConfiguration(micID: target.uniqueID))
-            print("    attempt \(attempt): updateConfiguration OK")
-        } catch {
-            print("    attempt \(attempt): threw — \(error.localizedDescription)")
-        }
-        try? await Task.sleep(for: .seconds(2))
-        let now = probe.snapshot()
-        if !now.formats.isEmpty { resumed = now.formats; break }
-    }
+    let resumed = await retryRepoint(stream, to: target.uniqueID, probe: probe)
     try? await stream.stopCapture()
 
     print("")
@@ -571,19 +568,7 @@ private func runMicFallbackSpike() async {
 
     print("")
     print("  re-pointing to \(fallback.name) [\(fallback.uniqueID)] — alive the whole time…")
-    probe.reset()
-    var resumed: [(format: String, count: Int)] = []
-    for attempt in 1...8 {
-        do {
-            try await stream.updateConfiguration(spikeConfiguration(micID: fallback.uniqueID))
-            print("    attempt \(attempt): updateConfiguration OK")
-        } catch {
-            print("    attempt \(attempt): threw — \(error.localizedDescription)")
-        }
-        try? await Task.sleep(for: .seconds(2))
-        let now = probe.snapshot()
-        if !now.formats.isEmpty { resumed = now.formats; break }
-    }
+    let resumed = await retryRepoint(stream, to: fallback.uniqueID, probe: probe)
     let final = probe.snapshot()
     try? await stream.stopCapture()
     if let error = final.error { print("    stream error: \(error)") }

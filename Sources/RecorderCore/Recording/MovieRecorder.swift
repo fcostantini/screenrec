@@ -115,6 +115,17 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         return didStartSession ? latestRebasedPTS : .invalid
     }
 
+    /// Whether the writer has a session — i.e. a first frame landed and there is now something
+    /// worth saving. Ask this rather than decoding `recordedDuration`'s NaN sentinel: callers
+    /// were spelling the same question three different ways (`.isNaN`, `.isFinite`,
+    /// `!= .invalid`) over a `CMTime → Double` round trip, which is a convention to rediscover
+    /// rather than a question to ask. ⚠️ NOT the same as `EngineEvent.started`, which fires on
+    /// the first frame — the writer can still be waiting out the mic grace at that point.
+    public var hasStartedSession: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return didStartSession
+    }
+
     // MARK: - Consume
 
     /// Route a captured buffer to its track (`SampleConsumer`). Safe to call from the separate
