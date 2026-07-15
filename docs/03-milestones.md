@@ -218,7 +218,7 @@ clap test; static-screen duration test; 30-min drift test).
       every non-boot volume**, so the guard killed every external-drive recording at ~2 s —
       invisible to both the gate and the unit test, which only ever touched the boot volume.
       See 02 §7 + STATUS field notes.
-- [ ] M3-T4 Display-change / sleep handling end-to-end (unplug display, close lid):
+- [x] M3-T4 Display-change / sleep handling end-to-end (unplug display, close lid):
       always a playable file + correct event. Document observed behaviors in 02.
       **Also fix (found 2026-07-15, see STATUS):** a display asleep AT START is misreported as
       a permission failure — preflight says *granted* while `SCShareableContent` returns 0
@@ -229,9 +229,19 @@ clap test; static-screen duration test; 30-min drift test).
       `CaptureEngineTests.failsWhenNoDisplaysAvailable` encodes the conflation today.
       **Verify:** §4.3 **(human)** — both scenarios end in probe-clean files; observed
       SCK error codes recorded in docs/02 field additions.
-      Head start: a display sleeping MID-recording was already observed to behave correctly —
-      `didStopWithError` "Failed to find any displays or windows to capture" →
-      `finished(streamError(…))` → playable 1.81 s file.
+      ✅ 2026-07-15. **Display-gone is `SCStreamErrorNoCaptureSource` (-3815)** — measured, not
+      guessed, via `pmset displaysleepnow` mid-recording (which turns out to be a headless lever
+      for this leg). `endReason(forStreamError:)` maps it → `finished(.displayDisconnected)` +
+      playable file (verified live, 3.33 s); unmapped SCK errors now carry their raw code, which
+      is how -3815 was identified at all. This finally wires up `EndReason.displayDisconnected`,
+      declared-but-dead since M1. ⚠️ SCK collapses sleep/lock/unplug into that one code, so
+      `.systemSleep` stays unreachable — no distinction faked (02 §7).
+      **Locked-screen bug FIXED and verified live**: zero displays no longer implies "grant
+      permission" — with the preflight reporting *granted*, we now say "No displays are
+      available — the screen may be asleep, locked, or disconnected". Repro needs lock **AND**
+      display-off (neither alone; truth table in 02 §1). Failure path leaves no 0-byte litter.
+      **Still human (→ Needs Franco):** lid-close (system sleep, distinct from display sleep) and
+      physical monitor unplug — both remain unobserved.
 - [ ] M3-T5 Stall watchdog logging (02 §7; input-idle via
       `CGEventSource.secondsSinceLastEventType` — not NSEvent), clock injectable.
       **Verify:** unit test with injected clock — 30 s of no video buffers fires
@@ -308,6 +318,13 @@ UI layout, states, notification copy, and onboarding flow are specified in
       logic via AppCore unit test against a fixture directory.
 - [ ] M4-T3 Onboarding: permission status view; request buttons; explains the
       restart-after-grant dance (02 §2); blocks record until green.
+      **Also settle (M3-T4 left this open):** does a genuinely **ungranted** process *throw* from
+      `SCShareableContent` (02 §10, measured in M1-T2) or *enumerate zero displays* (the old 02 §1
+      claim, now retracted)? The two contradicted each other and it can't be tested here without
+      revoking TCC and destroying this machine's grant (02 §2) — a fresh account is the one place
+      it's free. `CaptureEngine.startDecision` currently assumes **throws**, and so never blames
+      permission for zero displays. If the fresh account shows zero-displays-when-ungranted
+      instead, that decision needs revisiting.
       **Verify:** unit tests render view model for every permission-state combination;
       fresh-account walkthrough per 04-testing §5.1 **(human)**.
 - [ ] M4-T4 Settings window (SwiftUI Form, UserDefaults): output dir (with preflight on

@@ -84,7 +84,7 @@ public actor CaptureEngine {
             }
 
             let handler = StreamHandler(router: router) { [weak self] error in
-                Task { await self?.terminate(.streamError(error.localizedDescription)) }
+                Task { await self?.terminate(Self.endReason(forStreamError: error)) }
             }
             let (filter, streamConfig) = makeStreamConfiguration(for: display)
             let stream = SCStream(filter: filter, configuration: streamConfig, delegate: handler)
@@ -245,14 +245,23 @@ public actor CaptureEngine {
         case fail(String)
     }
 
-    /// The primary live signal for missing Screen Recording permission is that
-    /// `SCShareableContent` returns zero displays (docs/02 §1); it can also *throw*
-    /// (see `startErrorMessage`). `.denied` is handled defensively though the public API
-    /// can't currently produce it.
+    /// ⚠️ **Zero shareable displays never proves a missing grant.** An *ungranted* process does
+    /// not enumerate zero — `SCShareableContent` **throws** "The user declined TCCs…" (docs/02
+    /// §10, measured in M1-T2), which `start()`'s catch turns into `permissionGuidance` via
+    /// `startErrorMessage`. So reaching this function at all means enumeration succeeded, i.e.
+    /// we are authorized in fact; and the only measured zero-display state is a screen that is
+    /// locked **and** slept (docs/02 §7). Blaming permission here sent users to System Settings
+    /// to grant what they already held (verified live by locking the screen).
+    ///
+    /// Deliberately does NOT consult the preflight to decide: `CGPreflightScreenCaptureAccess()`
+    /// is documented to false-negative for freshly-built CLI binaries that capture fine (docs/02
+    /// §10), so trusting it would resurrect the same misdiagnosis on exactly that path.
+    ///
+    /// `.denied` is honored defensively though the public API cannot currently produce it —
+    /// `Permissions.screenRecordingState()` only ever returns `.granted` or `.notDetermined`.
     static func startDecision(screenPermission: PermissionState, availableDisplays: Int) -> StartDecision {
-        if screenPermission == .denied || availableDisplays == 0 {
-            return .fail(permissionGuidance)
-        }
+        if screenPermission == .denied { return .fail(permissionGuidance) }
+        guard availableDisplays > 0 else { return .fail(noDisplaysGuidance) }
         return .proceed
     }
 
@@ -262,10 +271,51 @@ public actor CaptureEngine {
     /// a message fallback so it holds even if the code constant shifts.
     static func startErrorMessage(_ error: Error) -> String {
         let nsError = error as NSError
-        let isDecline = (nsError.domain == "com.apple.ScreenCaptureKit.SCStreamErrorDomain" && nsError.code == -3801)
+        let isSCK = nsError.domain == SCStreamError.errorDomain
+        let isDecline = (isSCK && nsError.code == SCStreamError.Code.userDeclined.rawValue)
             || error.localizedDescription.range(of: "declined", options: .caseInsensitive) != nil
-        return isDecline ? permissionGuidance : error.localizedDescription
+        if isDecline { return permissionGuidance }
+        // The display can also vanish *inside* the start window (enumeration succeeds, then
+        // `startCapture` throws). Same condition as the two sibling paths — say the same thing
+        // rather than leaking a raw SCK string on the one surface that missed it.
+        if isSCK, nsError.code == SCStreamError.Code.noCaptureSource.rawValue { return noDisplaysGuidance }
+        return error.localizedDescription
     }
+
+    /// Classifies an unexpected stream death into the most specific `EndReason` we can (docs/01),
+    /// so the file's stated cause is meaningful rather than a raw SCK string.
+    ///
+    /// Measured (2026-07-15, `pmset displaysleepnow` mid-recording): a display going away ends
+    /// the stream with `.noCaptureSource`. ⚠️ **Lid-close and monitor-unplug are NOT yet
+    /// observed** (STATUS → Needs Franco) — they may land on a different code, which is exactly
+    /// why unmapped errors keep their raw code in the message. Carrying the code is how
+    /// `.noCaptureSource` was identified rather than guessed; don't remove it.
+    ///
+    /// `.systemSleep` stays unreachable on purpose: nothing we have measured distinguishes it,
+    /// and faking the distinction would be worse than leaving the case unused (docs/02 §7).
+    static func endReason(forStreamError error: Error) -> EndReason {
+        let nsError = error as NSError
+        guard nsError.domain == SCStreamError.errorDomain else {
+            return .streamError(error.localizedDescription)
+        }
+        switch nsError.code {
+        case SCStreamError.Code.noCaptureSource.rawValue:  // measured: the display went away
+            return .displayDisconnected
+        case SCStreamError.Code.noDisplayList.rawValue:    // same family; unobserved, by kinship
+            return .displayDisconnected
+        case SCStreamError.Code.userStopped.rawValue:
+            // The user stopped us from the system's screen-recording indicator. Ordinary, not a
+            // failure — mapping it anywhere else makes ADR-007 treat the most normal stop there
+            // is as a fail-stop, and M4 would fire an "ended unexpectedly" notification for it.
+            return .userStopped
+        default:
+            return .streamError("\(error.localizedDescription) [SCStreamError \(nsError.code)]")
+        }
+    }
+
+    static let noDisplaysGuidance =
+        "No displays are available to capture — the screen is locked or asleep, or no display "
+        + "is connected. Unlock and wake the screen, then try again."
 
     static let permissionGuidance =
         "Screen Recording permission is needed. Grant it in System Settings → Privacy & Security "

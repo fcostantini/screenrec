@@ -27,8 +27,23 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   (ring buffer holds *compressed* video, not SCK surfaces; PCM copies for audio).
 - `showsCursor = true` for v1 (cursor-as-data is ADR-008, deferred).
 - Content enumeration: `SCShareableContent.excludingDesktopWindows(false,
-  onScreenWindowsOnly: true)`. Returns **empty results, not an error**, when Screen
-  Recording permission is missing.
+  onScreenWindowsOnly: true)`.
+  ⚠️ **CORRECTION (2026-07-15, M3-T4).** This section used to claim it "returns empty results,
+  not an error, when Screen Recording permission is missing". That contradicts §10, which
+  records the *measured* M1-T2 behavior: an ungranted process **throws** ("The user declined
+  TCCs…"), it does not enumerate zero. §10 wins — it was observed; this line was research.
+  **Consequence: zero displays NEVER means "ungranted".** If enumeration returned at all, you
+  are authorized; zero displays means the screen is locked **and** slept (the only measured
+  zero-display state — see §7's table). `startDecision` therefore reports "no displays
+  available" for zero, and never blames permission for it; the real ungranted path is the
+  thrown error, mapped by `startErrorMessage`.
+  ⚠️ Do **not** "fix" this by consulting `CGPreflightScreenCaptureAccess()` — it false-negatives
+  for freshly-built CLI binaries that capture fine (§10), so trusting it re-creates the very
+  misdiagnosis (users sent to grant a permission they already hold).
+  Not yet re-verified against a genuinely ungranted process — the only way to test it is to
+  revoke TCC, which would destroy this machine's own grant (§2). **M4-T3's fresh-account
+  onboarding walkthrough is where this finally gets confirmed** — if an ungranted app turns out
+  to enumerate zero after all, `startDecision` needs revisiting.
 - Sample handler queues must do minimal work. Video buffers: check
   `SCStreamFrameInfo.status == .complete` via attachments; `.idle`/incomplete frames are
   skipped (but see tail-frame patch).
@@ -188,6 +203,27 @@ Consequences for anyone designing mic recovery:
   Display sleep still ends the stream — that's a clean finalize, acceptable.
 - Display unplug / resolution change / user lock → `didStopWithError` → finalize + notify.
   Never attempt hot re-attach in v1 (ADR-007).
+- **The display-gone error is `SCStreamErrorNoCaptureSource` (-3815)**, "Failed to find any
+  displays or windows to capture" (measured 2026-07-15: `pmset displaysleepnow` mid-recording →
+  -3815 → `finished(.displayDisconnected)` → playable file). ⚠️ SCK reports display **sleep**,
+  screen **lock**, and display **unplug** identically as -3815, so `EndReason.systemSleep` is
+  currently unreachable — do not invent a distinction the API doesn't give you.
+  `CaptureEngine.endReason(forStreamError:)` maps it; unmapped SCK errors keep their code in the
+  message, which is how -3815 was identified rather than guessed.
+- ⚠️ **Zero displays needs lock AND display-off — neither alone does it** (measured 2026-07-15,
+  after getting this wrong twice by testing one condition at a time):
+
+  | State | `SCShareableContent` | Starting a capture |
+  |---|---|---|
+  | Unlocked, display slept (`pmset displaysleepnow`) | displays listed | **works** — SCK wakes the display |
+  | **Locked**, display on | displays listed | **works** — records the login window |
+  | **Locked AND display slept** | **zero displays** | fails (this is the only zero-display state) |
+
+  The model: SCK will wake a sleeping display to capture it, but it cannot while the session is
+  locked. So the real-world trigger is "walked away" — locking, then the idle timer powering the
+  display off. Reproduce it headlessly-ish: have a human lock, then `pmset displaysleepnow` from
+  a shell (the shell keeps running while locked). A running stream is separate: display sleep
+  alone kills it with -3815 regardless of lock state.
 - Disk-full: stop cleanly at < 2 GB free with notification (`DiskSpaceMonitor`, M3-T3).
 - ⚠️ **Do NOT read `volumeAvailableCapacityForImportantUsage` alone** — an earlier draft of this
   line recommended exactly that, and it is a trap. Measured 2026-07-15 (HFS+/exFAT/FAT32/APFS

@@ -29,10 +29,16 @@
   `RecordingSession` polls it and stops via M3-T2's `engine.stop(reason: .diskAlmostFull)` seam
   — third trigger through that seam now, no new plumbing. Live: `--test-disk-floor 500000` vs
   676 GiB free → `finished (diskAlmostFull)`, playable 2.02 s file.
-- **Next task:** **M3-T4** — display-change / sleep handling. Two head starts from this session
-  (see field notes): mid-recording display sleep already **observed working** (streamError →
-  playable file), and a **confirmed bug to fix** (a locked screen is reported as a permission
-  failure). Then **M3-T5** (stall watchdog) closes M3 → gate G3.
+- **M3-T4 DONE.** Display-gone = SCK **-3815** (measured via `pmset displaysleepnow`, which is a
+  headless lever for this) → `finished(.displayDisconnected)` + playable file; `.displayDisconnected`
+  was declared-but-dead since M1 and is now wired. **Locked-screen bug fixed + verified live**:
+  granted-preflight + zero displays no longer demands a permission you already hold. ⚠️ SCK
+  collapses sleep/lock/unplug into one code → `.systemSleep` unreachable, not faked (02 §1/§7).
+- **Next task:** **M3-T5** — stall watchdog logging (02 §7; input-idle via
+  `CGEventSource.secondsSinceLastEventType`, NOT NSEvent), clock injectable. It is the **third**
+  poll loop → extract the shared `poll(every:)` helper there (deferred from M3-T3 by rule of
+  three; see field notes for why it wasn't done earlier). Then M3 is code-complete → **gate G3**,
+  where the `/simplify` sweep over the milestone is offered.
 - **Now done:** M2-T1..T6 + M3-T1..T2. `record` is a full CLI (real 3-track capture, presets,
   explicit path, progress ticker, pause/resume, scripted timeline, mic-change fail-stop).
   KEY ENV FACT: foreground Bash captures WORK (TCC held); backgrounded/detached ones lose the
@@ -78,11 +84,14 @@ video (deterministic, reproducible).
       disproved the gate's premise (no takeover → docs/02 §4 corrected, ADR-012 written); the
       second (post-M3-T6) passed the redefined gate — loss reported, recording continued, file
       playable. A bonus reconnect run proved a lost mic never returns for the session.
-- [ ] **M3-T7 leg 2 (human, device action) — only if leg 1 succeeds.** Physically disconnect and
-      reconnect AirPods mid-capture while the spike calls `updateConfiguration`, to see whether a
-      *returned* device can be re-bound. Skip entirely if the headless leg says no.
-      NOTE: leg 1 needs AirPods **connected** (two input devices present) — right now `list-mics`
-      shows only the built-in.
+- [x] **M3-T7 spike — DONE 2026-07-15** (all legs run; findings in 02 §4).
+- [ ] **G3 §4.3 leftovers (human, physical)** — two scenarios still unobserved. Both should end
+      in a playable file with a sensible reason; paste the `finished (…)` line + probe output:
+      1. **Close the lid mid-recording** (system sleep — distinct from display sleep, which is
+         already verified). Note this differs again with an external display attached (clamshell
+         = no sleep). Expect `.displayDisconnected` or a new code worth recording.
+      2. **Unplug an external monitor mid-recording** while capturing *that* display.
+      Everything else in §4.3 is now covered headlessly via `pmset displaysleepnow` (02 §7).
 - [x] **M2-T6 subjective quality check** — DONE 2026-07-14: Franco compared Balanced vs High on
       real busy content and confirmed "balanced looks pretty good". Balanced quality is
       acceptable at ~2× the efficiency of Tier-1 → BitrateModel constants CONFIRMED, no change.
@@ -105,6 +114,42 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-15 (M3-T4 display/sleep): the technical findings are in **02 §1/§7** (the -3815 code,
+  the lock+sleep truth table). What belongs here is the process lesson:
+  - **I mis-modelled this twice, and each wrong model produced a test that "passed" while
+    testing nothing.** First guess: "a locked screen hides displays" → locked, captured fine
+    (it records the login window). Second: "display sleep hides displays" → `pmset` slept it,
+    captured fine (SCK wakes it). Only lock **AND** display-off does it. Both wrong runs looked
+    like clean passes, not errors — that is the whole danger. Fourth time today (see the
+    `--nil-follow` window and the 400 MB disk image) that a test's *setup* failed to create the
+    state under test and quietly reported success.
+    **Rule going forward: for any environment-dependent test, first prove the condition exists,
+    then assert on it.** A test that cannot fail for the intended reason is decoration.
+  - **`pmset displaysleepnow` is a genuine headless lever** for the mid-recording death
+    (-3815 → `.displayDisconnected` → playable file) — that half of §4.3 no longer needs a human.
+    The zero-display start path still needs a real lock (a shell keeps running while locked, so
+    a human locks and the agent drives `pmset` + the capture).
+  - **`EndReason.systemSleep` is unreachable** and was never wired up. SCK collapses sleep, lock
+    and unplug into one code, so there is nothing to map it from. Left in place (docs/01 defines
+    it, M5/M6 may find a source) but do not fake a distinction to justify it.
+  - **The review found my fix only half-fixed the bug.** I gated the permission message on the
+    preflight (`granted` → "no displays", else → "grant permission") — but
+    `Permissions.screenRecordingState()` never returns `.denied`, so `.notDetermined` is the only
+    other live value, and it's exactly what a freshly-built CLI binary reports *while capturing
+    fine* (02 §10). So the original misdiagnosis survived on the only path the CLI can reach.
+    The deeper point the review surfaced: **zero displays can never mean "ungranted"** — an
+    ungranted process throws instead (02 §10) — so the preflight should not gate this at all.
+    Now: zero displays ⇒ "no displays available", full stop. Lesson: a decision table looks
+    complete until you check which cells the production caller can actually produce.
+  - ⚠️ **02 §1 and §10 flatly contradicted each other** on ungranted behavior (empty results vs
+    throws) and had done since the planning docs. §10 is measured, so it won. Untestable here
+    (revoking TCC would destroy our own grant) → **M4-T3's fresh-account walkthrough settles it**,
+    and the task now says so. If §1 turns out right, `startDecision` needs revisiting.
+  - **-3817 `SCStreamErrorUserStopped` was landing on the fail-stop path.** macOS's screen-
+    recording indicator lets a user stop the capture; that arrived as `.streamError`, which
+    ADR-007 defines as fail-stop — so the most ordinary stop there is would have fired M4's
+    "ended unexpectedly" notification. Now maps to `.userStopped`.
 
 - 2026-07-15 (M3-T3 disk guard): the review caught a bug my gate **and** my unit test were both
   structurally blind to. Worth internalizing.
