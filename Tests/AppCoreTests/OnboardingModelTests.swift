@@ -54,10 +54,15 @@ import RecorderCore
                     // being broken.
                     for r in all {
                         if r.isSatisfied {
-                            #expect(r.action == .none)
+                            // Nothing to do — but never nothing to *reach*: a granted
+                            // permission must stay revocable from here.
+                            #expect(!r.action.isCallToAction)
+                            #expect(r.action.settingsPane != nil)
                             #expect(!r.blocksRecording)
                         } else {
-                            #expect(r.action != .none)
+                            // Always a way forward — the dead `Grant…` button this task exists
+                            // to prevent (02 §2) is exactly this rule being broken.
+                            #expect(r.action.isCallToAction)
                         }
                         #expect(!r.title.isEmpty)
                         #expect(!r.detail.isEmpty)
@@ -69,10 +74,10 @@ import RecorderCore
 
     // MARK: - Screen recording (the row that has to guess)
 
-    @Test func screenGrantedIsDoneAndBlocksNothing() {
+    @Test func screenGrantedIsDoneAndBlocksNothingButStaysRevocable() {
         let r = row(.screenRecording, rows(screen: .granted))
         #expect(r.isSatisfied)
-        #expect(r.action == .none)
+        #expect(r.action == .review(.screenRecording))
         #expect(!r.blocksRecording)
     }
 
@@ -98,7 +103,7 @@ import RecorderCore
     @Test func askingChangesNothingOnceGranted() {
         let r = row(.screenRecording, rows(screen: .granted, hasAskedForScreen: true))
         #expect(r.isSatisfied)
-        #expect(r.action == .none)
+        #expect(r.action == .review(.screenRecording))
     }
 
     // MARK: - Microphone (the row that never has to guess)
@@ -153,6 +158,18 @@ import RecorderCore
         let r = row(.notifications, rows(notifications: .denied))
         #expect(r.detail.contains("Skipped"))
         #expect(r.action == .openSettings(.notifications))
+    }
+
+    @Test(arguments: PermissionKind.allCases)
+    func everyGrantedRowStaysRevocable(kind: PermissionKind) {
+        // A granted row used to have no button, so a permission once given had no route out
+        // from inside the app — a poor answer from a screen recorder to "how do I turn this
+        // off?" (Franco, 2026-07-15). Each row must point at its OWN pane, not just any.
+        let all = rows(screen: .granted, microphone: .granted, notifications: .granted)
+        let r = row(kind, all)
+        #expect(r.isSatisfied)
+        #expect(!r.action.isCallToAction)          // quiet: nothing needs doing
+        #expect(r.action.settingsPane != nil)      // …but reachable
     }
 
     // MARK: - Copy rules (docs/06)

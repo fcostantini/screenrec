@@ -38,8 +38,31 @@ public struct OnboardingRow: Sendable, Equatable, Identifiable {
         /// "Open System Settings…" — asking is no longer a route (02 §2: macOS prompts once,
         /// ever), so hand the user the only door that's left.
         case openSettings(SettingsPane)
-        /// Satisfied; no button.
-        case none
+        /// "System Settings" — nothing needs doing; a quiet way to review or **revoke**.
+        ///
+        /// A granted row used to have no button at all, which left no route out of a permission
+        /// once given — the mirror image of the dead end this window exists to prevent, and a
+        /// poor answer from a screen recorder to "how do I turn this off?" (Franco, 2026-07-15).
+        /// It earns a link rather than a button because the window is also the *done* screen:
+        /// three call-to-action buttons on an all-green checklist read as unfinished work.
+        case review(SettingsPane)
+
+        /// Whether this row is asking for something. Drives the button's prominence: bordered
+        /// means there is something to do, a plain link means there isn't.
+        public var isCallToAction: Bool {
+            switch self {
+            case .request, .openSettings: true
+            case .review: false
+            }
+        }
+
+        /// Where the button goes, if anywhere.
+        public var settingsPane: SettingsPane? {
+            switch self {
+            case .openSettings(let pane), .review(let pane): pane
+            case .request: nil
+            }
+        }
     }
 
     public let id: PermissionKind
@@ -88,7 +111,7 @@ public enum OnboardingModel {
         switch (satisfied, hasAsked) {
         case (true, _):
             detail = "ScreenRec can record your screen and system audio."
-            action = .none
+            action = .review(.screenRecording)
         case (false, false):
             detail = "macOS requires quitting and reopening ScreenRec after granting — "
                 + "we'll relaunch automatically."
@@ -115,7 +138,7 @@ public enum OnboardingModel {
         switch state {
         case .granted:
             detail = "ScreenRec can record your microphone onto its own track."
-            action = .none
+            action = .review(.microphone)
         case .notDetermined:
             // "Optional" is only true until they pick one. Said while Start is greyed out
             // *because of this row*, it reads as "this isn't your problem" to the one person
@@ -146,7 +169,7 @@ public enum OnboardingModel {
         switch state {
         case .granted:
             detail = "ScreenRec will tell you when a recording is saved."
-            action = .none
+            action = .review(.notifications)
         case .notDetermined:
             detail = "Optional — tells you when a recording is saved, and why it ended."
             action = .request

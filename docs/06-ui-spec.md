@@ -115,7 +115,18 @@ often clicked the wrong button once, months ago, and has no idea that's why.
 
 Recording controls stay disabled until rows 1–2 green (mic optional if user picks
 `None`; notifications never gate anything).
-Window never reappears once satisfied. No marketing copy, no multi-step wizard.
+Window never *reappears* on its own once satisfied — but it stays openable from the menu header
+(item 1 above). No marketing copy, no multi-step wizard.
+
+⚠️ **AMENDED 2026-07-15 (Franco): a granted row links to its System Settings pane too.** Once the
+window became always-openable it stopped being onboarding-only and became the app's permissions
+screen — and a granted row with no button left no route *out* of a permission once given, which
+is a poor answer from a screen recorder to "how do I turn this off?". Granted rows get a plain
+**link** (`System Settings`), not a bordered button: three call-to-action buttons on an all-green
+checklist read as unfinished work. **Bordered = something to do; link = something to review.**
+The intro line follows the same split: it states what's needed while anything blocks, and reads
+"ScreenRec has everything it needs. You can change any of these at any time." once nothing does —
+the old line is simply false above three green ticks.
 
 ## Settings window (SwiftUI Form, UserDefaults-backed)
 

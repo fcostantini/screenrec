@@ -16,7 +16,13 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("ScreenRec needs two permissions from macOS before it can record.")
+            // The window is two things now — the first-run checklist and (since it became
+            // reachable from the menu at any time) the app's permissions screen. "ScreenRec
+            // needs two permissions before it can record" is true of the first and plainly false
+            // above three green ticks.
+            Text(state.needsOnboarding
+                 ? "ScreenRec needs two permissions from macOS before it can record."
+                 : "ScreenRec has everything it needs. You can change any of these at any time.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 18)
@@ -34,9 +40,7 @@ struct OnboardingView: View {
     /// One button, whatever the row says it should do.
     private func act(on row: OnboardingRow) {
         switch row.action {
-        case .none:
-            break
-        case .openSettings(let pane):
+        case .openSettings(let pane), .review(let pane):
             NSWorkspace.shared.open(pane.url)
         case .request:
             switch row.id {
@@ -109,18 +113,25 @@ private struct PermissionRowView: View {
 
             Spacer(minLength: 8)
 
-            if let title = buttonTitle {
-                Button(title, action: act)
+            // Bordered when there's something to do, a plain link when there isn't. The done
+            // screen has to read as done: three call-to-action buttons on an all-green
+            // checklist would say "unfinished" louder than three ticks say "finished".
+            if row.action.isCallToAction {
+                Button(buttonTitle, action: act)
+            } else {
+                Button(buttonTitle, action: act)
+                    .buttonStyle(.link)
+                    .accessibilityLabel("\(row.title): open System Settings to change this")
             }
         }
         .padding(.vertical, 12)
     }
 
-    private var buttonTitle: String? {
+    private var buttonTitle: String {
         switch row.action {
         case .request: "Grant…"
         case .openSettings: "Open System Settings…"
-        case .none: nil
+        case .review: "System Settings"
         }
     }
 }
