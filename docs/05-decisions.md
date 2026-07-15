@@ -74,10 +74,21 @@ not the stop. Other ADR-007 triggers (display unplug, sleep, disk floor, and a *
 mic FORMAT change — M3-T2) still fail-stop.
 Cost: the user gets a partial mic track rather than a hard stop; acceptable, since the stop
 loses strictly more. UI copy for the notification lands with M4 (docs/06).
-**Not decided here:** re-attaching to another mic and continuing to record sound. That needs a
-fixed-format (resampled) mic input — the input's format is welded to the first buffer's — plus
-live device re-pointing (`SCStream.updateConfiguration`, unverified). M3-T7 spikes the latter;
-revisit this ADR once it lands.
+**Revisited 2026-07-15 once M3-T7 landed — decision unchanged for v1.** The spike answered the
+open question: mic recovery IS possible (two verified routes, 02 §4), so this is now a real
+choice rather than a limitation. Keeping notify-and-continue for v1 anyway:
+- Both routes need a fixed-format (resampled) mic input first — the input's format is welded to
+  the first buffer's — so it is ~2 tasks touching the sample path, for a case where the user is
+  already told what happened and keeps their screen capture.
+- The cheaper-looking route (re-point to a live device) is **one-way**: a died device can never
+  be re-bound, so once AirPods drop you are on the built-in for the rest of the recording even
+  after they reconnect. The route that *does* handle reconnect (rebuild a mic-only second
+  stream) still carries an unverified PTS-coherence assumption — ADR-001's core concern.
+- v1's job is a dependable recorder; "your mic died, we said so, the capture continued" is a
+  defensible answer for it.
+Scheduled as an explicit decision point in **M6-T4**, not left to memory — both routes are
+verified and costed in 02 §4, so that call is a product judgement (does it bite in real use?),
+not a research question.
 
 ## ADR-011 ✅ CLI-first development
 Every capability lands in `screenrec-cli` before the app (M1–M3, M5 core). Agents can

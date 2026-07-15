@@ -21,9 +21,13 @@
   disconnect. §4.2's original premise was wrong (no mic takeover) → docs/02 §4 corrected,
   ADR-012 written. Also proved: **a lost mic never returns** — reconnecting delivers nothing,
   which is what makes the one-shot watchdog safe. See field notes.
-- **Next task:** **M3-T7** — spike: can `SCStream.updateConfiguration` re-point a live stream's
-  mic? Leg 1 is headless but **needs AirPods connected** (two devices). Prior is low. Then back
-  to **M3-T3** (disk floor; reuses M3-T2's `engine.stop(reason:)` seam), T4, T5.
+- **M3-T7 DONE (spike).** The one rule: **SCK binds the mic once at `startCapture` and never
+  re-resolves** — named or nil. That single fact explains every mic-device behavior we've hit.
+  Mic recovery IS possible (2 verified routes) but **deferred post-v1**; ADR-012 unchanged.
+  Full experiment table + routes in **02 §4**; **02 §1's "nil throws" was STALE** and is fixed.
+- **Next task:** **M3-T3** — disk-space monitor → clean stop at <2 GB free (docs/02 §7) with
+  `--test-disk-floor N` to trip it deterministically. Reuses M3-T2's `engine.stop(reason:)`
+  seam (pass `.diskAlmostFull`). Gate §4.4. Then T4 (display/sleep), T5 (stall watchdog).
 - **Now done:** M2-T1..T6 + M3-T1..T2. `record` is a full CLI (real 3-track capture, presets,
   explicit path, progress ticker, pause/resume, scripted timeline, mic-change fail-stop).
   KEY ENV FACT: foreground Bash captures WORK (TCC held); backgrounded/detached ones lose the
@@ -96,6 +100,24 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-15 (M3-T7 spike — mic device binding): full findings live in **02 §4** (experiment
+  table + the two recovery routes) and **02 §1** (the nil correction). Meta-lessons worth keeping:
+  - **The spike blew its time-box (30 min → ~2 h) and was worth it.** It killed a stale ⚠️ that
+    had been shaping the design, produced a one-line root-cause model, and turned "can we ever
+    recover the mic?" from a guess into two costed, de-risked routes. But log it honestly: a
+    time-box that gets ignored should at least be noticed.
+  - **My priors were 1-for-3.** I predicted leg 1 would fail (it worked), leg 2 would fail
+    (right), leg 2b would fail (it worked). In this API, reason less and measure more.
+  - **A test that never triggers its event reads exactly like a negative.** The first `--nil-follow`
+    run "proved" nil doesn't follow — actually the AirPods never disconnected inside the fixed
+    25 s window (buffer counts kept climbing). Fixed by watching for *either* outcome with a
+    generous bound, plus an explicit INCONCLUSIVE verdict. Any future device spike should do the
+    same rather than assume a duration.
+  - **AirPods only disconnect when the case LID CLOSES** — an open case keeps them connected.
+    That is what silently invalidated the first run; put it in any test instructions.
+  - **`updateConfiguration` returns OK while doing nothing** when asked to bind a died device
+    (8/8 attempts). No error path to detect it — you must watch for buffers.
 
 - 2026-07-15 (M3-T6 mic-loss watchdog): what the live runs and the review taught.
   - **SCK keeps delivering mic buffers while paused** — proved by a 5 s scripted pause against

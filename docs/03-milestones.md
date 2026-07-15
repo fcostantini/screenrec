@@ -230,7 +230,7 @@ clap test; static-screen duration test; 30-min drift test).
       playable, mic track ends at 21.82 s vs video 59.83 s. Also verified: a 5 s scripted pause
       (> the 3 s timeout) does NOT false-fire, which proves SCK keeps delivering mic buffers
       while paused — so pause needs no handling here.
-- [ ] M3-T7 **SPIKE (time-boxed): can SCK re-point a live stream's mic?** The load-bearing
+- [x] M3-T7 **SPIKE (time-boxed): can SCK re-point a live stream's mic?** The load-bearing
       unknown behind ever recovering mic audio after a disconnect. Two legs, staged — only run
       leg 2 if leg 1 survives:
       1. **Headless**: mid-capture, call `SCStream.updateConfiguration` with a *different*
@@ -249,6 +249,13 @@ clap test; static-screen duration test; 30-min drift test).
       **Verify:** the finding is recorded in 02 §4 + STATUS either way. Yes ⇒ reopen ADR-012
       with a re-attach proposal (reconnect-recovery first, it's cheaper). No ⇒ ADR-012's
       notify-and-continue is final for v1 and the resampling question closes with it.
+      ✅ 2026-07-15 — ran to 6 experiments (`mic-swap-spike`, 5 modes). The one rule: **SCK binds
+      the mic once at `startCapture` and never re-resolves**, named or nil. Re-point works to a
+      device alive throughout, never to one that died (and `updateConfiguration` returns OK while
+      doing nothing). Poisoning is per-stream, so a rebuilt mic-only stream recovers anything —
+      two streams verified to coexist. nil is accepted (02 §1's "nil throws" is STALE) but
+      resolves-once, so it is not a fallback mechanism. Full table + both routes in 02 §4.
+      ADR-012 revisited: recovery is possible but **deferred post-v1** — decision unchanged.
 
 **Gate G3**: 04-testing §4 (pause math: 10 s rec / 5 s pause / 10 s rec ⇒ 20 s ± 0.2 s
 file, A/V in sync across the seam; all three robustness scenarios end in playable files).
@@ -348,7 +355,14 @@ while a manual recording runs; memory flat over 30 min).
 - [ ] M6-T3 Error-message audit: force each failure path; every message says what
       happened AND what to do.
 - [ ] M6-T4 Optional (decide then): Developer ID + notarization for distribution
-      beyond this machine; `--h264-downscale` compat mode; HDR spike (ADR stretch).
+      beyond this machine; `--h264-downscale` compat mode; HDR spike (ADR stretch);
+      **mic recovery after device loss** — ADR-012 deferred it to here. Not a research
+      question any more: M3-T7 verified both routes and 02 §4 costs them (~2 tasks; a
+      fixed-format resampled mic input is a hard prerequisite for either). Decide with
+      real usage in hand — does an AirPod dying mid-recording actually bite often enough
+      to be worth touching the sample path? If yes, prefer the rebuild-a-mic-only-stream
+      route (it also fixes reconnect, which re-pointing provably never can) and settle
+      its PTS-coherence assumption first via the §3.5 drift method.
 - [ ] M6-T5 README for the repo: build, sign, install, use. Update all docs to
       match reality; close out STATUS.md v1 section.
 

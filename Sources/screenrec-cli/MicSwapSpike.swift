@@ -1,0 +1,605 @@
+import AVFoundation
+import CoreMedia
+import Foundation
+import RecorderCore
+import ScreenCaptureKit
+
+/// M3-T7 spike (docs/03): can a live `SCStream` be re-pointed at another microphone via
+/// `updateConfiguration`? The load-bearing unknown behind ever recovering mic audio after a
+/// disconnect (02 §4 / ADR-012) — a lost device's buffers just stop and SCK does not re-attach
+/// on its own, so an explicit re-point is the only candidate mechanism.
+///
+/// Two legs: the default swaps between two present devices (headless); `--reconnect` covers the
+/// harder case where the device dies and comes back as a new CoreAudio object (needs a human to
+/// case/uncase the AirPods).
+///
+/// Lives in the CLI rather than `tools/` because touching the mic requires the
+/// `NSMicrophoneUsageDescription` embedded in this binary — a bare `swift tools/x.swift` would
+/// be killed on first mic access (02 §2).
+private final class MicFormatProbe: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
+    private let lock = NSLock()
+    private var counts: [String: Int] = [:]
+    private var order: [String] = []
+    private var lastBufferAt: TimeInterval?
+    private var streamError: String?
+    private var screenCount = 0
+    private var systemAudioCount = 0
+
+    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        switch type {
+        case .screen:
+            lock.lock(); screenCount += 1; lock.unlock()
+            return
+        case .audio:
+            lock.lock(); systemAudioCount += 1; lock.unlock()
+            return
+        default:
+            break
+        }
+        guard type == .microphone,
+              let format = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee
+        else { return }
+        let key = "\(Int(asbd.mSampleRate))Hz/\(asbd.mChannelsPerFrame)ch"
+        lock.lock()
+        if counts[key] == nil { order.append(key) }
+        counts[key, default: 0] += 1
+        lastBufferAt = ProcessInfo.processInfo.systemUptime
+        lock.unlock()
+    }
+
+    /// Non-mic buffer tallies — used to show a co-running stream stays healthy.
+    var otherCounts: (screen: Int, systemAudio: Int) {
+        lock.lock(); defer { lock.unlock() }
+        return (screenCount, systemAudioCount)
+    }
+
+    func stream(_ stream: SCStream, didStopWithError error: Error) {
+        lock.lock(); streamError = error.localizedDescription; lock.unlock()
+    }
+
+    /// Mic formats seen since the last `reset()`, in first-seen order, with buffer counts.
+    func snapshot() -> (formats: [(format: String, count: Int)], error: String?) {
+        lock.lock(); defer { lock.unlock() }
+        return (order.map { ($0, counts[$0] ?? 0) }, streamError)
+    }
+
+    /// Seconds since the last mic buffer; nil if none has ever arrived.
+    var quietFor: TimeInterval? {
+        lock.lock(); defer { lock.unlock() }
+        guard let last = lastBufferAt else { return nil }
+        return ProcessInfo.processInfo.systemUptime - last
+    }
+
+    /// Clears format tallies. `lastBufferAt` survives — silence tracking spans phases.
+    func reset() {
+        lock.lock(); counts = [:]; order = []; lock.unlock()
+    }
+}
+
+private func summarize(_ formats: [(format: String, count: Int)]) -> String {
+    formats.isEmpty ? "NONE (no mic buffers at all)"
+        : formats.map { "\($0.format) ×\($0.count)" }.joined(separator: ", ")
+}
+
+/// Mirrors CaptureEngine's audio setup exactly so findings generalize; only the video geometry
+/// is shrunk, since the spike is about the mic.
+private func spikeConfiguration(micID: String) -> SCStreamConfiguration {
+    let config = SCStreamConfiguration()
+    config.width = 640
+    config.height = 360
+    config.minimumFrameInterval = CMTime(value: 1, timescale: 5)
+    config.queueDepth = 5
+    config.showsCursor = true
+    config.capturesAudio = true
+    config.sampleRate = 48_000
+    config.channelCount = 2
+    config.excludesCurrentProcessAudio = true
+    config.captureMicrophone = true
+    config.microphoneCaptureDeviceID = micID
+    return config
+}
+
+/// As `spikeConfiguration`, but deliberately leaves `microphoneCaptureDeviceID` unset — which
+/// Apple documents as "capture the default microphone".
+private func defaultMicConfiguration() -> SCStreamConfiguration {
+    let config = SCStreamConfiguration()
+    config.width = 640
+    config.height = 360
+    config.minimumFrameInterval = CMTime(value: 1, timescale: 5)
+    config.queueDepth = 5
+    config.showsCursor = true
+    config.capturesAudio = true
+    config.sampleRate = 48_000
+    config.channelCount = 2
+    config.excludesCurrentProcessAudio = true
+    config.captureMicrophone = true
+    return config
+}
+
+private func startSpikeStream(micID: String, probe: MicFormatProbe) async -> SCStream {
+    let content: SCShareableContent
+    do {
+        content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    } catch {
+        die("SCShareableContent failed: \(error.localizedDescription)", code: 74)
+    }
+    guard let display = content.displays.first else { die("no displays available", code: 74) }
+    let stream = SCStream(
+        filter: SCContentFilter(display: display, excludingWindows: []),
+        configuration: spikeConfiguration(micID: micID),
+        delegate: probe)
+    do {
+        try stream.addStreamOutput(probe, type: .screen, sampleHandlerQueue: DispatchQueue(label: "spike.screen"))
+        try stream.addStreamOutput(probe, type: .microphone, sampleHandlerQueue: DispatchQueue(label: "spike.mic"))
+        try await stream.startCapture()
+    } catch {
+        die("startCapture failed: \(error.localizedDescription)", code: 74)
+    }
+    return stream
+}
+
+/// Polls until the mic has been quiet for `quiet` seconds. False if it never goes quiet.
+private func waitForMicSilence(_ probe: MicFormatProbe, quiet: TimeInterval, giveUpAfter: TimeInterval) async -> Bool {
+    let start = ProcessInfo.processInfo.systemUptime
+    while ProcessInfo.processInfo.systemUptime - start < giveUpAfter {
+        try? await Task.sleep(for: .milliseconds(500))
+        if let gap = probe.quietFor, gap >= quiet { return true }
+    }
+    return false
+}
+
+func runMicSwapSpike(_ args: [String]) async {
+    var seconds = 4.0
+    var mode = "swap"
+    var iterator = args.makeIterator()
+    while let arg = iterator.next() {
+        switch arg {
+        case "--reconnect":
+            mode = "reconnect"
+        case "--fallback":
+            mode = "fallback"
+        case "--nil-device":
+            mode = "nil-device"
+        case "--nil-follow":
+            mode = "nil-follow"
+        case "--two-streams":
+            mode = "two-streams"
+        case "--seconds":
+            guard let value = iterator.next(), let parsed = Double(value), parsed.isFinite, parsed > 0 else {
+                die("--seconds needs a positive number")
+            }
+            seconds = parsed
+        default:
+            die("Unknown option: \(arg)")
+        }
+    }
+    switch mode {
+    case "reconnect": await runMicReconnectSpike()
+    case "fallback": await runMicFallbackSpike()
+    case "nil-device": await runNilDeviceSpike(seconds: seconds)
+    case "nil-follow": await runNilFollowSpike()
+    case "two-streams": await runTwoStreamSpike(seconds: seconds)
+    default: await runMicDeviceSwapSpike(seconds: seconds)
+    }
+}
+
+// MARK: - Experiment: does a nil microphoneCaptureDeviceID work on 15.6.1?
+
+/// 02 §1 says nil throws "invalid parameter" (PoC finding, macOS 15.6). Worth one retest: if nil
+/// now means "follow the system default", a dying device could fall back with no work from us —
+/// macOS repoints its default to the built-in the moment AirPods vanish.
+private func runNilDeviceSpike(seconds: Double) async {
+    let content: SCShareableContent
+    do {
+        content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    } catch {
+        die("SCShareableContent failed: \(error.localizedDescription)", code: 74)
+    }
+    guard let display = content.displays.first else { die("no displays available", code: 74) }
+
+    let config = defaultMicConfiguration()
+    let probe = MicFormatProbe()
+    let stream = SCStream(
+        filter: SCContentFilter(display: display, excludingWindows: []),
+        configuration: config, delegate: probe)
+    print("nil-device spike: captureMicrophone = true, microphoneCaptureDeviceID left nil")
+    do {
+        try stream.addStreamOutput(probe, type: .screen, sampleHandlerQueue: DispatchQueue(label: "spike.screen"))
+        try stream.addStreamOutput(probe, type: .microphone, sampleHandlerQueue: DispatchQueue(label: "spike.mic"))
+        try await stream.startCapture()
+    } catch {
+        print("    startCapture THREW: \(error.localizedDescription)")
+        print("")
+        print("  VERDICT: 02 §1 still holds — nil is rejected; an explicit device id is mandatory.")
+        exit(0)
+    }
+    try? await Task.sleep(for: .seconds(seconds))
+    let seen = probe.snapshot()
+    try? await stream.stopCapture()
+    print("    mic formats: \(summarize(seen.formats))")
+    print("")
+    if seen.formats.isEmpty {
+        print("  VERDICT: PARTIAL — nil is accepted but delivers no mic buffers. Useless; 02 §1 stands.")
+    } else {
+        print("  VERDICT: CHANGED — nil is accepted AND delivers! 02 §1's 'nil throws' no longer holds")
+        print("  on this OS. Worth testing whether it FOLLOWS the system default when a device dies —")
+        print("  that would make fallback automatic.")
+    }
+    exit(0)
+}
+
+// MARK: - Experiment: does a nil device FOLLOW the system default as it changes?
+
+/// The elegant candidate. `nil` means "the default microphone" — but does SCK *resolve* that
+/// once at `startCapture`, or *follow* it? macOS repoints its default input to the built-in the
+/// instant AirPods vanish, so if SCK follows, fallback is free: no watchdog trigger, no
+/// re-point, no ADR change. If it merely resolves once, `nil` behaves exactly like pinning and
+/// buys nothing.
+private func runNilFollowSpike() async {
+    let content: SCShareableContent
+    do {
+        content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    } catch {
+        die("SCShareableContent failed: \(error.localizedDescription)", code: 74)
+    }
+    guard let display = content.displays.first else { die("no displays available", code: 74) }
+
+    let probe = MicFormatProbe()
+    let stream = SCStream(
+        filter: SCContentFilter(display: display, excludingWindows: []),
+        configuration: defaultMicConfiguration(), delegate: probe)
+    do {
+        try stream.addStreamOutput(probe, type: .screen, sampleHandlerQueue: DispatchQueue(label: "spike.screen"))
+        try stream.addStreamOutput(probe, type: .microphone, sampleHandlerQueue: DispatchQueue(label: "spike.mic"))
+        try await stream.startCapture()
+    } catch {
+        die("startCapture failed: \(error.localizedDescription)", code: 74)
+    }
+
+    print("nil-follow spike: does microphoneCaptureDeviceID = nil FOLLOW the system default,")
+    print("or just resolve it once at startCapture?")
+    try? await Task.sleep(for: .seconds(3))
+    let initial = probe.snapshot()
+    print("    starting mic: \(summarize(initial.formats))   (expect 24000Hz = AirPods)")
+    guard let startFormat = initial.formats.first?.format else {
+        try? await stream.stopCapture()
+        die("no mic buffers at all — are the AirPods connected and the default input?", code: 74)
+    }
+    guard startFormat.hasPrefix("24000") else {
+        try? await stream.stopCapture()
+        die("expected AirPods (24000Hz) as the default input, got \(startFormat). Connect AirPods first.", code: 74)
+    }
+
+    print("")
+    print("  >>> PUT THE AIRPODS IN THE CASE AND *CLOSE THE LID* <<<")
+    print("      (an open case keeps them connected — the lid is what disconnects them)")
+    print("      Watching up to 60s for EITHER outcome, rather than assuming a duration:")
+    print("        · a non-24kHz format appears  → nil FOLLOWED the default")
+    print("        · the mic goes quiet for 3s   → nil pinned, and the device is simply gone")
+    probe.reset()
+    enum Outcome { case followed([(format: String, count: Int)]), died, timedOut }
+    var outcome = Outcome.timedOut
+    for tick in 1...120 {
+        try? await Task.sleep(for: .milliseconds(500))
+        let now = probe.snapshot()
+        if let switched = now.formats.first(where: { !$0.format.hasPrefix("24000") }) {
+            print("    t+\(tick / 2)s: FOLLOWED → \(switched.format)")
+            outcome = .followed(now.formats)
+            break
+        }
+        // `reset()` deliberately keeps the heartbeat, so silence is measured across it.
+        if let quiet = probe.quietFor, quiet >= 3 {
+            print("    t+\(tick / 2)s: mic went quiet (no follow)")
+            outcome = .died
+            break
+        }
+        if tick % 20 == 0 { print("    t+\(tick / 2)s: still \(summarize(now.formats))") }
+    }
+    let final = probe.snapshot()
+    try? await stream.stopCapture()
+    if let error = final.error { print("    stream error: \(error)") }
+
+    print("")
+    switch outcome {
+    case .followed(let formats):
+        print("  VERDICT: YES — nil FOLLOWS the system default (\(summarize(formats))). A dying mic")
+        print("  falls back to the built-in for free: no watchdog trigger, no re-point, no new ADR.")
+        print("  But the format changes under us (24k → 48k), so it still needs the fixed-format input.")
+    case .died:
+        print("  VERDICT: NO — nil resolves the default ONCE at startCapture and pins it, exactly")
+        print("  like naming the device: the mic simply died rather than following to the built-in.")
+        print("  nil buys nothing for recovery; rebuild-the-mic-stream is the only route left.")
+    case .timedOut:
+        print("  VERDICT: INCONCLUSIVE — the AirPods never disconnected within 60s, so the event")
+        print("  under test never happened. Close the case LID and re-run; an open case keeps them")
+        print("  connected. (Do not read this as a NO.)")
+    }
+    print("  (record in docs/02 §1 + §4 + STATUS either way)")
+    exit(0)
+}
+
+// MARK: - Experiment: can a mic-only stream coexist with the recording stream?
+
+/// The poisoning is per-STREAM (a fresh stream binds a device that died in an older one — leg 1
+/// did exactly that). So the escape hatch is to rebuild rather than re-point. That is only
+/// affordable if the mic lives on its OWN stream: rebuilding the main stream would tear a hole
+/// in the video + system audio, but rebuilding a mic-only stream costs nothing visible.
+/// This checks the precondition: can two SCStreams run at once and both deliver?
+private func runTwoStreamSpike(seconds: Double) async {
+    let devices = AudioInputs.available()
+    guard let mic = devices.first(where: { $0.isDefault }) ?? devices.first else {
+        die("no input devices", code: 74)
+    }
+
+    let content: SCShareableContent
+    do {
+        content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    } catch {
+        die("SCShareableContent failed: \(error.localizedDescription)", code: 74)
+    }
+    guard let display = content.displays.first else { die("no displays available", code: 74) }
+    let filter = SCContentFilter(display: display, excludingWindows: [])
+
+    // Stream A — the "real recording": screen + system audio, no mic. Must stay untouched.
+    let configA = SCStreamConfiguration()
+    configA.width = 640
+    configA.height = 360
+    configA.minimumFrameInterval = CMTime(value: 1, timescale: 10)
+    configA.queueDepth = 5
+    configA.capturesAudio = true
+    configA.sampleRate = 48_000
+    configA.channelCount = 2
+    configA.excludesCurrentProcessAudio = true
+
+    let probeA = MicFormatProbe()
+    let streamA = SCStream(filter: filter, configuration: configA, delegate: probeA)
+
+    // Stream B — mic only. Screen capture is unavoidable (a filter is required), so keep it
+    // minimal and simply never add a .screen output.
+    let probeB = MicFormatProbe()
+    let streamB = SCStream(filter: filter, configuration: spikeConfiguration(micID: mic.uniqueID), delegate: probeB)
+
+    print("two-stream spike: can a mic-only SCStream run alongside the recording stream?")
+    print("  stream A: screen + system audio (no mic)")
+    print("  stream B: microphone only — \(mic.name)")
+    do {
+        try streamA.addStreamOutput(probeA, type: .screen, sampleHandlerQueue: DispatchQueue(label: "spike.a.screen"))
+        try streamA.addStreamOutput(probeA, type: .audio, sampleHandlerQueue: DispatchQueue(label: "spike.a.audio"))
+        try await streamA.startCapture()
+        print("    stream A: started")
+    } catch {
+        die("stream A startCapture failed: \(error.localizedDescription)", code: 74)
+    }
+    do {
+        try streamB.addStreamOutput(probeB, type: .microphone, sampleHandlerQueue: DispatchQueue(label: "spike.b.mic"))
+        try await streamB.startCapture()
+        print("    stream B: started")
+    } catch {
+        try? await streamA.stopCapture()
+        print("    stream B startCapture THREW: \(error.localizedDescription)")
+        print("")
+        print("  VERDICT: NO — a second concurrent SCStream is rejected. Rebuild-the-mic-stream is dead.")
+        exit(0)
+    }
+
+    try? await Task.sleep(for: .seconds(seconds))
+    let a = probeA.otherCounts
+    let b = probeB.snapshot()
+    let aError = probeA.snapshot().error
+    try? await streamB.stopCapture()
+    try? await streamA.stopCapture()
+
+    print("    stream A delivered: screen ×\(a.screen), system audio ×\(a.systemAudio)")
+    print("    stream B delivered: \(summarize(b.formats))")
+    if let aError { print("    stream A error: \(aError)") }
+    if let bError = b.error { print("    stream B error: \(bError)") }
+
+    print("")
+    if a.screen > 0 && a.systemAudio > 0 && !b.formats.isEmpty {
+        print("  VERDICT: YES — both streams delivered concurrently. A mic-only stream is viable,")
+        print("  so a dead mic could be recovered by REBUILDING stream B (a fresh stream binds a")
+        print("  previously-died device — leg 1 proved that) while the recording stream never blinks.")
+    } else {
+        print("  VERDICT: NO — concurrent streams don't both deliver (A screen ×\(a.screen)/audio ×\(a.systemAudio),")
+        print("  B mic \(b.formats.isEmpty ? "none" : "ok")). Rebuild-the-mic-stream is not viable.")
+    }
+    exit(0)
+}
+
+// MARK: - Leg 1: swap between two present devices (headless)
+
+private func runMicDeviceSwapSpike(seconds: Double) async {
+    let devices = AudioInputs.available()
+    guard devices.count >= 2 else {
+        die("mic-swap-spike needs two input devices; found \(devices.count). Connect a second mic.")
+    }
+    // Start on the built-in and swap to the other: the 48 kHz → 24 kHz jump (AirPods) is
+    // unmistakable, so a swap that works can't be confused with one that silently didn't.
+    let first = devices.first { $0.uniqueID == "BuiltInMicrophoneDevice" } ?? devices[0]
+    guard let second = devices.first(where: { $0.uniqueID != first.uniqueID }) else {
+        die("couldn't find a second distinct input device")
+    }
+
+    let probe = MicFormatProbe()
+    let stream = await startSpikeStream(micID: first.uniqueID, probe: probe)
+
+    print("mic-swap spike (M3-T7 leg 1): can updateConfiguration re-point a live stream's mic?")
+    print("  phase 1 — capturing with: \(first.name)  [\(first.uniqueID)]")
+    try? await Task.sleep(for: .seconds(seconds))
+    let before = probe.snapshot()
+    print("    mic formats: \(summarize(before.formats))")
+
+    print("  phase 2 — updateConfiguration → \(second.name)  [\(second.uniqueID)]")
+    probe.reset()
+    var swapThrew: String?
+    do {
+        try await stream.updateConfiguration(spikeConfiguration(micID: second.uniqueID))
+        print("    updateConfiguration: returned OK")
+    } catch {
+        swapThrew = error.localizedDescription
+        print("    updateConfiguration: THREW — \(error.localizedDescription)")
+    }
+    try? await Task.sleep(for: .seconds(seconds))
+    let after = probe.snapshot()
+    print("    mic formats after swap: \(summarize(after.formats))")
+    try? await stream.stopCapture()
+    if let error = after.error ?? before.error { print("    stream error: \(error)") }
+
+    let beforeFormats = Set(before.formats.map(\.format))
+    let afterFormats = Set(after.formats.map(\.format))
+    print("")
+    if swapThrew != nil {
+        print("  VERDICT: NO — updateConfiguration rejects a mic device change outright.")
+    } else if !afterFormats.isEmpty && !afterFormats.isSubset(of: beforeFormats) {
+        print("  VERDICT: YES — buffers switched to the new device's format. Live mic re-point works.")
+    } else if afterFormats.isEmpty {
+        print("  VERDICT: NO — mic delivery STOPPED after the swap (config accepted, capture dead).")
+    } else {
+        print("  VERDICT: NO — updateConfiguration accepted but buffers kept the OLD device's format.")
+    }
+    exit(0)
+}
+
+// MARK: - Leg 2: re-bind a device that died and came back (needs a human)
+
+private func runMicReconnectSpike() async {
+    let devices = AudioInputs.available()
+    guard let target = devices.first(where: { $0.uniqueID != "BuiltInMicrophoneDevice" }) else {
+        die("--reconnect needs a removable mic (e.g. AirPods) connected; only the built-in is present.")
+    }
+
+    let probe = MicFormatProbe()
+    let stream = await startSpikeStream(micID: target.uniqueID, probe: probe)
+
+    print("mic-reconnect spike (M3-T7 leg 2): can a device that DIED and came back be re-bound?")
+    print("  capturing with: \(target.name)  [\(target.uniqueID)]")
+    try? await Task.sleep(for: .seconds(3))
+    let initial = probe.snapshot()
+    print("    mic alive: \(summarize(initial.formats))")
+    guard !initial.formats.isEmpty else {
+        try? await stream.stopCapture()
+        die("no mic buffers at all — is \(target.name) really the active mic?", code: 74)
+    }
+
+    print("")
+    print("  >>> PUT THE AIRPODS IN THE CASE NOW <<<   (waiting up to 45s for the mic to die)")
+    guard await waitForMicSilence(probe, quiet: 3, giveUpAfter: 45) else {
+        try? await stream.stopCapture()
+        die("the mic never went quiet — were they cased?", code: 74)
+    }
+    print("    ✓ mic went quiet")
+
+    // Phase A: passive. Franco's earlier run says a returning device delivers nothing on its
+    // own; re-confirm that here so any resume in phase B is unambiguously due to the re-point.
+    print("")
+    print("  >>> TAKE THE AIRPODS BACK OUT NOW <<<")
+    print("  phase A — watching 12s WITHOUT re-pointing (expect: nothing, per 02 §4)…")
+    probe.reset()
+    try? await Task.sleep(for: .seconds(12))
+    let passive = probe.snapshot()
+    print("    passive resume: \(summarize(passive.formats))")
+
+    // Phase B: active. Same device id — SCK may re-resolve it to the new CoreAudio object.
+    print("  phase B — retrying updateConfiguration with the SAME device id every 2s…")
+    probe.reset()
+    var resumed: [(format: String, count: Int)] = []
+    for attempt in 1...8 {
+        do {
+            try await stream.updateConfiguration(spikeConfiguration(micID: target.uniqueID))
+            print("    attempt \(attempt): updateConfiguration OK")
+        } catch {
+            print("    attempt \(attempt): threw — \(error.localizedDescription)")
+        }
+        try? await Task.sleep(for: .seconds(2))
+        let now = probe.snapshot()
+        if !now.formats.isEmpty { resumed = now.formats; break }
+    }
+    try? await stream.stopCapture()
+
+    print("")
+    if !passive.formats.isEmpty {
+        print("  VERDICT: the mic resumed on its OWN (\(summarize(passive.formats))) — 02 §4's")
+        print("  'a lost mic never returns' finding needs revisiting; re-point wasn't even needed.")
+    } else if !resumed.isEmpty {
+        print("  VERDICT: YES — re-pointing at the SAME device id revived it: \(summarize(resumed)).")
+        print("  Reconnect-recovery is viable, and needs no resampling (same device, same format).")
+    } else {
+        print("  VERDICT: NO — a device that died stays dead for the stream's life, even when it")
+        print("  comes back and even with an explicit updateConfiguration. ADR-012 stands as-is.")
+    }
+    print("  (record in docs/02 §4 + STATUS either way — M3-T7's deliverable is the finding)")
+    exit(0)
+}
+
+// MARK: - Leg 2b: re-point to a device that never died, after the current one dies
+
+/// The decisive leg. Every other test re-pointed at a device with a death in its history; this
+/// aims a *healthy* target at a *dead* stream, which separates "the target is poisoned" from
+/// "the stream's mic path is torn down". It answers whether mic recovery is possible at all.
+private func runMicFallbackSpike() async {
+    let devices = AudioInputs.available()
+    guard let target = devices.first(where: { $0.uniqueID != "BuiltInMicrophoneDevice" }) else {
+        die("--fallback needs a removable mic (e.g. AirPods) connected as the starting device.")
+    }
+    guard let fallback = devices.first(where: { $0.uniqueID == "BuiltInMicrophoneDevice" }) else {
+        die("--fallback needs the built-in microphone present as the fallback target.")
+    }
+
+    let probe = MicFormatProbe()
+    let stream = await startSpikeStream(micID: target.uniqueID, probe: probe)
+
+    print("mic-fallback spike (M3-T7 leg 2b): once the mic dies, can the stream be re-pointed")
+    print("at a device that NEVER died? This decides whether mic recovery is possible at all.")
+    print("  capturing with: \(target.name)  [\(target.uniqueID)]")
+    try? await Task.sleep(for: .seconds(3))
+    let initial = probe.snapshot()
+    print("    mic alive: \(summarize(initial.formats))")
+    guard !initial.formats.isEmpty else {
+        try? await stream.stopCapture()
+        die("no mic buffers at all — is \(target.name) really the active mic?", code: 74)
+    }
+
+    print("")
+    print("  >>> PUT THE AIRPODS IN THE CASE NOW — and LEAVE them in <<<")
+    print("      (waiting up to 45s for the mic to die)")
+    guard await waitForMicSilence(probe, quiet: 3, giveUpAfter: 45) else {
+        try? await stream.stopCapture()
+        die("the mic never went quiet — were they cased?", code: 74)
+    }
+    print("    ✓ mic went quiet")
+
+    print("")
+    print("  re-pointing to \(fallback.name) [\(fallback.uniqueID)] — alive the whole time…")
+    probe.reset()
+    var resumed: [(format: String, count: Int)] = []
+    for attempt in 1...8 {
+        do {
+            try await stream.updateConfiguration(spikeConfiguration(micID: fallback.uniqueID))
+            print("    attempt \(attempt): updateConfiguration OK")
+        } catch {
+            print("    attempt \(attempt): threw — \(error.localizedDescription)")
+        }
+        try? await Task.sleep(for: .seconds(2))
+        let now = probe.snapshot()
+        if !now.formats.isEmpty { resumed = now.formats; break }
+    }
+    let final = probe.snapshot()
+    try? await stream.stopCapture()
+    if let error = final.error { print("    stream error: \(error)") }
+
+    print("")
+    if !resumed.isEmpty {
+        print("  VERDICT: YES — a dead mic path CAN be revived by re-pointing at a live device:")
+        print("  \(summarize(resumed)). 'AirPods die → keep recording on the built-in' is possible,")
+        print("  which reopens ADR-012. Cost: the new device's format differs (48k vs the input's")
+        print("  24k), so it needs the fixed-format resampled mic input first.")
+    } else {
+        print("  VERDICT: NO — the stream's mic path is torn down for good when its device dies;")
+        print("  not even a device that never died can be bound to it. No mic recovery is possible")
+        print("  for a running stream, so ADR-012's notify-and-continue is FINAL for v1 and the")
+        print("  resampling question closes with it.")
+    }
+    print("  (record in docs/02 §4 + STATUS either way)")
+    exit(0)
+}

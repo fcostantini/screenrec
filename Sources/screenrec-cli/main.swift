@@ -14,7 +14,16 @@ func printUsage() {
       screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
       screenrec-cli probe-stream [--duration N] [--mic <id>] [--no-mic]
                                        Capture and report per-source buffers/formats/PTS
+      screenrec-cli mic-swap-spike [mode]  How SCK binds mic devices (M3-T7 evidence, 02 §4)
       screenrec-cli --help
+
+    mic-swap-spike modes:
+      (default)      Re-point between two live devices mid-capture
+      --reconnect    Re-bind a device that died and came back        (human: case/uncase)
+      --fallback     Re-point to a never-died device after mic loss  (human: case)
+      --nil-device   Is a nil microphoneCaptureDeviceID accepted?
+      --nil-follow   Does nil follow the system default as it changes? (human: case)
+      --two-streams  Can a mic-only stream coexist with the recording stream?
 
     record options:
       --duration <sec>   Stop after N seconds (else p/r/Return on a terminal, or stream end)
@@ -485,6 +494,8 @@ case "engine-smoke":
     await runEngineSmoke(Array(arguments.dropFirst()))
 case "probe-stream":
     await runProbeStream(Array(arguments.dropFirst()))
+case "mic-swap-spike":
+    await runMicSwapSpike(Array(arguments.dropFirst()))
 case "-h", "--help":
     printUsage()
 default:

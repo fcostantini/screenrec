@@ -13,9 +13,14 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   `filter.pointPixelScale`. On the dev machine that yields 4112×2570. Never hardcode.
 - `capturesAudio = true`, `sampleRate = 48_000`, `channelCount = 2`,
   `excludesCurrentProcessAudio = true`.
-- ⚠️ **`microphoneCaptureDeviceID` must be set explicitly.** Docs say nil = default mic;
-  on 15.6 nil makes `startCapture` throw "invalid parameter". Resolve
-  `AVCaptureDevice.default(for: .audio)?.uniqueID` and pass it. (PoC commit has the fix.)
+- **`microphoneCaptureDeviceID`: pass an explicit id.** Resolve
+  `AVCaptureDevice.default(for: .audio)?.uniqueID` and pass it.
+  ⚠️ **Correction (2026-07-15, M3-T7):** the old claim here — "on 15.6 nil makes `startCapture`
+  throw invalid parameter" — is **stale on 15.6.1**: nil is accepted and delivers the default
+  mic fine. It buys nothing, though: nil **resolves the default once at `startCapture` and then
+  pins it** — measured, AirPods → built-in default switch mid-stream is NOT followed (the mic
+  just dies). So nil is equivalent to naming the device, minus knowing which device you got.
+  Keep passing the explicit id. Do not "fix" this by dropping to nil hoping for auto-fallback.
 - `minimumFrameInterval = CMTime(value: 1, timescale: fps)` is a **cap** — SCK is
   frame-on-change. A static screen delivers no frames (see §5 tail-frame patch).
 - `queueDepth = 5`. Do not retain sample buffers beyond the callback except by design
@@ -98,10 +103,41 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
 - ⚠️ **A lost mic never comes back — reconnecting the device does NOT resume delivery.**
   Verified 2026-07-15: AirPods cased mid-recording and then reconnected ~20 s later produced
   no further mic buffers at all (mic track ended at 21.8 s of a 59.8 s file; the recording ran
-  to the end). SCK tears down capture for a pinned `microphoneCaptureDeviceID` permanently.
-  Consequences: (a) mic loss is one-shot per session — nothing to re-arm or recover, which is
-  why `MicrophoneWatchdog` fires once; (b) it lowers the odds that `SCStream.updateConfiguration`
-  can re-point the mic live (M3-T7 spikes it anyway — an explicit call is not passive re-attach).
+  to the end). Mic loss is therefore one-shot per session — nothing to re-arm or recover, which
+  is why `MicrophoneWatchdog` fires once.
+
+### The one rule behind all mic-device behavior (M3-T7 spike, 2026-07-15)
+
+> **SCK binds the mic device ONCE at `startCapture` and never re-resolves it** — whether you
+> name a device or pass nil. Everything below follows from that.
+
+Six experiments (`screenrec-cli mic-swap-spike`, modes `--reconnect` / `--fallback` /
+`--nil-device` / `--nil-follow` / `--two-streams`):
+
+| Experiment | Result |
+|---|---|
+| `updateConfiguration` re-point between two **live** devices | ✅ works (48k→24k, buffers follow) |
+| **Passive** reconnect of a died device | ❌ never resumes |
+| Re-point to a **died-and-returned** device (same uniqueID) | ❌ dead — and `updateConfiguration` **returns OK while doing nothing** |
+| Re-point to a device **alive throughout**, after the mic died | ✅ works, first attempt |
+| nil device id at start | ✅ accepted, delivers the default (see §1 — the old "nil throws" is stale) |
+| Does nil **follow** the default when it changes? | ❌ no — resolves once, then pins; the mic dies with its device |
+
+Consequences for anyone designing mic recovery:
+- **The stream's mic path is NOT poisoned when its device dies** — a live device binds to it
+  fine. What is permanently unbindable is *any device that disappeared during that stream's
+  life*, even back under the same uniqueID.
+- **The poisoning is per-STREAM.** A fresh `SCStream` binds a previously-died device normally.
+- ⚠️ **`updateConfiguration` gives no error signal for this** — it returned OK on all 8 attempts
+  while delivering nothing. Never trust its return value; watch for buffers.
+- Two viable recovery routes, both verified, neither built (ADR-012):
+  1. **Re-point to a live device** — enables "AirPods die → built-in". One-way (can never go
+     back to the AirPods) and needs a fixed-format/resampled mic input (48k into a 24k input).
+  2. **Rebuild a mic-only second stream** — two `SCStream`s were verified to coexist and both
+     deliver, so the recording stream never blinks. Handles fallback *and* reconnect (a
+     returning AirPod rebinds at the same 24 kHz → no resampling). Unverified assumption to
+     settle first: whether a second stream's mic PTS stays coherent with the main stream's
+     video (ADR-001's whole concern — use the §3.5 drift method).
 - **Format changes mid-stream** remain possible for the *same* device (e.g. an AirPods
   HFP/A2DP codec flip), so `MovieRecorder` compares each mic buffer's ASBD (sample rate /
   channels / format ID) against the input's and fail-stops on a diff (M3-T2). With a pinned
