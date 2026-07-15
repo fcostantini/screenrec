@@ -30,9 +30,13 @@
   verified with `defaults read` + a quit/relaunch, headlessly. Settings window (⌘, and the menu)
   with the output-folder preflight. **Descoped by Franco**: replay settings → M5 (with the
   feature), launch-at-login → M6-T5 (the app has no permanent address until then). 162 tests.
-- **Next: M4-T5 — notifications.** All three permission rows are green, so it can send one on
-  day one. After that G4, whose fresh-account walkthrough is where M4-T3's two unobserved paths
-  finally get watched.
+- **M4-T5 DONE.** Notifications ship: menu-driven recording → Stop & Save → relaunch with
+  `--print-delivered-notifications` → `Recording saved · 00:00:05 / Recording … .mov`, docs/06's
+  copy exactly. 174 tests. **docs/06's table covered four fewer cases than the engine emits** —
+  amended (see field notes). Owed to a human: does a banner appear, and does a click reveal.
+- **Next: M4-T6 — bundle polish** (app icon, version stamping), then **M4 is code-complete** and
+  **G4** is the gate. G4 §5.1's fresh account is where M4-T3's two unobserved paths — the
+  auto-relaunch and the screen row's Grant→Settings switch — finally get watched.
 - **The `/simplify` sweep over M3 was run** (commits `fff901e`, `2522e26`) — an ARC cycle that
   made `CaptureEngine.deinit` unreachable, and the M3-T7 spike held to the CLI's bar.
 - **Replay-armed toggle + icon badge: deferred to M4-T4** (Franco, 2026-07-15), which owns the
@@ -176,6 +180,56 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-15 (M4-T5 notifications): mostly wiring; the value was in the copy.
+  - 🔴 **docs/06's copy table covered four fewer cases than the engine emits**, and the gaps were
+    invisible until the two were laid side by side. `streamError` (reachable — SCK dies for
+    reasons we don't classify) had no copy; mic-loss had none though **ADR-012 promises a
+    notification**; `failed` had none because the table assumes "always a playable file"; and
+    `Mac went to sleep` was copy for `EndReason.systemSleep`, which M3-T4 measured as
+    unreachable. **Check a copy table against the enum, not against the happy path** — a spec
+    written before the code knows only the cases the author imagined.
+  - **The notification needs a duration `.finished` doesn't carry.** `elapsedSeconds` only
+    advances while the menu is open, so it's usually stale or zero at finish. The writer's
+    `recordedDuration` is the only accurate source, and it's readable only *before* the session
+    is torn down — hence `notify(about:)` runs at the top of `apply`, ahead of the fold.
+  - **The notification delegate must be installed before launch completes** (hence
+    `NSApplicationDelegateAdaptor`, not a view's `.task`): a click can *launch* the app, and a
+    response delivered before a delegate exists is dropped — losing the one interaction docs/06
+    specifies for notifications.
+  - **`willPresent` must return `.banner`** or the notification is silently swallowed whenever
+    ScreenRec happens to be frontmost (Settings or Onboarding open). Easy to miss: the app is an
+    accessory and rarely frontmost, so it works in testing and fails in the one case a user is
+    looking at the app.
+  - 🔴 **The feature was dead for every normal install, and the live test passed anyway.**
+    `requestAuthorization` was only reachable from onboarding's Notifications row — but that
+    window opens when a permission *blocks*, notifications never block, and it stops auto-opening
+    once the blocking rows go green. So: fresh install → grant screen → relaunch → the window
+    never opens again → authorization stays `.notDetermined` → **every notification silently
+    dropped, forever**, with the error discarded inside `add(request)`. The verify passed only
+    because this machine had been granted by hand. /code-review found it. The app now asks once
+    at launch; onboarding's row still shows the state and routes to Settings.
+    **Whenever a permission gates a feature, ask where it gets requested on a machine that never
+    saw the setup screen.**
+  - 🐞 **`.failed` means two things and its own doc comment says one.** `EngineEvent.failed` is
+    documented as "preflight/start failure", but `RecordingSession` also yields it from the
+    `finish()` catch — a *finalize* failure after a full recording. The notification mapper
+    trusted the doc, so losing a 90-minute capture at the last step announced "Couldn't start
+    recording" over a body saying finalization failed. Only the caller can tell them apart
+    (`statusIcon != .idle`). **A doc comment is not a contract; grep the emitters.**
+  - 🐞 **Two start-failure paths posted nothing at all.** `start()`'s `reserveRecordingURL` and
+    `RecordingSession.init` catches set `lastFailure` and returned — no session, so no event
+    stream, so no notification; and `lastFailure` reaches no idle surface since the header shows
+    readiness. Net effect: click Start with an unwritable folder, get *no banner and no visible
+    change*, walk away believing you're recording. They now route through `apply(.failed(…))`.
+  - **What `--print-delivered-notifications` proves, and what it can't.** It asserts real copy
+    from a real delivery — docs/03's verify, no human needed. ⚠️ But it reads Notification
+    Center's **persisted** list, not this run's: it happily prints week-old entries, so the gate
+    could pass with nothing delivered. It now prints each notification's date — **assert on the
+    date, not just the copy** (verified: run at 22:24:19, notification at 22:24:26). It still
+    says nothing about whether a banner *appeared* or what a click does.
+  - **Fail-stop copy is unit-tested but never delivered live** — the app has no
+    `--test-disk-floor` (that's the CLI's), so provoking one needs a patch. G4 §5.3 covers it.
 
 - 2026-07-15 (M4-T4 settings): the app finally remembers something. Two lessons, one of them
   the same one as always.

@@ -9,7 +9,17 @@ let settingsWindowID = "settings"
 /// app's surface. Owns the one `AppState`; the only windows are Onboarding and Settings.
 @main
 struct ScreenRecApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var state = AppState()
+
+    init() {
+        let notifier = ScreenRecApp.notifier
+        // Posting is the app's job; AppCore may not import UserNotifications (docs/01).
+        state.notifier = { [weak notifier] in notifier?.post($0) }
+    }
+
+    /// Shared with the delegate, which installs it before launch completes.
+    fileprivate static let notifier = Notifier()
 
     var body: some Scene {
         MenuBarExtra {
@@ -32,6 +42,19 @@ struct ScreenRecApp: App {
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+    }
+}
+
+/// Exists for one reason: the notification delegate must be installed before launch finishes, or
+/// a click that *launches* the app is delivered to nobody.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        ScreenRecApp.notifier.install()
+        // docs/03's verify hook: print what was delivered, then exit before any UI appears.
+        if CommandLine.arguments.contains("--print-delivered-notifications") {
+            Notifier.printDeliveredAndExit()
+        }
+        ScreenRecApp.notifier.requestAuthorizationIfNeeded()
     }
 }
 

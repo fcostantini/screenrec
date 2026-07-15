@@ -172,6 +172,10 @@ public final class AppState {
     /// Drives the menu's Pause/Resume swap.
     public var isPaused: Bool { statusIcon == .paused }
 
+    /// Posts a notification. Injected because AppCore may not import UserNotifications (docs/01)
+    /// — and because `UNUserNotificationCenter.current()` needs a real bundle, which tests lack.
+    public var notifier: (@MainActor (RecordingNotification) -> Void)?
+
     /// `defaults` is injected so the persistence round-trip is testable without touching the
     /// real user's preferences.
     public init(defaults: UserDefaults = .standard) {
@@ -265,8 +269,11 @@ public final class AppState {
         do {
             outputURL = try outputLocation.reserveRecordingURL(date: Date())
         } catch {
-            lastFailure = "Couldn't create a recording in "
-                + "\"\(outputDirectory.lastPathComponent)\". Choose another folder."
+            // Through `apply`, not a bare assignment: these failures produce no session and so
+            // no event stream, and `lastFailure` alone reaches no surface — Start looks
+            // unchanged and the user walks away believing they are recording (ADR-007).
+            apply(.failed(message: "Couldn't create a recording in "
+                + "\"\(outputDirectory.lastPathComponent)\". Choose another folder."))
             return
         }
 
@@ -277,7 +284,7 @@ public final class AppState {
             // The reservation is an O_EXCL placeholder the recorder would have consumed; with no
             // recorder, drop it rather than leave a 0-byte file and the name taken.
             try? FileManager.default.removeItem(at: outputURL)
-            lastFailure = "Couldn't set up the recorder: \(error.localizedDescription)"
+            apply(.failed(message: "Couldn't set up the recorder: \(error.localizedDescription)"))
             return
         }
 
@@ -329,6 +336,7 @@ public final class AppState {
     /// Folds one engine event into the state. Internal: production always arrives via
     /// `consume(_:)`; only tests hand-feed events.
     func apply(_ event: EngineEvent) {
+        notify(about: event)
         switch event {
         case .started, .resumed:
             statusIcon = .recording
@@ -348,6 +356,22 @@ public final class AppState {
         case .fileProgress:
             break   // nothing emits this; `refreshProgress()` polls instead
         }
+    }
+
+    /// Posts the notification an event warrants, if any (docs/06).
+    ///
+    /// Runs before the fold, while `session` is still alive: `.finished` carries no duration, and
+    /// the writer's own `recordedDuration` is the only accurate source for the title's clock —
+    /// `elapsedSeconds` only advances while the menu is open, so it is usually stale or zero.
+    private func notify(about event: EngineEvent) {
+        let duration = session?.recordedDuration.seconds ?? 0
+        guard let notification = RecordingNotifications.notification(
+            for: event,
+            duration: duration.isFinite ? duration : 0,
+            // `.failed` covers both a start that never happened and a finalize that threw after
+            // a full recording; the icon is the only thing that knows which.
+            hadStarted: statusIcon != .idle) else { return }
+        notifier?(notification)
     }
 
     private func endSession() {

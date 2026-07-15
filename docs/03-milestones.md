@@ -384,7 +384,7 @@ UI layout, states, notification copy, and onboarding flow are specified in
       **Verify:** change each setting, quit, relaunch → `defaults read
       dev.fcostantini.screenrec.app` shows the documented keys with persisted values
       and UI reflects them; choosing unreadable dir → immediate friendly error (§5.4).
-- [ ] M4-T5 Notifications (UserNotifications): recording ended + reason; click →
+- [x] M4-T5 Notifications (UserNotifications): recording ended + reason; click →
       reveal in Finder. Notification authorization is requested per docs/06 onboarding
       (optional row, non-blocking). Debug hook: the app accepts launch argument
       `--print-delivered-notifications` (prints `UNUserNotificationCenter` delivered
@@ -392,6 +392,14 @@ UI layout, states, notification copy, and onboarding flow are specified in
       **Verify:** stop a recording, relaunch with the debug argument → the finish
       notification is in the delivered list with docs/06 copy; click behavior
       **(human)**.
+      DONE 2026-07-15, verified headlessly: menu-driven 5 s recording → Stop & Save → relaunch
+      with `--print-delivered-notifications` → `Recording saved · 00:00:05 / Recording 2026-07-15
+      at 19.06.29.mov`. ⚠️ **docs/06's copy table didn't cover what the engine emits** — four
+      amendments there: `streamError` had no copy, mic-loss had none though ADR-012 promises one,
+      `failed` had none (the table assumes a playable file), and `Mac went to sleep` was copy for
+      an unreachable state (M3-T4). **Still owed to a human:** whether a banner appears, and
+      click-to-reveal. **Fail-stop copy is unit-tested but never delivered live** — the app has no
+      `--test-disk-floor`, so provoking one needs a patch; G4 §5.3 covers it.
 - [ ] M4-T6 Bundle polish: app icon (placeholder ok, iconutil-built .icns),
       `bundle.sh` produces the final artifact, version stamping.
       **Verify:** Info.plist version matches a `VERSION` file; icon renders in Finder;

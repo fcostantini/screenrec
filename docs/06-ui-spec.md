@@ -76,12 +76,31 @@ Paused state: header dot goes amber, timer freezes, `Resume` primary.
 Copy pattern — **outcome first, cause second, always a playable file** (ADR-007 in UI
 form). Never the word "error" for a fail-stop.
 
-| Event | Title | Body |
-|---|---|---|
-| Manual stop | `Recording saved · 00:12:34` | `Recording 2026-07-14 at 10.12.mov` |
-| Fail-stop (any cause) | `Recording saved · 00:12:34` | `Ended: <cause>. File is playable.` — causes: `display disconnected`, `microphone changed`, `disk almost full`, `Mac went to sleep` |
-| Replay saved | `Replay saved` | `Replay … .mov — last 60 s. Click to reveal.` |
-| Replay save failed | `Couldn't save replay` | one-line cause + what to do |
+| Event | Title | Body | Click |
+|---|---|---|---|
+| Manual stop | `Recording saved · 00:12:34` | `Recording 2026-07-14 at 10.12.mov` | reveal |
+| Fail-stop (any cause) | `Recording saved · 00:12:34` | `Ended: <cause>. File is playable.` | reveal |
+| Microphone lost mid-recording | `Still recording · microphone disconnected` | `The rest of the recording has no microphone track.` | — |
+| Never started | `Couldn't start recording` | the engine's own message, e.g. `No displays available — the screen may be asleep or locked.` | — |
+| Replay saved — **M5** | `Replay saved` | `Replay … .mov — last 60 s. Click to reveal.` | reveal |
+| Replay save failed — **M5** | `Couldn't save replay` | one-line cause + what to do | — |
+
+Fail-stop causes, one per reachable `EndReason`:
+`display disconnected` · `microphone changed` · `disk almost full` ·
+`screen capture stopped unexpectedly` (an unclassified `streamError` — say what happened, never
+the raw SCK string, never the word "error")
+
+⚠️ **AMENDED 2026-07-15 (M4-T5): the table didn't cover what the engine emits.** Four fixes:
+- **`streamError` had no copy** and is reachable — SCK can die for a reason we don't classify.
+- **Microphone lost had no row**, though ADR-012 promises a notification: the recording
+  *continues*, so this is the one notification that isn't about an ending. Outcome-first means
+  leading with "still recording" — the question it answers is "did my 90-minute capture die?".
+- **`failed` had no row.** The rest of the table assumes a playable file; this is the case where
+  there isn't one, so it's the one place "Couldn't" is right (as in "Couldn't save replay").
+- **`Mac went to sleep` is deleted — it was copy for a state that cannot occur.** M3-T4 measured
+  that SCK reports sleep, lock and unplug as the same code (-3815 → `displayDisconnected`), so
+  `EndReason.systemSleep` is unreachable. The enum case stays (docs/01 defines it; M5/M6 may find
+  a source) but nothing renders it.
 
 ## Onboarding window (first launch, or any missing permission)
 
