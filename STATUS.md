@@ -15,9 +15,14 @@
   once) + live stable-mic regression (no false-positive). **Live AirPods-die run → Needs Franco.**
 - **M3-T1 DONE** — pause/resume wired end-to-end (rebaser math, engine `.paused`/`.resumed`,
   RecordingSession coordination, CLI `--script` + `p`/`r`/Return). G3 §4.1 pause-math PASSED.
-- **Next task:** **M3-T3** — disk-space monitor → clean stop at <2 GB free (docs/02 §7), with a
-  `--test-disk-floor N` flag to trip it deterministically. Reuses the `engine.stop(reason:)`
-  seam from M3-T2 (pass `.diskAlmostFull`). Gate §4.4.
+- **§4.2 ran (Franco) and disproved docs/02 §4** — a lost mic does NOT hand over, its buffers
+  just stop, so M3-T2's format-compare can never fire for the AirPods case (it remains a valid
+  guard for a same-device format change). Status quo silently degraded the recording = an
+  ADR-007 violation. Policy now **ADR-012**: notify and keep recording. Docs corrected (02 §4,
+  04 §4.2, 01 event surface, 05). See field notes for the data.
+- **Next task:** **M3-T6** — mic-loss starvation watchdog → emit `microphoneLost`, recording
+  continues (ADR-012). Then **M3-T7** (spike: can `SCStream.updateConfiguration` re-point the
+  mic live?). Then back to **M3-T3** (disk floor; reuses M3-T2's `engine.stop(reason:)` seam).
 - **Now done:** M2-T1..T6 + M3-T1..T2. `record` is a full CLI (real 3-track capture, presets,
   explicit path, progress ticker, pause/resume, scripted timeline, mic-change fail-stop).
   KEY ENV FACT: foreground Bash captures WORK (TCC held); backgrounded/detached ones lose the
@@ -59,10 +64,12 @@ video (deterministic, reproducible).
 - [ ] **G3 §4.1 cross-seam A/V sync (human)** — record `--script rec10,pause5,rec10` with mic
       while clapping near the pause seam; scrub QuickTime that video/system/mic realign within
       ~2 frames across the resume seam. (Automated duration + monotonic legs already PASS.)
-- [ ] **G3 §4.2 mic-disappears (human, device action)** — record with AirPods as the mic, then
-      turn them off / put them in the case mid-recording. Expect: clean stop, playable file, the
-      CLI's finish line names the cause (`finished (microphoneChanged)`). (Detection + reason
-      plumbing are unit-tested; a real device switch is the only thing that can't run headlessly.)
+- [x] **G3 §4.2 mic-disappears — RUN 2026-07-15 (Franco).** Outcome: no takeover, mic buffers
+      just stop; recording continued, no event. Disproved docs/02 §4 → corrected; policy set in
+      ADR-012; watchdog queued as M3-T6. **Re-run needed once M3-T6 lands** (expect: recording
+      continues + a `microphoneLost` event names the cause + mic track ends at the disconnect).
+- [ ] **G3 §4.2 re-run after M3-T6 (human, device action)** — same AirPods-into-case run; the
+      only new thing to check is that the loss is *reported*, not that it stops.
 - [x] **M2-T6 subjective quality check** — DONE 2026-07-14: Franco compared Balanced vs High on
       real busy content and confirmed "balanced looks pretty good". Balanced quality is
       acceptable at ~2× the efficiency of Tier-1 → BitrateModel constants CONFIRMED, no change.
@@ -79,12 +86,37 @@ video (deterministic, reproducible).
 | M1   | ✅ complete 2026-07-14 | all 5 tasks done; capture engine + router + probe + sleep guard, 41 tests |
 | G1   | ✅ passed 2026-07-14 | probe-stream: all 3 sources flowing. video 4112×2570 420v (PTS Δ 0.008–0.09s, frame-on-change); system audio 48kHz/2ch/32-bit (Δ 0.02s); mic native format device-dependent — AirPods 24kHz/1ch, built-in 48kHz/1ch (both differ from system audio → separate tracks required, M2) |
 | G2   | ✅ passed 2026-07-14 | §3.1 tracks hvc1+2×aac ✅; §3.2 kill-9 ✅ (kill@6s→5.04s playable AFTER fragment fix 10s→1s — 10s was unparseable if killed <10s); §3.3 sync-clap ✅ (Franco); §3.4 static-tail ✅ (14s static→14.4s @7.9fps, tail patch holds); §3.5 30-min drift ✅ (Franco ran real 30-min record + beepflash; per-track dur match 50ms; flash↔beep offset constant ~−67ms±10 from min 5→29 = no drift) |
-| G3   | 🟡 §4.1 passed | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears / §4.3 sleep-lock / §4.4 disk-guard await M3-T2..T4. Cross-seam clap-sync = human. |
+| G3   | 🟡 §4.1 passed | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears RAN 2026-07-15 (Franco): premise disproved — no mic takeover, buffers just stop, recording continued with no event (mic 22.57s vs video 59.85s). Gate redefined per ADR-012 (continue + report); re-run after M3-T6. §4.3 sleep-lock / §4.4 disk-guard await M3-T4/T3. Cross-seam clap-sync = human. |
 | G4   | ⬜ not run | — |
 | G5   | ⬜ not run | — |
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-15 (§4.2 LIVE — **docs/02 §4's mic-takeover claim is FALSE**): Franco recorded 60 s
+  with AirPods, cased them at ~22 s. Result — the recording **continued to the full 60 s** and
+  finished `userStopped`, dropped frames 0:
+  ```
+  duration: 59.85s
+  track 1: audio aac  48000Hz 2ch  dur 59.79s   ← system audio, full
+  track 2: video hvc1 4112x2570    dur 59.85s   ← video, full
+  track 3: audio aac  24000Hz 1ch  dur 22.57s   ← mic (AirPods), STOPS at the disconnect
+  ```
+  - **The built-in mic did NOT take over. The mic buffers just stopped.** No format change, no
+    error, no event. So M3-T2's format-compare detector correctly never fired — it is a valid
+    guard for a *same-device* format change, but it is NOT the AirPods story it was written for.
+  - **Root cause: we pin an explicit `microphoneCaptureDeviceID`** (forced by 02 §1 — nil throws
+    "invalid parameter" on 15.6). SCK captures the device you named and won't substitute. With a
+    pinned ID a device *switch* essentially cannot occur; only *loss* can. Corrected in 02 §4.
+  - **This exposed a real ADR-007 violation in the status quo:** the mic died and nothing told
+    the user — 37 s narrated into a void, exit 0, file looks healthy. "Silently degraded" is the
+    exact failure ADR-007 forbids. Fix = a starvation watchdog (M3-T6) emitting `microphoneLost`.
+  - **Policy decided: ADR-012** — mic loss notifies and KEEPS recording (ending a 90-min screen
+    capture over a headphone battery is the worse outcome). Amends ADR-007 for that trigger only.
+  - **Open (M3-T7 spike):** re-attaching to the built-in mic to keep recording *sound* needs
+    (a) `SCStream.updateConfiguration` to accept a new mic device ID live — unverified, and
+    (b) a fixed-format resampled mic input, since the writer input's format is welded to the
+    first buffer's and cannot change after `startWriting()`. (a) is spike-able headlessly.
 
 - 2026-07-15 (M3-T2 mic format-change): fail-stop wiring + a reusable seam.
   - **Detection = compare the mic buffer's ASBD to the input's established one** (sample rate,

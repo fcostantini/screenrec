@@ -212,6 +212,25 @@ clap test; static-screen duration test; 30-min drift test).
       `CGEventSource.secondsSinceLastEventType` — not NSEvent), clock injectable.
       **Verify:** unit test with injected clock — 30 s of no video buffers fires
       exactly one log line; buffer arrival resets it.
+- [ ] M3-T6 **Mic-loss watchdog** (02 §4, ADR-012). A lost mic device stops delivering
+      rather than handing over (proved by §4.2, 2026-07-15), so M3-T2's format compare can
+      never fire for it: detect *starvation* instead — mic was delivering, then nothing for
+      N s while recording and not paused ⇒ emit `microphoneLost` (docs/01) exactly once.
+      Recording CONTINUES (ADR-012); the mic track just ends. Clock injectable; do not fire
+      while paused (buffers are dropped by design) or when no mic was ever selected.
+      **Verify:** unit tests with an injected clock — buffers→silence fires exactly one
+      event; no event while buffers flow, while paused, or with `--no-mic`. CLI prints the
+      loss. Live AirPods-case run per §4.2 **(human)**; agent then confirms the file is
+      playable with the mic track ending at the disconnect.
+- [ ] M3-T7 **SPIKE (time-boxed): can SCK re-point a live stream's mic?** Call
+      `SCStream.updateConfiguration` with a different `microphoneCaptureDeviceID` mid-capture
+      and observe whether `.microphone` buffers switch to the new device's format. Runnable
+      headlessly — swap built-in ↔ AirPods by ID, no physical action needed (needs both
+      devices present). This is the load-bearing unknown for ever recovering mic audio after
+      a disconnect; note that even a "yes" needs a fixed-format (resampled) mic input first,
+      since the input's format is welded to the first buffer's (ADR-012).
+      **Verify:** the finding is recorded in 02 §4 + STATUS either way. Yes ⇒ reopen ADR-012
+      with a re-attach proposal. No ⇒ ADR-012's notify-and-continue is final for v1.
 
 **Gate G3**: 04-testing §4 (pause math: 10 s rec / 5 s pause / 10 s rec ⇒ 20 s ± 0.2 s
 file, A/V in sync across the seam; all three robustness scenarios end in playable files).

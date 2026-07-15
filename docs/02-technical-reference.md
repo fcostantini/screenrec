@@ -86,11 +86,21 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   - mic: build input lazily from the **first mic buffer's format description** (device-
     native format varies: AirPods mono 24 kHz vs studio interface 96 kHz), AAC ~160 kbps.
 - Mic device notes: AirPods drop system playback quality while their mic is active
-  (HFP/A2DP limitation, not our bug — surface in UI copy). Watch for **format changes
-  mid-stream** (device switch, e.g. AirPods die → built-in mic takes over): compare
-  `CMSampleBufferGetFormatDescription` against the input's; on change, v1 policy is
-  end-recording-cleanly with a notification (ADR-007). Do not attempt live format
-  switching in v1.
+  (HFP/A2DP limitation, not our bug — surface in UI copy).
+- ⚠️ **A lost mic device does NOT hand over to another one — its buffers simply stop.**
+  Verified 2026-07-15 (§4.2, AirPods → case mid-recording): video and system audio ran the
+  full 60 s while the mic track just ended at 22.6 s. No takeover, no format change, no
+  error, no event. The cause is §1's forced explicit `microphoneCaptureDeviceID`: SCK
+  captures the device you *named* and will not substitute another. An earlier draft of this
+  section claimed "AirPods die → built-in mic takes over" — that is **FALSE**; do not design
+  against it. Detecting mic loss therefore needs a **starvation watchdog** (was delivering,
+  then stopped), not a format comparison — M3-T6, policy in ADR-012.
+- **Format changes mid-stream** remain possible for the *same* device (e.g. an AirPods
+  HFP/A2DP codec flip), so `MovieRecorder` compares each mic buffer's ASBD (sample rate /
+  channels / format ID) against the input's and fail-stops on a diff (M3-T2). With a pinned
+  device ID that is a defensive guard, not the common path. Do not attempt live format
+  switching in v1 (ADR-007): the input's format is welded to the first buffer's, so *any*
+  device swap would first require normalizing the mic into a fixed-format input (ADR-012).
 - Default track layout: system + mic as two separate tracks (the whole point of Tier 2).
   Optional third "mixed" track is out — players play all tracks simultaneously anyway,
   which IS the mixed experience.

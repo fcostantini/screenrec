@@ -97,6 +97,7 @@ is the seam that makes this trivial.
   enum EngineEvent: Sendable {
       case started                                   // first complete video frame
       case paused, resumed
+      case microphoneLost                            // mic stopped delivering; recording CONTINUES (M3-T6, ADR-012)
       case fileProgress(seconds: Double, bytes: Int64)
       case stopped(EndReason)                        // engine ran with no writer (e.g. engine-smoke)
       case finished(url: URL, reason: EndReason, droppedFrames: Int)  // file finalized, playable
@@ -105,6 +106,8 @@ is the seam that makes this trivial.
   ```
   Fail-stop (ADR-007) is ALWAYS `finished` with a non-`userStopped` reason — a playable
   file plus a cause. `failed` is reserved for failures before any media was written.
+  `microphoneLost` is the one mid-recording problem that does NOT end the session (ADR-012):
+  it is a notification, not a termination, and the mic track simply ends at that point.
 
 ## Recorder state machine (enforced in CaptureEngine)
 

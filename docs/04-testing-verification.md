@@ -59,8 +59,13 @@ Pass criteria:
 1. **Pause math**: scripted: record 10 s → pause 5 s → resume 10 s → stop (CLI
    supports timed pause for tests: `--script rec10,pause5,rec10`). Pass: duration
    20 s ± 0.2 s; clap-sync across the seam; monotonic PTS (probe warns otherwise).
-2. **Mic disappears**: kill AirPods mid-recording. Pass: clean stop, playable file,
-   event message names the cause.
+2. **Mic disappears** (human — device action): record with AirPods, then put them in the
+   case mid-recording. Pass (ADR-012): recording **CONTINUES** — video + system audio run to
+   the intended end, a `microphoneLost` event names the cause, the file is playable, and the
+   mic track ends at the disconnect (probe: mic track shorter than video). NOT a stop. The
+   original wording here ("clean stop") assumed a built-in-mic takeover that does not happen
+   — see 02 §4. Run 2026-07-15 against the pre-M3-T6 build recorded the loss correctly in the
+   file (mic 22.6 s vs video 59.9 s) but emitted no event; the event is what M3-T6 adds.
 3. **Display sleep/lock** (human): close lid mid-recording. Pass: playable file to
    that point.
 4. **Disk guard**: run with `--test-disk-floor <huge>` to trip the monitor. Pass:
