@@ -326,15 +326,26 @@ UI layout, states, notification copy, and onboarding flow are specified in
       outline, red pulse, amber half-circle); `lsappinfo` reports `ApplicationType=UIElement`
       (no Dock icon); 11 AppCore tests (108 total). docs/06's 4th state (replay-armed badge)
       deferred to M4-T2, which brings the toggle that can set it.
-- [ ] M4-T2 Menu: Start/Stop/Pause, display picker (NSScreen list), mic picker
+- [x] M4-T2 Menu: Start/Stop/Pause, display picker (NSScreen list), mic picker
       (AVCaptureDevice list + "None"), preset picker, "Open Recordings Folder",
-      recent-files submenu (last 5).
+      recent files, inline rows (last 5 — docs/06 item 10 wins over "submenu" here; Franco
+      confirmed 2026-07-15).
       **Verify:** menu-driven 5 s recording **(human — menus can't be clicked
       headlessly; first run also needs the app's own TCC grant)**; the agent's share:
       probe the produced file (3 tracks, sane duration) and check the recent-files
       logic via AppCore unit test against a fixture directory.
+      DONE 2026-07-15. **No longer human**: `tools/menudriver.swift` + the Accessibility grant
+      drove the whole flow (open → Start → 5 s → Stop & Save) headlessly → playable 6.38 s file,
+      probed. **2 tracks, not 3** — mic was `None`, which is correct for that config; the 3-track
+      probe moves to M4-T3 (below), because a mic needs Microphone TCC and *only the app can
+      request it* (that pane has no "+"). Franco granted the app Screen Recording by hand.
+      Instant-replay toggle deferred to M4-T4, which owns the `replayArmed` key (Franco, 2026-07-15).
 - [ ] M4-T3 Onboarding: permission status view; request buttons; explains the
       restart-after-grant dance (02 §2); blocks record until green.
+      **Inherits M4-T2's 3-track probe:** picking a mic in M4-T2 is an unrecoverable dead-end
+      (Start greys out; the Microphone pane has no "+", so only a `requestAccess` call can grant
+      it — verified 2026-07-15). Once the Grant… button exists, run a menu-driven recording with
+      a mic selected and probe for 3 tracks. That closes M4-T2's one open leg.
       **Also settle (M3-T4 left this open):** does a genuinely **ungranted** process *throw* from
       `SCShareableContent` (02 §10, measured in M1-T2) or *enumerate zero displays* (the old 02 §1
       claim, now retracted)? The two contradicted each other and it can't be tested here without

@@ -11,15 +11,24 @@
   `ScreenRecApp`. All three icon states verified by screenshot, not by eye-of-faith — including
   the pulse (measured 2.15× redness swing vs the 2.22× the 0.45 alpha floor predicts). No Dock
   icon confirmed via `lsappinfo` (`ApplicationType=UIElement`). 108 tests (+11).
-- **Next: M4-T2** — the menu proper (Start/Stop/Pause, display/mic/preset pickers, Open
-  Recordings Folder, recent files). It is what first drives `AppState` from a live session, and
-  it brings the replay-armed toggle that M4-T1 deliberately left out of `StatusIcon`.
+- **M4-T2 DONE.** The menu works end-to-end: menu-driven Start → 5 s → Stop & Save produced a
+  playable 6.38 s file (probed: hvc1 4112×2570 + aac 48k/2ch), with the recording then appearing
+  in the recent-files rows. **Verified headlessly** via `tools/menudriver.swift` + the new
+  Accessibility grant — docs/03's "(human)" tax on M4/M5 menus is largely gone. `AppState` now
+  owns a `RecordingSession`; pickers/recent-files/header text live in AppCore, views in
+  ScreenRecApp. RecorderCore untouched. 133 tests (+25).
+- **Next: M4-T3 — onboarding**, and it is load-bearing, not polish: M4-T2 proved that picking a
+  mic is an **unrecoverable dead-end** (Start greys out; the Microphone pane has no "+", so only
+  an in-app `requestAccess` can grant it). T3 also inherits M4-T2's 3-track probe (Franco's
+  call, 2026-07-15) and still owes the throws-vs-zero-displays answer below.
 - ⚠️ **M4-T3 owes an answer** the whole permission story rests on: does an ungranted process
   *throw* or *enumerate zero displays*? 02 §1 and §10 contradicted each other, §10 (measured)
   won, and `startDecision` assumes it — a fresh account is the only place to settle it without
   destroying this machine's grant (02 §2).
 - **The `/simplify` sweep over M3 was run** (commits `fff901e`, `2522e26`) — an ARC cycle that
   made `CaptureEngine.deinit` unreachable, and the M3-T7 spike held to the CLI's bar.
+- **Replay-armed toggle + icon badge: deferred to M4-T4** (Franco, 2026-07-15), which owns the
+  `replayArmed` key. Nothing can arm replay until M5, so a switch now would arm nothing.
 
 ## M3 (closed)
 
@@ -97,8 +106,18 @@ video (deterministic, reproducible).
       (`security add-trusted-cert -r trustRoot -p codeSign`). Verified: signs and
       passes `codesign --verify --strict`. devsign.sh should find and use this
       identity; it must NOT try to create a new one.
-- [ ] First GUI TCC grants for the .app once M4 begins (grant + relaunch dance). Not needed yet
-      — M4-T1's shell captures nothing; M4-T2's menu-driven recording is the first ask.
+- [x] **Screen Recording for the .app — GRANTED 2026-07-15 (Franco)**, by hand via the "+" button
+      (System Settings → Screen & System Audio Recording → dist/ScreenRec.app). Survives
+      `bundle.sh` rebuilds, as M0-T3's stable designated requirement promised. Real users will
+      never do this: M4-T3's `Grant…` button calls `CGRequestScreenCaptureAccess()` and macOS
+      handles it.
+- [ ] **Microphone for the .app — CANNOT be granted by hand.** That pane has no "+" (verified by
+      screenshot). Only an in-app `requestAccess` call can put ScreenRec in the list ⇒ blocked
+      until M4-T3's onboarding exists. This is why the 3-track probe moved to T3.
+- [x] **Accessibility for Terminal — GRANTED 2026-07-15 (Franco).** Unblocks
+      `tools/menudriver.swift`. Note it's on **Terminal**, not a "Claude Code" entry. Broad grant
+      (anything in Terminal can drive any app) — fine to revoke once M4/M5 menu work is done; the
+      product never needs it (M5's hotkey uses Carbon RegisterEventHotKey, no TCC).
 - [x] **M4-T1 visual check — PASSED 2026-07-15 (Franco).** "i like how it looks currently".
       Agent did the existence half (all three states screenshotted, pulse measured); Franco
       signed off the taste half. The icon constants are now settled: 12 frames / 2 s cycle,
@@ -139,6 +158,75 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-15 (M4-T2 the menu): the task that made M4 verifiable — and the first task where a
+  **live run found a bug the unit tests structurally could not**.
+  - 🐞 **A stored `readiness` is always one menu-open behind.** SwiftUI builds a menu's rows —
+    including which are `.disabled` — *before* any `.task` attached to them runs. So refreshing
+    readiness from that task lands after the decision it was meant to inform, and the menu shows
+    the answer from the **previous** open. Live symptom: pick a microphone, and the menu went on
+    offering an enabled Start that silently did nothing (the ungranted mic flipped readiness, the
+    stale menu didn't know). Now a **computed** property — both TCC queries are cheap local
+    checks, so asking during body evaluation is affordable and cannot lag. **Rule: anything the
+    menu's structure depends on must be readable at build time, not refreshed from `.task`.**
+    `.task` is only good for things that change *while* the menu is open (the elapsed clock).
+  - **`EngineEvent.fileProgress` is declared but nothing emits it** — a dead case, exactly like
+    `.systemSleep` was before M3-T4. The CLI's ticker polls `recordedDuration` + the file size on
+    disk; the menu now does the same. That suits docs/06 better anyway ("≤1 Hz, menu open only"):
+    a pull happens exactly when someone is looking, which no push could arrange. Left dead rather
+    than wired up — M4-T2 had no business changing RecorderCore. Whoever needs it should ask
+    whether it should exist at all before implementing it.
+  - **`isSessionActive` must be `session != nil`, NOT derived from the icon.** Between `start()`
+    and the first complete frame the icon still reads `.idle` while a session exists. Keying the
+    menu off the icon would offer "Start Recording" a second time in that window (a second
+    session over the first) and let ⌘Q skip its confirm and abandon a live writer.
+  - **A `Picker` in menu content already *is* docs/06's submenu-with-checkmark.** Wrapping it in
+    an explicit `Menu` + `.pickerStyle(.inline)` reads closer to the spec's wording and renders
+    further from it — it adds stray separators around the group. Verified with `menudriver dump`.
+  - **RecorderCore stayed untouched, but only just.** `DisplaySelection`/`MicrophoneSelection`
+    carry associated values and aren't `Hashable`, so they can't be SwiftUI picker tags. Rather
+    than add conformances to a capture type to suit a menu, `AppState` stores the raw picked
+    identifiers and builds a `CaptureConfiguration` at start. Better shape anyway — but note the
+    pull: the UI *will* keep asking for small favours from RecorderCore. Refuse them.
+  - **My own comment lied and a test caught it.** I claimed the recent-files filename tie-break
+    "keeps the newer of two same-second files first". It does not — `Recording.mov` sorts above
+    `Recording 2.mov` descending, though the suffixed one was written second. The tie-break buys
+    *determinism* (`sorted(by:)` isn't stable), nothing more. The test now asserts stability
+    rather than pinning the quirk as if it were intent.
+
+- 2026-07-15 (M4-T2 verification — **the "(human)" tax on M4/M5 mostly evaporated**):
+  - **`tools/menudriver.swift` + Franco's Accessibility grant = headless menu testing.** The
+    whole T2 verify (open menu → pick sources → Start → wait → Stop → probe the file) ran with no
+    human. `dump` prints the open menu as text — titles, checkmarks, shortcuts, disabled rows,
+    submenus — so docs/06's structure is **assertable**, not a screenshot to squint at. Use it.
+  - ⚠️ **`AXPress` on a menu-bar item returns `.success` and does nothing.** Menu tracking runs a
+    modal event loop the action never enters. Third instance of this project's oldest trap (SCK's
+    `updateConfiguration` OK-on-a-dead-device, 02 §4; the `--nil-follow` window). The menu opens
+    via a synthetic `CGEvent` click at the item's own reported frame. Menu *items* do respond to
+    AXPress once their menu is open.
+  - 🔴 **A submenu's AX children don't exist until the submenu is opened — and I shipped that as a
+    false negative into the very tool built to prevent false negatives.** `dump` read the children
+    without opening, so the Microphone submenu printed as empty. It looked exactly like a real
+    regression (the app "losing" its device list), I believed it, and I was one edit from
+    "fixing" an app that was never broken — until **Franco sent a screenshot showing the two
+    devices right there**. The tool now opens each submenu, retries, and prints
+    `(unread — submenu never populated)` rather than printing nothing. **The rule this project
+    keeps relearning, now in its fifth costume: an empty reading is not evidence of emptiness.
+    Any instrument that can't distinguish "nothing there" from "didn't look" will eventually
+    invent a bug for you.** Verified fixed: three consecutive dumps now identical and complete.
+  - **The grant is on Terminal, not "Claude Code"** — Claude Code here is a CLI hosted by
+    Terminal.app, so it never requests Accessibility and never appears in that list. It's a broad
+    grant (anything run in Terminal can drive any app); revoke it after M4/M5 if desired.
+  - 🔴 **The Microphone pane has NO "+" button** (verified by screenshot, 2026-07-15) — unlike
+    Screen Recording / Accessibility / Full Disk Access. Apps appear there *only* after calling
+    `requestAccess`. **Consequence: in M4-T2 the app is an unrecoverable dead-end the moment a mic
+    is picked** — Start greys out, and neither the app nor the user can grant it. This is the
+    strongest possible argument that M4-T3's onboarding is load-bearing, not polish. It also
+    means: **any permission the app needs, the app must ask for — you cannot document your way
+    around it.**
+  - **Screen Recording CAN be granted by hand** (`+` → the .app), which is how T2 was tested at
+    all. The grant survived a dozen `bundle.sh` rebuilds — M0-T3's stable designated requirement
+    holding up in practice, exactly as promised.
 
 - 2026-07-15 (M4-T1 menu-bar shell): the first UI task, and the headless-verification story is
   better than expected — **the agent does not have to hand the visual check to a human.**

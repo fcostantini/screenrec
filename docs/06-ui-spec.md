@@ -36,8 +36,14 @@ Order and grouping (separators between groups):
 7. `Quality ▸` submenu: Efficient / Balanced / High (docs/02 §3 presets).
 8. — separator —
 9. `Open Recordings Folder` — reveals output dir in Finder.
-10. Recent recordings: up to 5 most-recent files from the output dir, dimmed style;
-    click reveals in Finder.
+10. Recent recordings: up to 5 most-recent files from the output dir, **indented one level**
+    under `Open Recordings Folder` so they read as its contents rather than as more commands
+    (Franco, 2026-07-15 — inline rows, not a submenu, settling this against 03's wording);
+    click reveals in Finder. ⚠️ Implementation notes from M4-T2: a SwiftUI `.menu`
+    `MenuBarExtra` exposes neither `NSMenuItem.indentationLevel` (the indent is leading
+    whitespace in the title, with an explicit accessibility label so VoiceOver reads the
+    filename) nor a dimmed-but-clickable style — "dimmed style" is **not** currently met and
+    can't be without dropping to a hand-built NSMenu. Revisit in M6 polish if it matters.
 11. — separator —
 12. `Settings…` (⌘,) · `Quit` (⌘Q). Quit while recording → confirm, then clean
     finalize before exit (never abandon a writer).

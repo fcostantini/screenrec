@@ -6,7 +6,8 @@
 /// function of, which is what lets the event mapping be tested without a UI host.
 ///
 /// docs/06 lists a fourth state, replay-armed, as an idle icon with a dot badge. It arrives
-/// with the menu toggle that can set it (M4-T2); nothing can arm replay yet.
+/// with M4-T4, which owns the `replayArmed` setting that persists it — nothing can arm replay
+/// until M5 reads that key, so a badge before then would report a state no one can be in.
 public enum StatusIcon: Sendable, Equatable {
     /// Not recording: outline record circle, template-rendered so the menu bar tints it.
     case idle

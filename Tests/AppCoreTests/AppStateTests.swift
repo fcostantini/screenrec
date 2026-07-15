@@ -93,6 +93,120 @@ import RecorderCore
         #expect(state.statusIcon == .paused)
     }
 
+    // MARK: - The pickers → CaptureConfiguration (docs/06 items 5–7)
+
+    @Test func defaultsMatchTheCaptureDefaults() {
+        let state = AppState()
+        #expect(state.captureConfiguration.display == .main)
+        #expect(state.captureConfiguration.microphone == .none)
+        #expect(state.captureConfiguration.quality == .balanced)
+    }
+
+    @Test func pickedSourcesReachTheConfiguration() {
+        let state = AppState()
+        state.selectedDisplayID = 42
+        state.selectedMicrophoneID = "mic-uid"
+        state.quality = .high
+
+        #expect(state.captureConfiguration.display == .id(42))
+        #expect(state.captureConfiguration.microphone == .device(id: "mic-uid"))
+        #expect(state.captureConfiguration.quality == .high)
+    }
+
+    @Test func noMicrophoneMeansNoneNotADefaultDevice() {
+        // `.none` has to survive as `.none`: SCK treats a nil/sentinel device ID as an error
+        // (docs/02 §1), and "the user chose no mic" must not quietly become "some mic".
+        let state = AppState()
+        state.selectedMicrophoneID = nil
+        #expect(state.captureConfiguration.microphone == .none)
+    }
+
+    @Test func firstRefreshChecksTheMainDisplay() {
+        // docs/06 item 5 wants one row per screen with a checkmark on the current one — so the
+        // selection must name a real row, not sit on nil.
+        let state = AppState()
+        state.refreshSources(displays: [
+            DisplayOption(id: 1, name: "Sidecar", isMain: false),
+            DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
+        ])
+        #expect(state.selectedDisplayID == 2)
+    }
+
+    @Test func aPickedDisplayIsLeftAlone() {
+        let state = AppState()
+        state.refreshSources(displays: [
+            DisplayOption(id: 1, name: "Sidecar", isMain: false),
+            DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
+        ])
+        state.selectedDisplayID = 1
+        state.refreshSources(displays: [
+            DisplayOption(id: 1, name: "Sidecar", isMain: false),
+            DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
+        ])
+        #expect(state.selectedDisplayID == 1)      // the user's choice survives a menu re-open
+    }
+
+    @Test func aVanishedDisplayFallsBackToMain() {
+        // Unplug the display you picked and the submenu would otherwise show nothing checked
+        // while the engine resolves an ID that no longer exists.
+        let state = AppState()
+        state.selectedDisplayID = 99
+        state.refreshSources(displays: [
+            DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
+        ])
+        #expect(state.selectedDisplayID == 2)
+    }
+
+    @Test func aVanishedMicrophoneDropsToNone() {
+        // Not cosmetic: `start()` resolves a stale ID to the *system default*, so leaving the
+        // selection put would show one device checked in the menu while a different one was
+        // recorded. Dropping to None makes the menu and the file agree.
+        let state = AppState()
+        state.selectedMicrophoneID = "unplugged-device-uid"
+        state.refreshSources(displays: [])
+        #expect(state.selectedMicrophoneID == nil)
+        #expect(state.captureConfiguration.microphone == .none)
+    }
+
+    @Test func noDisplaysAtAllLeavesTheConfigurationOnMain() {
+        let state = AppState()
+        state.refreshSources(displays: [])
+        #expect(state.selectedDisplayID == nil)
+        #expect(state.captureConfiguration.display == .main)
+    }
+
+    // MARK: - Session shape
+
+    @Test func nothingIsActiveBeforeStarting() {
+        let state = AppState()
+        #expect(!state.isSessionActive)
+        #expect(!state.isPaused)
+    }
+
+    @Test func pausedTracksTheIcon() {
+        let state = recordingState()
+        #expect(!state.isPaused)
+        state.apply(.paused)
+        #expect(state.isPaused)
+        state.apply(.resumed)
+        #expect(!state.isPaused)
+    }
+
+    @Test func aStartFailureIsSaidOutLoud() {
+        // ADR-007: a recording that never happened must not fail silently. Until M4-T5's
+        // notifications, the header row is the only place this can be said.
+        let state = AppState()
+        state.apply(.failed(message: "No displays available"))
+        #expect(state.lastFailure == "No displays available")
+    }
+
+    @Test func losingTheMicrophoneIsReportedWithoutEndingTheRecording() {
+        let state = recordingState()
+        state.apply(.microphoneLost)
+        #expect(state.statusIcon == .recording)      // ADR-012
+        #expect(state.lastFailure != nil)            // …but never silently
+    }
+
     @Test func consumesAWholeSessionFromItsEventStream() async {
         // The production path: RecordingSession hands over a stream, not loose events. It ends
         // by finishing the stream, so `consume` must return rather than hang the caller.
