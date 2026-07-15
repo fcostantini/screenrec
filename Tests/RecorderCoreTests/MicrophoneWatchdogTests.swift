@@ -15,18 +15,6 @@ import Testing
         func advance(_ seconds: TimeInterval) { lock.lock(); value += seconds; lock.unlock() }
     }
 
-    /// A minimal empty CMSampleBuffer — the watchdog only inspects the `type` it is routed as.
-    private static func markerBuffer() -> CMSampleBuffer {
-        var buffer: CMSampleBuffer?
-        let status = CMSampleBufferCreate(
-            allocator: kCFAllocatorDefault, dataBuffer: nil, dataReady: true,
-            makeDataReadyCallback: nil, refcon: nil, formatDescription: nil,
-            sampleCount: 0, sampleTimingEntryCount: 0, sampleTimingArray: nil,
-            sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &buffer)
-        precondition(status == noErr, "CMSampleBufferCreate failed: \(status)")
-        return buffer!
-    }
-
     private static let timeout: TimeInterval = 3
 
     @Test func firesOnceWhenMicrophoneStopsDelivering() async {
@@ -36,7 +24,7 @@ import Testing
         await confirmation("microphone loss reported exactly once") { lost in
             let watchdog = MicrophoneWatchdog(
                 timeout: Self.timeout, now: { clock.now }, onLoss: { lost() })
-            watchdog.consume(Self.markerBuffer(), type: .microphone)  // mic is alive…
+            watchdog.consume(makeMarkerBuffer(), type: .microphone)  // mic is alive…
             clock.advance(Self.timeout + 1)                           // …then it goes away
             watchdog.check()
             watchdog.check()
@@ -51,7 +39,7 @@ import Testing
                 timeout: Self.timeout, now: { clock.now }, onLoss: { lost() })
             // Heartbeats keep the gap under the timeout across a span far longer than it.
             for _ in 0..<10 {
-                watchdog.consume(Self.markerBuffer(), type: .microphone)
+                watchdog.consume(makeMarkerBuffer(), type: .microphone)
                 clock.advance(Self.timeout - 1)
                 watchdog.check()
             }
@@ -63,7 +51,7 @@ import Testing
         await confirmation("no loss before the timeout", expectedCount: 0) { lost in
             let watchdog = MicrophoneWatchdog(
                 timeout: Self.timeout, now: { clock.now }, onLoss: { lost() })
-            watchdog.consume(Self.markerBuffer(), type: .microphone)
+            watchdog.consume(makeMarkerBuffer(), type: .microphone)
             clock.advance(Self.timeout - 0.01)
             watchdog.check()
         }
@@ -89,10 +77,10 @@ import Testing
         await confirmation("other sources don't mask a dead mic") { lost in
             let watchdog = MicrophoneWatchdog(
                 timeout: Self.timeout, now: { clock.now }, onLoss: { lost() })
-            watchdog.consume(Self.markerBuffer(), type: .microphone)
+            watchdog.consume(makeMarkerBuffer(), type: .microphone)
             clock.advance(Self.timeout + 1)
-            watchdog.consume(Self.markerBuffer(), type: .systemAudio)
-            watchdog.consume(Self.markerBuffer(), type: .screen)
+            watchdog.consume(makeMarkerBuffer(), type: .systemAudio)
+            watchdog.consume(makeMarkerBuffer(), type: .screen)
             watchdog.check()
         }
     }

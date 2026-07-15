@@ -2,20 +2,6 @@ import CoreMedia
 import Testing
 @testable import RecorderCore
 
-/// A minimal empty CMSampleBuffer (a valid object with no data/format). Enough to
-/// exercise fan-out, which passes buffers opaquely. Routed as `.systemAudio` so the
-/// router's video-completeness filter (which would drop this) doesn't apply.
-private func makeMarkerBuffer() -> CMSampleBuffer {
-    var buffer: CMSampleBuffer?
-    let status = CMSampleBufferCreate(
-        allocator: kCFAllocatorDefault, dataBuffer: nil, dataReady: true,
-        makeDataReadyCallback: nil, refcon: nil, formatDescription: nil,
-        sampleCount: 0, sampleTimingEntryCount: 0, sampleTimingArray: nil,
-        sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &buffer)
-    precondition(status == noErr, "CMSampleBufferCreate failed: \(status)")
-    return buffer!
-}
-
 private final class CountingConsumer: SampleConsumer, @unchecked Sendable {
     private let lock = NSLock()
     private var _count = 0

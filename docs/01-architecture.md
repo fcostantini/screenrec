@@ -12,6 +12,7 @@ screenrec-app/
 │   │   │   ├── CaptureConfiguration.swift # value type: display, mic, fps, quality…
 │   │   │   ├── SampleRouter.swift         # SCStreamOutput → fan-out to consumers
 │   │   │   ├── MicrophoneWatchdog.swift   # mic stopped delivering → .microphoneLost (M3-T6)
+│   │   │   ├── StallWatchdog.swift        # video silent while user active → log it (M3-T5)
 │   │   │   └── Permissions.swift          # TCC preflight/request, onboarding state
 │   │   ├── Recording/
 │   │   │   ├── RecordingSession.swift     # composes engine+recorder; the seam CLI/app share
@@ -25,6 +26,7 @@ screenrec-app/
 │   │   └── Support/
 │   │       ├── OutputLocation.swift       # dir preflight (TCC!), naming, ~/Movies
 │   │       ├── DiskSpaceMonitor.swift     # output volume < 2 GB → .diskAlmostFull (M3-T3)
+│   │       ├── Polling.swift              # the one poll loop all three monitors share (M3-T5)
 │   │       └── SleepGuard.swift           # ProcessInfo activity assertion
 │   ├── screenrec-cli/         # Dev harness. Thin CLI over RecorderCore.
 │   │   └── main.swift

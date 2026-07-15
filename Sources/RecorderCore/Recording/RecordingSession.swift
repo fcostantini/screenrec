@@ -73,15 +73,9 @@ public final class RecordingSession: @unchecked Sendable {
         // (first launch, Bluetooth mic binding), and a thrashing near-full volume is precisely
         // when it does. `recordedDuration` is NaN until the first frame starts the session.
         let diskMonitor = self.diskMonitor
-        let diskTask = Task { [recorder] in
-            while !Task.isCancelled, recorder.recordedDuration.seconds.isNaN {
-                do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
-            }
-            while !Task.isCancelled {
-                do { try await Task.sleep(for: .seconds(DiskSpaceMonitor.checkInterval)) }
-                catch { return }
-                diskMonitor.check()
-            }
+        let diskTask = pollingTask(every: DiskSpaceMonitor.checkInterval) { [recorder] in
+            guard !recorder.recordedDuration.seconds.isNaN else { return }
+            diskMonitor.check()
         }
         self.diskTask = diskTask
 

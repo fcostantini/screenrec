@@ -34,11 +34,16 @@
   was declared-but-dead since M1 and is now wired. **Locked-screen bug fixed + verified live**:
   granted-preflight + zero displays no longer demands a permission you already hold. ⚠️ SCK
   collapses sleep/lock/unplug into one code → `.systemSleep` unreachable, not faked (02 §1/§7).
-- **Next task:** **M3-T5** — stall watchdog logging (02 §7; input-idle via
-  `CGEventSource.secondsSinceLastEventType`, NOT NSEvent), clock injectable. It is the **third**
-  poll loop → extract the shared `poll(every:)` helper there (deferred from M3-T3 by rule of
-  three; see field notes for why it wasn't done earlier). Then M3 is code-complete → **gate G3**,
-  where the `/simplify` sweep over the milestone is offered.
+- **M3-T5 DONE — M3 is CODE-COMPLETE (T1–T7 all landed).** `StallWatchdog` logs a wedged capture
+  (video silent while the user is demonstrably active) to the unified log — diagnostic only, no
+  auto-restart. The idle cross-check IS the design: frame-on-change makes a static screen
+  legitimately silent, so "no frames" alone would cry wolf on every coffee break. Shared
+  `pollingTask(every:)` extracted here (rule of three: mic-loss, disk, stall).
+- **Next: GATE G3** (04 §4). Automated legs already pass (§4.1 pause math, §4.2 mic loss,
+  §4.4 disk guard); §4.3's display-sleep leg passes headlessly via `pmset`. Remaining before G3
+  can be called: the **human legs in "Needs Franco"** (cross-seam clap-sync; lid-close and
+  monitor-unplug). Offered and not yet run: a **`/simplify` sweep** over M3's code — nothing has
+  ever swept for cross-task drift, only per-diff correctness (see the 2026-07-15 note below).
 - **Now done:** M2-T1..T6 + M3-T1..T2. `record` is a full CLI (real 3-track capture, presets,
   explicit path, progress ticker, pause/resume, scripted timeline, mic-change fail-stop).
   KEY ENV FACT: foreground Bash captures WORK (TCC held); backgrounded/detached ones lose the
@@ -114,6 +119,41 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-15 (M3-T5 stall watchdog): the review caught a **logic bug in the one condition the
+  class exists for**, and my tests could not have found it.
+  - **`idle < silence` is NOT `the user was active`.** I wrote the guard as "did any input land
+    after the last frame?". One inert keypress (a lone modifier changes nothing on screen, so no
+    frame) leaves idle permanently 1 s behind silence — so it stays true *forever after the user
+    walks away*, and every poll then reports a stall on an untouched machine. Exactly the
+    coffee-break cry-wolf the class was written to prevent. Correct guard is **recent** activity:
+    `idle < timeout`.
+  - **My test harness structurally couldn't express the bug.** `advance(_:userActive:)` pins idle
+    to 0 or grows it — so every test was "always active" or "always idle", never the realistic
+    middle (active, *then* leave). Both extremes passed. Fifth blind-spot test today (see the
+    boot-volume-only disk probe, the 400 MB image, the `--nil-follow` window, the lock-only
+    repro). **The pattern is always the same: the fixture can only produce states where the code
+    is right.** When a condition compares two quantities, test them *diverging*, not just each
+    pinned.
+  - **The refactor I deferred for safety introduced its own risk anyway.** Moving the mic poll
+    onto the nonisolated `pollingTask` means `check()` no longer serializes against the actor, so
+    a late `.microphoneLost` can in principle interleave between `.stopped` and
+    `continuation.finish()` where the actor-isolated form made that structurally impossible.
+    Mitigated by disarming both watchdogs *before* teardown; the residual window needs
+    `terminate()` delayed ≥3 s past a stream death. Documented in Polling.swift rather than
+    pretended away — if it ever shows up, revert the mic poll to an actor-isolated `Task {}`.
+  - **`.hidSystemState`, not `.combinedSessionState`**, for the idle probe: the combined state
+    counts *synthetic* events, so a mouse jiggler or keep-awake utility reads as "someone's here"
+    on an unattended machine and manufactures the false stall the cross-check exists to prevent.
+  - **Accepted false positive (documented, not faked): multiple displays.** The idle probe is
+    machine-wide, capture is per-display — working on an uncaptured second display reads as
+    active while the captured one is legitimately static. macOS exposes no per-display input
+    signal. Costs log noise in a diagnostic, never a recording. Weigh it when reading a
+    multi-display soak.
+  - **The diff took the package from warning-clean to not** (a bare `@Sendable` method-reference
+    default). With no CI the build loop is the only gate we have, so a standing warning is how
+    the next real one gets scrolled past. Fixed; a clean build is back to **0 warnings** — worth
+    checking that explicitly, since `grep error` won't show it.
 
 - 2026-07-15 (M3-T4 display/sleep): the technical findings are in **02 §1/§7** (the -3815 code,
   the lock+sleep truth table). What belongs here is the process lesson:

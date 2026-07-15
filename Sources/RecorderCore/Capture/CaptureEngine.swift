@@ -2,6 +2,7 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 import ScreenCaptureKit
+import os
 
 /// Owns the single `SCStream`'s lifecycle and publishes `EngineEvent`s. In M1-T2 it
 /// detects the first complete video frame (`.started`) and clean/error termination;
@@ -26,6 +27,13 @@ public actor CaptureEngine {
     /// when no mic was selected. Polled by `microphoneWatchdogTask` while capture runs.
     private let microphoneWatchdog: MicrophoneWatchdog?
     private var microphoneWatchdogTask: Task<Void, Never>?
+
+    /// Logs a wedged capture — video silent while the user is active (docs/02 §7). Diagnostic
+    /// only: v1 never auto-restarts, this exists so a soak can be explained afterwards.
+    private let stallWatchdog: StallWatchdog
+    private var stallWatchdogTask: Task<Void, Never>?
+
+    private static let log = Logger(subsystem: "dev.fcostantini.screenrec", category: "capture")
 
     private enum State { case idle, starting, running, terminated }
     private var state: State = .idle
@@ -56,10 +64,18 @@ public actor CaptureEngine {
         } else {
             microphoneWatchdog = nil
         }
+        stallWatchdog = StallWatchdog { seconds in
+            Self.log.warning(
+                """
+                Capture stalled: no video for \(Int(seconds), privacy: .public)s while the user \
+                was active. The stream is likely wedged (docs/02 §7). Not restarting — v1 policy.
+                """)
+        }
         // `.started` = first complete video frame. The router already drops incomplete
         // frames, so the first `.screen` buffer the detector sees is exactly that.
         router.attach(StartedDetector(continuation: continuation))
         if let microphoneWatchdog { router.attach(microphoneWatchdog) }
+        router.attach(stallWatchdog)
     }
 
     public func start() async {
@@ -110,7 +126,7 @@ public actor CaptureEngine {
             self.handler = handler
             state = .running
             sleepGuard.begin(reason: "Recording the screen")
-            startMicrophoneWatchdog()
+            startWatchdogs()
         } catch {
             failToStart(Self.startErrorMessage(error))
         }
@@ -128,10 +144,12 @@ public actor CaptureEngine {
             stopRequested = true
             requestedStopReason = reason
         case .running:
-            // Disarm BEFORE tearing the stream down: `stopCapture` halts mic delivery and can
-            // take seconds (Bluetooth teardown), which the watchdog would otherwise read as a
-            // disconnect and report on a recording whose mic track is perfectly complete.
-            cancelMicrophoneWatchdog()
+            // Disarm BEFORE tearing the stream down. `stopCapture` halts delivery and can take
+            // seconds (Bluetooth teardown), and a monitor still polling across that suspension
+            // reports on a recording that is perfectly complete: the mic watchdog would call it
+            // a disconnect, and the stall watchdog — with frames already stopped and the user's
+            // just-pressed stop hotkey making them look "active" — would call it a wedge.
+            cancelWatchdogs()
             if let stream {
                 try? await stream.stopCapture()
             }
@@ -166,36 +184,36 @@ public actor CaptureEngine {
         continuation.finish()
     }
 
-    /// Polls the mic watchdog for as long as capture runs. `Task {}` inherits this actor's
-    /// isolation, so `check()` — and any `.microphoneLost` it yields — runs on the actor; that
-    /// is fine, the work is one lock-guarded comparison. Cancellation exits the loop rather
-    /// than being swallowed, so no `check()` can run after the engine has torn down.
-    private func startMicrophoneWatchdog() {
-        guard let watchdog = microphoneWatchdog else { return }
-        microphoneWatchdogTask = Task {
-            while !Task.isCancelled {
-                do { try await Task.sleep(for: .seconds(MicrophoneWatchdog.checkInterval)) }
-                catch { return }
-                watchdog.check()
+    /// Starts the health monitors for as long as capture runs (see `pollingTask` for the
+    /// cancellation and handle-retention rules these depend on).
+    private func startWatchdogs() {
+        if let microphoneWatchdog {
+            microphoneWatchdogTask = pollingTask(every: MicrophoneWatchdog.checkInterval) {
+                microphoneWatchdog.check()
             }
         }
+        let stallWatchdog = self.stallWatchdog
+        stallWatchdogTask = pollingTask(every: StallWatchdog.checkInterval) { stallWatchdog.check() }
     }
 
-    private func cancelMicrophoneWatchdog() {
+    private func cancelWatchdogs() {
         microphoneWatchdogTask?.cancel()
         microphoneWatchdogTask = nil
+        stallWatchdogTask?.cancel()
+        stallWatchdogTask = nil
     }
 
     /// Dropping a `Task` reference does not cancel it, so an engine released while running —
-    /// never stopped, no stream error — would otherwise leave the poll loop waking forever.
+    /// never stopped, no stream error — would otherwise leave the poll loops waking forever.
     deinit {
         microphoneWatchdogTask?.cancel()
+        stallWatchdogTask?.cancel()
     }
 
     private func terminate(_ reason: EndReason) {
         guard state != .terminated else { return }
         state = .terminated
-        cancelMicrophoneWatchdog()
+        cancelWatchdogs()
         sleepGuard.end()
         continuation.yield(.stopped(reason))
         continuation.finish()

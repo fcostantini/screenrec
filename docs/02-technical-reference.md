@@ -238,11 +238,24 @@ Consequences for anyone designing mic recovery:
   everywhere else. Test the reconciliation as a pure function over both keys.
 - Probe the output **directory**, not the output file: `resourceValues` throws for a path that
   doesn't exist yet, which returns nil forever and silently disables the guard.
-- OBS reports rare SCK stalls on multi-hour Sequoia sessions; our watchdog: if no video
-  buffer arrives for 30 s AND the user isn't idle — input activity via
+- OBS reports rare SCK stalls on multi-hour Sequoia sessions; our watchdog (`StallWatchdog`,
+  M3-T5): if no video buffer arrives for 30 s AND the user isn't idle — input activity via
   `CGEventSource.secondsSinceLastEventType(_:eventType:)` (CoreGraphics,
   RecorderCore-safe; NSEvent monitors are AppKit and permission-gated) — log it; do not
   auto-restart in v1.
+  ⚠️ **The idle cross-check is the whole design, not a refinement.** SCK is frame-on-change, so
+  an idle user's static screen delivers nothing for minutes and that is *healthy* (§5's
+  tail-frame patch exists for exactly that; G2 §3.4 measured 14 s of it). "No frames" alone
+  would cry wolf on every coffee break. Silence is evidence only when the user was demonstrably
+  active during it — i.e. `secondsSinceLastEventType < the silence`.
+- **Reading the stall log.** It goes to the unified log (`os.Logger`, subsystem
+  `dev.fcostantini.screenrec`, category `capture`) — **not** to the CLI's stdout, so it is
+  invisible unless you look for it. A stall can't be forced (SCK has to genuinely wedge), so the
+  M6-T2 soak is the realistic place it would ever fire. Check with:
+  ```sh
+  log show --predicate 'subsystem == "dev.fcostantini.screenrec"' --last 2h
+  log stream --predicate 'subsystem == "dev.fcostantini.screenrec"'   # live
+  ```
 
 ## 8. Echo cancellation — explicitly out (v1)
 

@@ -242,10 +242,23 @@ clap test; static-screen duration test; 30-min drift test).
       display-off (neither alone; truth table in 02 §1). Failure path leaves no 0-byte litter.
       **Still human (→ Needs Franco):** lid-close (system sleep, distinct from display sleep) and
       physical monitor unplug — both remain unobserved.
-- [ ] M3-T5 Stall watchdog logging (02 §7; input-idle via
+- [x] M3-T5 Stall watchdog logging (02 §7; input-idle via
       `CGEventSource.secondsSinceLastEventType` — not NSEvent), clock injectable.
       **Verify:** unit test with injected clock — 30 s of no video buffers fires
       exactly one log line; buffer arrival resets it.
+      ✅ 2026-07-15. `StallWatchdog` (Capture/) is a router consumer; the engine polls it and
+      logs via `os.Logger` (subsystem `dev.fcostantini.screenrec` — see 02 §7 for how to READ
+      it; it does NOT reach stdout). Diagnostic only, no auto-restart. 8 unit tests with injected
+      clock AND injected idle probe: fires once per episode; **silent when the user is idle**
+      (the central case — frame-on-change makes a static screen legitimately silent); silent
+      before the timeout / while frames flow / before the first frame ever arrives; re-arms so a
+      second episode is reported (a stall can pass, unlike a mic disconnect); only `.screen`
+      counts as proof-of-life (audio flows through a video stall and would mask it); and reports
+      the measured silence, not the constant. A real stall can't be forced — SCK must genuinely
+      wedge — so M6-T2's soak is where this would ever actually fire.
+      Also **extracted the shared `pollingTask(every:)`** here per the rule-of-three deferral
+      from M3-T3: mic-loss, disk-floor and stall were three verbatim copies of the same loop,
+      each having re-learned the same cancellation/handle-retention lessons.
 - [x] M3-T6 **Mic-loss watchdog** (02 §4, ADR-012). A lost mic device stops delivering
       rather than handing over (proved by §4.2, 2026-07-15), so M3-T2's format compare can
       never fire for it: detect *starvation* instead — mic was delivering, then nothing for
