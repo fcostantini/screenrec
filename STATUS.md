@@ -99,11 +99,11 @@ video (deterministic, reproducible).
       identity; it must NOT try to create a new one.
 - [ ] First GUI TCC grants for the .app once M4 begins (grant + relaunch dance). Not needed yet
       — M4-T1's shell captures nothing; M4-T2's menu-driven recording is the first ask.
-- [ ] **M4-T1 visual check — agent did the existence half, Franco owns the taste half.** All
-      three icon states are screenshotted in the task artifact (and the pulse measured), so
-      "does it render" is answered. What's left is judgement: is the pulse *subtle* enough at
-      12 frames / 2 s with a 0.45 alpha floor, and is amber `circle.lefthalf.filled` legible at
-      menu-bar size on your wallpaper? Say the word and the constants move.
+- [x] **M4-T1 visual check — PASSED 2026-07-15 (Franco).** "i like how it looks currently".
+      Agent did the existence half (all three states screenshotted, pulse measured); Franco
+      signed off the taste half. The icon constants are now settled: 12 frames / 2 s cycle,
+      0.45 alpha floor, `record.circle` / `record.circle.fill` red / `circle.lefthalf.filled`
+      amber. Don't churn them without a reason.
 - [x] **G3 §4.1 cross-seam A/V sync — PASSED 2026-07-15 (Franco).** Sync holds across the seam.
 - [x] **G3 §4.2 mic-disappears — PASSED 2026-07-15 (Franco).** Two runs: the first (pre-M3-T6)
       disproved the gate's premise (no takeover → docs/02 §4 corrected, ADR-012 written); the
