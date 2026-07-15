@@ -188,8 +188,20 @@ Consequences for anyone designing mic recovery:
   Display sleep still ends the stream — that's a clean finalize, acceptable.
 - Display unplug / resolution change / user lock → `didStopWithError` → finalize + notify.
   Never attempt hot re-attach in v1 (ADR-007).
-- Disk-full: watch `recordedFileSize` growth vs `volumeAvailableCapacityForImportantUsage`;
-  stop cleanly at < 2 GB free with notification.
+- Disk-full: stop cleanly at < 2 GB free with notification (`DiskSpaceMonitor`, M3-T3).
+- ⚠️ **Do NOT read `volumeAvailableCapacityForImportantUsage` alone** — an earlier draft of this
+  line recommended exactly that, and it is a trap. Measured 2026-07-15 (HFS+/exFAT/FAT32/APFS
+  disk images): **every non-boot volume reports it as `0` — not nil — while the volume has
+  plenty free** (0 vs 102 MB real). Any `< floor` test then reads every external SSD, USB stick,
+  SD card, disk image and network share as full and kills the recording on the first poll. It is
+  still the *better* key on the boot volume (it counts purgeable space: 764 GB vs 726 GB raw), so
+  read **both** `volumeAvailableCapacityForImportantUsage` and `volumeAvailableCapacity` and take
+  the **larger**. A genuinely full volume reports ~0 from both, so the guard still fires.
+  ⚠️ Note `0` is a *successfully read* value, so no nil-guard catches this — and tests probing
+  only `temporaryDirectory`/`~/Movies` (the boot volume) will pass while the guard is broken
+  everywhere else. Test the reconciliation as a pure function over both keys.
+- Probe the output **directory**, not the output file: `resourceValues` throws for a path that
+  doesn't exist yet, which returns nil forever and silently disables the guard.
 - OBS reports rare SCK stalls on multi-hour Sequoia sessions; our watchdog: if no video
   buffer arrives for 30 s AND the user isn't idle — input activity via
   `CGEventSource.secondsSinceLastEventType(_:eventType:)` (CoreGraphics,

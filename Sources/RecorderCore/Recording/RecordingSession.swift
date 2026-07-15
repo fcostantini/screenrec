@@ -18,8 +18,21 @@ public final class RecordingSession: @unchecked Sendable {
 
     private let engine: CaptureEngine
     private let recorder: MovieRecorder
+    /// Guards the output volume; the session owns it because the engine has no idea where the
+    /// file lives. Polled for the life of the capture (below).
+    private let diskMonitor: DiskSpaceMonitor
+    /// Held only so `deinit` can cancel it: dropping a `Task` reference does not cancel it, and
+    /// this one keeps `engine` alive through `onLow`, which would also defeat the engine's own
+    /// deinit. Written once by `start()`, which cannot race deinit (the caller holds us).
+    private var diskTask: Task<Void, Never>?
 
-    public init(configuration: CaptureConfiguration, outputURL: URL) throws {
+    /// `diskFloorBytes` overrides the 2 GB free-space floor (docs/02 §7) — the CLI's
+    /// `--test-disk-floor` passes an absurd value to trip the guard on demand.
+    public init(
+        configuration: CaptureConfiguration,
+        outputURL: URL,
+        diskFloorBytes: Int64? = nil
+    ) throws {
         let engine = CaptureEngine(configuration: configuration)
         self.engine = engine
         // A mic device swap mid-recording can't be handled transparently (v1: no hot-reconfig,
@@ -31,7 +44,19 @@ public final class RecordingSession: @unchecked Sendable {
             preset: configuration.quality,
             includesMicrophone: configuration.microphone != .none,
             onMicrophoneFormatChange: { Task { await engine.stop(reason: .microphoneChanged) } })
+        // Same fail-stop seam, different trigger: run out of room and we finalize what we have
+        // rather than let the writer wedge against a full volume. Watches the output
+        // DIRECTORY — same volume, but it exists before the file does, and probing a
+        // not-yet-created path would return nil forever and quietly disable the guard.
+        diskMonitor = DiskSpaceMonitor(
+            floorBytes: diskFloorBytes ?? DiskSpaceMonitor.defaultFloorBytes,
+            watching: outputURL.deletingLastPathComponent(),
+            onLow: { Task { await engine.stop(reason: .diskAlmostFull) } })
         (events, continuation) = AsyncStream.makeStream(of: EngineEvent.self)
+    }
+
+    deinit {
+        diskTask?.cancel()
     }
 
     /// Attaches the recorder, begins forwarding/finalizing engine events, and starts capture.
@@ -40,6 +65,26 @@ public final class RecordingSession: @unchecked Sendable {
         let engine = self.engine
         let recorder = self.recorder
         let continuation = self.continuation
+
+        // Poll the disk guard, but only once there is something worth saving: stopping before
+        // the first frame throws `noFramesWritten` and yields NO file, instead of ADR-007's
+        // playable clip. Waiting on the writer's own state rather than a wall-clock delay
+        // removes that race instead of narrowing it — engine start can outlast any fixed sleep
+        // (first launch, Bluetooth mic binding), and a thrashing near-full volume is precisely
+        // when it does. `recordedDuration` is NaN until the first frame starts the session.
+        let diskMonitor = self.diskMonitor
+        let diskTask = Task { [recorder] in
+            while !Task.isCancelled, recorder.recordedDuration.seconds.isNaN {
+                do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
+            }
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(DiskSpaceMonitor.checkInterval)) }
+                catch { return }
+                diskMonitor.check()
+            }
+        }
+        self.diskTask = diskTask
+
         Task {
             var startFailure: String?
             var endReason: EndReason = .userStopped
@@ -57,6 +102,7 @@ public final class RecordingSession: @unchecked Sendable {
                     break                              // engine never emits this
                 }
             }
+            diskTask.cancel()
             engine.router.detach(recorder)
 
             if let startFailure {

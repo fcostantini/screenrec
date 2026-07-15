@@ -200,14 +200,38 @@ clap test; static-screen duration test; 30-min drift test).
       ✅ 2026-07-15 (unit test: injected format-B mic buffer fires the one-shot handler
       exactly once; live regression: 4s stable-mic record finishes `userStopped` with a
       clean 3-track file, no false-positive. Live AirPods-die run → Needs Franco.)
-- [ ] M3-T3 Disk-space monitor → clean stop at <2 GB (02 §7), `--test-disk-floor N`
+- [x] M3-T3 Disk-space monitor → clean stop at <2 GB (02 §7), `--test-disk-floor N`
       flag to trip it deterministically.
       **Verify:** §4.4 — run with floor above current free space → clean stop, message
       names disk space, file playable.
+      ✅ 2026-07-15. `DiskSpaceMonitor` (Support/) watches free space on the output volume;
+      `RecordingSession` owns and polls it (the engine has no idea where the file lives) and
+      calls the M3-T2 seam `engine.stop(reason: .diskAlmostFull)`. §4.4 PASSED:
+      `--test-disk-floor 500000` (GB) vs 676 GiB free → `✓ finished (diskAlmostFull)`, file
+      **playable** (2.25 s). Negative side verified on a real non-boot volume: a 4 GB HFS+ image
+      records the full 8 s and finishes `userStopped`. 9 unit tests (injected probe: fires once /
+      not above / not *at* the floor / not when unreadable; plus the pure two-key reconciliation
+      incl. the external-volume case). The poll waits for `recordedDuration` to leave NaN before
+      guarding — stopping pre-first-frame yields `.failed`, not a playable file, and a wall-clock
+      delay only narrows that race rather than removing it.
+      ⚠️ /code-review caught a shipper: `volumeAvailableCapacityForImportantUsage` reads **0 on
+      every non-boot volume**, so the guard killed every external-drive recording at ~2 s —
+      invisible to both the gate and the unit test, which only ever touched the boot volume.
+      See 02 §7 + STATUS field notes.
 - [ ] M3-T4 Display-change / sleep handling end-to-end (unplug display, close lid):
       always a playable file + correct event. Document observed behaviors in 02.
+      **Also fix (found 2026-07-15, see STATUS):** a display asleep AT START is misreported as
+      a permission failure — preflight says *granted* while `SCShareableContent` returns 0
+      displays, and `startDecision` maps any zero-display result to `permissionGuidance`. Gate
+      that wording on the preflight actually disagreeing; otherwise report "no displays
+      available — the screen may be asleep, locked, or disconnected". 02 §1's "empty results =
+      permission missing" is incomplete and needs the same correction, and
+      `CaptureEngineTests.failsWhenNoDisplaysAvailable` encodes the conflation today.
       **Verify:** §4.3 **(human)** — both scenarios end in probe-clean files; observed
       SCK error codes recorded in docs/02 field additions.
+      Head start: a display sleeping MID-recording was already observed to behave correctly —
+      `didStopWithError` "Failed to find any displays or windows to capture" →
+      `finished(streamError(…))` → playable 1.81 s file.
 - [ ] M3-T5 Stall watchdog logging (02 §7; input-idle via
       `CGEventSource.secondsSinceLastEventType` — not NSEvent), clock injectable.
       **Verify:** unit test with injected clock — 30 s of no video buffers fires

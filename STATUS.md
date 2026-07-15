@@ -25,9 +25,14 @@
   re-resolves** — named or nil. That single fact explains every mic-device behavior we've hit.
   Mic recovery IS possible (2 verified routes) but **deferred post-v1**; ADR-012 unchanged.
   Full experiment table + routes in **02 §4**; **02 §1's "nil throws" was STALE** and is fixed.
-- **Next task:** **M3-T3** — disk-space monitor → clean stop at <2 GB free (docs/02 §7) with
-  `--test-disk-floor N` to trip it deterministically. Reuses M3-T2's `engine.stop(reason:)`
-  seam (pass `.diskAlmostFull`). Gate §4.4. Then T4 (display/sleep), T5 (stall watchdog).
+- **M3-T3 DONE — G3 §4.4 PASSED.** `DiskSpaceMonitor` (Support/) watches the output volume;
+  `RecordingSession` polls it and stops via M3-T2's `engine.stop(reason: .diskAlmostFull)` seam
+  — third trigger through that seam now, no new plumbing. Live: `--test-disk-floor 500000` vs
+  676 GiB free → `finished (diskAlmostFull)`, playable 2.02 s file.
+- **Next task:** **M3-T4** — display-change / sleep handling. Two head starts from this session
+  (see field notes): mid-recording display sleep already **observed working** (streamError →
+  playable file), and a **confirmed bug to fix** (a locked screen is reported as a permission
+  failure). Then **M3-T5** (stall watchdog) closes M3 → gate G3.
 - **Now done:** M2-T1..T6 + M3-T1..T2. `record` is a full CLI (real 3-track capture, presets,
   explicit path, progress ticker, pause/resume, scripted timeline, mic-change fail-stop).
   KEY ENV FACT: foreground Bash captures WORK (TCC held); backgrounded/detached ones lose the
@@ -94,12 +99,65 @@ video (deterministic, reproducible).
 | M1   | ✅ complete 2026-07-14 | all 5 tasks done; capture engine + router + probe + sleep guard, 41 tests |
 | G1   | ✅ passed 2026-07-14 | probe-stream: all 3 sources flowing. video 4112×2570 420v (PTS Δ 0.008–0.09s, frame-on-change); system audio 48kHz/2ch/32-bit (Δ 0.02s); mic native format device-dependent — AirPods 24kHz/1ch, built-in 48kHz/1ch (both differ from system audio → separate tracks required, M2) |
 | G2   | ✅ passed 2026-07-14 | §3.1 tracks hvc1+2×aac ✅; §3.2 kill-9 ✅ (kill@6s→5.04s playable AFTER fragment fix 10s→1s — 10s was unparseable if killed <10s); §3.3 sync-clap ✅ (Franco); §3.4 static-tail ✅ (14s static→14.4s @7.9fps, tail patch holds); §3.5 30-min drift ✅ (Franco ran real 30-min record + beepflash; per-track dur match 50ms; flash↔beep offset constant ~−67ms±10 from min 5→29 = no drift) |
-| G3   | 🟡 §4.1 passed | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears ✅ PASSED 2026-07-15 (Franco, post-M3-T6, per the ADR-012 definition): AirPods cased at ~22s of a 60s run → CLI printed `⚠️ microphone disconnected — still recording` at ~25s (≈3.2s latency = 3s timeout + ≤1s poll), recording ran to the end, `finished (userStopped)`, file playable, mic track 21.82s vs video 59.83s. First run (pre-M3-T6) disproved the gate's premise — no takeover, buffers just stop → docs/02 §4 corrected, ADR-012 written. Also proved: a reconnected device NEVER resumes (mic gone for the session). §4.3 sleep-lock / §4.4 disk-guard await M3-T4/T3. Cross-seam clap-sync = human. |
+| G3   | 🟡 §4.1 passed | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears ✅ PASSED 2026-07-15 (Franco, post-M3-T6, per the ADR-012 definition): AirPods cased at ~22s of a 60s run → CLI printed `⚠️ microphone disconnected — still recording` at ~25s (≈3.2s latency = 3s timeout + ≤1s poll), recording ran to the end, `finished (userStopped)`, file playable, mic track 21.82s vs video 59.83s. First run (pre-M3-T6) disproved the gate's premise — no takeover, buffers just stop → docs/02 §4 corrected, ADR-012 written. Also proved: a reconnected device NEVER resumes (mic gone for the session). §4.4 disk-guard ✅ PASSED 2026-07-15: `--test-disk-floor 500000` (GB) vs 676 GiB free → `finished (diskAlmostFull)`, file playable (2.25s); negative verified on a real non-boot volume (4 GB HFS+ image, importantUsage reads 0 → records the full 8s, `userStopped`) after /code-review caught that the recommended capacity key reads 0 on every external volume. §4.3 sleep-lock awaits M3-T4 — though a mid-recording display sleep was already observed behaving correctly (streamError → playable 1.81s file). Cross-seam clap-sync = human. |
 | G4   | ⬜ not run | — |
 | G5   | ⬜ not run | — |
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-15 (M3-T3 disk guard): the review caught a bug my gate **and** my unit test were both
+  structurally blind to. Worth internalizing.
+  - **`volumeAvailableCapacityForImportantUsage` returns 0 (not nil) on every non-boot volume.**
+    Full detail + the fix now in 02 §7. Shipping impact would have been: every recording to an
+    external SSD/USB/SD/disk-image self-terminates at ~2 s claiming "disk almost full".
+  - **Why nothing I did could have caught it:** the unit test probed `temporaryDirectory` and the
+    §4.4 gate wrote to `~/Movies` — *both the boot volume*, the one place the key works. A test
+    named "reads real capacity" passed the whole time. Lesson: when an API's behavior is
+    **environment-dependent**, testing one environment is testing nothing. The fix splits the
+    volume-dependent reconciliation into a pure function over both keys, which IS testable, and
+    keeps the live probe as a thin shell.
+  - **Verified end-to-end after the fix**: a 4 GB HFS+ image (importantUsage 0, raw 3.7 GB) now
+    records the full 8 s and finishes `userStopped`. Test that scenario with `hdiutil create
+    -size 4g -type SPARSE` — and make the image **bigger than the floor**, or the guard fires for
+    a legitimate reason and the test proves nothing (I did exactly that with a 400 MB image first).
+  - **A wall-clock delay is not a startup guarantee.** The poll originally slept 2 s before its
+    first check so it couldn't stop the engine pre-first-frame. But engine start can exceed 2 s
+    (first launch, Bluetooth mic binding) — and a thrashing near-full volume is *precisely* when
+    it does, so the guard's own trigger correlates with the race. Now it waits on
+    `recordedDuration` leaving NaN (the writer session actually starting) instead.
+  - **Deferred (rule of three):** the disk poll loop is verbatim-identical to CaptureEngine's mic
+    watchdog loop. The review flagged the duplication; M3-T5's stall watchdog makes it three, so
+    extract a shared `poll(every:)` helper there. Not done here because moving CaptureEngine's
+    `Task {}` into a nonisolated helper would silently change its actor isolation — a real
+    behavior change to ship as a side effect of a cleanup.
+  - **Open design question for M3-T4/M6-T3:** we *guard* a filling disk but never *preflight*
+    one — starting a recording with < 2 GB free stops it ~instantly with `.diskAlmostFull`
+    (correct, but a refusal up front with "free some space" would be kinder than a 2-second file).
+
+- 2026-07-15 (**free M3-T4 evidence, found by accident during M3-T3**): Franco's display went to
+  sleep mid-session and handed us two display-handling findings for nothing.
+  - ✅ **Display sleeping MID-recording behaves correctly**: SCK fired `didStopWithError`
+    ("Failed to find any displays or windows to capture") → `finished(streamError(…))` → a
+    **playable 1.81 s file**. That is ADR-007's fail-stop working in the wild, and it is most of
+    what §4.3 asks for. M3-T4 should still do the deliberate lid-close run, but the mechanism is
+    already observed.
+  - 🐞 **BUG for M3-T4: a LOCKED screen is misreported as a permission failure.** Confirmed
+    cause — Franco locked the screen on stepping away, so this is a 2-second repro, not a
+    theory: **lock the screen → run `record` → "Screen Recording permission is needed"** while
+    `CGPreflightScreenCaptureAccess()` says **granted**. `SCShareableContent` returns **0
+    displays** for a locked screen, and `CaptureEngine.startDecision` maps *any* zero-display
+    result to `permissionGuidance` — sending the user to System Settings to grant a permission
+    they already hold. 02 §1's "empty results = permission missing" is **incomplete**: locked,
+    asleep, and disconnected displays are indistinguishable from it. Fix in M3-T4 — gate the
+    permission wording on the preflight actually disagreeing, else say "no displays available —
+    the screen may be asleep, locked, or disconnected". `CaptureEngineTests.
+    failsWhenNoDisplaysAvailable` encodes the conflation and must change with it. Deliberately
+    NOT folded into M3-T3 (unrelated to the disk guard).
+  - **Capture tests need the screen unlocked and awake.** Zero displays ⇒ nothing captures. If
+    capture suddenly fails with a permission message mid-session while the preflight says
+    granted, suspect a locked/sleeping screen before suspecting TCC — the message actively
+    misleads you here until M3-T4 lands.
 
 - 2026-07-15 (M3-T7 spike — mic device binding): full findings live in **02 §4** (experiment
   table + the two recovery routes) and **02 §1** (the nil correction). Meta-lessons worth keeping:

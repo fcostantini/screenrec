@@ -11,8 +11,10 @@ screenrec-app/
 │   │   │   ├── CaptureEngine.swift        # SCStream lifecycle, owns the one stream
 │   │   │   ├── CaptureConfiguration.swift # value type: display, mic, fps, quality…
 │   │   │   ├── SampleRouter.swift         # SCStreamOutput → fan-out to consumers
+│   │   │   ├── MicrophoneWatchdog.swift   # mic stopped delivering → .microphoneLost (M3-T6)
 │   │   │   └── Permissions.swift          # TCC preflight/request, onboarding state
 │   │   ├── Recording/
+│   │   │   ├── RecordingSession.swift     # composes engine+recorder; the seam CLI/app share
 │   │   │   ├── MovieRecorder.swift        # AVAssetWriter session (3 inputs)
 │   │   │   ├── TimestampRebaser.swift     # epoch rebase + pause offset accounting
 │   │   │   └── BitrateModel.swift         # quality preset → bitrate math
@@ -22,6 +24,7 @@ screenrec-app/
 │   │   │   └── ReplayMuxer.swift          # ring → passthrough AVAssetWriter → file
 │   │   └── Support/
 │   │       ├── OutputLocation.swift       # dir preflight (TCC!), naming, ~/Movies
+│   │       ├── DiskSpaceMonitor.swift     # output volume < 2 GB → .diskAlmostFull (M3-T3)
 │   │       └── SleepGuard.swift           # ProcessInfo activity assertion
 │   ├── screenrec-cli/         # Dev harness. Thin CLI over RecorderCore.
 │   │   └── main.swift

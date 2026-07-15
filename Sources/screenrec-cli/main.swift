@@ -32,6 +32,8 @@ func printUsage() {
       --no-mic           Record without a microphone
       --output <dir>     Output directory when no [path] is given (default: ~/Movies)
       --script <steps>   Unattended pause timeline, e.g. rec10,pause5,rec10 (seconds each)
+      --test-disk-floor <GB>  Trip the disk guard on demand: stop cleanly when free space
+                         is below <GB> (real floor is 2 GB — pass a huge value to test)
       --dry-run          Print the config that would be used, without capturing
       [path]             Explicit output file, or an existing directory to write into
 
@@ -162,6 +164,7 @@ struct RecordOptions {
     var path: String?
     var dryRun = false
     var script: [ScriptStep]?
+    var diskFloorBytes: Int64?
 }
 
 /// Parses `rec10,pause5,rec10` into steps. Each token is `rec<seconds>` or `pause<seconds>`
@@ -210,6 +213,14 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
         case "--script":
             guard let value = iterator.next() else { die("--script needs a value like rec10,pause5,rec10") }
             options.script = parseScript(value)
+        case "--test-disk-floor":
+            // Test hook (04 §4.4): pass a floor above the volume's free space to trip the disk
+            // guard on demand. Bounded at 1 PB so GB→bytes can't overflow Int64.
+            guard let value = iterator.next(), let gigabytes = Double(value),
+                  gigabytes.isFinite, gigabytes > 0, gigabytes <= 1_000_000 else {
+                die("--test-disk-floor needs a positive number of GB (max 1000000)")
+            }
+            options.diskFloorBytes = Int64(gigabytes * 1_073_741_824)
         case "--dry-run":
             options.dryRun = true
         default:
@@ -405,7 +416,8 @@ func performRecording(_ options: RecordOptions) async {
     let configuration = CaptureConfiguration(microphone: mic.selection, quality: options.preset)
     let session: RecordingSession
     do {
-        session = try RecordingSession(configuration: configuration, outputURL: outputURL)
+        session = try RecordingSession(
+            configuration: configuration, outputURL: outputURL, diskFloorBytes: options.diskFloorBytes)
     } catch {
         try? FileManager.default.removeItem(at: outputURL)  // drop the unused reservation placeholder
         die("Couldn't set up the recorder: \(error.localizedDescription)", code: 74)
