@@ -30,10 +30,12 @@ screenrec-app/
 │   │       └── SleepGuard.swift           # ProcessInfo activity assertion
 │   ├── screenrec-cli/         # Dev harness. Thin CLI over RecorderCore.
 │   │   └── main.swift
-│   └── ScreenRecApp/          # Menu-bar app. SwiftUI. Depends on RecorderCore only.
+│   ├── AppCore/               # Library. App state + view models. No AppKit/SwiftUI (M4-T1).
+│   │   ├── AppState.swift                 # @Observable, MainActor; folds EngineEvents
+│   │   └── StatusIcon.swift               # what the status item shows (docs/06)
+│   └── ScreenRecApp/          # Menu-bar app. SwiftUI views only. Depends on AppCore.
 │       ├── App.swift                      # @main, MenuBarExtra
-│       ├── AppState.swift                 # ObservableObject bridging RecorderCore
-│       ├── Views/ (MenuView, SettingsView, OnboardingView)
+│       ├── Views/ (StatusIconView, MenuView, SettingsView, OnboardingView)
 │       ├── Hotkey.swift                   # Carbon RegisterEventHotKey wrapper
 │       └── Resources/Info.plist, AppIcon
 ├── Scripts/

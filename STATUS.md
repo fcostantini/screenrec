@@ -5,7 +5,25 @@
 
 ## Now
 
-- **Current milestone:** M3 — pause/resume + robustness. M2 COMPLETE, G2 PASSED (5/5).
+- **Current milestone:** M4 — the menu-bar app. M3 COMPLETE, G3 PASSED (all legs).
+- **M4-T1 DONE.** `AppCore` library target exists (RecorderCore-only deps, no AppKit/SwiftUI):
+  `AppState` (@MainActor @Observable) folds `EngineEvent` → `StatusIcon`; SwiftUI views stay in
+  `ScreenRecApp`. All three icon states verified by screenshot, not by eye-of-faith — including
+  the pulse (measured 2.15× redness swing vs the 2.22× the 0.45 alpha floor predicts). No Dock
+  icon confirmed via `lsappinfo` (`ApplicationType=UIElement`). 108 tests (+11).
+- **Next: M4-T2** — the menu proper (Start/Stop/Pause, display/mic/preset pickers, Open
+  Recordings Folder, recent files). It is what first drives `AppState` from a live session, and
+  it brings the replay-armed toggle that M4-T1 deliberately left out of `StatusIcon`.
+- ⚠️ **M4-T3 owes an answer** the whole permission story rests on: does an ungranted process
+  *throw* or *enumerate zero displays*? 02 §1 and §10 contradicted each other, §10 (measured)
+  won, and `startDecision` assumes it — a fresh account is the only place to settle it without
+  destroying this machine's grant (02 §2).
+- **The `/simplify` sweep over M3 was run** (commits `fff901e`, `2522e26`) — an ARC cycle that
+  made `CaptureEngine.deinit` unreachable, and the M3-T7 spike held to the CLI's bar.
+
+## M3 (closed)
+
+- **Was:** M3 — pause/resume + robustness. M2 COMPLETE, G2 PASSED (5/5).
 - **M3-T2 DONE** — mic format-change → fail-stop. `MovieRecorder` captures the mic input's
   ASBD when it builds the input and, on a later mic buffer with a different sample-rate/
   channels/format-ID, fires a one-shot callback and drops the mismatched buffers (docs/02 §4);
@@ -42,15 +60,6 @@
 - **🎉 M3 COMPLETE — GATE G3 PASSED 2026-07-15 (all legs; see the gate table).** Pause/resume,
   mic-loss reporting, disk guard, display-loss classification and the stall watchdog all land,
   with every §4 leg verified. Only §4.3's monitor-unplug is N/A (hardware).
-- **Next: M4 — the menu-bar app** (docs/06 is required reading before any M4 work; build to that
-  spec, don't improvise structure or copy). Start at **M4-T1** (MenuBarExtra shell + `AppCore`
-  target). ⚠️ **M4-T3 now also owes an answer** the whole permission story rests on: does an
-  ungranted process *throw* or *enumerate zero displays*? 02 §1 and §10 contradicted each other,
-  §10 (measured) won, and `startDecision` assumes it — a fresh account is the only place to
-  settle it without destroying this machine's grant (02 §2).
-- **Offered, not yet run: a `/simplify` sweep over M3.** Nothing has ever swept this code for
-  cross-task drift — every review so far was per-diff correctness only (see the 2026-07-15
-  "review passes" note). G3 is the natural moment; M4 starts a new module (`AppCore`).
 - **Now done:** M2-T1..T6 + M3-T1..T2. `record` is a full CLI (real 3-track capture, presets,
   explicit path, progress ticker, pause/resume, scripted timeline, mic-change fail-stop).
   KEY ENV FACT: foreground Bash captures WORK (TCC held); backgrounded/detached ones lose the
@@ -88,7 +97,13 @@ video (deterministic, reproducible).
       (`security add-trusted-cert -r trustRoot -p codeSign`). Verified: signs and
       passes `codesign --verify --strict`. devsign.sh should find and use this
       identity; it must NOT try to create a new one.
-- [ ] First GUI TCC grants for the .app once M4 begins (grant + relaunch dance).
+- [ ] First GUI TCC grants for the .app once M4 begins (grant + relaunch dance). Not needed yet
+      — M4-T1's shell captures nothing; M4-T2's menu-driven recording is the first ask.
+- [ ] **M4-T1 visual check — agent did the existence half, Franco owns the taste half.** All
+      three icon states are screenshotted in the task artifact (and the pulse measured), so
+      "does it render" is answered. What's left is judgement: is the pulse *subtle* enough at
+      12 frames / 2 s with a 0.45 alpha floor, and is amber `circle.lefthalf.filled` legible at
+      menu-bar size on your wallpaper? Say the word and the constants move.
 - [x] **G3 §4.1 cross-seam A/V sync — PASSED 2026-07-15 (Franco).** Sync holds across the seam.
 - [x] **G3 §4.2 mic-disappears — PASSED 2026-07-15 (Franco).** Two runs: the first (pre-M3-T6)
       disproved the gate's premise (no takeover → docs/02 §4 corrected, ADR-012 written); the
@@ -124,6 +139,62 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-15 (M4-T1 menu-bar shell): the first UI task, and the headless-verification story is
+  better than expected — **the agent does not have to hand the visual check to a human.**
+  - **`screencapture -x -R x,y,w,h` works from this terminal** (same foreground-TCC rule as
+    capture — see the M2-T5 note). `NSScreen.main.frame` is **2056×1285 points** at 2× on this
+    machine; the menu bar is the top ~32 points. So any menu-bar state can be captured and read
+    back. Combined with the next point, docs/03's `(human)` visual checks for M4 are mostly
+    self-serviceable — leave the human the *judgement* calls (does it look right), not the
+    *existence* ones (does it render at all).
+  - **To photograph a state the UI can't reach yet, patch the app temporarily and revert.** T1
+    has no Start button (that's T2), so `.recording`/`.paused` were unreachable. A throwaway
+    `.task {}` in `App.swift` drove `state.apply(.started)` → `.paused` on a timer; captured;
+    reverted. Cheaper than a debug launch argument and it ships nothing.
+  - **Don't eyeball an animation — measure it.** Two pulse screenshots looked identical to me;
+    the mean red channel said otherwise (redness 0.198→0.426 across phases, a 2.15× swing vs the
+    2.22× the 0.45 alpha floor predicts). The pulse was working *and* the floor was right, but I
+    could not have told you either from the pictures. Same lesson as the M3 field notes in a new
+    costume: a check that can't fail for the intended reason is decoration.
+  - **SwiftUI's implicit animations do NOT drive a `MenuBarExtra` label** — the status item is
+    rendered to an `NSImage`, so `.animation`/`withAnimation` do nothing there. A `Timer.publish`
+    + `onReceive` flipping `@State` *does* re-render it (verified above). That's why the pulse is
+    hand-driven at 12 frames / 2 s cycle rather than declared.
+  - **Menu-bar colour requires `isTemplate = false`.** The menu bar tints template images to
+    match itself, which would flatten the red and amber — the two icons whose entire meaning is
+    their colour — into the same monochrome as idle. Only `.idle` stays a template (it *should*
+    follow the system). Colour is baked in via `NSImage.SymbolConfiguration(paletteColors:)`.
+  - **`lsappinfo info -only ApplicationType <pid>` → `"UIElement"` is the headless proof of "no
+    Dock icon"** — better than "I looked at the Dock", and scriptable for the G4 gate.
+  - **Scope call worth knowing:** docs/06's status-item table has four states, but the fourth
+    (replay-armed badge) has nothing that can set it until M4-T2's toggle, so `StatusIcon` has
+    three. `AppState.statusIcon` is therefore currently a 1:1 image of the event fold with no
+    second input — when T2 adds arming, that likely becomes a derived property over
+    (activity, isReplayArmed). Deliberate: the badge design would have been improvised now.
+  - 🐞 **UI has a whole class of bug the CLI never had: the invisible-to-sighted-testing kind.**
+    /code-review found the pulse dropping the status item's accessible name on every faded frame
+    (~92% of them) — `NSImage(size:flipped:)` returns a fresh image, and I copied `isTemplate`
+    across but not `accessibilityDescription`. So VoiceOver announced an unnamed image in the one
+    state where the icon is the app's only signal. **Two lessons.** (1) `Image(nsImage:)` does
+    NOT adopt an `NSImage`'s `accessibilityDescription`, and a label-based `MenuBarExtra` has no
+    title to fall back on — the accessible name must be applied in SwiftUI with
+    `.accessibilityLabel()`, so that is where it now lives (one source of truth, in the layer
+    that works). The old `MenuBarExtra("ScreenRec", systemImage:)` had been carrying the name for
+    free; switching to a custom label silently dropped it. (2) Every screenshot I took was of a
+    state that *looked* right — the a11y tree is not in the picture. For M4+, "I captured it" is
+    not the same evidence it was for the CLI.
+  - **I put a number in the audit trail that I never measured** (claimed 15 AppCore tests; there
+    are 11) and it reached docs/03 AND STATUS before the review caught it. docs/03 + STATUS are
+    the per-task audit trail, so an invented figure quietly devalues the measured ones beside it.
+    `swift test --filter AppCoreTests` prints the count in one second. **Never write a count you
+    didn't just read off the harness** — and note the count is @Test *declarations*, not expanded
+    parameterized cases (11 here, not the 21 the arguments would suggest).
+  - **The review is the only thing that catches cross-cutting scope drift.** It flagged an
+    unrelated CLAUDE.md process change riding inside the M4-T1 diff (Franco had asked for it
+    mid-session, so it was wanted — but it belonged in its own `docs:` commit, not smuggled into
+    a task commit whose message claims to be a menu-bar shell). "One task, one commit" is
+    enforced by nobody but the reviewer.
 
 - 2026-07-15 (M3-T5 stall watchdog): the review caught a **logic bug in the one condition the
   class exists for**, and my tests could not have found it.

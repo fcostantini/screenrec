@@ -315,13 +315,17 @@ Goal: ScreenRec.app is the daily driver; CLI demoted to debugging.
 UI layout, states, notification copy, and onboarding flow are specified in
 **docs/06-ui-spec.md** — build to that spec; don't improvise structure or copy.
 
-- [ ] M4-T1 `MenuBarExtra` app shell, LSUIElement, status icon states (idle/recording
+- [x] M4-T1 `MenuBarExtra` app shell, LSUIElement, status icon states (idle/recording
       pulse/paused), AppState consuming EngineEvents on MainActor. `AppState` + view
       models live in a NEW library target `AppCore` (depends on RecorderCore; no
       AppKit/SwiftUI imports) so they're unit-testable — SwiftUI views stay in the
       `ScreenRecApp` executable.
       **Verify:** `open dist/ScreenRec.app` → icon appears, no Dock icon; AppCore unit
       tests map each EngineEvent to the right icon state. Visual check **(human)**.
+      DONE 2026-07-15: all three icon states captured via `screencapture` (idle template
+      outline, red pulse, amber half-circle); `lsappinfo` reports `ApplicationType=UIElement`
+      (no Dock icon); 11 AppCore tests (108 total). docs/06's 4th state (replay-armed badge)
+      deferred to M4-T2, which brings the toggle that can set it.
 - [ ] M4-T2 Menu: Start/Stop/Pause, display picker (NSScreen list), mic picker
       (AVCaptureDevice list + "None"), preset picker, "Open Recordings Folder",
       recent-files submenu (last 5).
