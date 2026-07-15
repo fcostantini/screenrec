@@ -103,6 +103,25 @@ func openMenuElement() -> AXUIElement {
     return menu
 }
 
+/// A submenu's items only exist in the accessibility tree once the submenu has been opened —
+/// SwiftUI/AppKit build them lazily. Read them without opening and you get an empty list that is
+/// indistinguishable from a genuinely empty submenu.
+///
+/// That is not hypothetical: this printed an empty Microphone submenu for a menu that had two
+/// devices in it, and the empty reading was taken as an app regression until a human's
+/// screenshot disproved it. So: open it, and if it still reads empty, say `(unread)` rather than
+/// print nothing and let it pass for fact. Same family as AXPress-returns-success-and-does-
+/// nothing above, and as 02 §4's `updateConfiguration` — silence must never render as evidence.
+func openedChildren(of item: AXUIElement, _ submenu: AXUIElement) -> [AXUIElement]? {
+    for _ in 0..<10 {
+        let kids = children(submenu)
+        if !kids.isEmpty { return kids }
+        AXUIElementPerformAction(item, kAXPressAction as CFString)
+        usleep(80_000)
+    }
+    return children(submenu).isEmpty ? nil : children(submenu)
+}
+
 func describe(_ menu: AXUIElement, indent: String = "  ") {
     for item in children(menu) {
         let role = attribute(item, kAXRoleAttribute as String) as? String ?? "?"
@@ -122,24 +141,40 @@ func describe(_ menu: AXUIElement, indent: String = "  ") {
         // A submenu is a child AXMenu; recurse so `Display ▸` shows its entries.
         for sub in children(item) where
             (attribute(sub, kAXRoleAttribute as String) as? String) == "AXMenu" {
+            guard openedChildren(of: item, sub) != nil else {
+                print("\(indent)    (unread — submenu never populated)")
+                continue
+            }
             describe(sub, indent: indent + "    ")
         }
     }
 }
 
+/// Depth-first search for a titled item, so submenu entries ("Balanced", a microphone's name)
+/// are reachable and not just the top level.
+func find(_ menu: AXUIElement, title: String) -> AXUIElement? {
+    for item in children(menu) {
+        if (attribute(item, kAXTitleAttribute as String) as? String) == title { return item }
+        for sub in children(item)
+        where (attribute(sub, kAXRoleAttribute as String) as? String) == "AXMenu" {
+            if let hit = find(sub, title: title) { return hit }
+        }
+    }
+    return nil
+}
+
 func click(title: String) {
     let menu = openMenuElement()
-    for item in children(menu)
-    where (attribute(item, kAXTitleAttribute as String) as? String) == title {
-        // Menu *items* do respond to AXPress once their menu is open — unlike the bar item.
-        guard AXUIElementPerformAction(item, kAXPressAction as CFString) == .success else {
-            dismissMenu(); fail("couldn't press \"\(title)\"")
-        }
-        print("clicked \"\(title)\"")
-        return
+    guard let item = find(menu, title: title) else {
+        dismissMenu()
+        fail("no menu item titled \"\(title)\"")
     }
-    dismissMenu()
-    fail("no menu item titled \"\(title)\"")
+    // Menu *items* do respond to AXPress once their menu is open — unlike the bar item.
+    guard AXUIElementPerformAction(item, kAXPressAction as CFString) == .success else {
+        dismissMenu()
+        fail("couldn't press \"\(title)\"")
+    }
+    print("clicked \"\(title)\"")
 }
 
 switch CommandLine.arguments.dropFirst().first {
