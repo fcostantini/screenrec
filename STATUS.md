@@ -17,14 +17,17 @@
   Accessibility grant — docs/03's "(human)" tax on M4/M5 menus is largely gone. `AppState` now
   owns a `RecordingSession`; pickers/recent-files/header text live in AppCore, views in
   ScreenRecApp. RecorderCore untouched. 133 tests (+25).
-- **Next: M4-T3 — onboarding**, and it is load-bearing, not polish: M4-T2 proved that picking a
-  mic is an **unrecoverable dead-end** (Start greys out; the Microphone pane has no "+", so only
-  an in-app `requestAccess` can grant it). T3 also inherits M4-T2's 3-track probe (Franco's
-  call, 2026-07-15) and still owes the throws-vs-zero-displays answer below.
-- ⚠️ **M4-T3 owes an answer** the whole permission story rests on: does an ungranted process
-  *throw* or *enumerate zero displays*? 02 §1 and §10 contradicted each other, §10 (measured)
-  won, and `startDecision` assumes it — a fresh account is the only place to settle it without
-  destroying this machine's grant (02 §2).
+- **M4-T3 DONE.** Onboarding ships: the window opens itself at launch when blocked, and from
+  the menu header always. `OnboardingModel` is a pure truth table (AppCore); the window, the
+  requests and the relaunch are the app's. **M4-T2's 3-track probe closed** — mic granted through
+  the new window → menu-driven recording → `hvc1 + aac 2ch + aac 1ch`, 7.36 s, playable. 147
+  tests (+13).
+- ✅ **The M3-T4 question is SETTLED — an ungranted process throws `-3801`, never enumerates
+  zero.** Measured on both paths via a throwaway bundle (02 §1's recipe); `startDecision` was
+  right and is unchanged. The docs had called this untestable without a fresh account; it wasn't.
+- **Next: M4-T4 — Settings.** It owns every contractual UserDefaults key (docs/06), and it is
+  now the most-felt gap: nothing persists. Picker choices die on relaunch — which T3 made worse
+  by relaunching the app on purpose.
 - **The `/simplify` sweep over M3 was run** (commits `fff901e`, `2522e26`) — an ARC cycle that
   made `CaptureEngine.deinit` unreachable, and the M3-T7 spike held to the CLI's bar.
 - **Replay-armed toggle + icon badge: deferred to M4-T4** (Franco, 2026-07-15), which owns the
@@ -111,9 +114,13 @@ video (deterministic, reproducible).
       `bundle.sh` rebuilds, as M0-T3's stable designated requirement promised. Real users will
       never do this: M4-T3's `Grant…` button calls `CGRequestScreenCaptureAccess()` and macOS
       handles it.
-- [ ] **Microphone for the .app — CANNOT be granted by hand.** That pane has no "+" (verified by
-      screenshot). Only an in-app `requestAccess` call can put ScreenRec in the list ⇒ blocked
-      until M4-T3's onboarding exists. This is why the 3-track probe moved to T3.
+- [x] **Microphone for the .app — GRANTED 2026-07-15 (Franco), through M4-T3's own Grant…
+      button** — the first permission the app obtained for itself, which is the whole point of
+      the task. Unblocked M4-T2's 3-track probe immediately.
+- [ ] **Notifications for the .app — prompt was dismissed, so it reads `denied`.** Not a
+      problem and not blocking: open the menu header → Set Up ScreenRec → Notifications →
+      `Open System Settings…`. Worth doing before M4-T5, which is the task that actually sends
+      one.
 - [x] **Accessibility for Terminal — GRANTED 2026-07-15 (Franco).** Unblocks
       `tools/menudriver.swift`. Note it's on **Terminal**, not a "Claude Code" entry. Broad grant
       (anything in Terminal can drive any app) — fine to revoke once M4/M5 menu work is done; the
@@ -158,6 +165,88 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-15 (M4-T3 onboarding): the TCC findings are in **02 §1/§2** (measured tables — read
+  them before touching permissions). What belongs here is everything else.
+  - 🔴 **The same question — "is this state current?" — has OPPOSITE answers for a menu and a
+    window, and I got each one wrong once.**
+    - A **menu** is rebuilt on every open, and SwiftUI decides `.disabled` *before* any `.task`
+      on those rows runs ⇒ a stored-and-refreshed value is always one open behind ⇒ **compute
+      live** (`readiness`). Shipped stale; the live run caught it.
+    - A **window stays open** while the user walks to System Settings and back ⇒ computing live
+      keeps the values right and **still never redraws**, because TCC changes outside the
+      process and `@Observable` has nothing to observe ⇒ **store it and poll**
+      (`onboardingRows`). Shipped broken; *Franco* caught it — he granted the microphone and
+      watched the row sit on `○ Grant…`.
+    The two look inconsistent side by side and are not. **Rule: ask whether the surface is
+    rebuilt or persistent before deciding where the state lives.**
+  - **`@Observable` publishes on every set, not every change** — so a 1 Hz poll that assigns
+    unconditionally redraws the window every second forever. Assign only on a real change
+    (`OnboardingRow` is Equatable for exactly this).
+  - **Verification tooling: SwiftUI puts a button's label in `AXDescription`, not `AXTitle`.**
+    Matching on title finds zero buttons and looks exactly like "the window has no buttons".
+    `tools/menudriver.swift`-style helpers must match either. (Same false-negative family as the
+    unopened-submenu bug from M4-T2 — twice in two tasks.)
+  - **`osascript` + System Events needs an Automation grant** ("Terminal wants access to control
+    System Events"). It prompts the human unannounced — warn Franco before running one. Dev
+    tooling only; the product never needs it.
+  - **The throwaway-bundle trick generalises and is now the house method for permission work**
+    (recipe in 02 §1): same signing identity + a different bundle ID = a TCC subject macOS has
+    never granted, on this account, with our own grants untouched. It settled a question the
+    docs had called untestable-without-a-fresh-account since M3-T4, in ten minutes. Cleanup is
+    `tccutil reset <service> <that bundle id>` — **always with the bundle ID**; the bare form
+    would destroy our grant (02 §2).
+  - ⚠️ **A probe bundle must be launched via `open`, not run from the shell.** A bare binary is
+    attributed to the *responsible process* (Terminal), which holds every grant — it would have
+    measured the exact opposite of what was intended, and looked like a clean result.
+  - **I asserted something about Franco's screen I never verified, and it was wrong.** From run 1
+    I concluded "-3801 says *user declined* although nobody was asked" — a nice finding, entirely
+    false: a prompt *had* appeared and he *had* declined. He corrected it; otherwise it would
+    have gone into 02 as measured fact. **Never narrate the user's screen.** The re-run in the
+    genuinely-denied state is what actually earned the second row of that table.
+  - **Two spec bugs found by building, both the same shape — a door that only opens outward:**
+    1. docs/06's `Grant…`-only row is dead for anyone who ever declined (02 §2). Fixed: ask once,
+       then offer System Settings forever after. It flips on *having asked*, not on *being
+       denied*, because macOS won't tell us which state we're in — and the remedy is identical.
+    2. The header was spec'd disabled-unless-blocked, which strands the *optional* Notifications
+       row: it never blocks ⇒ `needsOnboarding` goes false ⇒ the window stops auto-opening ⇒ a
+       user who dismissed the prompt has no route back from anywhere in the app. Franco hit this
+       for real. Fixed: the header always opens Onboarding; only *auto*-opening is gated on a
+       blocking row. **Auto-appearing and being reachable are different questions — docs/06
+       conflated them, and so did I.**
+  - 🔴 **`CGPreflightScreenCaptureAccess()` goes true the instant the switch lands — and the
+    process still can't capture until it restarts (02 §2). Believing it is how you build an app
+    that says `Ready` and fails every recording.** /code-review found this and it was the root of
+    most of the task's defects: `readiness` trusted preflight, so Start enabled the moment the
+    user toggled Settings, whether or not the restart had happened. **Only a launch-time snapshot
+    can tell the difference** — permissions alone cannot, because "granted, usable" and "granted,
+    needs restart" are the same TCC answer. `AppState.screenWasGrantedAtLaunch` +
+    `needsRelaunchForScreenGrant` are that snapshot, and `readiness` now reports blocked until
+    the relaunch happens.
+  - **A promise the user can close is not a promise.** The relaunch first lived in the onboarding
+    window's `.task`, so closing the window (or granting straight in System Settings without
+    pressing our button) silently dropped the "we'll relaunch automatically" the row's own copy
+    makes. It now lives on the status item's task, which lives as long as the app, and keys on
+    the **grant transition** rather than on our button being pressed — the user may never touch
+    the button, and that grant needs the same restart. **Rule: a background promise belongs on a
+    surface the user can't dismiss.**
+  - **My fix for Franco's header request quietly created a way to abandon a recording.** Making
+    the header always-clickable broke the invariant the relaunch's safety argument rested on
+    ("the window only exists while recording is blocked") — so a click on a *status readout* could
+    silently quit and reopen the app, discarding every in-memory pick. Two lessons: **an
+    invariant defended by a comment in another file is not defended**, and a small UI change can
+    invalidate a safety argument three files away. `Relaunch.now()` is now guarded on
+    `isSessionActive` even though `readiness` should already make it unreachable — "should be" is
+    not a thing to abandon a live writer on.
+  - **Copy has to follow the gate.** The mic row said "Only needed if you record a microphone"
+    while Start was greyed out *because of that row* — telling the one person who is blocked that
+    it isn't their problem. Detail text now depends on whether the row is actually blocking.
+
+  - **The good news that reframes M4-T3: asking is the add button.** Neither the Microphone nor
+    the Notifications pane has a "+", but neither needs one — *the request itself creates the
+    row*, whatever the user answers. So there is exactly **one** unrecoverable state, **never
+    having asked**, and it is the state the app was in before this task. That is the whole case
+    for onboarding, and it's stronger than the spec's.
 
 - 2026-07-15 (M4-T2 the menu): the task that made M4 verifiable — and the first task where a
   **live run found a bug the unit tests structurally could not**.

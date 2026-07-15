@@ -24,8 +24,15 @@ missing permissions only).
 
 Order and grouping (separators between groups):
 
-1. Header row (disabled): `ScreenRec` — right-aligned status `Ready` (or blocking
-   condition, e.g. `Permissions needed…` which opens Onboarding).
+1. Header row: `ScreenRec` — right-aligned status `Ready` (or blocking condition, e.g.
+   `Permissions needed…`). ⚠️ **AMENDED 2026-07-15 (Franco): always clickable, never disabled —
+   it always opens Onboarding, `Ready` or not.** As originally specified it was disabled unless
+   blocked, which strands the optional Notifications row: notifications never block, so once
+   the blocking rows go green the window stops auto-opening and a user who dismissed the
+   notification prompt has no route back to it from anywhere in the app. Auto-opening is still
+   gated on a *blocking* row (nobody gets nagged about an optional one) — this only keeps the
+   door openable. Onboarding never *reappears* on its own once satisfied; it can always be
+   *asked for*.
 2. **Start Recording** — primary action, bold.
 3. **Instant Replay armed** — checkmark toggle; right hint `⌥⌘R saves`. Persisted.
 4. — separator —
@@ -85,6 +92,24 @@ one button:
    we'll relaunch automatically." (Relaunch helper: spawn detached
    `/usr/bin/open -n` on self after grant detected.)
 2. **Microphone** — button `Grant…` → standard prompt; instant, no relaunch.
+
+⚠️ **AMENDED 2026-07-15 (M4-T3 spike): a `Grant…` button alone is not enough, and shipping only
+one would strand exactly the users who need help.** macOS prompts **once, ever** — after a
+decline, the request call is an instant no-op (02 §2), so the button does nothing and says
+nothing. Both rows therefore need a second state:
+
+- Row 1 (screen): the app can't distinguish "never asked" from "declined" (preflight is false
+  for both — 02 §2), so it must find out **by asking**: press `Grant…`, and if the permission
+  still hasn't landed, the row switches — permanently, for that launch — to
+  **`Open System Settings…`** with the copy: *"ScreenRec was denied screen recording. Turn it on
+  in System Settings, then reopen ScreenRec."* Deep link:
+  `x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture`.
+- Row 2 (microphone): `AVCaptureDevice.authorizationStatus` reports a real `.denied`, so the row
+  can show `Open System Settings…` immediately, with no guessing.
+  Link: `…?Privacy_Microphone`.
+
+Per the copy rules: name the fix, not the API. Never say "denied" as an accusation — the user
+often clicked the wrong button once, months ago, and has no idea that's why.
 3. **Notifications** (optional, never blocks): `UNUserNotificationCenter` authorization
    request; row shows `✓` / `○ Skipped`; the app is fully functional without it.
 

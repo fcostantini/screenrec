@@ -12,6 +12,8 @@ import SwiftUI
 struct MenuView: View {
     @Bindable var state: AppState
 
+    @Environment(\.openWindow) private var openWindow
+
     var body: some View {
         if state.isSessionActive {
             recordingItems
@@ -33,7 +35,12 @@ struct MenuView: View {
         // The refresh hangs off the header rather than off a `Group` around the whole menu: a
         // Group hands its modifiers to *each* child, so a `.task` there starts one polling loop
         // per top-level row instead of one per opening.
-        Text("ScreenRec — \(MenuHeader.idleStatus(state.readiness))")
+        //
+        // docs/06 item 1: when the status is a blocking condition it opens Onboarding. That
+        // click is the only way out of the hole M4-T2 could put you in — pick a microphone with
+        // no permission and Start greys out, and until this existed there was nothing anywhere,
+        // in the app or in System Settings, that could fix it (02 §2).
+        idleHeader
             .task { await refreshWhileOpen() }
 
         Divider()
@@ -106,6 +113,23 @@ struct MenuView: View {
         // docs/06: the pickers are *hidden* while recording, not disabled-but-present — so this
         // row is the only thing that says why they're gone.
         Text("Sources locked while recording")
+    }
+
+    /// Always a button, never inert text — it is the only way back to the setup window.
+    ///
+    /// docs/06 draws this row disabled and only opens Onboarding on a blocking condition, but
+    /// that strands the optional row: notifications don't block, so `needsOnboarding` goes false,
+    /// the window stops auto-opening, and a user who dismissed the prompt has no route back to it
+    /// from anywhere in the app (Franco, 2026-07-15 — he hit exactly this). Auto-opening still
+    /// happens only when something blocks, so nobody is nagged; this just keeps the door
+    /// openable.
+    private var idleHeader: some View {
+        Button("ScreenRec — \(MenuHeader.idleStatus(state.readiness))") { showOnboarding() }
+    }
+
+    private func showOnboarding() {
+        openWindow(id: onboardingWindowID)
+        NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
     // MARK: - Lifecycle

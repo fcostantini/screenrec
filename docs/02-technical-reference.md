@@ -28,22 +28,39 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
 - `showsCursor = true` for v1 (cursor-as-data is ADR-008, deferred).
 - Content enumeration: `SCShareableContent.excludingDesktopWindows(false,
   onScreenWindowsOnly: true)`.
-  ⚠️ **CORRECTION (2026-07-15, M3-T4).** This section used to claim it "returns empty results,
-  not an error, when Screen Recording permission is missing". That contradicts §10, which
-  records the *measured* M1-T2 behavior: an ungranted process **throws** ("The user declined
-  TCCs…"), it does not enumerate zero. §10 wins — it was observed; this line was research.
-  **Consequence: zero displays NEVER means "ungranted".** If enumeration returned at all, you
-  are authorized; zero displays means the screen is locked **and** slept (the only measured
-  zero-display state — see §7's table). `startDecision` therefore reports "no displays
-  available" for zero, and never blames permission for it; the real ungranted path is the
-  thrown error, mapped by `startErrorMessage`.
+  ✅ **SETTLED (2026-07-15, M4-T3 spike) — an ungranted process THROWS. It never enumerates
+  zero.** Measured directly, both TCC states, on this machine:
+
+  | TCC state of the calling app | `SCShareableContent` |
+  |---|---|
+  | not determined | macOS **prompts**; on decline → throws **-3801** `SCStreamError.userDeclined` |
+  | denied | throws **-3801** immediately, no prompt |
+
+  §10 was right and this section's old "returns empty results" claim was research, never
+  observation. It is now deleted rather than merely doubted.
+  **Consequence: zero displays NEVER means "ungranted".** If enumeration returned at all you are
+  authorized; zero displays means the screen is locked **and** slept (§7's table).
+  `startDecision` therefore reports "no displays available" for zero and never blames
+  permission — **confirmed correct**, no change needed. The ungranted path is the thrown -3801,
+  which `startErrorMessage` already maps (it matches `SCStreamError.Code.userDeclined`, and
+  -3801 is exactly that constant; -3815 `noCaptureSource` is the display-gone code from §7 —
+  the two are cleanly distinct).
   ⚠️ Do **not** "fix" this by consulting `CGPreflightScreenCaptureAccess()` — it false-negatives
   for freshly-built CLI binaries that capture fine (§10), so trusting it re-creates the very
   misdiagnosis (users sent to grant a permission they already hold).
-  Not yet re-verified against a genuinely ungranted process — the only way to test it is to
-  revoke TCC, which would destroy this machine's own grant (§2). **M4-T3's fresh-account
-  onboarding walkthrough is where this finally gets confirmed** — if an ungranted app turns out
-  to enumerate zero after all, `startDecision` needs revisiting.
+
+  **How it was measured, since the old note said it was impossible here** (it claimed only a
+  fresh account could do it, because revoking TCC would destroy our own grant): **TCC keys on
+  code identity, not on the user.** A throwaway bundle signed with the *same* identity but a
+  different bundle ID (`dev.fcostantini.screenrec.tccprobe`) is a subject macOS has never
+  granted anything — its designated requirement differs only in the identifier. It measures the
+  ungranted path on this account, changing nothing about ours. Cleanup afterwards is
+  `tccutil reset ScreenCapture dev.fcostantini.screenrec.tccprobe` — **note the bundle ID
+  argument; a bare `tccutil reset ScreenCapture` would destroy this machine's grant (§2).**
+  Reusable for any future "what does an unprivileged copy of us see?" question.
+  ⚠️ The bundle must be launched via `open` to get its own identity — a bare binary run from the
+  shell is attributed to the *responsible process* (Terminal), which holds the grant, so it
+  would have measured the opposite of what was intended.
 - Sample handler queues must do minimal work. Video buffers: check
   `SCStreamFrameInfo.status == .complete` via attachments; `.idle`/incomplete frames are
   skipped (but see tail-frame patch).
@@ -54,6 +71,43 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   too. Preflight `CGPreflightScreenCaptureAccess()`; request
   `CGRequestScreenCaptureAccess()`. Grant is per code-signing identity; the granted app
   must be **fully restarted** (all processes) to pick it up.
+- 🔴 **A decline is FINAL — `CGRequestScreenCaptureAccess()` never asks twice** (measured
+  2026-07-15, M4-T3 spike, on a genuinely denied bundle):
+  ```
+  preflight BEFORE request: false
+  CGRequestScreenCaptureAccess() -> false   (returned in 0.00s — no prompt shown)
+  preflight AFTER request:  false
+  ```
+  macOS prompts **once, ever**. After that the request call is a no-op returning false, so a
+  `Grant…` button wired straight to it is **dead** for any user who ever clicked "Don't Allow" —
+  and they are the exact users who need it. Onboarding must offer a **route to System Settings**
+  (`x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture`), not just a
+  request call.
+  ⚠️ And the app **cannot tell "never asked" from "declined" up front**: preflight returns false
+  for both, and `Permissions.screenRecordingState()` collapses both to `.notDetermined` (which
+  is why its `.denied` case, and `recordingReadiness`'s `.blocked`, were unreachable for
+  screen). The only way to distinguish them is **empirically**: call request, and if the grant
+  still hasn't landed, treat it as declined and show the System Settings route. That is a
+  one-way door — once shown, don't go back to `Grant…`.
+- **Microphone: same one-prompt rule, but the state IS legible and a decline IS recoverable.**
+  Measured 2026-07-15 (M4-T3 spike, throwaway `…screenrec.micprobe` bundle):
+
+  | state | `AVCaptureDevice.requestAccess` | prompt? | row in the Microphone pane |
+  |---|---|---|---|
+  | notDetermined | `false` after 2.11 s | **yes** (declined) | **created** by the decline, toggled off |
+  | denied | `false` in 0.00 s | no | already there, toggled off |
+
+  Two consequences, and they point opposite ways from the screen case:
+  - ✅ **A declined microphone is recoverable.** The pane has **no "+"** (M4-T2, screenshot) —
+    but it doesn't need one, because *asking* is what creates the row. Once the app has asked
+    even once, the user has a permanent toggle, whatever they answered. So the only
+    unrecoverable state is **never having asked** — which is precisely M4-T2's dead end and
+    precisely what M4-T3 removes. **Any permission the app needs, the app must ask for; you
+    cannot document your way around it.**
+  - ✅ **No empiricism needed here**, unlike screen: `authorizationStatus(for: .audio)` returns a
+    real `.denied`, so the row can offer the System Settings route immediately.
+  ⚠️ `NSMicrophoneUsageDescription` in Info.plist is **mandatory** — the process is killed
+  without it (this bit the spike's probe bundle before it was added).
 - **Microphone**: `AVCaptureDevice.requestAccess(for: .audio)`;
   `NSMicrophoneUsageDescription` in Info.plist is MANDATORY (process is killed without
   it). Takes effect immediately, no restart.

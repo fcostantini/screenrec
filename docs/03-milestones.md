@@ -340,19 +340,27 @@ UI layout, states, notification copy, and onboarding flow are specified in
       probe moves to M4-T3 (below), because a mic needs Microphone TCC and *only the app can
       request it* (that pane has no "+"). Franco granted the app Screen Recording by hand.
       Instant-replay toggle deferred to M4-T4, which owns the `replayArmed` key (Franco, 2026-07-15).
-- [ ] M4-T3 Onboarding: permission status view; request buttons; explains the
+- [x] M4-T3 Onboarding: permission status view; request buttons; explains the
       restart-after-grant dance (02 §2); blocks record until green.
+      DONE 2026-07-15. Window opens itself at launch when blocked (verified frontmost), and from
+      the menu header always (Franco: a disabled header stranded the optional Notifications row).
+      ⚠️ **Two spec bugs found while building, both fixed and both amended into docs/06**: a
+      `Grant…`-only row is dead after any decline (macOS prompts once, ever — 02 §2), and
+      auto-appearing ≠ being reachable. **The M3-T4 question is SETTLED** (see below) — no code
+      change; `startDecision` was right. **M4-T2's 3-track probe closed**: menu-driven recording
+      with a mic → `hvc1 4112×2570 + aac 48k/2ch + aac 48k/1ch`, 7.36 s, playable.
       **Inherits M4-T2's 3-track probe:** picking a mic in M4-T2 is an unrecoverable dead-end
       (Start greys out; the Microphone pane has no "+", so only a `requestAccess` call can grant
       it — verified 2026-07-15). Once the Grant… button exists, run a menu-driven recording with
       a mic selected and probe for 3 tracks. That closes M4-T2's one open leg.
-      **Also settle (M3-T4 left this open):** does a genuinely **ungranted** process *throw* from
-      `SCShareableContent` (02 §10, measured in M1-T2) or *enumerate zero displays* (the old 02 §1
-      claim, now retracted)? The two contradicted each other and it can't be tested here without
-      revoking TCC and destroying this machine's grant (02 §2) — a fresh account is the one place
-      it's free. `CaptureEngine.startDecision` currently assumes **throws**, and so never blames
-      permission for zero displays. If the fresh account shows zero-displays-when-ungranted
-      instead, that decision needs revisiting.
+      **SETTLED 2026-07-15 — it throws.** An ungranted process throws `-3801`
+      (`SCStreamError.userDeclined`); it never enumerates zero. Measured on *both* paths
+      (not-determined → prompt → decline; and denied → instant throw) — and without the fresh
+      account the note called mandatory: **TCC keys on code identity, not on the user**, so a
+      throwaway bundle with a different bundle ID is a never-granted subject on this account
+      (recipe in 02 §1). `startDecision` was right all along and is unchanged; M3-T4's
+      locked-screen fix stands. The fresh-account walkthrough is still owed for G4's <2-minute
+      UX check — but it is no longer load-bearing for this question.
       **Verify:** unit tests render view model for every permission-state combination;
       fresh-account walkthrough per 04-testing §5.1 **(human)**.
 - [ ] M4-T4 Settings window (SwiftUI Form, UserDefaults): output dir (with preflight on
