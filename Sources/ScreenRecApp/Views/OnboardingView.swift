@@ -22,9 +22,15 @@ struct OnboardingView: View {
             // above three green ticks.
             Text(state.needsOnboarding
                  ? "ScreenRec needs two permissions from macOS before it can record."
-                 : "ScreenRec has everything it needs. You can change any of these at any time.")
+                 : "ScreenRec has everything it needs. Change any of these at any time.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                // Wrap, don't truncate. Without this a `Text` in a fixed-width window silently
+                // trims to one line and ends in an ellipsis — which is how the line above
+                // shipped, cut off mid-sentence. The rows have always had it; the intro didn't,
+                // and got away with it only because the first sentence happened to fit.
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 18)
 
             ForEach(state.onboardingRows) { row in
