@@ -191,12 +191,15 @@ clap test; static-screen duration test; 30-min drift test).
       loaded box: mean 20.05s/8 runs, 5/8 in-window, outliers = load jitter not math. All
       monotonic-clean. First run in a batch swings wide (cold SCK path) — warm up before
       measuring; measure on a calm system. Cross-seam clap-sync → Needs Franco.)
-- [ ] M3-T2 Mic format-change detection → clean stop emitting
+- [x] M3-T2 Mic format-change detection → clean stop emitting
       `finished(url:reason:.microphoneChanged)` (docs/01 event surface; 02 §4,
       ADR-007).
       **Verify:** unit test injects a format-changed buffer → clean-stop path taken.
       Live AirPods-off run per §4.2 **(human present for the device action)**;
       afterwards agent confirms playable file + causal message.
+      ✅ 2026-07-15 (unit test: injected format-B mic buffer fires the one-shot handler
+      exactly once; live regression: 4s stable-mic record finishes `userStopped` with a
+      clean 3-track file, no false-positive. Live AirPods-die run → Needs Franco.)
 - [ ] M3-T3 Disk-space monitor → clean stop at <2 GB (02 §7), `--test-disk-floor N`
       flag to trip it deterministically.
       **Verify:** §4.4 — run with floor above current free space → clean stop, message

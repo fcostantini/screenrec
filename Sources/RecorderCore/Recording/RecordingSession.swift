@@ -20,12 +20,17 @@ public final class RecordingSession: @unchecked Sendable {
     private let recorder: MovieRecorder
 
     public init(configuration: CaptureConfiguration, outputURL: URL) throws {
+        let engine = CaptureEngine(configuration: configuration)
+        self.engine = engine
+        // A mic device swap mid-recording can't be handled transparently (v1: no hot-reconfig,
+        // ADR-007). Stop the stream cleanly so the file finalizes with `.microphoneChanged` as
+        // its cause — that reason then flows through the normal `.stopped` → `.finished` path.
         recorder = try MovieRecorder(
             outputURL: outputURL,
             frameRate: configuration.frameRateCap,
             preset: configuration.quality,
-            includesMicrophone: configuration.microphone != .none)
-        engine = CaptureEngine(configuration: configuration)
+            includesMicrophone: configuration.microphone != .none,
+            onMicrophoneFormatChange: { Task { await engine.stop(reason: .microphoneChanged) } })
         (events, continuation) = AsyncStream.makeStream(of: EngineEvent.self)
     }
 

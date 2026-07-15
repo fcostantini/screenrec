@@ -6,17 +6,20 @@
 ## Now
 
 - **Current milestone:** M3 — pause/resume + robustness. M2 COMPLETE, G2 PASSED (5/5).
-- **M3-T1 DONE** — pause/resume wired end-to-end: `MovieRecorder.pause()/resume()` drive the
-  (already unit-tested) `TimestampRebaser`; `CaptureEngine` owns the paused state + emits
-  `.paused`/`.resumed`; `RecordingSession` coordinates (recorder freezes the timeline first,
-  then the engine publishes the event). CLI `record` gains `--script rec10,pause5,rec10`
-  (unattended) and interactive `p`/`r`/Return keys. G3 §4.1 pause-math leg PASSED (see gate
-  table). **Cross-seam clap-sync is human → Needs Franco.**
-- **Next task:** **M3-T2** — mic format-change detection → clean stop emitting
-  `finished(url:reason:.microphoneChanged)` (docs/02 §4, ADR-007). Unit test injects a
-  format-changed buffer; live AirPods-off run is human (§4.2).
-- **Now done:** M2-T1..T6 + M3-T1. `record` is a full CLI (real 3-track capture, presets,
-  explicit path, progress ticker, pause/resume, scripted timeline).
+- **M3-T2 DONE** — mic format-change → fail-stop. `MovieRecorder` captures the mic input's
+  ASBD when it builds the input and, on a later mic buffer with a different sample-rate/
+  channels/format-ID, fires a one-shot callback and drops the mismatched buffers (docs/02 §4);
+  `RecordingSession` injects a handler that calls `engine.stop(reason: .microphoneChanged)`
+  (new `stop(reason:)` seam) so the file finalizes as `.finished(reason:.microphoneChanged)`
+  via the normal `.stopped`→`.finished` path (ADR-007). Verified: unit test (fires exactly
+  once) + live stable-mic regression (no false-positive). **Live AirPods-die run → Needs Franco.**
+- **M3-T1 DONE** — pause/resume wired end-to-end (rebaser math, engine `.paused`/`.resumed`,
+  RecordingSession coordination, CLI `--script` + `p`/`r`/Return). G3 §4.1 pause-math PASSED.
+- **Next task:** **M3-T3** — disk-space monitor → clean stop at <2 GB free (docs/02 §7), with a
+  `--test-disk-floor N` flag to trip it deterministically. Reuses the `engine.stop(reason:)`
+  seam from M3-T2 (pass `.diskAlmostFull`). Gate §4.4.
+- **Now done:** M2-T1..T6 + M3-T1..T2. `record` is a full CLI (real 3-track capture, presets,
+  explicit path, progress ticker, pause/resume, scripted timeline, mic-change fail-stop).
   KEY ENV FACT: foreground Bash captures WORK (TCC held); backgrounded/detached ones lose the
   grant. Keep capture commands foreground. Reference binary: `~/code/screenrec-poc`.
 
@@ -56,6 +59,10 @@ video (deterministic, reproducible).
 - [ ] **G3 §4.1 cross-seam A/V sync (human)** — record `--script rec10,pause5,rec10` with mic
       while clapping near the pause seam; scrub QuickTime that video/system/mic realign within
       ~2 frames across the resume seam. (Automated duration + monotonic legs already PASS.)
+- [ ] **G3 §4.2 mic-disappears (human, device action)** — record with AirPods as the mic, then
+      turn them off / put them in the case mid-recording. Expect: clean stop, playable file, the
+      CLI's finish line names the cause (`finished (microphoneChanged)`). (Detection + reason
+      plumbing are unit-tested; a real device switch is the only thing that can't run headlessly.)
 - [x] **M2-T6 subjective quality check** — DONE 2026-07-14: Franco compared Balanced vs High on
       real busy content and confirmed "balanced looks pretty good". Balanced quality is
       acceptable at ~2× the efficiency of Tier-1 → BitrateModel constants CONFIRMED, no change.
@@ -78,6 +85,38 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-15 (M3-T2 mic format-change): fail-stop wiring + a reusable seam.
+  - **Detection = compare the mic buffer's ASBD to the input's established one** (sample rate,
+    channel count, format ID). SCK mic buffers are LPCM and a given device's format is stable,
+    so a device switch (AirPods 24 k mono → built-in 48 k mono/stereo) is the only thing that
+    changes those fields — no false positives. `MovieRecorder` stores the ASBD when it builds
+    the mic input and checks every later mic buffer; on a diff it fires a **one-shot** callback
+    and drops the mismatched buffers (never feed a new format into the established input — it
+    corrupts the track, docs/02 §4).
+  - **New reusable seam: `CaptureEngine.stop(reason: EndReason = .userStopped)`.** A monitor that
+    detects a fail-stop condition passes its reason; it flows through the existing `.stopped`→
+    `.finished` path so the file finalizes as `.finished(reason:)`. M3-T3 (disk floor →
+    `.diskAlmostFull`) and M3-T4 (display/sleep) reuse this — don't reinvent per-condition stops.
+  - **The recorder signals OUT via an injected `@Sendable` callback; it never touches the engine.**
+    `RecordingSession` builds the callback capturing the `engine` actor (no `self` capture, no
+    retain cycle) and injects it at recorder init. The callback fires from a capture queue under
+    the recorder lock but only spawns a `Task { await engine.stop(...) }` — non-blocking, and the
+    later `recorder.finish()` runs off-lock via the event loop, so no re-entrancy/deadlock.
+  - **Detection sits AFTER the writing gate, deliberately** (high-effort /code-review finding).
+    Placed before it, a swap in the first frame-interval fail-stopped a recording with nothing
+    written → `.failed(noFramesWritten)` + discarded output, while a swap a hair later gave a
+    playable file — the outcome flipped on sub-frame timing. Pre-writing mic buffers are already
+    dropped by the `guard didStartWriting`, so capture now just carries on until there's
+    something worth saving. Two tests pin this (fires-once-and-finalizes / before-writing-
+    doesn't-fail-stop) — note the mic-only test only passed originally *because* of the bug.
+  - **The callback fires OUTSIDE the lock** (same review): `consume` registers the notify defer
+    *before* the unlock defer, so LIFO runs unlock first. `lock` is non-reentrant — firing under
+    it made any handler that touched the recorder a capture-queue deadlock waiting to happen.
+  - **`stop(reason:)` carries the reason through the `.starting` path too** (same review): the
+    branch used to keep only `stopRequested` and terminate as `.userStopped` on resume, so a
+    swap during `startCapture()`'s suspension would misreport the cause. Now paired with
+    `requestedStopReason`.
 
 - 2026-07-14 (M3-T1 pause/resume): wiring + a timing lesson for future gate runs.
   - **Pause anchor = newest raw PTS across all tracks**, not the last video frame. The rebaser

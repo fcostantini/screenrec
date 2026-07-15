@@ -105,6 +105,87 @@ import Testing
         #expect(tracks.filter { $0.mediaType == .audio }.count == 1)
     }
 
+    @Test func microphoneFormatChangeFiresOnceAndStillFinalizes() async throws {
+        let url = Self.temporaryOutputURL()
+        try? FileManager.default.removeItem(at: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let systemFormat = Self.audioFormat(sampleRate: 48_000, channels: 2)
+        let micA = Self.audioFormat(sampleRate: 24_000, channels: 1)  // e.g. AirPods
+        let micB = Self.audioFormat(sampleRate: 48_000, channels: 1)  // built-in mic takes over
+        let frameDuration = CMTime(value: 1, timescale: CMTimeScale(Self.fps))
+
+        // The handler fires exactly once: not on the buffer that establishes the format, once on
+        // the first mismatched buffer, and never again — a device switch is fail-stop, not
+        // per-buffer (docs/02 §4, ADR-007). Detection only runs once the writer session is
+        // underway, so record real content first, then swap the device.
+        try await confirmation("mic device switch detected exactly once") { detected in
+            let recorder = try MovieRecorder(
+                outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: true,
+                onMicrophoneFormatChange: { detected() })
+
+            let frames = Self.fps * Self.seconds
+            for index in 0..<frames {
+                let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
+                recorder.consume(
+                    Self.videoSample(width: Self.width, height: Self.height, pts: pts,
+                                     duration: frameDuration),
+                    type: .screen)
+                recorder.consume(
+                    Self.audioSample(format: systemFormat, sampleRate: 48_000, channels: 2,
+                                     frames: 48_000 / Self.fps, pts: pts),
+                    type: .systemAudio)
+                recorder.consume(
+                    Self.audioSample(format: micA, sampleRate: 24_000, channels: 1,
+                                     frames: 24_000 / Self.fps, pts: pts),
+                    type: .microphone)
+            }
+            // Device switched: every later mic buffer carries the new format.
+            for index in frames..<(frames + 3) {
+                let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
+                recorder.consume(
+                    Self.audioSample(format: micB, sampleRate: 48_000, channels: 1,
+                                     frames: 48_000 / Self.fps, pts: pts),
+                    type: .microphone)
+            }
+
+            // Fail-stop's promise (ADR-007): the file is still finalizable and playable — video
+            // + system audio, plus the mic track up to the moment the device changed.
+            let asset = AVURLAsset(url: try await recorder.finish())
+            let tracks = try await asset.load(.tracks)
+            #expect(tracks.filter { $0.mediaType == .video }.count == 1)
+            #expect(tracks.filter { $0.mediaType == .audio }.count == 2)
+        }
+    }
+
+    @Test func microphoneFormatChangeBeforeWritingDoesNotFailStop() async throws {
+        let url = Self.temporaryOutputURL()
+        try? FileManager.default.removeItem(at: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let micA = Self.audioFormat(sampleRate: 24_000, channels: 1)
+        let micB = Self.audioFormat(sampleRate: 48_000, channels: 1)
+
+        // A swap before the first video frame starts the writer session must NOT fail-stop:
+        // nothing is written yet, so stopping would discard the whole recording as `.failed`
+        // purely on sub-frame timing. These buffers are dropped by the writing gate instead,
+        // and capture carries on until there is something worth saving.
+        try await confirmation("no fail-stop before the session starts", expectedCount: 0) { detected in
+            let recorder = try MovieRecorder(
+                outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: true,
+                onMicrophoneFormatChange: { detected() })
+            recorder.consume(
+                Self.audioSample(format: micA, sampleRate: 24_000, channels: 1, frames: 800,
+                                 pts: CMTime(value: 1, timescale: 100)),
+                type: .microphone)
+            recorder.consume(
+                Self.audioSample(format: micB, sampleRate: 48_000, channels: 1, frames: 1600,
+                                 pts: CMTime(value: 2, timescale: 100)),
+                type: .microphone)
+            recorder.cancel()
+        }
+    }
+
     @Test func finishWithoutFramesThrows() async throws {
         let url = Self.temporaryOutputURL()
         try? FileManager.default.removeItem(at: url)

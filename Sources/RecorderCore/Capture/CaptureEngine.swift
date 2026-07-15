@@ -25,8 +25,10 @@ public actor CaptureEngine {
     private enum State { case idle, starting, running, terminated }
     private var state: State = .idle
     /// Set if stop() arrives while start() is still suspended (actor reentrancy); start()
-    /// honors it when it resumes rather than bringing up an unstoppable stream.
+    /// honors it — with the requested reason — when it resumes, rather than bringing up an
+    /// unstoppable stream.
     private var stopRequested = false
+    private var requestedStopReason: EndReason = .userStopped
     /// Orthogonal to `state` (the stream stays `.running` while paused, still delivering
     /// buffers that the recorder drops); gates `pause`/`resume` so each event fires once.
     private var isPaused = false
@@ -52,7 +54,7 @@ public actor CaptureEngine {
         state = .starting
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-            if stopRequested { return terminate(.userStopped) }
+            if stopRequested { return terminate(requestedStopReason) }
 
             switch Self.startDecision(
                 screenPermission: Permissions.screenRecordingState(),
@@ -82,7 +84,7 @@ public actor CaptureEngine {
 
             if stopRequested {
                 try? await stream.stopCapture()
-                return terminate(.userStopped)
+                return terminate(requestedStopReason)
             }
             self.stream = stream
             self.handler = handler
@@ -93,20 +95,22 @@ public actor CaptureEngine {
         }
     }
 
-    /// Clean, user-initiated stop. Safe at any point: during `start()`'s suspension it
-    /// records a request that `start()` honors on resume; while running it stops the
-    /// stream; after termination it is a no-op.
-    public func stop() async {
+    /// Clean stop, carrying the end `reason` (default `.userStopped`; a monitor passes a
+    /// fail-stop reason like `.microphoneChanged`). Safe at any point: during `start()`'s
+    /// suspension it records the request *and its reason* for `start()` to honor on resume;
+    /// while running it stops the stream; after termination it is a no-op.
+    public func stop(reason: EndReason = .userStopped) async {
         switch state {
         case .idle, .terminated:
             return
         case .starting:
             stopRequested = true
+            requestedStopReason = reason
         case .running:
             if let stream {
                 try? await stream.stopCapture()
             }
-            terminate(.userStopped)
+            terminate(reason)
         }
     }
 
