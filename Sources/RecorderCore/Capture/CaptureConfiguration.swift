@@ -2,15 +2,15 @@ import CoreGraphics
 import Foundation
 
 /// Recording quality tier. Raw values are the CLI/settings literals; the bitrate math
-/// per tier lives in `BitrateModel` (M2-T1).
+/// per tier lives in `BitrateModel`.
 public enum QualityPreset: String, CaseIterable, Sendable {
     case efficient
     case balanced
     case high
 }
 
-/// Which display to capture. Resolved to a concrete `SCDisplay` by `CaptureEngine`
-/// (M1-T2); `.main` defers to whatever is the main display at capture time.
+/// Which display to capture. Resolved to a concrete `SCDisplay` by `CaptureEngine`;
+/// `.main` defers to whatever is the main display at capture time.
 public enum DisplaySelection: Sendable, Equatable {
     case main
     case id(CGDirectDisplayID)
@@ -44,10 +44,9 @@ public struct CaptureConfiguration: Sendable, Equatable {
         self.quality = quality
     }
 
-    /// Pixel dimensions for a display/window: point size × backing scale factor, rounded
-    /// to whole pixels. SCK wants pixels while `contentRect` is in points and
-    /// `pointPixelScale` is the Retina factor (docs/02 §1); skipping this records at half
-    /// resolution. Pure, so it's unit-testable without a real display.
+    /// Pixel dimensions for a display/window: point size × backing scale factor, rounded to
+    /// whole pixels. SCK wants pixels while `contentRect` is in points and `pointPixelScale` is
+    /// the Retina factor (docs/02 §1); skipping this records at half resolution.
     public static func pixelDimensions(
         pointSize: CGSize,
         pointPixelScale: CGFloat

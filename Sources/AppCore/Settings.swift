@@ -3,8 +3,7 @@ import RecorderCore
 
 /// The app's persisted preferences (docs/06 "Settings window").
 ///
-/// Only what M4-T4 owns: replay settings ship with M5 and launch-at-login with M6, because
-/// neither has anything to act on yet.
+/// Replay (M5) and launch-at-login (M6) settings arrive with the features they configure.
 public struct Settings: Sendable, Equatable {
     public var outputDirectory: URL
     public var quality: QualityPreset
@@ -23,9 +22,8 @@ public struct Settings: Sendable, Equatable {
 
 /// Loads and saves `Settings` in `UserDefaults`.
 ///
-/// **The key names are contractual** (docs/06). They're spelled exactly once — here — because a
-/// typo would be a bug found a milestone later, in whichever task assumed it was at fault. A
-/// test pins each literal against the doc.
+/// The key names are contractual (docs/06), spelled exactly once — here. A test pins each
+/// literal against the doc.
 public enum SettingsStore {
 
     public enum Key {
@@ -36,21 +34,15 @@ public enum SettingsStore {
 
     /// Reads settings, replacing anything unusable with the default.
     ///
-    /// Validation here isn't defensive padding — it's the difference in kind between this task
-    /// and every one before it. In-memory state self-corrects on the next launch; a persisted
-    /// value is the app's problem *at every launch until someone fixes it*. And these values are
-    /// trivially reachable: `defaults write dev.fcostantini.screenrec.app fpsCap 0` is one
-    /// command, the plist is user-editable, and an output folder that existed yesterday is an
-    /// unmounted volume today.
-    ///
-    /// Pure over an injected `UserDefaults`, so every bad-value case is a unit test rather than
-    /// something we hope never happens.
+    /// Every value is validated: unlike in-memory state, a bad persisted value is the app's
+    /// problem at every launch, and the plist is user-editable. Pure over an injected
+    /// `UserDefaults`, so each bad-value case is a unit test.
     public static func load(from defaults: UserDefaults) -> Settings {
         var settings = Settings.standard
 
-        // A folder that has gone away (unmounted volume, deleted, renamed) falls back rather
-        // than poisoning every later recording with an opaque "invalid parameter" (02 §2).
-        // Existence only — write access is preflighted when chosen, and again at record time.
+        // A folder that has gone away falls back rather than poisoning every later recording
+        // with an opaque "invalid parameter" (02 §2). Existence only — write access is
+        // preflighted when chosen, and again at record time.
         if let path = defaults.string(forKey: Key.outputDirectory), !path.isEmpty {
             var isDirectory: ObjCBool = false
             if FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
@@ -59,15 +51,15 @@ public enum SettingsStore {
             }
         }
 
-        // An unknown preset means a hand-edited plist or a future version's value. Either way
-        // the enum can't represent it, and Balanced is the honest fallback.
+        // An unknown preset means a hand-edited plist or a future version's value; the enum
+        // can't represent it either way.
         if let raw = defaults.string(forKey: Key.qualityPreset),
            let preset = QualityPreset(rawValue: raw) {
             settings.quality = preset
         }
 
-        // `integer(forKey:)` returns 0 for both "absent" and "garbage", and 0 fps would divide
-        // by zero downstream — so only the two documented values are accepted at all.
+        // `integer(forKey:)` returns 0 for both "absent" and "garbage", and 0 fps divides by
+        // zero downstream — so only the two documented values are accepted.
         let fps = defaults.integer(forKey: Key.fpsCap)
         if Settings.allowedFrameRateCaps.contains(fps) {
             settings.frameRateCap = fps
@@ -77,8 +69,8 @@ public enum SettingsStore {
     }
 
     public static func save(_ settings: Settings, to defaults: UserDefaults) {
-        // The path, not the URL: docs/06 says String, and a URL would archive as opaque data
-        // that `defaults read` couldn't show a human.
+        // The path, not the URL: docs/06 says String, and a URL archives as opaque data that
+        // `defaults read` can't show a human.
         defaults.set(settings.outputDirectory.path, forKey: Key.outputDirectory)
         defaults.set(settings.quality.rawValue, forKey: Key.qualityPreset)
         defaults.set(settings.frameRateCap, forKey: Key.fpsCap)

@@ -1,7 +1,7 @@
 import AVFoundation
 
-/// A selectable audio input, decoupled from AVFoundation so the CLI and app (mic
-/// picker, M4-T2) can present devices without importing AVFoundation themselves.
+/// A selectable audio input, decoupled from AVFoundation so the CLI and app can present
+/// devices without importing AVFoundation themselves.
 public struct AudioInputDevice: Sendable, Equatable {
     public let uniqueID: String
     public let name: String

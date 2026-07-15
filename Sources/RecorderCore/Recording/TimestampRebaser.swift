@@ -9,12 +9,11 @@ import CoreMedia
 /// - output PTS is kept **strictly monotonic per track** (SCK occasionally reorders or
 ///   duplicates buffers, which would otherwise corrupt the writer).
 ///
-/// Pure value type — no AVFoundation, no clock — so it is unit-testable in isolation and
-/// composes with `MovieRecorder`, which owns one and mutates it under its own lock (M2-T4).
-/// Pause/resume is exercised in M3, but the math lives here now.
+/// Pure value type — no AVFoundation, no clock — so it is testable in isolation; `MovieRecorder`
+/// owns one and mutates it under its own lock.
 ///
-/// Callers deliver only complete video frames as `.screen` (the `SampleRouter` already drops
-/// incomplete ones), so the first `.screen` buffer seen is the epoch.
+/// Callers deliver only complete video frames as `.screen` (the `SampleRouter` drops incomplete
+/// ones), so the first `.screen` buffer seen is the epoch.
 public struct TimestampRebaser {
     /// What to do with a buffer: drop it, or append it at the returned (rebased) PTS.
     public enum Decision: Equatable {
@@ -64,10 +63,8 @@ public struct TimestampRebaser {
         return .emit(presentationTimeStamp: rebased)
     }
 
-    /// Note the pause instant (raw capture PTS). Returns whether it took effect: `false`
-    /// before the timeline has started (no epoch yet), when already paused, or on a
-    /// non-numeric PTS — callers gate a user-visible "paused" signal on this so the event
-    /// can't claim a pause the timeline didn't actually take.
+    /// Note the pause instant (raw capture PTS). Returns whether it took effect: `false` before
+    /// the timeline has started, when already paused, or on a non-numeric PTS.
     @discardableResult
     public mutating func pause(atRawPTS pts: CMTime) -> Bool {
         guard epoch != nil, !isPaused, pts.isNumeric else { return false }
@@ -78,9 +75,8 @@ public struct TimestampRebaser {
     }
 
     /// Arm resume: the next complete video frame re-anchors the timeline and reopens the gate.
-    /// Returns whether it took effect — `false` if not paused, or if resume is already armed
-    /// (`isPaused` stays true until a video frame completes it, so a redundant resume before
-    /// that frame is a no-op) — so a caller can keep a user-visible "resumed" signal honest.
+    /// Returns whether it took effect — `false` if not paused or already armed (`isPaused` stays
+    /// true until a video frame completes it).
     @discardableResult
     public mutating func resume() -> Bool {
         guard isPaused, !awaitingResumeFrame else { return false }

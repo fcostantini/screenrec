@@ -3,21 +3,19 @@ import AppKit
 import RecorderCore
 import SwiftUI
 
-/// The Settings window (docs/06 "Settings window"). Three rows: where recordings go, and the two
-/// knobs that shape them. Replay settings arrive with M5 and launch-at-login with M6 — neither
-/// has anything to act on yet.
+/// The Settings window (docs/06 "Settings window"): where recordings go, and the two knobs that
+/// shape them. Replay (M5) and launch-at-login (M6) have nothing to act on yet.
 struct SettingsView: View {
     @Bindable var state: AppState
 
-    /// Set when a chosen folder can't be written to. docs/06 and G4 §5.4 both want this said
-    /// **at selection**, not discovered at record time as an opaque "invalid parameter" (02 §2).
+    /// Set when a chosen folder can't be written to. docs/06 and G4 §5.4 want this said at
+    /// selection, not as an opaque "invalid parameter" at record time (02 §2).
     @State private var folderProblem: String?
 
     var body: some View {
         Form {
             LabeledContent("Output folder") {
                 HStack(spacing: 8) {
-                    // The path as the user thinks of it — `~/Movies`, not /Users/you/Movies.
                     Text(abbreviatedOutputPath)
                         .foregroundStyle(.secondary)
                         .truncationMode(.head)          // the tail is the folder they picked
@@ -54,13 +52,9 @@ struct SettingsView: View {
         (state.outputDirectory.path as NSString).abbreviatingWithTildeInPath
     }
 
-    /// Picks a folder and preflights it immediately.
-    ///
-    /// The preflight is `OutputLocation.preflight` — written back in M0-T4, with copy that
-    /// already says "Choose a different folder in Settings." It probes *write* access rather
-    /// than mere existence, which is the whole point: Desktop/Documents/Downloads exist and are
-    /// readable while still refusing writes without the Files & Folders grant, and that refusal
-    /// surfaces from SCK as "invalid parameter" hours later if nobody checks here (02 §2).
+    /// Picks a folder and preflights write access immediately: Desktop/Documents/Downloads are
+    /// readable but refuse writes without the Files & Folders grant, which SCK surfaces as
+    /// "invalid parameter" much later (02 §2).
     private func chooseFolder() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -78,8 +72,7 @@ struct SettingsView: View {
             folderProblem = nil
             state.outputDirectory = chosen        // persists + re-reads recent files
         case .inaccessible(let reason):
-            // Keep the old folder. Accepting one we can't write to would trade a message the
-            // user is reading right now for a failed recording later.
+            // Keep the old folder; accepting an unwritable one defers the failure to record time.
             folderProblem = reason
         }
     }

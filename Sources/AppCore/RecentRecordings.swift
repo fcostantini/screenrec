@@ -13,20 +13,12 @@ public enum RecentRecordings {
         let modified: Date
     }
 
-    /// Picks the newest entries. Split from the directory read on purpose: reading a directory
-    /// is environment-dependent and this is not, and the M3-T3 disk guard is the standing lesson
-    /// about what happens when the two are welded together — a test of the volume-dependent half
-    /// passed for weeks while the behaviour it claimed to cover was wrong everywhere but the boot
-    /// volume. So the decision is pure, and the probe below is a thin shell over it.
+    /// Picks the newest entries. Pure, split from the environment-dependent directory read so
+    /// the choosing is testable on its own.
     ///
-    /// Ties break on filename, descending — for determinism only. `sorted(by:)` is not
-    /// guaranteed stable, so without a tie-break two same-second files could swap places between
-    /// menu openings for no reason the user could see.
-    ///
-    /// It does *not* order same-second files by recency, and shouldn't be read as doing so:
-    /// "Recording.mov" sorts above "Recording 2.mov" even though the suffixed one was written
-    /// second (the O_EXCL collision path, M2-T4). Which of two files written in the same second
-    /// is listed first is cosmetic; that the list stops moving on its own is not.
+    /// Ties break on filename descending, for determinism only: `sorted(by:)` isn't guaranteed
+    /// stable, so same-second files could otherwise swap places between menu openings. This is
+    /// not a recency order — "Recording.mov" sorts above the later-written "Recording 2.mov".
     static func newest(_ entries: [Entry], limit: Int = limit) -> [URL] {
         entries
             .sorted { ($0.modified, $0.url.lastPathComponent) > ($1.modified, $1.url.lastPathComponent) }
@@ -36,10 +28,9 @@ public enum RecentRecordings {
 
     /// Live probe of `directory`.
     ///
-    /// Deliberately non-throwing: a missing or unreadable output directory means no rows, not an
-    /// error dialog. The user may have pointed the app at a folder that has since gone (an
-    /// unmounted volume), and the menu still has to open — the failure surfaces when they try to
-    /// record, where it can be acted on, not when they glance at the menu bar.
+    /// Non-throwing: a missing or unreadable output directory (unmounted volume) means no rows,
+    /// not an error — the menu still has to open. The failure surfaces at record time instead,
+    /// where it can be acted on.
     public static func inDirectory(_ directory: URL, limit: Int = limit) -> [URL] {
         let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]
         guard let contents = try? FileManager.default.contentsOfDirectory(

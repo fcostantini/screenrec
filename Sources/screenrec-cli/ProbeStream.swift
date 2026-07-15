@@ -3,9 +3,8 @@ import CoreMedia
 import Foundation
 import RecorderCore
 
-/// Accumulates per-source stats: buffer count, first/last PTS, min/max consecutive-PTS
-/// delta, and the first format description seen. Thread-safe — buffers arrive on SCK's
-/// background queues.
+/// Accumulates per-source stats: buffer count, first/last PTS, min/max consecutive-PTS delta,
+/// and the first format seen. Thread-safe — buffers arrive on SCK's background queues.
 private final class ProbeConsumer: SampleConsumer, @unchecked Sendable {
     struct Stats {
         var count = 0
@@ -72,8 +71,7 @@ private func label(_ type: SourceType) -> String {
     }
 }
 
-/// Captures for `--duration` seconds and prints per-source buffer counts, formats, and
-/// PTS deltas. The diagnostic every later capture task leans on (M1-T4).
+/// Captures for `--duration` seconds and prints per-source buffer counts, formats, and PTS deltas.
 func runProbeStream(_ args: [String]) async {
     var duration = 5.0
     var micID: String?

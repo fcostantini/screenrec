@@ -4,31 +4,25 @@ import SwiftUI
 import UserNotifications
 
 /// The setup window (docs/06 "Onboarding window"): a checklist of three rows, each with live
-/// status and one button. No wizard, no marketing, no Continue — it closes itself when the rows
-/// that matter go green.
+/// status and one button.
 struct OnboardingView: View {
     let state: AppState
 
-    /// Screen recording is granted somewhere else entirely — in System Settings, minutes later —
-    /// and nothing calls back to say so. Polling while the window is open is the only way to
-    /// notice, and it's the same ≤1 Hz, only-while-visible discipline the menu uses.
+    /// Permissions are granted in System Settings with no callback, so polling while the window
+    /// is open is the only way to notice.
     private static let pollInterval = Duration.seconds(1)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // The window is two things now — the first-run checklist and (since it became
-            // reachable from the menu at any time) the app's permissions screen. "ScreenRec
-            // needs two permissions before it can record" is true of the first and plainly false
-            // above three green ticks.
+            // The window is both the first-run checklist and the app's permissions screen, so
+            // the intro tracks `needsOnboarding`.
             Text(state.needsOnboarding
                  ? "ScreenRec needs two permissions from macOS before it can record."
                  : "ScreenRec has everything it needs. Change any of these at any time.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                // Wrap, don't truncate. Without this a `Text` in a fixed-width window silently
-                // trims to one line and ends in an ellipsis — which is how the line above
-                // shipped, cut off mid-sentence. The rows have always had it; the intro didn't,
-                // and got away with it only because the first sentence happened to fit.
+                // Wrap, don't truncate: a `Text` in a fixed-width window otherwise trims to one
+                // line and ends in an ellipsis.
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 18)
@@ -51,7 +45,7 @@ struct OnboardingView: View {
         case .request:
             switch row.id {
             case .screenRecording:
-                // Returns false essentially always — granting happens in System Settings and
+                // Effectively always returns false: granting happens in System Settings and
                 // needs a restart (02 §2). `pollUntilSatisfied` is what notices.
                 state.requestScreenRecording()
             case .microphone:
@@ -63,8 +57,7 @@ struct OnboardingView: View {
     }
 
     /// UserNotifications lives here rather than in AppCore because the live call needs a real
-    /// bundle — `swift test` has none, so a call from AppCore would be untestable at best and a
-    /// crash at worst. AppCore keeps the state; the app supplies it.
+    /// bundle, which `swift test` has none of. AppCore keeps the state; the app supplies it.
     private func requestNotifications() async {
         let center = UNUserNotificationCenter.current()
         let granted = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
@@ -81,14 +74,9 @@ struct OnboardingView: View {
         }
     }
 
-    /// Keeps the rows honest while the window is up. **Does not relaunch** — that lives in
-    /// `App.swift`, on a task that outlives this window, because the user can close this one at
-    /// any moment and the promise to reopen must survive that.
-    ///
-    /// The refresh is the load-bearing part: every permission this window shows is granted
-    /// somewhere we aren't — in System Settings, minutes later — so nothing here notices on its
-    /// own. Both sources get re-read every tick; reading notification settings once before the
-    /// loop had the identical bug the microphone row shipped with.
+    /// Keeps the rows honest while the window is up. Does not relaunch — that lives in
+    /// `App.swift`, on a task that outlives this closable window. Both permission sources are
+    /// re-read every tick: they're granted elsewhere, with no callback.
     private func pollUntilSatisfied() async {
         while !Task.isCancelled {
             await refreshNotificationState()
@@ -119,9 +107,8 @@ private struct PermissionRowView: View {
 
             Spacer(minLength: 8)
 
-            // Bordered when there's something to do, a plain link when there isn't. The done
-            // screen has to read as done: three call-to-action buttons on an all-green
-            // checklist would say "unfinished" louder than three ticks say "finished".
+            // Bordered when there's something to do, a plain link when there isn't: an all-green
+            // checklist shouldn't read as unfinished.
             if row.action.isCallToAction {
                 Button(buttonTitle, action: act)
             } else {

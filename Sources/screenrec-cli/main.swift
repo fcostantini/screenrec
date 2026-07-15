@@ -46,12 +46,8 @@ func die(_ message: String, code: Int32 = 64) -> Never {
     exit(code)
 }
 
-/// Parses a flag's positive, finite number, or dies with a usage error. Every numeric flag in
-/// this CLI wants exactly this and had grown its own copy.
-///
-/// `max` bounds the flags whose value later feeds a conversion that would trap on absurd input —
-/// `--duration` becomes `UInt64(seconds * 1e9)`, `--test-disk-floor` becomes a byte count — so
-/// the bound is load-bearing, not decoration.
+/// Parses a flag's positive, finite number, or dies with a usage error.
+/// `max` bounds values that later feed trapping conversions (`UInt64(seconds * 1e9)`, byte counts).
 func parsePositive(
     _ value: String?, flag: String, unit: String = "seconds", max: Double? = nil
 ) -> Double {
@@ -97,8 +93,6 @@ func describe(_ event: EngineEvent) -> String {
 }
 
 /// Starts the capture engine, prints each event, stops after `--duration` seconds.
-/// Instrument for M1-T2: proves the SCStream lifecycle works (and, from the CLI,
-/// whether capture runs under the terminal's grant).
 func runEngineSmoke(_ args: [String]) async {
     var duration = 2.0
     var iterator = args.makeIterator()
@@ -114,8 +108,7 @@ func runEngineSmoke(_ args: [String]) async {
     let engine = CaptureEngine(configuration: CaptureConfiguration())
     print("engine-smoke: starting (\(Int(duration))s)…")
 
-    // OK requires: a video frame captured (.started) AND a clean user stop, with no
-    // failure or stream error. The consumer completes when the event stream finishes.
+    // OK requires a captured video frame (.started) and a clean user stop.
     let consumer = Task { () -> Bool in
         var sawStarted = false
         var cleanStop = false
@@ -137,8 +130,7 @@ func runEngineSmoke(_ args: [String]) async {
     }
 
     await engine.start()
-    // Stop after `duration`, but if the stream already ended (e.g. failed to start) the
-    // consumer completes immediately and we cancel the timer instead of waiting it out.
+    // Cancelled if the stream ends first, so a failed start doesn't wait out the timer.
     let stopTimer = Task {
         try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
         await engine.stop()
@@ -161,8 +153,7 @@ func listMics() {
     }
 }
 
-/// One step of a `--script` timeline: record for N seconds, or pause for N seconds (a pause
-/// step brackets its wait with pause/resume). Drives the unattended pause-math gate (04 §4.1).
+/// One step of a `--script` timeline (04 §4.1): record for N seconds, or pause for N seconds.
 enum ScriptStep {
     case record(Double)
     case pause(Double)
@@ -180,8 +171,7 @@ struct RecordOptions {
     var diskFloorBytes: Int64?
 }
 
-/// Parses `rec10,pause5,rec10` into steps. Each token is `rec<seconds>` or `pause<seconds>`
-/// with a finite, non-negative count; anything else is a usage error.
+/// Parses `rec10,pause5,rec10` into steps.
 func parseScript(_ raw: String) -> [ScriptStep] {
     let steps = raw.split(separator: ",").map { token -> ScriptStep in
         let text = token.trimmingCharacters(in: .whitespaces)
@@ -223,8 +213,8 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
             guard let value = iterator.next() else { die("--script needs a value like rec10,pause5,rec10") }
             options.script = parseScript(value)
         case "--test-disk-floor":
-            // Test hook (04 §4.4): pass a floor above the volume's free space to trip the disk
-            // guard on demand. Bounded at 1 PB so GB→bytes can't overflow Int64.
+            // Test hook (04 §4.4): a floor above the volume's free space trips the disk guard.
+            // Bounded at 1 PB so GB→bytes can't overflow Int64.
             let gigabytes = parsePositive(
                 iterator.next(), flag: "--test-disk-floor", unit: "GB", max: 1_000_000)
             options.diskFloorBytes = Int64(gigabytes * 1_073_741_824)
@@ -236,8 +226,7 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
             options.path = arg     // positional: an explicit output file, or a directory
         }
     }
-    // A script owns the whole timeline (its own pauses and stop), so a duration bound would
-    // just race it — reject the ambiguous combination rather than silently pick one.
+    // A script owns its own timeline, so a duration bound would race it.
     if options.script != nil, options.duration != nil {
         die("--script and --duration can't be combined (the script controls timing)")
     }
@@ -247,8 +236,7 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
 enum CLIError: Error { case message(String) }
 
 /// Where a recording writes: an auto-named file in a directory, or an exact user-given file.
-/// An explicit positional path that is an existing directory means the former; otherwise the
-/// latter. With no path, the `--output` directory (default ~/Movies) is used.
+/// A positional path that is an existing directory means the former; otherwise the latter.
 enum OutputTarget {
     case directory(URL)
     case file(URL)
@@ -264,8 +252,7 @@ func outputTarget(_ options: RecordOptions) -> OutputTarget {
     return .file(url)
 }
 
-/// Resolves and atomically reserves the output file for a real recording, running the write
-/// preflight on its directory first.
+/// Resolves and atomically reserves the output file, running the write preflight first.
 func reserveOutputURL(_ options: RecordOptions) throws -> URL {
     func preflight(_ directory: URL) throws {
         if case .inaccessible(let reason) = OutputLocation.preflight(directory) {
@@ -282,8 +269,8 @@ func reserveOutputURL(_ options: RecordOptions) throws -> URL {
     }
 }
 
-/// Pure microphone resolution: the selection plus, when a mic was requested but no device is
-/// usable, the reason. Both the dry-run and real capture go through this so they can't disagree.
+/// Microphone selection, plus the reason when a mic was requested but none is usable.
+/// Shared by the dry-run and real capture so they can't disagree.
 func resolveMicrophone(_ options: RecordOptions) -> (selection: MicrophoneSelection, unavailable: String?) {
     guard options.micEnabled else { return (.none, nil) }
     switch Permissions.resolvedMicrophoneID(preferred: options.micID) {
@@ -325,8 +312,7 @@ func printRecordDryRun(_ options: RecordOptions) {
     print("  Would write: \(planned.lastPathComponent)")
 }
 
-/// The output URL a real recording WOULD use, for the dry-run — same resolution as
-/// `reserveOutputURL` but with no side effects (check-then-act naming, reserves nothing).
+/// The URL a real recording would use, for the dry-run. Reserves nothing.
 func plannedOutputURL(_ options: RecordOptions) -> URL {
     switch outputTarget(options) {
     case .directory(let directory): return OutputLocation(directory: directory).newRecordingURL(date: Date())
@@ -341,8 +327,8 @@ func recordingFileSize(_ url: URL) -> Int64 {
     return size.int64Value
 }
 
-/// In-place progress line: `⏺ MM:SS  <size>`, refreshed twice a second. Guards the duration
-/// against NaN seconds before the first frame (docs/02 §10) so it can never print "NaN".
+/// In-place progress line, refreshed twice a second. `recordedDuration` is NaN before the first
+/// frame (docs/02 §10), so the duration is guarded.
 func runProgressTicker(_ session: RecordingSession, outputURL: URL) async {
     while !Task.isCancelled {
         let raw = session.recordedDuration.seconds
@@ -354,23 +340,18 @@ func runProgressTicker(_ session: RecordingSession, outputURL: URL) async {
     }
 }
 
-/// Sleeps `seconds` with a tight tolerance. The default `Task.sleep` grants the scheduler
-/// generous wake-up slack, which — under the capture's CPU load — inflates the measured file
-/// duration; over a script's two record segments that overshoot pushed past the ±0.2 s
-/// pause-math gate (04 §4.1). A 2 ms tolerance keeps the `--script` and `--duration` stop
-/// boundaries honest.
+/// Sleeps `seconds` with a tight tolerance. The default `Task.sleep` wake-up slack inflates the
+/// measured file duration past the ±0.2 s pause-math gate (04 §4.1).
 func preciseSleep(_ seconds: Double) async {
     let clock = ContinuousClock()
     try? await clock.sleep(until: clock.now.advanced(by: .seconds(seconds)), tolerance: .milliseconds(2))
 }
 
-/// Runs a `--script` timeline against a live session, then stops it. A record step is just a
-/// wait (capture continues); a pause step brackets its wait with `pause()`/`resume()`.
+/// Runs a `--script` timeline against a live session, then stops it. A record step is a wait;
+/// a pause step brackets its wait with `pause()`/`resume()`.
 func runScript(_ steps: [ScriptStep], session: RecordingSession) async {
-    // Anchor the timeline to the first captured frame, not to start() returning: SCK startup
-    // latency (the first frame lands ~0.1–0.5 s after capture begins, more on a cold start)
-    // would otherwise shorten the file below the ±0.2 s gate.
-    // Bounded (~5 s) so a stream that never starts can't hang the script.
+    // Anchor to the first captured frame, not to start() returning: SCK startup latency would
+    // otherwise shorten the file below the ±0.2 s gate. Bounded ~5 s so a dead stream can't hang.
     var waited = 0
     while !session.hasStartedSession, waited < 1000 {
         await preciseSleep(0.005)
@@ -389,9 +370,7 @@ func runScript(_ steps: [ScriptStep], session: RecordingSession) async {
     await session.stop()
 }
 
-/// Interactive stdin control on a TTY: `p`+Return pauses, `r`+Return resumes, any other line
-/// (a bare Return, `q`, EOF, …) stops — matching the pre-pause "Return to stop" behavior.
-/// Line-based, so no raw-terminal handling is needed.
+/// Line-based stdin control on a TTY: `p` pauses, `r` resumes, any other line (or EOF) stops.
 func runInteractiveControls(_ session: RecordingSession) async {
     while let line = readLine() {
         switch line.trimmingCharacters(in: .whitespaces).lowercased() {
@@ -403,9 +382,8 @@ func runInteractiveControls(_ session: RecordingSession) async {
     await session.stop()   // EOF
 }
 
-/// Real capture: reserve the output file, run a `RecordingSession` with a live progress ticker,
-/// drive it via `--script`, `--duration`, or interactive p/r/Return on a TTY (else stream end),
-/// then report the finalized file.
+/// Real capture: reserve the output file, run a `RecordingSession`, and drive it via `--script`,
+/// `--duration`, or interactive p/r/Return on a TTY (else until the stream ends).
 func performRecording(_ options: RecordOptions) async {
     let outputURL: URL
     do {
@@ -445,8 +423,6 @@ func performRecording(_ options: RecordOptions) async {
     await session.start()
     let ticker = Task { await runProgressTicker(session, outputURL: outputURL) }
 
-    // Control tasks: a script owns the whole timeline; otherwise a `--duration` timer and/or
-    // interactive keys. All are cancelled once the session finishes.
     var controls: [Task<Void, Never>] = []
     if let steps = options.script {
         controls.append(Task { await runScript(steps, session: session) })
@@ -471,8 +447,7 @@ func performRecording(_ options: RecordOptions) async {
         case .resumed:
             print("\n  ▶  resumed")
         case .microphoneLost:
-            // Not a stop: screen + system audio keep recording, the mic track ends here
-            // (ADR-012). Saying so is the whole point — a silent mic death is the failure.
+            // Not a stop: screen + system audio keep recording, the mic track ends here (ADR-012).
             print("\n  ⚠️  microphone disconnected — still recording (screen + system audio)")
         case .finished(let url, let reason, let dropped):
             ticker.cancel()

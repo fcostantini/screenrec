@@ -2,27 +2,19 @@ import AppKit
 import ApplicationServices
 import Foundation
 
-// Drives ScreenRec's menu-bar item through the Accessibility API, so menu states can be
-// inspected and exercised without a human clicking (docs/03 marks the M4/M5 menu verifies
-// "(human)" precisely because they couldn't be). Needs the Accessibility grant — see the
-// Environment facts in CLAUDE.md.
+// Drives ScreenRec's menu-bar item through the Accessibility API, so menu state can be inspected
+// without a human clicking. Needs the Accessibility grant (CLAUDE.md, Environment facts).
 //
-// 🔴 WHAT THIS TOOL CANNOT TELL YOU: **whether a window came to the front.**
-// A synthetic click doesn't confer activation the way a real one does, so after
-// `click "Settings…"` the app stays un-frontmost and the window looks like it opened behind
-// everything — *no matter what the app does*. That is this tool's artifact, not the app's
-// behaviour: it cost an hour and a design change chasing a bug that didn't exist, until Franco
-// said "the menu opens fine for me" (M4-T4, 2026-07-15). Window activation is a human check.
-// What IS trustworthy here: menu structure, titles, checkmarks, enabled/disabled, and that a
-// click reached its target.
+// 🔴 CANNOT verify window activation or z-order: a synthetic click doesn't confer activation, so
+// after `click "Settings…"` the app stays un-frontmost and the window looks like it opened behind
+// everything — no matter what the app does. That is this tool's artifact, not the app's behaviour;
+// activation is a human check. Trustworthy: menu structure, titles, checkmarks, enabled/disabled,
+// and that a click reached its target.
 //
 //   swift tools/menudriver.swift dump            structure of the open menu, one item per line
 //   swift tools/menudriver.swift open            open it and leave it open (then screencapture)
 //   swift tools/menudriver.swift click "Pause"   open, click an item by title, dismiss
 //   swift tools/menudriver.swift dismiss         close it
-//
-// `dump` is the useful one: it makes docs/06's menu order, checkmarks and disabled rows
-// *assertable* rather than a screenshot someone has to squint at.
 
 let bundleID = "dev.fcostantini.screenrec.app"
 
@@ -43,10 +35,8 @@ func children(_ element: AXUIElement) -> [AXUIElement] {
     attribute(element, kAXChildrenAttribute as String) as? [AXUIElement] ?? []
 }
 
-/// Narrows a CF attribute value to a concrete AX type, failing loudly if the API ever breaks
-/// its own contract. Loudly is the point: a silent fallback here would report an empty menu —
-/// indistinguishable from a menu that really is empty, which is the false negative this
-/// project keeps getting bitten by (02 §4's `updateConfiguration`, the `--nil-follow` window).
+/// Narrows a CF attribute value to a concrete AX type, failing loudly: a silent fallback would
+/// report an empty menu, indistinguishable from a genuinely empty one.
 func narrow<T>(_ value: CFTypeRef, _ typeID: CFTypeID, _ what: String) -> T {
     guard CFGetTypeID(value) == typeID else { fail("\(what) wasn't the type the AX API promises") }
     return unsafeBitCast(value, to: T.self)
@@ -79,12 +69,8 @@ func frameCenter(_ element: AXUIElement) -> CGPoint {
     return CGPoint(x: origin.x + size.width / 2, y: origin.y + size.height / 2)
 }
 
-/// Opens the menu with a synthetic click.
-///
-/// Not `AXPress`: on a menu-bar item that returns `.success` and does nothing at all — menu
-/// tracking runs its own modal event loop that the AX action never enters. The same shape as
-/// SCK's `updateConfiguration` reporting OK on a dead device (02 §4): a success code is not
-/// evidence the thing happened. Verify by looking, not by the return value.
+/// Opens the menu with a synthetic click. Not `AXPress`: on a menu-bar item it returns `.success`
+/// and does nothing — menu tracking runs its own modal loop the AX action never enters.
 func openMenu() {
     let center = frameCenter(statusItem())
     let source = CGEventSource(stateID: .hidSystemState)
@@ -112,15 +98,9 @@ func openMenuElement() -> AXUIElement {
     return menu
 }
 
-/// A submenu's items only exist in the accessibility tree once the submenu has been opened —
-/// SwiftUI/AppKit build them lazily. Read them without opening and you get an empty list that is
-/// indistinguishable from a genuinely empty submenu.
-///
-/// That is not hypothetical: this printed an empty Microphone submenu for a menu that had two
-/// devices in it, and the empty reading was taken as an app regression until a human's
-/// screenshot disproved it. So: open it, and if it still reads empty, say `(unread)` rather than
-/// print nothing and let it pass for fact. Same family as AXPress-returns-success-and-does-
-/// nothing above, and as 02 §4's `updateConfiguration` — silence must never render as evidence.
+/// A submenu's children don't exist in the AX tree until it's opened (SwiftUI/AppKit build them
+/// lazily), so an unopened submenu reads as empty. Returns nil when it never populates, so the
+/// caller can report `(unread)` rather than pass silence off as an empty menu.
 func openedChildren(of item: AXUIElement, _ submenu: AXUIElement) -> [AXUIElement]? {
     for _ in 0..<10 {
         let kids = children(submenu)
@@ -159,8 +139,7 @@ func describe(_ menu: AXUIElement, indent: String = "  ") {
     }
 }
 
-/// Depth-first search for a titled item, so submenu entries ("Balanced", a microphone's name)
-/// are reachable and not just the top level.
+/// Depth-first search for a titled item, so submenu entries are reachable too.
 func find(_ menu: AXUIElement, title: String) -> AXUIElement? {
     for item in children(menu) {
         if (attribute(item, kAXTitleAttribute as String) as? String) == title { return item }

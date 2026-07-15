@@ -4,18 +4,14 @@ import Foundation
 import ScreenCaptureKit
 import os
 
-/// Owns the single `SCStream`'s lifecycle and publishes `EngineEvent`s. In M1-T2 it
-/// detects the first complete video frame (`.started`) and clean/error termination;
-/// sample fan-out to consumers arrives with `SampleRouter` (M1-T3).
+/// Owns the single `SCStream`'s lifecycle and publishes `EngineEvent`s.
 public actor CaptureEngine {
-    /// Event stream (unbounded-buffered, so events emitted before the caller starts
-    /// iterating are still delivered). `nonisolated` + `let` so callers read it without
-    /// `await` and background SCK callbacks can yield without hopping onto the actor.
+    /// Event stream. Unbounded-buffered, so events emitted before the caller iterates are
+    /// still delivered; `nonisolated` so SCK callbacks yield without hopping onto the actor.
     public nonisolated let events: AsyncStream<EngineEvent>
     private nonisolated let continuation: AsyncStream<EngineEvent>.Continuation
 
-    /// Fan-out for captured buffers. Consumers (MovieRecorder, ReplayEncoder) attach here;
-    /// the engine attaches its own started-detector. Thread-safe, so `nonisolated`.
+    /// Fan-out for captured buffers; consumers attach here. Thread-safe, so `nonisolated`.
     public nonisolated let router: SampleRouter
 
     private let configuration: CaptureConfiguration
@@ -24,12 +20,12 @@ public actor CaptureEngine {
     private var handler: StreamHandler?
 
     /// Emits `.microphoneLost` if a selected mic stops delivering (docs/02 §4, ADR-012); nil
-    /// when no mic was selected. Polled by `microphoneWatchdogTask` while capture runs.
+    /// when no mic was selected.
     private let microphoneWatchdog: MicrophoneWatchdog?
     private var microphoneWatchdogTask: Task<Void, Never>?
 
-    /// Logs a wedged capture — video silent while the user is active (docs/02 §7). Diagnostic
-    /// only: v1 never auto-restarts, this exists so a soak can be explained afterwards.
+    /// Logs a wedged capture — video silent while the user is active (docs/02 §7).
+    /// Diagnostic only: v1 never auto-restarts.
     private let stallWatchdog: StallWatchdog
     private var stallWatchdogTask: Task<Void, Never>?
 
@@ -38,18 +34,14 @@ public actor CaptureEngine {
     private enum State { case idle, starting, running, terminated }
     private var state: State = .idle
     /// Set if stop() arrives while start() is still suspended (actor reentrancy); start()
-    /// honors it — with the requested reason — when it resumes, rather than bringing up an
-    /// unstoppable stream. One optional rather than a flag plus a reason: the reason is
-    /// meaningless unless a stop was asked for, so the pair can't fall out of sync if it can't
-    /// be spelled.
+    /// honors it on resume rather than bringing up an unstoppable stream.
     private var requestedStopReason: EndReason?
-    /// Orthogonal to `state` (the stream stays `.running` while paused, still delivering
-    /// buffers that the recorder drops); gates `pause`/`resume` so each event fires once.
+    /// Orthogonal to `state`: the stream stays `.running` while paused, still delivering
+    /// buffers that the recorder drops. Gates `pause`/`resume` so each event fires once.
     private var isPaused = false
 
-    // One serial queue per output type per engine — SCK requires per-output sample-handler
-    // queues, and handlers must stay light (docs/01 concurrency rules). Instance-scoped so
-    // two engines (e.g. record + replay, M5) never serialize through shared globals.
+    // SCK requires per-output sample-handler queues, and handlers must stay light (docs/01).
+    // Instance-scoped so two engines never serialize through shared globals.
     private let screenQueue = DispatchQueue(label: "dev.fcostantini.screenrec.capture.screen")
     private let audioQueue = DispatchQueue(label: "dev.fcostantini.screenrec.capture.audio")
     private let microphoneQueue = DispatchQueue(label: "dev.fcostantini.screenrec.capture.microphone")
@@ -58,7 +50,6 @@ public actor CaptureEngine {
         self.configuration = configuration
         (self.events, self.continuation) = AsyncStream.makeStream(of: EngineEvent.self)
         self.router = SampleRouter()
-        // Only a mic that was actually selected can be lost.
         if case .device = configuration.microphone {
             let continuation = self.continuation
             microphoneWatchdog = MicrophoneWatchdog { continuation.yield(.microphoneLost) }
@@ -72,8 +63,6 @@ public actor CaptureEngine {
                 was active. The stream is likely wedged (docs/02 §7). Not restarting — v1 policy.
                 """)
         }
-        // `.started` = first complete video frame. The router already drops incomplete
-        // frames, so the first `.screen` buffer the detector sees is exactly that.
         router.attach(StartedDetector(continuation: continuation))
         if let microphoneWatchdog { router.attach(microphoneWatchdog) }
         router.attach(stallWatchdog)
@@ -116,9 +105,8 @@ public actor CaptureEngine {
                 try? await stream.stopCapture()
                 return terminate(requestedStopReason)
             }
-            // `terminate()` can have run reentrantly while we were suspended (a stream error
-            // hops onto the actor). Don't resurrect a dead engine — and don't arm a watchdog
-            // that the already-finished `terminate()` will never cancel.
+            // `terminate()` can run reentrantly across the suspension (a stream error hops onto
+            // the actor); don't resurrect a dead engine or arm watchdogs it will never cancel.
             guard state == .starting else {
                 try? await stream.stopCapture()
                 return
@@ -133,10 +121,8 @@ public actor CaptureEngine {
         }
     }
 
-    /// Clean stop, carrying the end `reason` (default `.userStopped`; a monitor passes a
-    /// fail-stop reason like `.microphoneChanged`). Safe at any point: during `start()`'s
-    /// suspension it records the request *and its reason* for `start()` to honor on resume;
-    /// while running it stops the stream; after termination it is a no-op.
+    /// Clean stop carrying the end `reason`. Safe at any point: during `start()`'s suspension
+    /// it records the request for `start()` to honor on resume; after termination it is a no-op.
     public func stop(reason: EndReason = .userStopped) async {
         switch state {
         case .idle, .terminated:
@@ -144,11 +130,9 @@ public actor CaptureEngine {
         case .starting:
             requestedStopReason = reason
         case .running:
-            // Disarm BEFORE tearing the stream down. `stopCapture` halts delivery and can take
-            // seconds (Bluetooth teardown), and a monitor still polling across that suspension
-            // reports on a recording that is perfectly complete: the mic watchdog would call it
-            // a disconnect, and the stall watchdog — with frames already stopped and the user's
-            // just-pressed stop hotkey making them look "active" — would call it a wedge.
+            // Disarm before teardown: `stopCapture` halts delivery and can take seconds
+            // (Bluetooth), so watchdogs still polling across it would false-fire on a
+            // perfectly complete recording.
             cancelWatchdogs()
             if let stream {
                 try? await stream.stopCapture()
@@ -157,9 +141,8 @@ public actor CaptureEngine {
         }
     }
 
-    /// Pause the recording. The `SCStream` keeps running (SCK still delivers buffers, the
-    /// recorder drops them) and the paused span is removed from the output timeline (docs/02
-    /// §5). Emits `.paused`. No-op unless actively running and not already paused.
+    /// Pause the recording. The `SCStream` keeps running (the recorder drops buffers) and the
+    /// paused span is removed from the output timeline (docs/02 §5). Emits `.paused`.
     public func pause() {
         guard state == .running, !isPaused else { return }
         isPaused = true
@@ -167,7 +150,7 @@ public actor CaptureEngine {
     }
 
     /// Resume after `pause()`; the recorder re-anchors on the next complete video frame.
-    /// Emits `.resumed`. No-op unless currently paused.
+    /// Emits `.resumed`.
     public func resume() {
         guard state == .running, isPaused else { return }
         isPaused = false
@@ -184,8 +167,6 @@ public actor CaptureEngine {
         continuation.finish()
     }
 
-    /// Starts the health monitors for as long as capture runs (see `pollingTask` for the
-    /// cancellation and handle-retention rules these depend on).
     private func startWatchdogs() {
         if let microphoneWatchdog {
             microphoneWatchdogTask = pollingTask(every: MicrophoneWatchdog.checkInterval) {
@@ -203,8 +184,8 @@ public actor CaptureEngine {
         stallWatchdogTask = nil
     }
 
-    /// Dropping a `Task` reference does not cancel it, so an engine released while running —
-    /// never stopped, no stream error — would otherwise leave the poll loops waking forever.
+    /// Dropping a `Task` reference does not cancel it: an engine released while running would
+    /// otherwise leave the poll loops waking forever.
     deinit {
         microphoneWatchdogTask?.cancel()
         stallWatchdogTask?.cancel()
@@ -239,8 +220,8 @@ public actor CaptureEngine {
         let config = SCStreamConfiguration()
         config.width = width
         config.height = height
-        // Clamp the public, unvalidated fps: 0/negative yields an invalid CMTime SCK
-        // rejects, and a value above Int32.max would trap the CMTimeScale initializer.
+        // Clamp the public, unvalidated fps: 0/negative yields a CMTime SCK rejects, and a
+        // value above Int32.max traps the CMTimeScale initializer.
         let fps = min(max(configuration.frameRateCap, 1), 240)
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
         config.queueDepth = 5
@@ -263,54 +244,38 @@ public actor CaptureEngine {
         case fail(String)
     }
 
-    /// ⚠️ **Zero shareable displays never proves a missing grant.** An *ungranted* process does
-    /// not enumerate zero — `SCShareableContent` **throws** "The user declined TCCs…" (docs/02
-    /// §10, measured in M1-T2), which `start()`'s catch turns into `permissionGuidance` via
-    /// `startErrorMessage`. So reaching this function at all means enumeration succeeded, i.e.
-    /// we are authorized in fact; and the only measured zero-display state is a screen that is
-    /// locked **and** slept (docs/02 §7). Blaming permission here sent users to System Settings
-    /// to grant what they already held (verified live by locking the screen).
-    ///
-    /// Deliberately does NOT consult the preflight to decide: `CGPreflightScreenCaptureAccess()`
-    /// is documented to false-negative for freshly-built CLI binaries that capture fine (docs/02
-    /// §10), so trusting it would resurrect the same misdiagnosis on exactly that path.
-    ///
-    /// `.denied` is honored defensively though the public API cannot currently produce it —
-    /// `Permissions.screenRecordingState()` only ever returns `.granted` or `.notDetermined`.
+    /// Zero shareable displays never proves a missing grant: an ungranted process makes
+    /// `SCShareableContent` throw "user declined" (docs/02 §10), handled by `startErrorMessage`.
+    /// The only measured zero-display state is a locked *and* slept screen (docs/02 §7).
+    /// Deliberately ignores `CGPreflightScreenCaptureAccess()` — it false-negatives for
+    /// freshly-built CLI binaries that capture fine (docs/02 §10). `.denied` is handled
+    /// defensively; `Permissions.screenRecordingState()` cannot currently return it.
     static func startDecision(screenPermission: PermissionState, availableDisplays: Int) -> StartDecision {
         if screenPermission == .denied { return .fail(permissionGuidance) }
         guard availableDisplays > 0 else { return .fail(noDisplaysGuidance) }
         return .proceed
     }
 
-    /// Maps a start-time error to a user-facing message. The ungranted-permission case
-    /// arrives as a thrown SCK "user declined" error (docs/02 §2/§10) — translate it to
-    /// actionable guidance instead of the raw TCC string. Matches by SCK domain+code with
-    /// a message fallback so it holds even if the code constant shifts.
+    /// Maps a start-time error to user-facing guidance. Ungranted permission arrives as a
+    /// thrown SCK "user declined" error (docs/02 §2/§10). Matches by SCK domain+code with a
+    /// message fallback, in case the code constant shifts.
     static func startErrorMessage(_ error: Error) -> String {
         let nsError = error as NSError
         let isSCK = nsError.domain == SCStreamError.errorDomain
         let isDecline = (isSCK && nsError.code == SCStreamError.Code.userDeclined.rawValue)
             || error.localizedDescription.range(of: "declined", options: .caseInsensitive) != nil
         if isDecline { return permissionGuidance }
-        // The display can also vanish *inside* the start window (enumeration succeeds, then
-        // `startCapture` throws). Same condition as the two sibling paths — say the same thing
-        // rather than leaking a raw SCK string on the one surface that missed it.
+        // The display can vanish *inside* the start window: enumeration succeeds, then
+        // `startCapture` throws.
         if isSCK, nsError.code == SCStreamError.Code.noCaptureSource.rawValue { return noDisplaysGuidance }
         return error.localizedDescription
     }
 
-    /// Classifies an unexpected stream death into the most specific `EndReason` we can (docs/01),
-    /// so the file's stated cause is meaningful rather than a raw SCK string.
-    ///
-    /// Measured (2026-07-15, `pmset displaysleepnow` mid-recording): a display going away ends
-    /// the stream with `.noCaptureSource`. ⚠️ **Lid-close and monitor-unplug are NOT yet
-    /// observed** (STATUS → Needs Franco) — they may land on a different code, which is exactly
-    /// why unmapped errors keep their raw code in the message. Carrying the code is how
-    /// `.noCaptureSource` was identified rather than guessed; don't remove it.
-    ///
-    /// `.systemSleep` stays unreachable on purpose: nothing we have measured distinguishes it,
-    /// and faking the distinction would be worse than leaving the case unused (docs/02 §7).
+    /// Classifies an unexpected stream death into the most specific `EndReason` (docs/01).
+    /// Measured: a display going away ends the stream with `.noCaptureSource`. Lid-close and
+    /// monitor-unplug are unobserved and may use other codes — unmapped errors keep their raw
+    /// code in the message so it can be identified rather than guessed. `.systemSleep` is
+    /// unreachable on purpose: nothing measured distinguishes it (docs/02 §7).
     static func endReason(forStreamError error: Error) -> EndReason {
         let nsError = error as NSError
         guard nsError.domain == SCStreamError.errorDomain else {
@@ -322,9 +287,8 @@ public actor CaptureEngine {
         case SCStreamError.Code.noDisplayList.rawValue:    // same family; unobserved, by kinship
             return .displayDisconnected
         case SCStreamError.Code.userStopped.rawValue:
-            // The user stopped us from the system's screen-recording indicator. Ordinary, not a
-            // failure — mapping it anywhere else makes ADR-007 treat the most normal stop there
-            // is as a fail-stop, and M4 would fire an "ended unexpectedly" notification for it.
+            // Stopped from the system's screen-recording indicator: an ordinary stop, not a
+            // fail-stop (ADR-007).
             return .userStopped
         default:
             return .streamError("\(error.localizedDescription) [SCStreamError \(nsError.code)]")
@@ -340,10 +304,9 @@ public actor CaptureEngine {
         + "→ Screen & System Audio Recording, then quit and reopen."
 }
 
-/// SCK delegate + output sink. A separate `@unchecked Sendable` class because SCK
-/// callbacks arrive on background queues; it maps the SCK output type to `SourceType`,
-/// forwards every buffer to the router, and hands unexpected stream death to the actor
-/// (which owns termination). Stateless beyond its injected dependencies.
+/// SCK delegate + output sink: forwards buffers to the router and hands unexpected stream
+/// death to the actor, which owns termination. `@unchecked Sendable` because SCK callbacks
+/// arrive on background queues; stateless beyond its injected dependencies.
 private final class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput, @unchecked Sendable {
     private let router: SampleRouter
     private let onStreamStopped: @Sendable (Error) -> Void
@@ -369,10 +332,9 @@ private final class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
     }
 }
 
-/// Emits `.started` on the first complete video frame it sees. Attached to the engine's
-/// router; the router has already dropped incomplete frames, so the first `.screen`
-/// buffer here is the first real frame. A `.started` yielded after the stream finished is
-/// a harmless no-op (AsyncStream drops post-finish yields).
+/// Emits `.started` on the first complete video frame. The router drops incomplete frames,
+/// so the first `.screen` buffer here is the first real frame. Yielding after the stream
+/// finished is a harmless no-op (AsyncStream drops post-finish yields).
 private final class StartedDetector: SampleConsumer, @unchecked Sendable {
     private let continuation: AsyncStream<EngineEvent>.Continuation
     private let lock = NSLock()

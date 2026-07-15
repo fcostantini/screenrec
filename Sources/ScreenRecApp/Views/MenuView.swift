@@ -5,10 +5,8 @@ import SwiftUI
 
 /// The status item's menu (docs/06 "Menu — idle state" / "Menu — recording state").
 ///
-/// The menu is built fresh each time it opens, which is also when the state behind it is
-/// refreshed: docs/06 wants this current on open and silent while closed, so everything here
-/// pulls (`.task`) rather than subscribing to timers that would tick behind a closed menu for
-/// the length of a 90-minute recording.
+/// Built fresh on each open, which is when its state is refreshed: everything pulls (`.task`)
+/// rather than subscribing to timers that would tick behind a closed menu.
 struct MenuView: View {
     @Bindable var state: AppState
 
@@ -21,18 +19,11 @@ struct MenuView: View {
             idleItems
         }
         Divider()
-        // docs/06 item 12. Present in both the idle and recording menus — the spec says
-        // "Settings/Quit remain" while recording, and the settings it shows are read at the next
-        // Start, so changing them mid-recording is harmless.
+        // docs/06 item 12: present in both menus. Settings are read at the next Start, so
+        // changing them mid-recording is harmless.
         //
-        // The activate matters because ScreenRec is LSUIElement — an accessory — and an
-        // accessory's windows can open behind whatever the user is looking at unless the app is
-        // brought forward, which is indistinguishable from the menu item doing nothing. Same
-        // reason `showOnboarding()` activates.
-        //
-        // ⚠️ Do not try to verify that with `tools/menudriver.swift`: a synthetic click can't
-        // confer activation, so the window will look like it never comes forward no matter what
-        // this code does. Ask a human.
+        // A synthetic click (`tools/menudriver.swift`) can't confer activation, so window
+        // ordering can only be verified by hand.
         Button("Settings…") { showSettings() }
             .keyboardShortcut(",")
         Button("Quit") { quit() }
@@ -42,18 +33,11 @@ struct MenuView: View {
     // MARK: - Idle (docs/06 items 1–10)
 
     @ViewBuilder private var idleItems: some View {
-        // Header. docs/06 asks for a right-aligned status against a "ScreenRec" title; a
-        // `.menu`-style MenuBarExtra renders its rows through AppKit and keeps only the text,
-        // so one label is what the platform actually allows here.
+        // Header. docs/06 asks for a right-aligned status against a "ScreenRec" title, but a
+        // `.menu`-style MenuBarExtra renders rows through AppKit and keeps only the text.
         //
-        // The refresh hangs off the header rather than off a `Group` around the whole menu: a
-        // Group hands its modifiers to *each* child, so a `.task` there starts one polling loop
-        // per top-level row instead of one per opening.
-        //
-        // docs/06 item 1: when the status is a blocking condition it opens Onboarding. That
-        // click is the only way out of the hole M4-T2 could put you in — pick a microphone with
-        // no permission and Start greys out, and until this existed there was nothing anywhere,
-        // in the app or in System Settings, that could fix it (02 §2).
+        // The refresh hangs off the header rather than a `Group` around the whole menu: a Group
+        // hands its modifiers to each child, so a `.task` there runs once per row.
         idleHeader
             .task { await refreshWhileOpen() }
 
@@ -64,10 +48,8 @@ struct MenuView: View {
 
         Divider()
 
-        // A `Picker` in menu content renders as exactly what docs/06 items 5–7 ask for: a
-        // submenu with a checkmark on the current entry. Wrapping it in an explicit `Menu` and
-        // forcing `.inline` instead adds stray separators around the group — closer in code to
-        // the spec's wording, further from it on screen.
+        // A `Picker` in menu content renders as docs/06 items 5–7 ask: a submenu with a
+        // checkmark on the current entry. An explicit `Menu` forced `.inline` adds separators.
         Picker("Display", selection: $state.selectedDisplayID) {
             ForEach(state.displays) { screen in
                 Text(screen.name).tag(CGDirectDisplayID?.some(screen.id))
@@ -90,10 +72,8 @@ struct MenuView: View {
         Divider()
 
         Button("Open Recordings Folder") { Finder.open(state.outputDirectory) }
-        // Indented so the files read as belonging under the folder above them rather than as
-        // three more commands. The indent is in the title because a SwiftUI menu gives no access
-        // to `NSMenuItem.indentationLevel` — hence the explicit accessibility label, so VoiceOver
-        // announces the filename and not the padding.
+        // Indented under the folder above. The indent is in the title because a SwiftUI menu
+        // gives no access to `NSMenuItem.indentationLevel` — hence the accessibility label.
         ForEach(state.recentRecordings, id: \.self) { url in
             Button("    \(url.lastPathComponent)") { Finder.reveal(url) }
                 .accessibilityLabel(url.lastPathComponent)
@@ -124,19 +104,14 @@ struct MenuView: View {
             Text("\(microphone) · separate track")
         }
 
-        // docs/06: the pickers are *hidden* while recording, not disabled-but-present — so this
-        // row is the only thing that says why they're gone.
+        // docs/06: the pickers are hidden while recording, not disabled — this row says why.
         Text("Sources locked while recording")
     }
 
-    /// Always a button, never inert text — it is the only way back to the setup window.
-    ///
-    /// docs/06 draws this row disabled and only opens Onboarding on a blocking condition, but
-    /// that strands the optional row: notifications don't block, so `needsOnboarding` goes false,
-    /// the window stops auto-opening, and a user who dismissed the prompt has no route back to it
-    /// from anywhere in the app (Franco, 2026-07-15 — he hit exactly this). Auto-opening still
-    /// happens only when something blocks, so nobody is nagged; this just keeps the door
-    /// openable.
+    /// Always a button, never inert text: docs/06 draws it disabled outside blocking conditions,
+    /// but notifications don't block, so `needsOnboarding` goes false and a user who dismissed
+    /// the prompt would have no route back to the setup window. Auto-open still only fires on a
+    /// blocking condition (docs/06 item 1).
     private var idleHeader: some View {
         Button("ScreenRec — \(MenuHeader.idleStatus(state.readiness))") { showOnboarding() }
     }
@@ -146,8 +121,7 @@ struct MenuView: View {
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
-    /// Opens Settings. Identical shape to `showOnboarding()` — see App.swift for why it's a
-    /// plain `Window` rather than SwiftUI's `Settings` scene.
+    /// Opens Settings; see App.swift for why it's a plain `Window`.
     private func showSettings() {
         openWindow(id: settingsWindowID)
         NSApplication.shared.activate(ignoringOtherApps: true)
@@ -155,10 +129,9 @@ struct MenuView: View {
 
     // MARK: - Lifecycle
 
-    /// Refreshes on open, then ticks the elapsed clock at 1 Hz for as long as the menu is up.
-    /// SwiftUI builds menu content when the menu opens and tears it down when it closes, so this
-    /// task's cancellation is what delivers docs/06's "no timers while closed" — the clock stops
-    /// existing rather than merely being ignored.
+    /// Refreshes on open, then ticks the elapsed clock at 1 Hz while the menu is up. SwiftUI
+    /// tears down menu content on close, so cancellation delivers docs/06's "no timers while
+    /// closed".
     private func refreshWhileOpen() async {
         state.refreshRecentRecordings()
         if !state.isSessionActive {
@@ -170,8 +143,7 @@ struct MenuView: View {
         }
     }
 
-    /// docs/06 item 12: quitting mid-recording confirms, then finalizes before exit — never
-    /// abandon a writer.
+    /// docs/06 item 12: quitting mid-recording confirms, then finalizes before exit (ADR-007).
     private func quit() {
         guard state.isSessionActive else { return NSApplication.shared.terminate(nil) }
 

@@ -4,18 +4,13 @@ import Foundation
 import RecorderCore
 import ScreenCaptureKit
 
-/// M3-T7 spike (docs/03): can a live `SCStream` be re-pointed at another microphone via
-/// `updateConfiguration`? The load-bearing unknown behind ever recovering mic audio after a
-/// disconnect (02 §4 / ADR-012) — a lost device's buffers just stop and SCK does not re-attach
-/// on its own, so an explicit re-point is the only candidate mechanism.
-///
-/// Two legs: the default swaps between two present devices (headless); `--reconnect` covers the
-/// harder case where the device dies and comes back as a new CoreAudio object (needs a human to
-/// case/uncase the AirPods).
-///
-/// Lives in the CLI rather than `tools/` because touching the mic requires the
-/// `NSMicrophoneUsageDescription` embedded in this binary — a bare `swift tools/x.swift` would
-/// be killed on first mic access (02 §2).
+// Spike: can a live `SCStream` be re-pointed at another microphone via `updateConfiguration`?
+// SCK binds the mic once at startCapture and never re-resolves it (02 §4 / ADR-012).
+//
+// Lives in the CLI, not `tools/`: mic access needs the `NSMicrophoneUsageDescription` embedded in
+// this binary — a bare `swift tools/x.swift` is killed on first mic access (02 §2).
+
+/// Tallies mic buffer formats and tracks mic silence. Thread-safe — SCK delivers on its own queues.
 private final class MicFormatProbe: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     private let lock = NSLock()
     private var counts: [String: Int] = [:]
@@ -82,10 +77,9 @@ private func summarize(_ formats: [(format: String, count: Int)]) -> String {
         : formats.map { "\($0.format) ×\($0.count)" }.joined(separator: ", ")
 }
 
-/// Mirrors CaptureEngine's audio setup exactly so findings generalize; only the video geometry
-/// is shrunk, since the spike is about the mic. ⚠️ ONE builder on purpose: this invariant is
-/// what makes the legs' verdicts comparable, and a second copy is how it drifts unnoticed.
-/// `micID: nil` leaves `microphoneCaptureDeviceID` unset — Apple's "the default microphone".
+/// Mirrors CaptureEngine's audio setup so findings generalize; only the video geometry is shrunk.
+/// Shared by every leg, so their verdicts stay comparable. `micID: nil` leaves
+/// `microphoneCaptureDeviceID` unset — Apple's "the default microphone".
 private func spikeConfiguration(micID: String? = nil) -> SCStreamConfiguration {
     let config = SCStreamConfiguration()
     config.width = 640
@@ -102,8 +96,7 @@ private func spikeConfiguration(micID: String? = nil) -> SCStreamConfiguration {
     return config
 }
 
-/// The display every leg captures. One copy: four identical preambles is four places to fix
-/// when the failure wording or exit code changes.
+/// The display every leg captures.
 private func firstSpikeDisplay() async -> SCDisplay {
     let content: SCShareableContent
     do {
@@ -147,11 +140,7 @@ private func waitForMicSilence(_ probe: MicFormatProbe, quiet: TimeInterval, giv
 }
 
 /// Retries `updateConfiguration` at `micID` and reports the mic formats that resume, if any.
-///
-/// ⚠️ ONE copy on purpose: legs 2 and 2b are meant to differ in exactly one variable (which
-/// device we re-point AT), so their NO/YES verdicts are only comparable while they share this
-/// retry policy. Hand-copying the loop is how tuning one leg silently changes what the other's
-/// verdict means.
+/// Legs 2 and 2b share this retry policy so they differ in only one variable.
 private func retryRepoint(
     _ stream: SCStream, to micID: String, probe: MicFormatProbe
 ) async -> [(format: String, count: Int)] {
@@ -170,8 +159,7 @@ private func retryRepoint(
     return []
 }
 
-/// Which experiment to run. An enum, not a string: the dispatch switch below is then
-/// exhaustive, so a mistyped literal can't silently fall through to the swap leg.
+/// Which experiment to run.
 private enum SpikeMode { case swap, reconnect, fallback, nilDevice, nilFollow, twoStreams }
 
 func runMicSwapSpike(_ args: [String]) async {
@@ -208,9 +196,7 @@ func runMicSwapSpike(_ args: [String]) async {
 
 // MARK: - Experiment: does a nil microphoneCaptureDeviceID work on 15.6.1?
 
-/// 02 §1 says nil throws "invalid parameter" (PoC finding, macOS 15.6). Worth one retest: if nil
-/// now means "follow the system default", a dying device could fall back with no work from us —
-/// macOS repoints its default to the built-in the moment AirPods vanish.
+/// Retests 02 §1's finding that a nil `microphoneCaptureDeviceID` throws "invalid parameter".
 private func runNilDeviceSpike(seconds: Double) async {
     let display = await firstSpikeDisplay()
 
@@ -246,11 +232,8 @@ private func runNilDeviceSpike(seconds: Double) async {
 
 // MARK: - Experiment: does a nil device FOLLOW the system default as it changes?
 
-/// The elegant candidate. `nil` means "the default microphone" — but does SCK *resolve* that
-/// once at `startCapture`, or *follow* it? macOS repoints its default input to the built-in the
-/// instant AirPods vanish, so if SCK follows, fallback is free: no watchdog trigger, no
-/// re-point, no ADR change. If it merely resolves once, `nil` behaves exactly like pinning and
-/// buys nothing.
+/// Does `microphoneCaptureDeviceID = nil` follow the system default as it changes, or resolve it
+/// once at `startCapture`? macOS repoints its default to the built-in when AirPods vanish.
 private func runNilFollowSpike() async {
     let display = await firstSpikeDisplay()
 
@@ -329,11 +312,8 @@ private func runNilFollowSpike() async {
 
 // MARK: - Experiment: can a mic-only stream coexist with the recording stream?
 
-/// The poisoning is per-STREAM (a fresh stream binds a device that died in an older one — leg 1
-/// did exactly that). So the escape hatch is to rebuild rather than re-point. That is only
-/// affordable if the mic lives on its OWN stream: rebuilding the main stream would tear a hole
-/// in the video + system audio, but rebuilding a mic-only stream costs nothing visible.
-/// This checks the precondition: can two SCStreams run at once and both deliver?
+/// Mic-path poisoning is per-stream, so rebuilding a mic-only stream is a candidate recovery.
+/// Checks the precondition: can two SCStreams run at once and both deliver?
 private func runTwoStreamSpike(seconds: Double) async {
     let devices = AudioInputs.available()
     guard let mic = devices.first(where: { $0.isDefault }) ?? devices.first else {
@@ -357,8 +337,8 @@ private func runTwoStreamSpike(seconds: Double) async {
     let probeA = MicFormatProbe()
     let streamA = SCStream(filter: filter, configuration: configA, delegate: probeA)
 
-    // Stream B — mic only. Screen capture is unavoidable (a filter is required), so keep it
-    // minimal and simply never add a .screen output.
+    // Stream B — mic only. A filter is required regardless, so keep it minimal and add no
+    // .screen output.
     let probeB = MicFormatProbe()
     let streamB = SCStream(filter: filter, configuration: spikeConfiguration(micID: mic.uniqueID), delegate: probeB)
 
@@ -416,8 +396,7 @@ private func runMicDeviceSwapSpike(seconds: Double) async {
     guard devices.count >= 2 else {
         die("mic-swap-spike needs two input devices; found \(devices.count). Connect a second mic.")
     }
-    // Start on the built-in and swap to the other: the 48 kHz → 24 kHz jump (AirPods) is
-    // unmistakable, so a swap that works can't be confused with one that silently didn't.
+    // Start on the built-in: the 48 kHz → 24 kHz jump (AirPods) makes a real swap unmistakable.
     let first = devices.first { $0.uniqueID == "BuiltInMicrophoneDevice" } ?? devices[0]
     guard let second = devices.first(where: { $0.uniqueID != first.uniqueID }) else {
         die("couldn't find a second distinct input device")
@@ -492,8 +471,8 @@ private func runMicReconnectSpike() async {
     }
     print("    ✓ mic went quiet")
 
-    // Phase A: passive. Franco's earlier run says a returning device delivers nothing on its
-    // own; re-confirm that here so any resume in phase B is unambiguously due to the re-point.
+    // Phase A: passive — confirm a returning device delivers nothing on its own, so any resume
+    // in phase B is unambiguously due to the re-point.
     print("")
     print("  >>> TAKE THE AIRPODS BACK OUT NOW <<<")
     print("  phase A — watching 12s WITHOUT re-pointing (expect: nothing, per 02 §4)…")
@@ -524,9 +503,8 @@ private func runMicReconnectSpike() async {
 
 // MARK: - Leg 2b: re-point to a device that never died, after the current one dies
 
-/// The decisive leg. Every other test re-pointed at a device with a death in its history; this
-/// aims a *healthy* target at a *dead* stream, which separates "the target is poisoned" from
-/// "the stream's mic path is torn down". It answers whether mic recovery is possible at all.
+/// Re-points a dead stream at a device that never died — separates "the target is poisoned" from
+/// "the stream's mic path is torn down".
 private func runMicFallbackSpike() async {
     let devices = AudioInputs.available()
     guard let target = devices.first(where: { $0.uniqueID != "BuiltInMicrophoneDevice" }) else {

@@ -49,8 +49,20 @@ untracked files) as a critical senior Swift reviewer:
   blocks an SCK callback queue, no unbounded buffer retention; anything crossing threads
   is actually safe, not just quiet under language-mode v5.
 - **Cleanliness** — no dead code, commented-out code, stray debug prints, or leftover
-  TODO scaffolding; no duplication of an existing helper; comments state non-obvious
-  constraints only; style matches the surrounding file.
+  TODO scaffolding; no duplication of an existing helper; style matches the surrounding file.
+- **Comments — minimum information, and no storytelling.** A comment earns its place only by
+  stating a non-obvious constraint the code can't. Two lines is the norm; four on a complex
+  public type is the ceiling. Specifically, do NOT write:
+  - **history** ("this used to…", "the first pass did X", "shipped for an afternoon",
+    "deferred from M4-T2") — git has it;
+  - **attribution** ("/code-review found", "Franco caught", "the live run caught it");
+  - **your mistakes**, lessons learned, or war stories — those go to STATUS.md field notes,
+    which is what that section is for;
+  - **essays**. If a rationale needs a paragraph, it needs one *line* here and the paragraph
+    in docs/ or field notes.
+  Keep: platform facts and gotchas stated flatly, doc pointers (`02 §4`, `ADR-007`),
+  invariants behind a force-unwrap, concurrency constraints, and one line on why a
+  non-obvious approach beat the obvious one. Delete anything that only restates the code.
 - **Scope** — the diff contains this task only. Unrelated improvements you noticed go to
   STATUS.md field notes (or a separate `docs:`/follow-up commit), not smuggled in.
 

@@ -11,13 +11,10 @@ func fourCC(_ subtype: FourCharCode) -> String {
     String(bytes: withUnsafeBytes(of: subtype.bigEndian, Array.init), encoding: .ascii) ?? "?"
 }
 
-/// Reads every track's samples in one pass (passthrough — no decode) and reports, per track, a
-/// warning if any decode timestamp steps *backward*. DTS is the right invariant: it stays
-/// non-decreasing even when an encoder reorders frames (B-frames make *presentation* timestamps
-/// legitimately out of order in storage), and a pause gap keeps it moving forward too. Audio
-/// carries no DTS, so it falls back to PTS. Only a strictly backward step is flagged — a
-/// genuinely corrupt pause seam or reordered append — because encoders emit a benign
-/// equal-timestamp edit at the very start (priming) and an invalid trailing packet.
+/// Reads every track's samples in one pass (passthrough — no decode) and warns, per track, if a
+/// timestamp steps backward. Uses DTS, not PTS: HEVC B-frames make PTS legitimately non-monotonic
+/// in storage. Audio carries no DTS, so it falls back to PTS. Only strictly backward steps are
+/// flagged — encoders emit a benign equal-timestamp priming edit and an invalid trailing packet.
 func monotonicWarnings(asset: AVAsset, tracks: [AVAssetTrack]) -> [CMPersistentTrackID: String] {
     guard let reader = try? AVAssetReader(asset: asset) else { return [:] }
     struct State { var last = CMTime.negativeInfinity; var samples = 0; var violations = 0 }
@@ -60,8 +57,7 @@ let url = URL(fileURLWithPath: CommandLine.arguments[1])
 let asset = AVURLAsset(url: url)
 let sem = DispatchSemaphore(value: 0)
 Task {
-    // Always release the semaphore, even if a load throws (missing/corrupt file) — otherwise
-    // the main thread blocks on sem.wait() forever instead of exiting with an error.
+    // Always release the semaphore: a throwing load would otherwise block sem.wait() forever.
     defer { sem.signal() }
     guard FileManager.default.fileExists(atPath: url.path) else {
         print("probe: no such file: \(url.path)")

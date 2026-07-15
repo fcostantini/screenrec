@@ -11,15 +11,14 @@ public enum EndReason: Sendable, Equatable {
     case streamError(String)
 }
 
-/// The one event surface RecorderCore exposes to callers (CLI, app AppState). Extend
-/// here — never fork — since M1/M3/M4 and the docs/06 notification copy all consume it.
+/// The one event surface RecorderCore exposes to callers (CLI, app AppState).
 public enum EngineEvent: Sendable, Equatable {
     case started                                    // first complete video frame
     case paused
     case resumed
     /// A selected mic stopped delivering — the device went away (docs/02 §4). The one
-    /// mid-recording problem that does NOT end the session: recording continues and the mic
-    /// track simply ends here (ADR-012). A notification, not a termination.
+    /// mid-recording problem that does not end the session: recording continues and the mic
+    /// track ends here (ADR-012).
     case microphoneLost
     case fileProgress(seconds: Double, bytes: Int64)
     case stopped(EndReason)                         // engine ran with no writer (e.g. engine-smoke)

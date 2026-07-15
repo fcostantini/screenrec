@@ -8,8 +8,8 @@ public enum PermissionKind: Sendable, Equatable, CaseIterable {
     case notifications
 }
 
-/// A System Settings pane a row can send the user to. The URL lives here (Foundation) while
-/// the opening is the app's job (NSWorkspace) — the usual split.
+/// A System Settings pane a row can send the user to. The URL lives here (Foundation); opening
+/// it is the app's job (NSWorkspace).
 public enum SettingsPane: Sendable, Equatable {
     case screenRecording
     case microphone
@@ -35,16 +35,11 @@ public struct OnboardingRow: Sendable, Equatable, Identifiable {
     public enum Action: Sendable, Equatable {
         /// "Grant…" — ask macOS.
         case request
-        /// "Open System Settings…" — asking is no longer a route (02 §2: macOS prompts once,
-        /// ever), so hand the user the only door that's left.
+        /// "Open System Settings…" — macOS prompts once ever (02 §2), so after a decline this is
+        /// the only route left.
         case openSettings(SettingsPane)
-        /// "System Settings" — nothing needs doing; a quiet way to review or **revoke**.
-        ///
-        /// A granted row used to have no button at all, which left no route out of a permission
-        /// once given — the mirror image of the dead end this window exists to prevent, and a
-        /// poor answer from a screen recorder to "how do I turn this off?" (Franco, 2026-07-15).
-        /// It earns a link rather than a button because the window is also the *done* screen:
-        /// three call-to-action buttons on an all-green checklist read as unfinished work.
+        /// "System Settings" — a quiet way to review or revoke a granted permission. A link, not
+        /// a button: nothing needs doing.
         case review(SettingsPane)
 
         /// Whether this row is asking for something. Drives the button's prominence: bordered
@@ -78,9 +73,8 @@ public struct OnboardingRow: Sendable, Equatable, Identifiable {
 
 /// Builds the onboarding checklist from permission states.
 ///
-/// Pure and injectable, so every combination is a unit test rather than a thing you have to
-/// take on faith — which matters more here than anywhere else in the app, because most of these
-/// states are ones this machine can't easily be put into.
+/// Pure and injectable: most of these permission states can't easily be reproduced on a dev
+/// machine, so every combination is a unit test.
 public enum OnboardingModel {
 
     public static func rows(
@@ -95,15 +89,12 @@ public enum OnboardingModel {
          notificationsRow(notifications)]
     }
 
-    /// Screen recording — always required, and the only row that has to guess.
+    /// Screen recording — always required.
     ///
     /// `Permissions.screenRecordingState()` collapses "never asked" and "declined" into
-    /// `.notDetermined` (02 §2), so the row can't know which it's in. It doesn't need to: the
-    /// remedy differs only in whether a prompt happens to appear. So the row asks once, and
-    /// afterwards offers System Settings regardless — which covers the user who just declined,
-    /// the user who declined months ago, *and* the user who granted it and needs the restart.
-    /// Switching on "did we ask" rather than "were we denied" is what makes that possible;
-    /// trying to detect the decline itself would be guessing at a state macOS won't report.
+    /// `.notDetermined` (02 §2), so the row switches on `hasAsked` instead: ask once, then offer
+    /// System Settings regardless. That covers decline, old decline, and grant-needs-restart
+    /// alike.
     private static func screenRow(_ state: PermissionState, hasAsked: Bool) -> OnboardingRow {
         let satisfied = state == .granted
         let detail: String
@@ -127,7 +118,7 @@ public enum OnboardingModel {
             blocksRecording: !satisfied)
     }
 
-    /// Microphone — needed only when one is selected, and the one row that never has to guess:
+    /// Microphone — needed only when one is selected. The one row that never has to guess:
     /// `authorizationStatus` reports a real `.denied` (02 §2).
     private static func microphoneRow(
         _ state: PermissionState, required: Bool
@@ -140,9 +131,8 @@ public enum OnboardingModel {
             detail = "ScreenRec can record your microphone onto its own track."
             action = .review(.microphone)
         case .notDetermined:
-            // "Optional" is only true until they pick one. Said while Start is greyed out
-            // *because of this row*, it reads as "this isn't your problem" to the one person
-            // whose problem it is.
+            // "Optional" stops being true once a mic is picked: Start is greyed out because of
+            // this row.
             detail = required
                 ? "Needed for the microphone you selected. Recording is paused until this is on."
                 : "Only needed if you record a microphone."
@@ -160,8 +150,8 @@ public enum OnboardingModel {
             blocksRecording: required && !satisfied)
     }
 
-    /// Notifications — optional, and never blocks anything (docs/06). The app is fully
-    /// functional without them; they only carry the "saved / ended because…" message (M4-T5).
+    /// Notifications — optional, never blocks anything (docs/06). They only carry the
+    /// "saved / ended because…" message.
     private static func notificationsRow(_ state: PermissionState) -> OnboardingRow {
         let satisfied = state == .granted
         let detail: String

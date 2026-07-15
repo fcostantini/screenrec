@@ -14,9 +14,8 @@ public protocol SampleConsumer: AnyObject, Sendable {
     func consume(_ buffer: CMSampleBuffer, type: SourceType)
 }
 
-/// Fans one capture stream out to many consumers, so recording and instant replay (and
-/// the started-detector) can all tap the same `SCStream`. Thread-safe: attach/detach and
-/// the fan-out snapshot are lock-guarded.
+/// Fans one capture stream out to many consumers, so recording and instant replay can tap
+/// the same `SCStream`. Thread-safe: attach/detach and the fan-out snapshot are lock-guarded.
 public final class SampleRouter: @unchecked Sendable {
     private let lock = NSLock()
     private var consumers: [ObjectIdentifier: any SampleConsumer] = [:]
@@ -38,10 +37,9 @@ public final class SampleRouter: @unchecked Sendable {
     }
 
     /// Deliver a captured buffer to every attached consumer. Called on SCK's serial
-    /// sample-handler queues. Incomplete video frames (screen-unchanged ticks) are dropped
-    /// here so consumers only ever see real frames (docs/02 §1). The consumer list is
-    /// snapshotted under the lock and delivered outside it — a slow consumer can't block
-    /// attach/detach or hold the capture queue beyond its own work.
+    /// sample-handler queues. Incomplete video frames are dropped here so consumers only see
+    /// real frames (docs/02 §1). The consumer list is snapshotted under the lock and delivered
+    /// outside it, so a slow consumer can't block attach/detach.
     func route(_ buffer: CMSampleBuffer, type: SourceType) {
         if type == .screen, !Self.isCompleteVideoFrame(buffer) { return }
         lock.lock()

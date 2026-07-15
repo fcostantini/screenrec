@@ -2,18 +2,14 @@ import Foundation
 import RecorderCore
 
 /// Text for the menu's header row (docs/06 "Menu — idle state" item 1, "Menu — recording
-/// state" item 1). Pure string-making, kept out of the views so the copy rules in docs/06 are
-/// testable rather than a matter of trust.
+/// state" item 1). Pure string-making, kept out of the views so docs/06's copy rules are
+/// testable.
 public enum MenuHeader {
 
-    /// Elapsed time, always `HH:MM:SS` per docs/06's copy rules. (Tabular numerals are the
-    /// view's job — this only decides the digits.)
+    /// Elapsed time, always `HH:MM:SS` per docs/06's copy rules.
     ///
-    /// The non-finite guard is belt-and-braces, not the last line of defence: `refreshProgress`
-    /// already sanitizes before anything reaches here. It stays because the trap it prevents is
-    /// real and cheap to prevent — `recordedDuration` is `.invalid`/NaN until the first frame
-    /// starts the session (docs/02 §10) and `Int(nan)` traps — and because this is a public
-    /// formatter that will outlive its one current caller.
+    /// The non-finite guard is load-bearing: `recordedDuration` is `.invalid`/NaN until the
+    /// first frame starts the session (02 §10), and `Int(nan)` traps.
     public static func elapsed(_ seconds: TimeInterval) -> String {
         guard seconds.isFinite, seconds > 0 else { return "00:00:00" }
         let total = Int(seconds)
@@ -29,10 +25,8 @@ public enum MenuHeader {
 
     /// The idle header's right-hand status: `Ready`, or the blocking condition.
     ///
-    /// Every non-ready verdict collapses to one short phrase because this is a menu row, not a
-    /// place to explain. `RecordingReadiness.blocked` carries a full remedy sentence for the
-    /// onboarding window (M4-T3) to show — putting it here would blow out the menu's width to
-    /// say something the user can't act on from a disabled row.
+    /// Every non-ready verdict collapses to one short phrase; `RecordingReadiness.blocked`'s
+    /// full remedy sentence is the onboarding window's to show, not a menu row's.
     public static func idleStatus(_ readiness: RecordingReadiness) -> String {
         switch readiness {
         case .ready: "Ready"

@@ -2,9 +2,8 @@ import Foundation
 
 /// Where recordings are written, plus the naming and collision rules.
 ///
-/// The naming and collision logic is pure (injected `exists` predicate) so it is
-/// unit-testable without touching disk; `preflight` and `newRecordingURL` touch the
-/// real filesystem.
+/// The naming and collision logic is pure (injected `exists` predicate), so it is testable
+/// without touching disk; `preflight` and `newRecordingURL` touch the real filesystem.
 public struct OutputLocation: Sendable {
     public let directory: URL
 
@@ -21,9 +20,8 @@ public struct OutputLocation: Sendable {
 
     // MARK: - Naming (pure)
 
-    /// e.g. `2026-07-14 at 10.12.34` — POSIX locale, caller's time zone (injectable so
-    /// tests are deterministic regardless of the machine's zone). Internal composition
-    /// step for `newRecordingURL`; not part of the module's public surface.
+    /// e.g. `2026-07-14 at 10.12.34` — POSIX locale, caller's time zone (injectable so tests
+    /// are deterministic regardless of the machine's zone).
     static func timestamp(for date: Date, timeZone: TimeZone = .current) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -32,9 +30,8 @@ public struct OutputLocation: Sendable {
         return formatter.string(from: date)
     }
 
-    /// First non-colliding file name, appending ` 2`, ` 3`, … before the extension
-    /// (docs/02 §6). `exists` is injected so the policy is testable without disk I/O.
-    /// Internal composition step for `newRecordingURL`.
+    /// First non-colliding file name, appending ` 2`, ` 3`, … before the extension (docs/02 §6).
+    /// `exists` is injected so the policy is testable without disk I/O.
     static func resolvedFileName(
         base: String,
         ext: String,
@@ -57,10 +54,9 @@ public struct OutputLocation: Sendable {
         case inaccessible(reason: String)
     }
 
-    /// An output directory the process can't write to surfaces later as an opaque
-    /// SCK/AVFoundation "invalid parameter"; catch it here. We probe *write* access
-    /// (recording needs it) rather than `opendir` (which only proves read/execute), and
-    /// distinguish a missing folder from a permission denial so the guidance is correct.
+    /// An unwritable output directory surfaces later as an opaque SCK/AVFoundation "invalid
+    /// parameter" (docs/02 §2); catch it here. Probes *write* access rather than `opendir`,
+    /// which only proves read/execute.
     public static func preflight(_ directory: URL) -> DirectoryAccess {
         let fileManager = FileManager.default
         var isDirectory: ObjCBool = false
@@ -86,8 +82,7 @@ public struct OutputLocation: Sendable {
     // MARK: - Compose
 
     /// Full URL for a new recording, resolving collisions against the real filesystem.
-    /// Check-then-act — for display only (the dry-run). Real recording uses
-    /// `reserveRecordingURL`, which reserves the name atomically.
+    /// Check-then-act, so display only (the dry-run); real recording uses `reserveRecordingURL`.
     public func newRecordingURL(
         prefix: String = "Recording",
         ext: String = "mov",
@@ -109,11 +104,9 @@ public struct OutputLocation: Sendable {
         case alreadyExists(path: String)
     }
 
-    /// `O_EXCL`-creates an empty placeholder at `url`, returning true if it claimed the name
-    /// and false if the name is already taken. Retries an interrupted syscall; throws on any
-    /// other error. The placeholder is **kept** — the writer removes it in the same breath as
-    /// it creates the real file (`AVAssetWriter` refuses a pre-existing file), so the name is
-    /// held from reservation until the file exists, not freed in between.
+    /// `O_EXCL`-creates an empty placeholder at `url`; true if it claimed the name, false if
+    /// taken. Retries `EINTR`, throws otherwise. The placeholder is **kept**: the writer removes
+    /// it as it creates the real file, so the name is held throughout, never freed in between.
     private static func claim(_ url: URL) throws -> Bool {
         while true {
             let descriptor = open(url.path, O_CREAT | O_EXCL | O_WRONLY, 0o644)
@@ -126,9 +119,8 @@ public struct OutputLocation: Sendable {
         }
     }
 
-    /// Atomically reserves the first non-colliding auto-named recording URL. Two recordings
-    /// started the same second get different names (`… 2.mov`), which check-then-act
-    /// `newRecordingURL` couldn't guarantee (STATUS field note).
+    /// Atomically reserves the first non-colliding auto-named recording URL, so two recordings
+    /// started in the same second get different names (`… 2.mov`).
     public func reserveRecordingURL(
         prefix: String = "Recording",
         ext: String = "mov",
@@ -141,7 +133,7 @@ public struct OutputLocation: Sendable {
             let name = suffix == 1 ? "\(base).\(ext)" : "\(base) \(suffix).\(ext)"
             let url = directory.appendingPathComponent(name)
             if try Self.claim(url) { return url }
-            suffix += 1                              // name taken → try the next suffix
+            suffix += 1
         }
     }
 

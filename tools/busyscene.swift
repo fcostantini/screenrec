@@ -1,17 +1,14 @@
 import AppKit
 
 // A deterministic full-screen "busy" animation for quality/size calibration (docs/04 §3.6).
-// It scrolls a detailed pre-rendered texture and drags a few large opaque shapes across it —
-// busy and high-detail, but with COHERENT motion, so it compresses like real screen content
-// (scrolling / video) rather than like incompressible noise. That lets each preset's average
-// bitrate cap actually bind, so files separate cleanly by preset. Preferred over "loop a video
-// in QuickTime": no external file, same content every run.
+// Motion is coherent, so it compresses like real screen content rather than like incompressible
+// noise — each preset's average bitrate cap then binds and files separate cleanly by preset.
 //
 // Usage: swift tools/busyscene.swift [seconds]   (default 10)
 
 let duration = CommandLine.arguments.count > 1 ? (Double(CommandLine.arguments[1]) ?? 10) : 10
 
-/// A detailed, tileable texture (fine multi-frequency color structure) rendered once.
+/// A detailed, tileable texture rendered once.
 func makeTexture(width: Int, height: Int) -> CGImage? {
     let space = CGColorSpaceCreateDeviceRGB()
     guard let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
@@ -53,8 +50,8 @@ final class BusyView: NSView {
                 ctx.draw(texture, in: CGRect(x: ox, y: oy, width: textureSize.width, height: textureSize.height))
             }
         }
-        // A few large opaque squares gliding across — they occlude/reveal texture, adding the
-        // moderate unpredictability real content has (new pixels appearing) without going random.
+        // Gliding opaque squares occlude and reveal texture, adding the unpredictability real
+        // content has without going random.
         let f = Double(frameIndex)
         for i in 0..<6 {
             let phase = f * 0.02 + Double(i)

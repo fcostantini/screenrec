@@ -20,7 +20,7 @@ public enum RecordingReadiness: Sendable, Equatable {
 
 /// Result of resolving which microphone to capture. Never `nil`: SCK's
 /// `microphoneCaptureDeviceID` must be an explicit ID or capture fails with an opaque
-/// "invalid parameter" (docs/02 §1). This type makes that impossible to get wrong.
+/// "invalid parameter" (docs/02 §1).
 public enum MicrophoneResolution: Sendable, Equatable {
     case explicit(String)
     case noDevice(reason: String)
@@ -63,10 +63,9 @@ public enum Permissions {
         }
     }
 
-    /// A non-empty preferred ID that still refers to a present device wins; otherwise
-    /// fall back to the injected default provider; otherwise report no device. A stale
-    /// preferred ID (device unplugged) must NOT pass through — it would fail capture with
-    /// the opaque "invalid parameter" this type exists to prevent. `deviceExists` and
+    /// A non-empty preferred ID that still refers to a present device wins, else the injected
+    /// default, else no device. A stale preferred ID (device unplugged) must not pass through:
+    /// it fails capture with the opaque "invalid parameter" (docs/02 §1). `deviceExists` and
     /// `defaultDeviceID` are injected so this is testable without real hardware.
     public static func resolveMicrophoneID(
         preferred: String?,
@@ -84,10 +83,8 @@ public enum Permissions {
 
     // MARK: - Live queries (TCC / AVFoundation)
 
-    /// Screen Recording state. Note: the public API can only distinguish granted from
-    /// not-granted — a *denied* grant is indistinguishable from not-yet-determined, so
-    /// this returns `.granted` or `.notDetermined` only. The app requests access and, if
-    /// still not granted, shows the "restart after granting" guidance (docs/02 §2).
+    /// Screen Recording state. The public API cannot distinguish *denied* from
+    /// not-yet-determined, so this returns `.granted` or `.notDetermined` only (docs/02 §2).
     public static func screenRecordingState() -> PermissionState {
         CGPreflightScreenCaptureAccess() ? .granted : .notDetermined
     }
