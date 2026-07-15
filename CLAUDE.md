@@ -59,6 +59,32 @@ a /code-review or /simplify skill, run it on the diff as part of this pass — t
 checklist above still applies on top. Genuine findings that are out of scope for the
 task: record them in STATUS.md field notes rather than fixing silently.
 
+## Plan artifact (mandatory — BEFORE implementing any task)
+
+Before writing code for a task, publish a **visual Artifact** laying out what you intend to
+do, then stop and wait. This is a review gate, not a summary: it proves you understood the
+task and lets Franco correct the plan while it's still cheap. Do not start implementing
+until he's seen it.
+
+- **Show the UI/UX the task will produce**, don't just describe it. Sketch the states,
+  layout and copy you intend to build — enough for Franco to say "not that" before the work
+  exists. Ground every element in a docs/06 line; where the spec is silent and you had to
+  choose, say so out loud and give your reasoning. Where you're proposing to *change* an
+  existing screen, show what's there now (real screenshot, see below) next to the proposal.
+- **Also state:** the files/targets you'll add or touch, the seams you'll reuse (never
+  reinvent one — e.g. `stop(reason:)`, SampleRouter, TimestampRebaser), what you're
+  deliberately leaving out and to which task, how you'll Verify, and anything you'll need
+  from Franco (a human gate, a TCC grant, a taste call).
+- **Screenshotting the app headlessly** (for before/after shots, and for the evidence you
+  hand back once the work is done): `screencapture -x -R <x>,<y>,<w>,<h>` against the
+  running `dist/ScreenRec.app`, foreground only — the TCC rule in Environment facts applies.
+  `NSScreen.main.frame` gives the point size to aim at; this display is 2×. To reach a state
+  the UI can't drive yet, patch the app *temporarily* to enter it, capture, then revert —
+  never ship the scaffolding. **Don't eyeball an animation; measure it** (M4-T1 field note).
+- **Artifacts block external hosts**: embed images as `data:` URIs, inline all CSS/JS.
+- Never present a mockup as a screenshot, or a plan as a finished result. If you don't yet
+  know something the plan turns on, that's a question for Franco, not a guess to render.
+
 ## Version control
 
 Commit after every completed task (its Verify must pass first), message prefixed with
