@@ -47,7 +47,7 @@ public final class RecordingSession: @unchecked Sendable {
                 switch event {
                 case .started:
                     continuation.yield(.started)
-                case .paused, .resumed, .fileProgress:
+                case .paused, .resumed, .microphoneLost, .fileProgress:
                     continuation.yield(event)          // M3 / M2-T5 pass-throughs
                 case .failed(let message):
                     startFailure = message

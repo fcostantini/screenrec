@@ -22,6 +22,11 @@ public actor CaptureEngine {
     private var stream: SCStream?
     private var handler: StreamHandler?
 
+    /// Emits `.microphoneLost` if a selected mic stops delivering (docs/02 §4, ADR-012); nil
+    /// when no mic was selected. Polled by `microphoneWatchdogTask` while capture runs.
+    private let microphoneWatchdog: MicrophoneWatchdog?
+    private var microphoneWatchdogTask: Task<Void, Never>?
+
     private enum State { case idle, starting, running, terminated }
     private var state: State = .idle
     /// Set if stop() arrives while start() is still suspended (actor reentrancy); start()
@@ -44,9 +49,17 @@ public actor CaptureEngine {
         self.configuration = configuration
         (self.events, self.continuation) = AsyncStream.makeStream(of: EngineEvent.self)
         self.router = SampleRouter()
+        // Only a mic that was actually selected can be lost.
+        if case .device = configuration.microphone {
+            let continuation = self.continuation
+            microphoneWatchdog = MicrophoneWatchdog { continuation.yield(.microphoneLost) }
+        } else {
+            microphoneWatchdog = nil
+        }
         // `.started` = first complete video frame. The router already drops incomplete
         // frames, so the first `.screen` buffer the detector sees is exactly that.
         router.attach(StartedDetector(continuation: continuation))
+        if let microphoneWatchdog { router.attach(microphoneWatchdog) }
     }
 
     public func start() async {
@@ -86,10 +99,18 @@ public actor CaptureEngine {
                 try? await stream.stopCapture()
                 return terminate(requestedStopReason)
             }
+            // `terminate()` can have run reentrantly while we were suspended (a stream error
+            // hops onto the actor). Don't resurrect a dead engine — and don't arm a watchdog
+            // that the already-finished `terminate()` will never cancel.
+            guard state == .starting else {
+                try? await stream.stopCapture()
+                return
+            }
             self.stream = stream
             self.handler = handler
             state = .running
             sleepGuard.begin(reason: "Recording the screen")
+            startMicrophoneWatchdog()
         } catch {
             failToStart(Self.startErrorMessage(error))
         }
@@ -107,6 +128,10 @@ public actor CaptureEngine {
             stopRequested = true
             requestedStopReason = reason
         case .running:
+            // Disarm BEFORE tearing the stream down: `stopCapture` halts mic delivery and can
+            // take seconds (Bluetooth teardown), which the watchdog would otherwise read as a
+            // disconnect and report on a recording whose mic track is perfectly complete.
+            cancelMicrophoneWatchdog()
             if let stream {
                 try? await stream.stopCapture()
             }
@@ -141,9 +166,36 @@ public actor CaptureEngine {
         continuation.finish()
     }
 
+    /// Polls the mic watchdog for as long as capture runs. `Task {}` inherits this actor's
+    /// isolation, so `check()` — and any `.microphoneLost` it yields — runs on the actor; that
+    /// is fine, the work is one lock-guarded comparison. Cancellation exits the loop rather
+    /// than being swallowed, so no `check()` can run after the engine has torn down.
+    private func startMicrophoneWatchdog() {
+        guard let watchdog = microphoneWatchdog else { return }
+        microphoneWatchdogTask = Task {
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(MicrophoneWatchdog.checkInterval)) }
+                catch { return }
+                watchdog.check()
+            }
+        }
+    }
+
+    private func cancelMicrophoneWatchdog() {
+        microphoneWatchdogTask?.cancel()
+        microphoneWatchdogTask = nil
+    }
+
+    /// Dropping a `Task` reference does not cancel it, so an engine released while running —
+    /// never stopped, no stream error — would otherwise leave the poll loop waking forever.
+    deinit {
+        microphoneWatchdogTask?.cancel()
+    }
+
     private func terminate(_ reason: EndReason) {
         guard state != .terminated else { return }
         state = .terminated
+        cancelMicrophoneWatchdog()
         sleepGuard.end()
         continuation.yield(.stopped(reason))
         continuation.finish()

@@ -95,6 +95,13 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   section claimed "AirPods die → built-in mic takes over" — that is **FALSE**; do not design
   against it. Detecting mic loss therefore needs a **starvation watchdog** (was delivering,
   then stopped), not a format comparison — M3-T6, policy in ADR-012.
+- ⚠️ **A lost mic never comes back — reconnecting the device does NOT resume delivery.**
+  Verified 2026-07-15: AirPods cased mid-recording and then reconnected ~20 s later produced
+  no further mic buffers at all (mic track ended at 21.8 s of a 59.8 s file; the recording ran
+  to the end). SCK tears down capture for a pinned `microphoneCaptureDeviceID` permanently.
+  Consequences: (a) mic loss is one-shot per session — nothing to re-arm or recover, which is
+  why `MicrophoneWatchdog` fires once; (b) it lowers the odds that `SCStream.updateConfiguration`
+  can re-point the mic live (M3-T7 spikes it anyway — an explicit call is not passive re-attach).
 - **Format changes mid-stream** remain possible for the *same* device (e.g. an AirPods
   HFP/A2DP codec flip), so `MovieRecorder` compares each mic buffer's ASBD (sample rate /
   channels / format ID) against the input's and fail-stops on a diff (M3-T2). With a pinned

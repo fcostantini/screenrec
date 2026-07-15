@@ -17,6 +17,10 @@ public enum EngineEvent: Sendable, Equatable {
     case started                                    // first complete video frame
     case paused
     case resumed
+    /// A selected mic stopped delivering — the device went away (docs/02 §4). The one
+    /// mid-recording problem that does NOT end the session: recording continues and the mic
+    /// track simply ends here (ADR-012). A notification, not a termination.
+    case microphoneLost
     case fileProgress(seconds: Double, bytes: Int64)
     case stopped(EndReason)                         // engine ran with no writer (e.g. engine-smoke)
     case finished(url: URL, reason: EndReason, droppedFrames: Int)  // file finalized, playable

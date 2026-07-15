@@ -15,14 +15,15 @@
   once) + live stable-mic regression (no false-positive). **Live AirPods-die run → Needs Franco.**
 - **M3-T1 DONE** — pause/resume wired end-to-end (rebaser math, engine `.paused`/`.resumed`,
   RecordingSession coordination, CLI `--script` + `p`/`r`/Return). G3 §4.1 pause-math PASSED.
-- **§4.2 ran (Franco) and disproved docs/02 §4** — a lost mic does NOT hand over, its buffers
-  just stop, so M3-T2's format-compare can never fire for the AirPods case (it remains a valid
-  guard for a same-device format change). Status quo silently degraded the recording = an
-  ADR-007 violation. Policy now **ADR-012**: notify and keep recording. Docs corrected (02 §4,
-  04 §4.2, 01 event surface, 05). See field notes for the data.
-- **Next task:** **M3-T6** — mic-loss starvation watchdog → emit `microphoneLost`, recording
-  continues (ADR-012). Then **M3-T7** (spike: can `SCStream.updateConfiguration` re-point the
-  mic live?). Then back to **M3-T3** (disk floor; reuses M3-T2's `engine.stop(reason:)` seam).
+- **M3-T6 DONE — G3 §4.2 PASSED.** Mic-loss starvation watchdog (`MicrophoneWatchdog`, router
+  consumer + 1 Hz poll on the engine) emits `.microphoneLost`; recording continues (ADR-012).
+  Live: AirPods cased → warning at ~25s, capture ran to the end, mic track ends at the
+  disconnect. §4.2's original premise was wrong (no mic takeover) → docs/02 §4 corrected,
+  ADR-012 written. Also proved: **a lost mic never returns** — reconnecting delivers nothing,
+  which is what makes the one-shot watchdog safe. See field notes.
+- **Next task:** **M3-T7** — spike: can `SCStream.updateConfiguration` re-point a live stream's
+  mic? Leg 1 is headless but **needs AirPods connected** (two devices). Prior is low. Then back
+  to **M3-T3** (disk floor; reuses M3-T2's `engine.stop(reason:)` seam), T4, T5.
 - **Now done:** M2-T1..T6 + M3-T1..T2. `record` is a full CLI (real 3-track capture, presets,
   explicit path, progress ticker, pause/resume, scripted timeline, mic-change fail-stop).
   KEY ENV FACT: foreground Bash captures WORK (TCC held); backgrounded/detached ones lose the
@@ -64,12 +65,15 @@ video (deterministic, reproducible).
 - [ ] **G3 §4.1 cross-seam A/V sync (human)** — record `--script rec10,pause5,rec10` with mic
       while clapping near the pause seam; scrub QuickTime that video/system/mic realign within
       ~2 frames across the resume seam. (Automated duration + monotonic legs already PASS.)
-- [x] **G3 §4.2 mic-disappears — RUN 2026-07-15 (Franco).** Outcome: no takeover, mic buffers
-      just stop; recording continued, no event. Disproved docs/02 §4 → corrected; policy set in
-      ADR-012; watchdog queued as M3-T6. **Re-run needed once M3-T6 lands** (expect: recording
-      continues + a `microphoneLost` event names the cause + mic track ends at the disconnect).
-- [ ] **G3 §4.2 re-run after M3-T6 (human, device action)** — same AirPods-into-case run; the
-      only new thing to check is that the loss is *reported*, not that it stops.
+- [x] **G3 §4.2 mic-disappears — PASSED 2026-07-15 (Franco).** Two runs: the first (pre-M3-T6)
+      disproved the gate's premise (no takeover → docs/02 §4 corrected, ADR-012 written); the
+      second (post-M3-T6) passed the redefined gate — loss reported, recording continued, file
+      playable. A bonus reconnect run proved a lost mic never returns for the session.
+- [ ] **M3-T7 leg 2 (human, device action) — only if leg 1 succeeds.** Physically disconnect and
+      reconnect AirPods mid-capture while the spike calls `updateConfiguration`, to see whether a
+      *returned* device can be re-bound. Skip entirely if the headless leg says no.
+      NOTE: leg 1 needs AirPods **connected** (two input devices present) — right now `list-mics`
+      shows only the built-in.
 - [x] **M2-T6 subjective quality check** — DONE 2026-07-14: Franco compared Balanced vs High on
       real busy content and confirmed "balanced looks pretty good". Balanced quality is
       acceptable at ~2× the efficiency of Tier-1 → BitrateModel constants CONFIRMED, no change.
@@ -86,12 +90,35 @@ video (deterministic, reproducible).
 | M1   | ✅ complete 2026-07-14 | all 5 tasks done; capture engine + router + probe + sleep guard, 41 tests |
 | G1   | ✅ passed 2026-07-14 | probe-stream: all 3 sources flowing. video 4112×2570 420v (PTS Δ 0.008–0.09s, frame-on-change); system audio 48kHz/2ch/32-bit (Δ 0.02s); mic native format device-dependent — AirPods 24kHz/1ch, built-in 48kHz/1ch (both differ from system audio → separate tracks required, M2) |
 | G2   | ✅ passed 2026-07-14 | §3.1 tracks hvc1+2×aac ✅; §3.2 kill-9 ✅ (kill@6s→5.04s playable AFTER fragment fix 10s→1s — 10s was unparseable if killed <10s); §3.3 sync-clap ✅ (Franco); §3.4 static-tail ✅ (14s static→14.4s @7.9fps, tail patch holds); §3.5 30-min drift ✅ (Franco ran real 30-min record + beepflash; per-track dur match 50ms; flash↔beep offset constant ~−67ms±10 from min 5→29 = no drift) |
-| G3   | 🟡 §4.1 passed | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears RAN 2026-07-15 (Franco): premise disproved — no mic takeover, buffers just stop, recording continued with no event (mic 22.57s vs video 59.85s). Gate redefined per ADR-012 (continue + report); re-run after M3-T6. §4.3 sleep-lock / §4.4 disk-guard await M3-T4/T3. Cross-seam clap-sync = human. |
+| G3   | 🟡 §4.1 passed | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears ✅ PASSED 2026-07-15 (Franco, post-M3-T6, per the ADR-012 definition): AirPods cased at ~22s of a 60s run → CLI printed `⚠️ microphone disconnected — still recording` at ~25s (≈3.2s latency = 3s timeout + ≤1s poll), recording ran to the end, `finished (userStopped)`, file playable, mic track 21.82s vs video 59.83s. First run (pre-M3-T6) disproved the gate's premise — no takeover, buffers just stop → docs/02 §4 corrected, ADR-012 written. Also proved: a reconnected device NEVER resumes (mic gone for the session). §4.3 sleep-lock / §4.4 disk-guard await M3-T4/T3. Cross-seam clap-sync = human. |
 | G4   | ⬜ not run | — |
 | G5   | ⬜ not run | — |
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-15 (M3-T6 mic-loss watchdog): what the live runs and the review taught.
+  - **SCK keeps delivering mic buffers while paused** — proved by a 5 s scripted pause against
+    a 3 s watchdog timeout that did NOT false-fire. That's why the watchdog needs no pause
+    handling at all: it's a router-level consumer, and pause never stops the stream (M3-T1).
+    If pause is ever changed to stop the stream, this watchdog WILL false-fire — read this first.
+  - **Detection latency is timeout + poll interval** (3 s + ≤1 s). Live: mic died at 21.82 s,
+    warning at ~25 s. Matches by construction; don't shrink the timeout without checking the
+    load-jitter margin (M3-T1 saw ~0.9 s audio starvation under heavy load).
+  - **Disarm the watchdog BEFORE `await stream.stopCapture()`, not after** (/code-review). Stop
+    halts mic delivery and Bluetooth teardown can take seconds, so a watchdog still polling
+    across that suspension reports a disconnect on a recording whose mic track is complete —
+    "⚠️ disconnected" immediately followed by "✓ finished". Cancel-on-`terminate()` alone is
+    too late. The same reasoning will apply to M3-T5's stall watchdog.
+  - **`Task {}` inside an actor method INHERITS the actor's isolation** — it does not run off-
+    actor (I had a comment claiming the opposite; the compiler disagrees). Fine here (the poll
+    body is one lock-guarded compare) but don't assume a spawned Task escapes the actor.
+  - **Dropping a `Task` reference does not cancel it.** An engine released while `.running`
+    (never stopped, no error) left the 1 Hz poll waking forever — now cancelled in `deinit`.
+  - **`start()` could resurrect a terminated engine**: a stream error can `terminate()`
+    reentrantly during the `startCapture()` await, then `start()` resumed and set
+    `state = .running` over it (pre-existing; M3-T6 made it worse by stranding an
+    uncancellable Task). Now guarded with `guard state == .starting` on resume.
 
 - 2026-07-15 (§4.2 LIVE — **docs/02 §4's mic-takeover claim is FALSE**): Franco recorded 60 s
   with AirPods, cased them at ~22 s. Result — the recording **continued to the full 60 s** and

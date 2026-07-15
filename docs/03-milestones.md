@@ -212,7 +212,7 @@ clap test; static-screen duration test; 30-min drift test).
       `CGEventSource.secondsSinceLastEventType` — not NSEvent), clock injectable.
       **Verify:** unit test with injected clock — 30 s of no video buffers fires
       exactly one log line; buffer arrival resets it.
-- [ ] M3-T6 **Mic-loss watchdog** (02 §4, ADR-012). A lost mic device stops delivering
+- [x] M3-T6 **Mic-loss watchdog** (02 §4, ADR-012). A lost mic device stops delivering
       rather than handing over (proved by §4.2, 2026-07-15), so M3-T2's format compare can
       never fire for it: detect *starvation* instead — mic was delivering, then nothing for
       N s while recording and not paused ⇒ emit `microphoneLost` (docs/01) exactly once.
@@ -222,15 +222,33 @@ clap test; static-screen duration test; 30-min drift test).
       event; no event while buffers flow, while paused, or with `--no-mic`. CLI prints the
       loss. Live AirPods-case run per §4.2 **(human)**; agent then confirms the file is
       playable with the mic track ending at the disconnect.
-- [ ] M3-T7 **SPIKE (time-boxed): can SCK re-point a live stream's mic?** Call
-      `SCStream.updateConfiguration` with a different `microphoneCaptureDeviceID` mid-capture
-      and observe whether `.microphone` buffers switch to the new device's format. Runnable
-      headlessly — swap built-in ↔ AirPods by ID, no physical action needed (needs both
-      devices present). This is the load-bearing unknown for ever recovering mic audio after
-      a disconnect; note that even a "yes" needs a fixed-format (resampled) mic input first,
-      since the input's format is welded to the first buffer's (ADR-012).
+      ✅ 2026-07-15. Unit: 5 tests, injected clock, zero real time (fires once; not before the
+      timeout; not while delivering; not when never delivered; only `.microphone` counts).
+      **Live §4.2 PASSED** (Franco): AirPods cased at ~22 s of a 60 s run → CLI printed
+      `⚠️ microphone disconnected — still recording` at ~25 s (≈3.2 s latency = the designed
+      3 s timeout + ≤1 s poll), recording ran to the end, `finished (userStopped)`, file
+      playable, mic track ends at 21.82 s vs video 59.83 s. Also verified: a 5 s scripted pause
+      (> the 3 s timeout) does NOT false-fire, which proves SCK keeps delivering mic buffers
+      while paused — so pause needs no handling here.
+- [ ] M3-T7 **SPIKE (time-boxed): can SCK re-point a live stream's mic?** The load-bearing
+      unknown behind ever recovering mic audio after a disconnect. Two legs, staged — only run
+      leg 2 if leg 1 survives:
+      1. **Headless**: mid-capture, call `SCStream.updateConfiguration` with a *different*
+         `microphoneCaptureDeviceID` (swap built-in ↔ AirPods by ID — no physical action, but
+         both devices must be present) and see whether `.microphone` buffers switch to the new
+         device's format.
+      2. **Physical (human)**: the harder case — re-point at a device that *died and came back*
+         (reconnect creates a NEW CoreAudio device object even when the uniqueID string is
+         stable, which is the leading theory for why passive reconnect delivers nothing).
+      Prior is now **low**: SCK doesn't resume even the same pinned device when it returns
+      (02 §4), suggesting the mic path is torn down for good — but an explicit API call is not
+      passive re-attach, so it's worth 30 minutes to stop guessing.
+      Costing note: leg 2 is the *cheap* feature. A reconnecting device returns at the **same
+      format**, so it needs no resampling — it drops straight into the existing mic input.
+      Only switching to a *different* device needs the fixed-format/resampled input (ADR-012).
       **Verify:** the finding is recorded in 02 §4 + STATUS either way. Yes ⇒ reopen ADR-012
-      with a re-attach proposal. No ⇒ ADR-012's notify-and-continue is final for v1.
+      with a re-attach proposal (reconnect-recovery first, it's cheaper). No ⇒ ADR-012's
+      notify-and-continue is final for v1 and the resampling question closes with it.
 
 **Gate G3**: 04-testing §4 (pause math: 10 s rec / 5 s pause / 10 s rec ⇒ 20 s ± 0.2 s
 file, A/V in sync across the seam; all three robustness scenarios end in playable files).

@@ -59,6 +59,7 @@ func describe(_ event: EngineEvent) -> String {
     case .started: return "started"
     case .paused: return "paused"
     case .resumed: return "resumed"
+    case .microphoneLost: return "microphoneLost"
     case .fileProgress(let seconds, let bytes):
         return "fileProgress(\(seconds.isFinite ? Int(seconds) : 0)s, \(bytes) bytes)"
     case .stopped(let reason): return "stopped(\(describe(reason)))"
@@ -441,6 +442,10 @@ func performRecording(_ options: RecordOptions) async {
             print("\n  ⏸  paused")
         case .resumed:
             print("\n  ▶  resumed")
+        case .microphoneLost:
+            // Not a stop: screen + system audio keep recording, the mic track ends here
+            // (ADR-012). Saying so is the whole point — a silent mic death is the failure.
+            print("\n  ⚠️  microphone disconnected — still recording (screen + system audio)")
         case .finished(let url, let reason, let dropped):
             ticker.cancel()
             print("\n  ✓ finished (\(describe(reason))), dropped frames: \(dropped)")
