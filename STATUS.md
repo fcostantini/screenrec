@@ -117,10 +117,16 @@ video (deterministic, reproducible).
 - [x] **Microphone for the .app — GRANTED 2026-07-15 (Franco), through M4-T3's own Grant…
       button** — the first permission the app obtained for itself, which is the whole point of
       the task. Unblocked M4-T2's 3-track probe immediately.
-- [ ] **Notifications for the .app — prompt was dismissed, so it reads `denied`.** Not a
-      problem and not blocking: open the menu header → Set Up ScreenRec → Notifications →
-      `Open System Settings…`. Worth doing before M4-T5, which is the task that actually sends
-      one.
+- [x] **Notifications for the .app — GRANTED 2026-07-15 (Franco)**, via the route T4-T3 added
+      (menu header → Set Up ScreenRec → Notifications). All three rows are now green, so M4-T5
+      can send one the day it lands.
+- [x] **M4-T3 visual check — PASSED 2026-07-15 (Franco).** "looks good now", after he caught two
+      things live: a granted row with no route out (→ quiet `System Settings` links), and the
+      intro line truncating mid-sentence (→ it wraps). ⚠️ **Two paths remain verified by
+      reasoning + review only, not by observation** — this machine can't reach them without
+      revoking its own grant: (1) the auto-relaunch when a grant lands mid-session, and (2) the
+      `Grant… → Open System Settings…` switch on the screen row. Both are reachable on a fresh
+      account, so **G4 §5.1's walkthrough is where they finally get watched**.
 - [x] **Accessibility for Terminal — GRANTED 2026-07-15 (Franco).** Unblocks
       `tools/menudriver.swift`. Note it's on **Terminal**, not a "Claude Code" entry. Broad grant
       (anything in Terminal can drive any app) — fine to revoke once M4/M5 menu work is done; the
