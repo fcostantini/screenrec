@@ -18,7 +18,7 @@ missing permissions only).
 | idle | outline record circle (`record.circle`) | template image, adapts to menu bar |
 | recording | filled red circle | subtle pulse; respect Reduce Motion (static red) |
 | paused | half-filled circle, amber | |
-| replay armed (idle) | outline circle + small dot badge | armed is orthogonal to recording |
+| replay armed (idle) | outline circle + small dot badge | armed is orthogonal to recording. **M5** — see the Settings amendment: the badge ships with the feature that can be armed, not before (it had been re-homed T1→T2→T4 before Franco ruled) |
 
 ## Menu — idle state
 
@@ -35,6 +35,7 @@ Order and grouping (separators between groups):
    *asked for*.
 2. **Start Recording** — primary action, bold.
 3. **Instant Replay armed** — checkmark toggle; right hint `⌥⌘R saves`. Persisted.
+   **M5** (Franco, 2026-07-15): a toggle that arms nothing is a lie for a whole milestone.
 4. — separator —
 5. `Display ▸` submenu: one entry per `NSScreen`, checkmark on current. Disabled while
    recording.
@@ -132,13 +133,32 @@ the old line is simply false above three green ticks.
 
 - Output folder (choose → `opendir` preflight immediately, friendly error per 02 §2)
 - Quality preset · Frame-rate cap (30/60)
-- Instant replay: buffer length 30 s / 60 s / 2 min · hotkey recorder (default ⌥⌘R)
-- Launch at login (`SMAppService`)
+- Instant replay: buffer length 30 s / 60 s / 2 min · hotkey recorder (default ⌥⌘R) — **M5**
+- Launch at login (`SMAppService`) — **M6**
 
-UserDefaults keys (contractual — M4-T4 writes them, M5-T5 reads them; do not rename):
-`outputDirectory` (String path), `qualityPreset` (`efficient`|`balanced`|`high`),
-`fpsCap` (Int 30|60), `replayArmed` (Bool), `replaySeconds` (Int 30|60|120),
-`replayHotkey` (Dict: keyCode Int, modifiers Int), `launchAtLogin` (Bool).
+⚠️ **AMENDED 2026-07-15 (Franco): the last two rows do not ship with M4-T4.**
+- **Instant replay settings move to M5, with the feature.** M4-T4 was going to store the keys
+  for M5-T5 to read later, which sounds harmless — but it means shipping controls for a feature
+  that does not exist for a whole milestone. Nothing about replay appears in the UI until the
+  ring buffer behind it does. (This toggle had been re-homed three times — T1→T2→T4 — before
+  Franco ruled: it belongs to the feature.)
+- **Launch at login moves to M6.** `SMAppService` registers a login item pointing at the
+  bundle's *current path*, and until M6 the app has no permanent address — `dist/ScreenRec.app`
+  is a build directory `bundle.sh` deletes on every run. Registering it now aims a login item at
+  a folder that will not exist. It belongs with notarization and installability, which are the
+  same problem: the app needs somewhere to live.
+
+UserDefaults keys (contractual — **do not rename**; the names are fixed even where the writer
+moved):
+| Key | Type | Written by |
+|---|---|---|
+| `outputDirectory` | String path | M4-T4 |
+| `qualityPreset` | `efficient`\|`balanced`\|`high` | M4-T4 |
+| `fpsCap` | Int 30\|60 | M4-T4 |
+| `replayArmed` | Bool | **M5** |
+| `replaySeconds` | Int 30\|60\|120 | **M5** |
+| `replayHotkey` | Dict: keyCode Int, modifiers Int | **M5** |
+| `launchAtLogin` | Bool | **M6** |
 
 ## Copy rules
 

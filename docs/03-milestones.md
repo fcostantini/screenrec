@@ -339,7 +339,8 @@ UI layout, states, notification copy, and onboarding flow are specified in
       probed. **2 tracks, not 3** — mic was `None`, which is correct for that config; the 3-track
       probe moves to M4-T3 (below), because a mic needs Microphone TCC and *only the app can
       request it* (that pane has no "+"). Franco granted the app Screen Recording by hand.
-      Instant-replay toggle deferred to M4-T4, which owns the `replayArmed` key (Franco, 2026-07-15).
+      Instant-replay toggle deferred — first to M4-T4, then (Franco, 2026-07-15) to **M5**, with
+      the feature it claims to arm. It had moved three times; the ruling is that it belongs to M5.
 - [x] M4-T3 Onboarding: permission status view; request buttons; explains the
       restart-after-grant dance (02 §2); blocks record until green.
       DONE 2026-07-15. Window opens itself at launch when blocked (verified frontmost), and from
@@ -364,9 +365,14 @@ UI layout, states, notification copy, and onboarding flow are specified in
       **Verify:** unit tests render view model for every permission-state combination;
       fresh-account walkthrough per 04-testing §5.1 **(human)**.
 - [ ] M4-T4 Settings window (SwiftUI Form, UserDefaults): output dir (with preflight on
-      choose — 02 §2), preset, fps, replay duration (for M5), hotkey recorder (for M5).
-      UserDefaults key names are contractual — use exactly the list in docs/06
-      "Settings window" (M5-T5 reads `replayArmed`/`replaySeconds`/`replayHotkey`).
+      choose — 02 §2), preset, fps.
+      ⚠️ **DESCOPED 2026-07-15 (Franco)**: replay duration + hotkey recorder move to **M5**, and
+      launch-at-login to **M6** — see docs/06's Settings amendment. The principle: don't ship
+      controls for a feature that doesn't exist, and don't register a login item pointing at
+      `dist/`, which `bundle.sh` deletes on every build. So T4 writes exactly three keys:
+      `outputDirectory`, `qualityPreset`, `fpsCap`.
+      UserDefaults key names are still contractual — use exactly the table in docs/06
+      "Settings window"; the names are fixed even where the writing task moved.
       **Verify:** change each setting, quit, relaunch → `defaults read
       dev.fcostantini.screenrec.app` shows the documented keys with persisted values
       and UI reflects them; choosing unreadable dir → immediate friendly error (§5.4).
@@ -413,6 +419,13 @@ TCC grants — app appears by name in System Settings, grants survive rebuild).
       **(human)**.
 - [ ] M5-T5 App integration: "Arm instant replay" toggle (persists), hotkey ⌥⌘R via
       Carbon (02 §9), menu item + notification on save.
+      **Inherits from M4-T4 (Franco, 2026-07-15):** the replay Settings rows (buffer length
+      30/60/120, hotkey recorder) and the status-icon's replay-armed badge, plus the keys they
+      write — `replayArmed`, `replaySeconds`, `replayHotkey` (names contractual, docs/06). They
+      were going to ship in M4-T4 for this task to read later; the ruling is that nothing about
+      replay appears in the UI until the ring buffer behind it exists. **So M5-T5 both writes and
+      reads them — there is no cross-milestone contract left to get wrong, only a spelling to
+      match docs/06.**
       **Verify:** §6.4 — manual recording + armed replay + save simultaneously → both
       files probe-clean. Hotkey fires while another app is frontmost **(human)**.
 - [ ] M5-T6 Memory/CPU audit: 30-min armed session.
@@ -431,6 +444,14 @@ while a manual recording runs; memory flat over 30 min).
       unplug)**.
 - [ ] M6-T3 Error-message audit: force each failure path; every message says what
       happened AND what to do.
+- [ ] M6-T5 Launch at login (`SMAppService`, key `launchAtLogin` — docs/06). **Moved here from
+      M4-T4 (Franco, 2026-07-15):** `SMAppService.mainApp` registers a login item pointing at the
+      bundle's *current path*, and until the app has a permanent address that path is
+      `dist/ScreenRec.app` — a build directory `bundle.sh` deletes on every run. Registering it
+      earlier aims a login item at a folder that stops existing. It belongs with M6-T4's
+      installability work, not before it.
+      **Verify:** toggle on → `SMAppService.mainApp.status == .enabled`; log out/in → the app is
+      running **(human)**; toggle off → the login item is gone.
 - [ ] M6-T4 Optional (decide then): Developer ID + notarization for distribution
       beyond this machine; `--h264-downscale` compat mode; HDR spike (ADR stretch);
       **mic recovery after device loss** — ADR-012 deferred it to here. Not a research
