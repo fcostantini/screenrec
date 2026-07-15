@@ -7,6 +7,15 @@ import Foundation
 // "(human)" precisely because they couldn't be). Needs the Accessibility grant — see the
 // Environment facts in CLAUDE.md.
 //
+// 🔴 WHAT THIS TOOL CANNOT TELL YOU: **whether a window came to the front.**
+// A synthetic click doesn't confer activation the way a real one does, so after
+// `click "Settings…"` the app stays un-frontmost and the window looks like it opened behind
+// everything — *no matter what the app does*. That is this tool's artifact, not the app's
+// behaviour: it cost an hour and a design change chasing a bug that didn't exist, until Franco
+// said "the menu opens fine for me" (M4-T4, 2026-07-15). Window activation is a human check.
+// What IS trustworthy here: menu structure, titles, checkmarks, enabled/disabled, and that a
+// click reached its target.
+//
 //   swift tools/menudriver.swift dump            structure of the open menu, one item per line
 //   swift tools/menudriver.swift open            open it and leave it open (then screencapture)
 //   swift tools/menudriver.swift click "Pause"   open, click an item by title, dismiss

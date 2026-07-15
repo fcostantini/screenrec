@@ -21,6 +21,20 @@ struct MenuView: View {
             idleItems
         }
         Divider()
+        // docs/06 item 12. Present in both the idle and recording menus — the spec says
+        // "Settings/Quit remain" while recording, and the settings it shows are read at the next
+        // Start, so changing them mid-recording is harmless.
+        //
+        // The activate matters because ScreenRec is LSUIElement — an accessory — and an
+        // accessory's windows can open behind whatever the user is looking at unless the app is
+        // brought forward, which is indistinguishable from the menu item doing nothing. Same
+        // reason `showOnboarding()` activates.
+        //
+        // ⚠️ Do not try to verify that with `tools/menudriver.swift`: a synthetic click can't
+        // confer activation, so the window will look like it never comes forward no matter what
+        // this code does. Ask a human.
+        Button("Settings…") { showSettings() }
+            .keyboardShortcut(",")
         Button("Quit") { quit() }
             .keyboardShortcut("q")
     }
@@ -129,6 +143,13 @@ struct MenuView: View {
 
     private func showOnboarding() {
         openWindow(id: onboardingWindowID)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    /// Opens Settings. Identical shape to `showOnboarding()` — see App.swift for why it's a
+    /// plain `Window` rather than SwiftUI's `Settings` scene.
+    private func showSettings() {
+        openWindow(id: settingsWindowID)
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
 

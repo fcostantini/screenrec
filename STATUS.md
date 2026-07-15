@@ -25,9 +25,14 @@
 - ✅ **The M3-T4 question is SETTLED — an ungranted process throws `-3801`, never enumerates
   zero.** Measured on both paths via a throwaway bundle (02 §1's recipe); `startDecision` was
   right and is unchanged. The docs had called this untestable without a fresh account; it wasn't.
-- **Next: M4-T4 — Settings.** It owns every contractual UserDefaults key (docs/06), and it is
-  now the most-felt gap: nothing persists. Picker choices die on relaunch — which T3 made worse
-  by relaunching the app on purpose.
+- **M4-T4 DONE (pending Franco's look at the window).** The app remembers: `outputDirectory`,
+  `qualityPreset`, `fpsCap` persist under exactly docs/06's names and survive a relaunch —
+  verified with `defaults read` + a quit/relaunch, headlessly. Settings window (⌘, and the menu)
+  with the output-folder preflight. **Descoped by Franco**: replay settings → M5 (with the
+  feature), launch-at-login → M6-T5 (the app has no permanent address until then). 162 tests.
+- **Next: M4-T5 — notifications.** All three permission rows are green, so it can send one on
+  day one. After that G4, whose fresh-account walkthrough is where M4-T3's two unobserved paths
+  finally get watched.
 - **The `/simplify` sweep over M3 was run** (commits `fff901e`, `2522e26`) — an ARC cycle that
   made `CaptureEngine.deinit` unreachable, and the M3-T7 spike held to the CLI's bar.
 - **Replay-armed toggle + icon badge: deferred to M4-T4** (Franco, 2026-07-15), which owns the
@@ -171,6 +176,42 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-15 (M4-T4 settings): the app finally remembers something. Two lessons, one of them
+  the same one as always.
+  - 🔴 **`tools/menudriver.swift` CANNOT verify window activation, and it took an hour and a
+    design change to learn that.** A synthetic click doesn't confer activation the way a real one
+    does, so after `click "Settings…"` the app stays un-frontmost and the window looks like it
+    opened behind everything — *whatever the app does*. I read that as a bug, replaced
+    `Settings` + `SettingsLink` with a plain `Window` chasing it, tried an AppKit selector,
+    and wrote "verified — Terminal stayed frontmost" into the source as fact. Then **Franco said
+    "the menu opens fine for me"** and the whole thing evaporated. **Third false negative from my
+    own tooling in two tasks** (unopened submenus; `AXDescription` vs `AXTitle`; now this) — the
+    warning is in the tool's header now. Trustworthy from it: structure, titles, checkmarks,
+    enabled/disabled, that a click landed. Not trustworthy: anything about focus or z-order.
+    **When a tool says the app is broken and a human says it isn't, the tool is the defendant.**
+  - **The `Settings` scene buys an LSUIElement app nothing** — it exists to route ⌘, through the
+    app menu, which an accessory doesn't have. ⌘, is bound on the menu item instead. That's why
+    the plain `Window` stayed after the false alarm: one way of opening a window rather than two.
+    But it is a *preference*, not a fix, and the source says so — `SettingsLink` is not known to
+    be broken.
+  - 🐞 **A setting that persists perfectly and reaches nothing.** `fpsCap` round-tripped through
+    UserDefaults, showed in the UI, and never reached the capture: `captureConfiguration` didn't
+    pass `frameRateCap`, so the engine used its own default. Persistence tests all passed. The
+    test that catches it asserts the *configuration*, not the stored value — **a settings test
+    that stops at the plist is testing a drawer, not a setting.**
+  - 🐞 **Tests were writing to the real `UserDefaults`.** `AppState()` defaults to `.standard`,
+    and settings persist on `didSet` since this task — so one test's `state.quality = .high`
+    leaked into another test's launch, and onto disk between runs. Found because a test that had
+    passed for hours suddenly failed. Every AppState in a test now gets a throwaway suite.
+    **The moment state persists, "just construct one" stops being free in tests.**
+  - **Persisted state is a different risk in kind, and this is the task where it starts.**
+    In-memory state self-corrects on the next launch; a bad plist value is the app's problem at
+    *every* launch until someone fixes it — and `defaults write dev.fcostantini.screenrec.app
+    fpsCap 0` is one command. So the load validates rather than trusts: unknown preset → the
+    default, fps not in {30,60} → the default (not clamped: 0 divides by zero downstream and
+    "clamped to 30" is a value nobody chose), a folder that's gone → `~/Movies`. The realistic
+    one isn't a hand-edited plist — it's the external drive that was mounted when they chose it.
 
 - 2026-07-15 (M4-T3 onboarding): the TCC findings are in **02 §1/§2** (measured tables — read
   them before touching permissions). What belongs here is everything else.

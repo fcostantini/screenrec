@@ -4,6 +4,7 @@ import SwiftUI
 /// Identifies the onboarding window to `openWindow`. Both the launch check and the menu's
 /// blocked header open the same one.
 let onboardingWindowID = "onboarding"
+let settingsWindowID = "settings"
 
 /// The menu-bar app (docs/06 "Shell"): no Dock icon, no main window — `LSUIElement` in
 /// Info.plist — so the status item and its menu are the app's surface. The only windows that
@@ -24,6 +25,24 @@ struct ScreenRecApp: App {
 
         Window("Set Up ScreenRec", id: onboardingWindowID) {
             OnboardingView(state: state)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
+        // A plain `Window`, not SwiftUI's `Settings` scene — the same shape as Onboarding.
+        //
+        // `Settings` exists to route ⌘, through the app menu, which an LSUIElement app doesn't
+        // have; ⌘, is bound on the menu item instead, so the scene type buys nothing here. Using
+        // one `Window` for both of the app's windows also means one way of opening a window
+        // rather than two.
+        //
+        // ⚠️ Honest history: this replaced `Settings` + `SettingsLink` because those *appeared*
+        // to open the window behind everything — but that reading came from a synthetic click
+        // (`tools/menudriver.swift`), and a synthetic click can't confer activation the way a
+        // real one does. Franco confirmed the real thing was fine. So this is a preference, not
+        // a fix, and `SettingsLink` is not known to be broken.
+        Window("ScreenRec Settings", id: settingsWindowID) {
+            SettingsView(state: state)
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)

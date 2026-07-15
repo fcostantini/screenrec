@@ -374,6 +374,14 @@ UI layout, states, notification copy, and onboarding flow are specified in
       UserDefaults key names are still contractual — use exactly the table in docs/06
       "Settings window"; the names are fixed even where the writing task moved.
       **Verify:** change each setting, quit, relaunch → `defaults read
+      dev.fcostantini.screenrec.app` shows the documented keys with persisted values and UI
+      reflects them; choosing unreadable dir → immediate friendly error (§5.4).
+      DONE 2026-07-15: verified headlessly — Quality→High via the menu → `qualityPreset = high`
+      in `defaults read` → quit → relaunch → menu returns on `✓ High`. All three keys land under
+      exactly the documented names. ⚠️ **G4 §5.4 (choose Desktop → friendly error at selection)
+      is NOT yet run** — it needs the NSOpenPanel driven, and `menudriver` can't; the preflight
+      behind it is M0-T4's and unit-tested. Owed to G4.
+      **Verify:** change each setting, quit, relaunch → `defaults read
       dev.fcostantini.screenrec.app` shows the documented keys with persisted values
       and UI reflects them; choosing unreadable dir → immediate friendly error (§5.4).
 - [ ] M4-T5 Notifications (UserNotifications): recording ended + reason; click →

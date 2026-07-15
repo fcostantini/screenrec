@@ -16,15 +16,25 @@ import RecorderCore
         .diskAlmostFull, .systemSleep, .streamError("-3815"),
     ]
 
+    /// An AppState on a throwaway preferences domain.
+    ///
+    /// Never `AppState()` here: settings persist on `didSet` since M4-T4, so a bare AppState in
+    /// a test writes to the real `UserDefaults.standard` — leaking one test's assignment into
+    /// another's launch, and onto disk between runs. (That is exactly how this was found.)
+    private func makeState() -> AppState {
+        // Invariant: a fresh UUID suite name is always a valid, unused domain.
+        AppState(defaults: UserDefaults(suiteName: "appstate-tests-\(UUID().uuidString)")!)
+    }
+
     /// An AppState that has been through `started`, i.e. the first complete video frame landed.
     private func recordingState() -> AppState {
-        let state = AppState()
+        let state = makeState()
         state.apply(.started)
         return state
     }
 
     @Test func idleBeforeAnythingHappens() {
-        #expect(AppState().statusIcon == .idle)
+        #expect(makeState().statusIcon == .idle)
     }
 
     @Test func firstFrameStartsRecording() {
@@ -55,7 +65,7 @@ import RecorderCore
     }
 
     @Test func aStartFailureLeavesNothingRunning() {
-        let state = AppState()
+        let state = makeState()
         state.apply(.failed(message: "No displays available"))
         #expect(state.statusIcon == .idle)
     }
@@ -96,14 +106,14 @@ import RecorderCore
     // MARK: - The pickers → CaptureConfiguration (docs/06 items 5–7)
 
     @Test func defaultsMatchTheCaptureDefaults() {
-        let state = AppState()
+        let state = makeState()
         #expect(state.captureConfiguration.display == .main)
         #expect(state.captureConfiguration.microphone == .none)
         #expect(state.captureConfiguration.quality == .balanced)
     }
 
     @Test func pickedSourcesReachTheConfiguration() {
-        let state = AppState()
+        let state = makeState()
         state.selectedDisplayID = 42
         state.selectedMicrophoneID = "mic-uid"
         state.quality = .high
@@ -116,7 +126,7 @@ import RecorderCore
     @Test func noMicrophoneMeansNoneNotADefaultDevice() {
         // `.none` has to survive as `.none`: SCK treats a nil/sentinel device ID as an error
         // (docs/02 §1), and "the user chose no mic" must not quietly become "some mic".
-        let state = AppState()
+        let state = makeState()
         state.selectedMicrophoneID = nil
         #expect(state.captureConfiguration.microphone == .none)
     }
@@ -124,7 +134,7 @@ import RecorderCore
     @Test func firstRefreshChecksTheMainDisplay() {
         // docs/06 item 5 wants one row per screen with a checkmark on the current one — so the
         // selection must name a real row, not sit on nil.
-        let state = AppState()
+        let state = makeState()
         state.refreshSources(displays: [
             DisplayOption(id: 1, name: "Sidecar", isMain: false),
             DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
@@ -133,7 +143,7 @@ import RecorderCore
     }
 
     @Test func aPickedDisplayIsLeftAlone() {
-        let state = AppState()
+        let state = makeState()
         state.refreshSources(displays: [
             DisplayOption(id: 1, name: "Sidecar", isMain: false),
             DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
@@ -149,7 +159,7 @@ import RecorderCore
     @Test func aVanishedDisplayFallsBackToMain() {
         // Unplug the display you picked and the submenu would otherwise show nothing checked
         // while the engine resolves an ID that no longer exists.
-        let state = AppState()
+        let state = makeState()
         state.selectedDisplayID = 99
         state.refreshSources(displays: [
             DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
@@ -161,7 +171,7 @@ import RecorderCore
         // Not cosmetic: `start()` resolves a stale ID to the *system default*, so leaving the
         // selection put would show one device checked in the menu while a different one was
         // recorded. Dropping to None makes the menu and the file agree.
-        let state = AppState()
+        let state = makeState()
         state.selectedMicrophoneID = "unplugged-device-uid"
         state.refreshSources(displays: [])
         #expect(state.selectedMicrophoneID == nil)
@@ -169,7 +179,7 @@ import RecorderCore
     }
 
     @Test func noDisplaysAtAllLeavesTheConfigurationOnMain() {
-        let state = AppState()
+        let state = makeState()
         state.refreshSources(displays: [])
         #expect(state.selectedDisplayID == nil)
         #expect(state.captureConfiguration.display == .main)
@@ -178,7 +188,7 @@ import RecorderCore
     // MARK: - Session shape
 
     @Test func nothingIsActiveBeforeStarting() {
-        let state = AppState()
+        let state = makeState()
         #expect(!state.isSessionActive)
         #expect(!state.isPaused)
     }
@@ -195,7 +205,7 @@ import RecorderCore
     @Test func aStartFailureIsSaidOutLoud() {
         // ADR-007: a recording that never happened must not fail silently. Until M4-T5's
         // notifications, the header row is the only place this can be said.
-        let state = AppState()
+        let state = makeState()
         state.apply(.failed(message: "No displays available"))
         #expect(state.lastFailure == "No displays available")
     }
@@ -210,7 +220,7 @@ import RecorderCore
     @Test func consumesAWholeSessionFromItsEventStream() async {
         // The production path: RecordingSession hands over a stream, not loose events. It ends
         // by finishing the stream, so `consume` must return rather than hang the caller.
-        let state = AppState()
+        let state = makeState()
         let (events, continuation) = AsyncStream.makeStream(of: EngineEvent.self)
         for event: EngineEvent in [
             .started, .fileProgress(seconds: 5, bytes: 500_000), .paused, .resumed,

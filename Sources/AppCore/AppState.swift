@@ -32,7 +32,13 @@ public final class AppState {
     /// the one moment it matters.
     public var selectedDisplayID: CGDirectDisplayID?      // nil ⇒ whatever is the main display
     public var selectedMicrophoneID: String?              // nil ⇒ record no microphone
-    public var quality: QualityPreset = .balanced
+
+    // Persisted since M4-T4 (docs/06). The display and microphone picks deliberately are not:
+    // they name hardware that may not be there next launch, and re-homing a vanished device is
+    // already `refreshSources`'s job. docs/06 lists no key for either.
+    public var quality: QualityPreset { didSet { persist() } }
+    /// docs/06 offers 30 or 60; `Settings.allowedFrameRateCaps` is the source of truth.
+    public var frameRateCap: Int { didSet { persist() } }
 
     // MARK: - Header row
 
@@ -159,8 +165,18 @@ public final class AppState {
 
     // MARK: - Session
 
-    public let outputDirectory: URL
-    private let outputLocation: OutputLocation
+    /// Where recordings go. Settable since M4-T4 — the one place that task reaches into M4-T2's
+    /// code rather than adding beside it. Changing it re-reads the recent-files rows, which
+    /// belong to the folder, not to the app.
+    public var outputDirectory: URL {
+        didSet {
+            guard outputDirectory != oldValue else { return }
+            outputLocation = OutputLocation(directory: outputDirectory)
+            persist()
+            refreshRecentRecordings()
+        }
+    }
+    private var outputLocation: OutputLocation
     private var session: RecordingSession?
     private var currentOutputURL: URL?
     /// Captures `self` weakly and is awaited by `stopAndWaitForFinalize()`. There is no `deinit`
@@ -182,11 +198,29 @@ public final class AppState {
     /// Drives the menu's Pause/Resume swap.
     public var isPaused: Bool { statusIcon == .paused }
 
-    public init(outputLocation: OutputLocation = OutputLocation()) {
-        self.outputLocation = outputLocation
-        outputDirectory = outputLocation.directory
+    /// `defaults` is injected so the persistence round-trip is testable without touching the
+    /// real user's preferences.
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        let settings = SettingsStore.load(from: defaults)
+        outputDirectory = settings.outputDirectory
+        outputLocation = OutputLocation(directory: settings.outputDirectory)
+        quality = settings.quality
+        frameRateCap = settings.frameRateCap
         screenWasGrantedAtLaunch = Permissions.screenRecordingState() == .granted
         refreshOnboarding()          // populated before the first render, or the window flickers
+    }
+
+    private let defaults: UserDefaults
+
+    /// Writes the current settings. Called from the `didSet`s rather than by the views, so a
+    /// preference cannot be changed without being saved — "the UI forgot to persist it" is the
+    /// obvious bug in a settings screen and this makes it unreachable.
+    private func persist() {
+        SettingsStore.save(
+            Settings(
+                outputDirectory: outputDirectory, quality: quality, frameRateCap: frameRateCap),
+            to: defaults)
     }
 
     // MARK: - Menu refresh
@@ -244,6 +278,7 @@ public final class AppState {
         CaptureConfiguration(
             display: selectedDisplayID.map(DisplaySelection.id) ?? .main,
             microphone: selectedMicrophoneID.map { MicrophoneSelection.device(id: $0) } ?? .none,
+            frameRateCap: frameRateCap,
             quality: quality)
     }
 
