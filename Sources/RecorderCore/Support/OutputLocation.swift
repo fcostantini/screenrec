@@ -110,12 +110,22 @@ public struct OutputLocation: Sendable {
         return directory.appendingPathComponent(name)
     }
 
-    public enum ReservationError: Error, Equatable {
+    public enum ReservationError: Error, Equatable, LocalizedError {
         /// Creating the placeholder failed for a reason other than a name collision
         /// (e.g. the directory is unwritable). `code` is the POSIX errno.
         case cannotCreate(path: String, code: Int32)
         /// An explicit user-specified output path already exists (we won't overwrite it).
         case alreadyExists(path: String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .cannotCreate(let path, let code):
+                let reason = String(cString: strerror(code))
+                return "Couldn't create \"\(path)\" (\(reason)). Check the output folder in Settings."
+            case .alreadyExists(let path):
+                return "\"\(path)\" already exists — choose a different name or move the file."
+            }
+        }
     }
 
     /// `O_EXCL`-creates an empty placeholder at `url`; true if it claimed the name, false if

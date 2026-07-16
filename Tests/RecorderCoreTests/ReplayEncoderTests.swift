@@ -26,32 +26,9 @@ struct ReplayEncoderTests {
         }
     }
 
-    /// Feeds `count` 30 fps frames. Session bring-up is asynchronous (off the SCK queue), so the
-    /// first frame only triggers it and is dropped; this waits for readiness before feeding the
-    /// rest, failing loudly if the encoder never comes up.
-    private func encodeFrames(into encoder: ReplayEncoder, count: Int) {
-        for index in 0..<count {
-            encoder.consume(
-                makeVideoSampleBuffer(
-                    width: 640, height: 360,
-                    pts: CMTime(value: CMTimeValue(index), timescale: 30),
-                    shade: UInt8(truncatingIfNeeded: index &* 7)),
-                type: .screen)
-            if index == 0 {
-                var waited = 0
-                while !encoder.isReadyForTesting, waited < 400 {
-                    usleep(10_000)
-                    waited += 1
-                }
-                precondition(encoder.isReadyForTesting, "encoder session never became ready")
-            }
-        }
-        encoder.completePendingFrames()
-    }
-
     @Test func encodesScreenFramesIntoRingWithKeyframeCadence() {
         let encoder = ReplayEncoder(seconds: 60, frameRateCap: 30)
-        encodeFrames(into: encoder, count: 90)  // 3 s at 30 fps; frame 0 triggers bring-up
+        encodeSyntheticFrames(into: encoder, count: 90)  // 3 s at 30 fps; frame 0 triggers bring-up
         let stats = encoder.stats()
 
         // RealTime sessions may shed frames under load, so exact counts would flake. The
@@ -64,14 +41,14 @@ struct ReplayEncoderTests {
 
     @Test func firstEncodedFrameIsKeyframe() {
         let encoder = ReplayEncoder(seconds: 60, frameRateCap: 30)
-        encodeFrames(into: encoder, count: 5)
+        encodeSyntheticFrames(into: encoder, count: 5)
         let entries = encoder.ringEntriesForTesting()
         #expect(entries.first?.isKeyframe == true)
     }
 
     @Test func evictsBeyondCapacityPlusSlack() {
         let encoder = ReplayEncoder(seconds: 2, frameRateCap: 30)
-        encodeFrames(into: encoder, count: 240)  // 8 s at 30 fps into a 2 s ring
+        encodeSyntheticFrames(into: encoder, count: 240)  // 8 s at 30 fps into a 2 s ring
         let stats = encoder.stats()
         // Capacity 2 s + 2 s slack; one frame of overshoot tolerated at the boundary.
         #expect(stats.spanSeconds <= 4.1)
@@ -90,7 +67,7 @@ struct ReplayEncoderTests {
     @Test func invalidateStopsAcceptingFramesWithoutFailing() {
         let failure = FailureLatch()
         let encoder = ReplayEncoder(seconds: 60, frameRateCap: 30) { failure.set($0) }
-        encodeFrames(into: encoder, count: 5)
+        encodeSyntheticFrames(into: encoder, count: 5)
         encoder.invalidate()
         encoder.consume(
             makeVideoSampleBuffer(width: 640, height: 360, pts: CMTime(value: 6, timescale: 30)),

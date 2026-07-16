@@ -7,6 +7,7 @@ struct ReplayArmOptions {
     var duration: Double?
     var micID: String?
     var micEnabled = true
+    var outputDir = OutputLocation.defaultDirectory()
 }
 
 func parseReplayArmOptions(_ args: [String]) -> ReplayArmOptions {
@@ -25,6 +26,8 @@ func parseReplayArmOptions(_ args: [String]) -> ReplayArmOptions {
             options.micID = value
         case "--no-mic":
             options.micEnabled = false
+        case "--output":
+            options.outputDir = parseOutputDirectory(iterator.next())
         default:
             die("Unknown option: \(arg)")
         }
@@ -109,7 +112,8 @@ private func runReplayTicker(
 }
 
 /// Arms instant replay: boots the capture engine with only replay consumers attached (encoder
-/// + audio rings) — no MovieRecorder, no file. Saving arrives in M5-T4.
+/// + audio rings) — no MovieRecorder. SIGUSR1 or `s`+Return saves the last N seconds via
+/// `ReplayMuxer`; concurrent triggers coalesce.
 func runReplayArm(_ args: [String]) async {
     let options = parseReplayArmOptions(args)
 
@@ -137,12 +141,50 @@ func runReplayArm(_ args: [String]) async {
         micName = AudioInputs.available().first { $0.uniqueID == id }?.name
     }
 
+    if case .inaccessible(let reason) = OutputLocation.preflight(options.outputDir) {
+        die(reason, code: 74)
+    }
+    let muxer = ReplayMuxer(
+        encoder: encoder, systemRing: systemRing, microphoneRing: micRing,
+        seconds: options.seconds, outputDirectory: options.outputDir)
+
+    // Both triggers (SIGUSR1 and s+Return) funnel here; the muxer coalesces overlaps (§6.3).
+    let requestSave: @Sendable () -> Void = {
+        let clock = ContinuousClock()
+        let start = clock.now
+        let accepted = muxer.requestSave { result in
+            switch result {
+            case .success(let saved):
+                let parts = start.duration(to: clock.now).components
+                let elapsed = Double(parts.seconds) + Double(parts.attoseconds) / 1e18
+                print(String(
+                    format: "  ✓ replay saved in %.2f s → %@  (%.1f s)",
+                    elapsed, saved.url.path, saved.duration))
+            case .failure(let error):
+                let message = (error as? ReplayMuxerError) == .nothingBuffered
+                    ? "nothing buffered yet — the ring needs at least one frame"
+                    : error.localizedDescription
+                print("  ✗ replay save failed: \(message)")
+            }
+        }
+        print(accepted ? "  ⏺ saving replay…" : "  (save already in progress — coalesced)")
+    }
+
     let interactive = isatty(STDIN_FILENO) != 0
     var stopHints: [String] = []
     if let duration = options.duration { stopHints.append("auto-stop \(Int(duration))s") }
-    if interactive { stopHints.append("Return stops early") }
+    if interactive { stopHints.append("s+Return saves · Return stops") }
     if stopHints.isEmpty { stopHints.append("until the stream ends") }
     print("replay-arm: balanced HEVC → \(Int(options.seconds)) s ring  (\(stopHints.joined(separator: " · ")))")
+    let pid = ProcessInfo.processInfo.processIdentifier
+    print("  pid \(pid) — save from another shell:  kill -USR1 \(pid)")
+
+    // SIG_IGN first: the dispatch source only works once the default terminate action is off.
+    signal(SIGUSR1, SIG_IGN)
+    let saveSignal = DispatchSource.makeSignalSource(
+        signal: SIGUSR1, queue: DispatchQueue(label: "dev.fcostantini.screenrec.replay.signal"))
+    saveSignal.setEventHandler(handler: requestSave)
+    saveSignal.resume()
 
     await engine.start()
 
@@ -153,8 +195,11 @@ func runReplayArm(_ args: [String]) async {
     // Only on a terminal, so a piped/automated run isn't stopped by stdin EOF.
     if interactive {
         controls.append(Task.detached {
-            _ = readLine()
-            await engine.stop()
+            while let line = readLine() {
+                guard line.trimmingCharacters(in: .whitespaces).lowercased() == "s" else { break }
+                requestSave()
+            }
+            await engine.stop()   // non-"s" line, or EOF
         })
     }
 
@@ -171,7 +216,7 @@ func runReplayArm(_ args: [String]) async {
             // mic ring just stops filling — without this line its frozen column looks healthy.
             print("  ⚠️  microphone disconnected — replay continues (screen + system audio)")
         case .stopped(let reason):
-            print("replay-arm: stopped (\(describe(reason))) — ring discarded (saving arrives in M5-T4)")
+            print("replay-arm: stopped (\(describe(reason))) — ring discarded")
             if reason != .userStopped { exitCode = 1 }
         case .failed(let message):
             FileHandle.standardError.write(Data("  ✗ \(message)\n".utf8))
@@ -182,6 +227,8 @@ func runReplayArm(_ args: [String]) async {
     }
     ticker?.cancel()
     controls.forEach { $0.cancel() }
+    // A save triggered moments before stop may still be writing; exiting now would tear it.
+    muxer.waitUntilIdle()
     encoder.invalidate()
     exit(exitCode)
 }

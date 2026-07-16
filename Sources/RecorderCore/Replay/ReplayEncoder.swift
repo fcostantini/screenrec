@@ -136,7 +136,25 @@ public final class ReplayEncoder: SampleConsumer, @unchecked Sendable {
         if let session { VTCompressionSessionInvalidate(session) }
     }
 
-    /// Test seam; M5-T4's muxer gets a real clip API instead of raw entries.
+    /// The compressed samples for a clip of the last `seconds` before `anchor` (the mux clock —
+    /// audio-derived, so a static screen's stale video ring doesn't shrink the window), starting
+    /// on a keyframe (RingBuffer's contract). Falls back to everything from the oldest retained
+    /// keyframe when the ring is younger than the window (armed < N seconds ago) — a short clip
+    /// beats a refusal; the policy T1 assigned to the mux side. Empty ⇒ nothing buffered.
+    func clip(seconds: Double, endingAt anchor: CMTime) -> [RingEntry<CMSampleBuffer>] {
+        let window = ring.clip(endingAt: anchor, seconds: CMTime(seconds: seconds, preferredTimescale: 600))
+        if !window.isEmpty { return window }
+        let all = ring.snapshot()
+        guard let firstKeyframe = all.firstIndex(where: \.isKeyframe) else { return [] }
+        return Array(all[firstKeyframe...])
+    }
+
+    /// Newest encoded pts, nil while nothing is buffered.
+    func newestPTS() -> CMTime? {
+        ring.newestPTS()
+    }
+
+    /// Test seam; M5-T4's muxer gets its data through `clip(seconds:)`.
     func ringEntriesForTesting() -> [RingEntry<CMSampleBuffer>] {
         ring.snapshot()
     }
@@ -148,8 +166,9 @@ public final class ReplayEncoder: SampleConsumer, @unchecked Sendable {
         return session != nil
     }
 
-    /// Blocks until every submitted frame has reached the output handler. Test seam — live use
-    /// never waits on the encoder.
+    /// Blocks until every submitted frame has reached the output handler (≤ a frame of latency
+    /// for a RealTime session). The muxer calls this before snapshotting so the frames nearest
+    /// the trigger — the ones the user pressed save for — are in the ring.
     func completePendingFrames() {
         lock.lock()
         let session = self.session

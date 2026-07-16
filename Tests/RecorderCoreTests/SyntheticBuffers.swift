@@ -1,6 +1,31 @@
 import CoreMedia
 import CoreVideo
 
+@testable import RecorderCore
+
+/// Feeds `count` synthesized 30 fps frames through the real VT encoder and drains it. The
+/// first frame only triggers the encoder's asynchronous bring-up (and is dropped), so this
+/// waits for readiness before feeding the rest — the one ritual every replay suite shares.
+func encodeSyntheticFrames(into encoder: ReplayEncoder, count: Int) {
+    for index in 0..<count {
+        encoder.consume(
+            makeVideoSampleBuffer(
+                width: 640, height: 360,
+                pts: CMTime(value: CMTimeValue(index), timescale: 30),
+                shade: UInt8(truncatingIfNeeded: index &* 7)),
+            type: .screen)
+        if index == 0 {
+            var waited = 0
+            while !encoder.isReadyForTesting, waited < 400 {
+                usleep(10_000)
+                waited += 1
+            }
+            precondition(encoder.isReadyForTesting, "encoder session never became ready")
+        }
+    }
+    encoder.completePendingFrames()
+}
+
 /// A filled BGRA frame wrapped as a ready `CMSampleBuffer` — the shared video fixture
 /// (MovieRecorder writes it, ReplayEncoder encodes it). IOSurface-backed because that's what SCK
 /// delivers and what the hardware encoder wants; vary `shade` per frame so encoders see real

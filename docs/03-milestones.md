@@ -456,7 +456,7 @@ TCC grants — app appears by name in System Settings, grants survive rebuild).
       spans pinned at 62.0 s. **SCK system audio is planar Float32** — the live run caught
       `CMSampleBufferGetTotalSampleSize` returning 0 and a 2× rate error the interleaved-only
       fixtures couldn't see (field note). 200 tests, TSan-clean.
-- [ ] M5-T4 `ReplayMuxer`: snapshot → keyframe trim → rebase → passthrough video +
+- [x] M5-T4 `ReplayMuxer`: snapshot → keyframe trim → rebase → passthrough video +
       AAC audio → file. Coalesce concurrent saves. CLI trigger (the ring lives inside
       the running `replay-arm` process — there is NO separate `replay-save`
       subcommand): `replay-arm` saves a clip on SIGUSR1 or on `s` + Return on stdin;
@@ -465,6 +465,15 @@ TCC grants — app appears by name in System Settings, grants survive rebuild).
       later; probe: hvc1 + 2 aac, duration N + ≤ 1 s, starts on keyframe; two rapid
       signals → one clean file, no crash. "Genuinely the last minute" content check
       **(human)**.
+      DONE 2026-07-16: §6.2 ✅ signal→file-exists 0.08 s external / 0.29 s to finalized;
+      probe hvc1 4112×2570 + 2 aac, 60.56 s (60 + ≤1). §6.3 ✅ two rapid SIGUSR1s → one
+      coalesced, 2 clean files total. `s`+Return verified through a pty. The clip window
+      anchors at the newest pts across ALL rings and the last frame is tail-patched to
+      the clip end (docs/02 §5's accounting) so a static screen still yields the true
+      last N seconds. `--output` added; drains in-flight saves before exit. 207 tests
+      (incl. real-HEVC end-to-end mux, static-tail + fully-stale-window), TSan-clean.
+      /code-review presented → Franco approved batch. Owed **(human)**: "genuinely the
+      last minute" content check.
 - [ ] M5-T5 App integration: "Arm instant replay" toggle (persists), hotkey ⌥⌘R via
       Carbon (02 §9), menu item + notification on save.
       **Inherits from M4-T4 (Franco, 2026-07-15):** the replay Settings rows (buffer length

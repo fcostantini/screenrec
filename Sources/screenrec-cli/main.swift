@@ -15,9 +15,13 @@ func printUsage() {
       screenrec-cli probe-stream [--duration N] [--mic <id>] [--no-mic]
                                        Capture and report per-source buffers/formats/PTS
       screenrec-cli replay-arm [--seconds N] [--duration N] [--mic <id>] [--no-mic]
-                                       Arm instant replay: screen + system audio + mic
-                                       into rolling N-second rings (default 60; no file —
-                                       saving lands in M5-T4). Prints occupancy every 2 s.
+                               [--output <dir>]
+                                       Arm instant replay: screen + system audio + mic into
+                                       rolling N-second rings (default 60). Prints occupancy
+                                       every 2 s.
+                                       Save the last N seconds anytime with 's'+Return or
+                                       `kill -USR1 <pid>` → "Replay <date>.mov" in --output
+                                       (default ~/Movies); any other line (or Return) stops.
       screenrec-cli mic-swap-spike [mode]  How SCK binds mic devices (M3-T7 evidence, 02 §4)
       screenrec-cli --help
 
@@ -60,6 +64,12 @@ func parsePositive(
         die("\(flag) needs a positive number of \(unit)\(max.map { " (max \(Int($0)))" } ?? "")")
     }
     return parsed
+}
+
+/// Parses `--output`'s directory argument — one resolver so record and replay-arm can't drift.
+func parseOutputDirectory(_ value: String?) -> URL {
+    guard let value else { die("--output needs a path") }
+    return URL(fileURLWithPath: (value as NSString).expandingTildeInPath, isDirectory: true)
 }
 
 func describe(_ state: PermissionState) -> String {
@@ -208,8 +218,7 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
         case "--no-mic":
             options.micEnabled = false
         case "--output":
-            guard let value = iterator.next() else { die("--output needs a path") }
-            options.outputDir = URL(fileURLWithPath: (value as NSString).expandingTildeInPath, isDirectory: true)
+            options.outputDir = parseOutputDirectory(iterator.next())
         case "--script":
             guard let value = iterator.next() else { die("--script needs a value like rec10,pause5,rec10") }
             options.script = parseScript(value)

@@ -56,11 +56,14 @@ import Testing
         let entries = (0...8).map {
             RingEntry(element: $0, pts: Self.t(Double($0)), isKeyframe: $0 % 2 == 0)
         }
-        // newest pts 8, seconds 4 ⇒ cut 4; newest keyframe ≤ 4 is index 4.
-        #expect(RingBuffer<Int>.clipStartIndex(in: entries, seconds: Self.t(4)) == 4)
+        // anchor 8, seconds 4 ⇒ cut 4; newest keyframe ≤ 4 is index 4.
+        #expect(RingBuffer<Int>.clipStartIndex(in: entries, endingAt: Self.t(8), seconds: Self.t(4)) == 4)
         // No keyframe reaches back 30 s ⇒ nil; empty input ⇒ nil.
-        #expect(RingBuffer<Int>.clipStartIndex(in: entries, seconds: Self.t(30)) == nil)
-        #expect(RingBuffer<Int>.clipStartIndex(in: [], seconds: Self.t(1)) == nil)
+        #expect(RingBuffer<Int>.clipStartIndex(in: entries, endingAt: Self.t(8), seconds: Self.t(30)) == nil)
+        #expect(RingBuffer<Int>.clipStartIndex(in: [], endingAt: Self.t(8), seconds: Self.t(1)) == nil)
+        // An external anchor newer than the newest entry (static screen: the mux clock is the
+        // audio ring) selects the newest keyframe that still precedes the shifted cut.
+        #expect(RingBuffer<Int>.clipStartIndex(in: entries, endingAt: Self.t(60), seconds: Self.t(4)) == 8)
     }
 
     @Test func snapshotAndClipDuringConcurrentAppendStaySafe() async {

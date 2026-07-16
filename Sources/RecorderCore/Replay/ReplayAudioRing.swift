@@ -111,7 +111,19 @@ public final class ReplayAudioRing: SampleConsumer, @unchecked Sendable {
             copyFailures: failures)
     }
 
-    /// Test seam; M5-T4's muxer gets a real clip API instead of raw entries.
+    /// The buffered PCM from `pts` onward (start-to-start: a buffer straddling `pts` is
+    /// excluded, bounding the clip's leading audio gap to one buffer, ~20 ms). The muxer calls
+    /// this with the clip's rebase origin.
+    func entries(startingAt pts: CMTime) -> [RingEntry<CMSampleBuffer>] {
+        ring.snapshot().filter { CMTimeCompare($0.pts, pts) >= 0 }
+    }
+
+    /// Newest buffered pts, nil while empty — one input to the muxer's window anchor.
+    func newestPTS() -> CMTime? {
+        ring.newestPTS()
+    }
+
+    /// Test seam; M5-T4's muxer gets its data through `entries(startingAt:)`.
     func ringEntriesForTesting() -> [RingEntry<CMSampleBuffer>] {
         ring.snapshot()
     }

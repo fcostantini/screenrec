@@ -95,7 +95,7 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
 
         systemAudioInput = AVAssetWriterInput(
             mediaType: .audio,
-            outputSettings: Self.audioSettings(sampleRate: 48_000, channels: 2, bitRate: 192_000))
+            outputSettings: AudioEncodingSettings.aac(sampleRate: 48_000, channels: 2, bitRate: 192_000))
         systemAudioInput.expectsMediaDataInRealTime = true
         guard writer.canAdd(systemAudioInput) else { throw MovieRecorderError.cannotAddInput(.systemAudio) }
         writer.add(systemAudioInput)
@@ -227,7 +227,7 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
             if source == .screen { droppedFrames += 1 }
             return
         }
-        guard let retimed = Self.retimed(buffer, to: rebasedPTS) else { return }
+        guard let retimed = SampleTiming.retimed(buffer, to: rebasedPTS) else { return }
         input.append(retimed)
 
         if source == .screen {
@@ -310,7 +310,7 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         if let buffer = lastVideoBuffer, let lastPTS = lastVideoRebasedPTS,
            let input = videoInput, input.isReadyForMoreMediaData,
            CMTimeCompare(latestRebasedPTS, lastPTS) > 0,
-           let tail = Self.retimed(buffer, to: latestRebasedPTS) {
+           let tail = SampleTiming.retimed(buffer, to: latestRebasedPTS) {
             input.append(tail)
         }
 
@@ -355,38 +355,6 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         if !didStartWriting { didFailToBeginWriting = true }
     }
 
-    /// Copies `buffer` shifting every timing entry so its presentation timestamp becomes
-    /// `newPTS` — sample data is shared, not copied. Returns nil if the buffer has no numeric
-    /// timing or the copy fails.
-    private static func retimed(_ buffer: CMSampleBuffer, to newPTS: CMTime) -> CMSampleBuffer? {
-        let originalPTS = CMSampleBufferGetPresentationTimeStamp(buffer)
-        guard originalPTS.isNumeric else { return nil }
-        let delta = CMTimeSubtract(newPTS, originalPTS)
-
-        var count: CMItemCount = 0
-        guard CMSampleBufferGetSampleTimingInfoArray(
-            buffer, entryCount: 0, arrayToFill: nil, entriesNeededOut: &count) == noErr, count > 0
-        else { return nil }
-        var timings = [CMSampleTimingInfo](repeating: CMSampleTimingInfo(), count: count)
-        guard CMSampleBufferGetSampleTimingInfoArray(
-            buffer, entryCount: count, arrayToFill: &timings, entriesNeededOut: &count) == noErr
-        else { return nil }
-        for index in timings.indices {
-            if timings[index].presentationTimeStamp.isNumeric {
-                timings[index].presentationTimeStamp = CMTimeAdd(timings[index].presentationTimeStamp, delta)
-            }
-            if timings[index].decodeTimeStamp.isNumeric {
-                timings[index].decodeTimeStamp = CMTimeAdd(timings[index].decodeTimeStamp, delta)
-            }
-        }
-        var out: CMSampleBuffer?
-        guard CMSampleBufferCreateCopyWithNewTiming(
-            allocator: kCFAllocatorDefault, sampleBuffer: buffer,
-            sampleTimingEntryCount: count, sampleTimingArray: &timings, sampleBufferOut: &out) == noErr
-        else { return nil }
-        return out
-    }
-
     // MARK: - Encoder settings
 
     private static func makeVideoInput(
@@ -419,40 +387,6 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         ]
     }
 
-    private static func audioSettings(sampleRate: Double, channels: Int, bitRate: Int) -> [String: Any] {
-        [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: sampleRate,
-            AVNumberOfChannelsKey: channels,
-            AVEncoderBitRateKey: supportedAACBitRate(target: bitRate, sampleRate: sampleRate, channels: channels),
-        ]
-    }
-
-    /// Snaps `target` to a rate in `AVAudioConverter.applicableEncodeBitRates` for this format:
-    /// the AAC encoder accepts only a discrete set that shrinks with the format (24 kHz mono
-    /// tops out at 64 kbps), and an out-of-set value fails the writer with -12651. Picks the
-    /// highest supported rate ≤ target; falls back to target if the encoder can't be queried.
-    private static func supportedAACBitRate(target: Int, sampleRate: Double, channels: Int) -> Int {
-        let bytesPerFrame = UInt32(2 * channels)
-        var sourceASBD = AudioStreamBasicDescription(
-            mSampleRate: sampleRate, mFormatID: kAudioFormatLinearPCM,
-            mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
-            mBytesPerPacket: bytesPerFrame, mFramesPerPacket: 1, mBytesPerFrame: bytesPerFrame,
-            mChannelsPerFrame: UInt32(channels), mBitsPerChannel: 16, mReserved: 0)
-        guard let source = AVAudioFormat(streamDescription: &sourceASBD),
-              let destination = AVAudioFormat(settings: [
-                  AVFormatIDKey: kAudioFormatMPEG4AAC,
-                  AVSampleRateKey: sampleRate,
-                  AVNumberOfChannelsKey: channels,
-              ]),
-              let converter = AVAudioConverter(from: source, to: destination),
-              let rates = converter.applicableEncodeBitRates?.compactMap({ $0.intValue }),
-              !rates.isEmpty else {
-            return target
-        }
-        return rates.filter { $0 <= target }.max() ?? rates.min() ?? target
-    }
-
     /// Builds the mic AAC input matching the device-native sample rate/channel count read
     /// from its first buffer (docs/02 §4). Returns nil if the format carries no audio ASBD.
     private static func makeMicrophoneInput(format: CMFormatDescription) -> AVAssetWriterInput? {
@@ -461,7 +395,7 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         }
         let input = AVAssetWriterInput(
             mediaType: .audio,
-            outputSettings: audioSettings(
+            outputSettings: AudioEncodingSettings.aac(
                 sampleRate: asbd.mSampleRate,
                 channels: Int(asbd.mChannelsPerFrame),
                 bitRate: 160_000))

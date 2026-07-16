@@ -74,16 +74,38 @@ final class RingBuffer<Element>: @unchecked Sendable {
     /// (docs/04 §6.2). Any fall-back-to-shorter policy is the muxer's (M5-T4), not the ring's.
     func clip(seconds: CMTime) -> [RingEntry<Element>] {
         lock.lock(); defer { lock.unlock() }
-        guard let start = Self.clipStartIndex(in: entries, seconds: seconds) else { return [] }
+        guard let newest = entries.last else { return [] }
+        return clipLocked(endingAt: newest.pts, seconds: seconds)
+    }
+
+    /// Like `clip(seconds:)`, but the window ends at an external `anchor` — the mux clock, which
+    /// may be newer than this ring's newest entry (frame-on-change: a static screen's video ring
+    /// lags a live audio clock).
+    func clip(endingAt anchor: CMTime, seconds: CMTime) -> [RingEntry<Element>] {
+        lock.lock(); defer { lock.unlock() }
+        return clipLocked(endingAt: anchor, seconds: seconds)
+    }
+
+    /// Newest stored pts, without copying the ring. Nil while empty.
+    func newestPTS() -> CMTime? {
+        lock.lock(); defer { lock.unlock() }
+        return entries.last?.pts
+    }
+
+    private func clipLocked(endingAt anchor: CMTime, seconds: CMTime) -> [RingEntry<Element>] {
+        guard let start = Self.clipStartIndex(in: entries, endingAt: anchor, seconds: seconds) else {
+            return []
+        }
         return Array(entries[start...])
     }
 
     /// Pure keyframe selection, so it's testable without a live ring or clock: the index of the
-    /// newest keyframe whose pts ≤ `newest.pts − seconds` — the tightest start that still yields at
-    /// least `seconds` — or nil if none qualifies.
-    static func clipStartIndex(in entries: [RingEntry<Element>], seconds: CMTime) -> Int? {
-        guard let newest = entries.last else { return nil }
-        let cut = CMTimeSubtract(newest.pts, seconds)
+    /// newest keyframe whose pts ≤ `anchor − seconds` — the tightest start that still yields at
+    /// least `seconds` before the anchor — or nil if none qualifies.
+    static func clipStartIndex(
+        in entries: [RingEntry<Element>], endingAt anchor: CMTime, seconds: CMTime
+    ) -> Int? {
+        let cut = CMTimeSubtract(anchor, seconds)
         return entries.lastIndex { $0.isKeyframe && CMTimeCompare($0.pts, cut) <= 0 }
     }
 }

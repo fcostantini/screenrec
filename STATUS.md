@@ -5,13 +5,20 @@
 
 ## Now
 
-- **Current milestone: M5 — instant replay. M5-T3 DONE** (`ReplayAudioRing`: deep PCM copies of
+- **Current milestone: M5 — instant replay. M5-T4 DONE — replay saves real files.**
+  (`ReplayMuxer`: rings → keyframe-trimmed, rebased, passthrough-video + AAC `Replay … .mov` in
+  ~0.3 s; SIGUSR1 + `s`+Return triggers, coalescing, drain-before-exit; window anchored at the
+  newest pts across all rings + docs/02 §5 tail patch so a static screen still saves the true
+  last N seconds. §6.2 ✅ §6.3 ✅ headless; 207 tests, TSan-clean; /code-review findings presented
+  → batch approved — see field note.) **Next: M5-T5 (app integration — arm toggle, ⌥⌘R Carbon
+  hotkey, menu item, "Replay saved" notification; owns `replayArmed`/`replaySeconds`/
+  `replayHotkey` per docs/06).** Owed to Franco (non-blocking): §6.2's "genuinely the last
+  minute" content check.
+- **M5-T3 DONE** (`ReplayAudioRing`: deep PCM copies of
   `.systemAudio` + `.microphone` into per-source rings; ASBD latch that **clears + re-latches on a
   format change** (Franco picked re-latch over drop-forever, 2026-07-16 — "see how it works in the
   wild"); `replay-arm` grew `--mic/--no-mic`, format lines and a per-ring ticker; 2-min live verify
-  exact on byte math; 201 tests, TSan-clean; /code-review applied — see field note). **Next: M5-T4
-  (`ReplayMuxer` — snapshot → keyframe trim → rebase → passthrough video + AAC audio → file;
-  SIGUSR1 / `s`+Return trigger in `replay-arm`).**
+  exact on byte math; 201 tests, TSan-clean; /code-review applied — see field note).
   ⚠️ G5 risk to settle by M5-T6: §6.1's "RSS ≲ 200 MB" was written against 02 §9's ~10 Mbps
   estimate, but Balanced at this display is 19 Mbps ⇒ a busy 60 s video ring alone is ~141–190 MB
   payload. Candidate fix: VT `DataRateLimits` on the replay session (we drive VT directly, unlike
@@ -244,6 +251,27 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-16 (M5-T4 ReplayMuxer): instant replay produces files; two findings worth keeping.
+  - 🔴 **The clip window must be anchored at the newest pts across ALL rings, never the video
+    ring's own newest** — frame-on-change means a static screen's video ring can be minutes
+    stale while audio tracks wall-clock. /code-review caught my first pass anchoring on video:
+    a static-screen save would have written minutes-long files of *old* content. The fix is the
+    same idea as MovieRecorder's tail patch (02 §5), applied at mux time: window ends at the
+    audio clock, the last frame is re-appended at the clip end, and a fully-static window
+    rebases audio from the window start with the stale GOP frozen at the top.
+  - 🐞 **AVAssetWriter infers a track's LAST sample duration from the *previous* pts delta when
+    durations are invalid** (VT compressed samples: we encode with `duration: .invalid`). A
+    tail patch 9 s after the last real frame therefore got a 9 s duration and inflated the
+    track — video 19 s in a 10 s clip. Only the *last* sample misbehaves (interior samples get
+    their real delta, which is exactly the frozen-frame display we want). Fix: the patch copy
+    carries an explicit duration (`SampleTiming.retimed(_:to:duration:)`). Caught by the
+    fully-stale-window unit test before it ever reached a live run.
+  - **Process note: findings presented to Franco before fixing** (his rule from M5-T3), batch
+    approved incl. option (b) on the window anchor. One finding was refuted by a verifier that
+    actually reproduced disk-full against a tiny APFS image — the writer keeps accepting and
+    fails cleanly at `finishWriting`; the drain's writer-status escape stays as cheap insurance
+    for any state where `requestMediaDataWhenReady` stops re-firing.
 
 - 2026-07-16 (M5-T3 audio rings): the live run earned its keep twice in one afternoon.
   - **/code-review's theme was silent-failure observability, and it was right four ways at once:**
