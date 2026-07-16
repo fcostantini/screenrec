@@ -31,9 +31,14 @@ public final class AppState {
             if selectedDisplayID != oldValue, !isRehomingSources { replayConfigurationChanged() }
         }
     }
-    public var selectedMicrophoneID: String? {            // nil ⇒ record no microphone
+    /// The last user-picked microphone; nil ⇒ record no microphone. Persisted, and it survives
+    /// the device's absence: resolution at every stream start uses the device if present and
+    /// records without a mic if not — "AirPods when they're in your ears", automatically.
+    public var selectedMicrophoneID: String? {
         didSet {
-            if selectedMicrophoneID != oldValue, !isRehomingSources { replayConfigurationChanged() }
+            guard selectedMicrophoneID != oldValue, !isRehomingSources else { return }
+            persist()
+            replayConfigurationChanged()
         }
     }
 
@@ -250,6 +255,7 @@ public final class AppState {
         outputLocation = OutputLocation(directory: settings.outputDirectory)
         quality = settings.quality
         frameRateCap = settings.frameRateCap
+        selectedMicrophoneID = settings.microphoneID
         isReplayArmed = settings.replayArmed
         replaySeconds = settings.replaySeconds
         replayHotkey = settings.replayHotkey
@@ -278,6 +284,7 @@ public final class AppState {
         SettingsStore.save(
             Settings(
                 outputDirectory: outputDirectory, quality: quality, frameRateCap: frameRateCap,
+                microphoneID: selectedMicrophoneID,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey),
             to: defaults)
@@ -350,12 +357,13 @@ public final class AppState {
     }
 
     /// The configuration for replay's own stream: the current picks with the mic ID resolved
-    /// the way `start()` resolves it — a stale ID fed raw to SCK fails with the opaque
-    /// "invalid parameter" (02 §1), which would spin the armed retry loop forever.
+    /// the way `start()` resolves it (picked-device-or-nothing) — a stale ID fed raw to SCK
+    /// fails with the opaque "invalid parameter" (02 §1), which would spin the armed retry
+    /// loop forever.
     private func replayCaptureConfiguration() -> CaptureConfiguration {
         var configuration = captureConfiguration
         if let picked = selectedMicrophoneID {
-            switch Permissions.resolvedMicrophoneID(preferred: picked) {
+            switch Permissions.resolvedMicrophoneID(preferred: picked, fallingBackToDefault: false) {
             case .explicit(let id): configuration.microphone = .device(id: id)
             case .noDevice: configuration.microphone = .none
             }
@@ -393,11 +401,19 @@ public final class AppState {
         if selectedDisplayID == nil || !displays.contains(where: { $0.id == selectedDisplayID }) {
             selectedDisplayID = (displays.first(where: \.isMain) ?? displays.first)?.id
         }
-        // A microphone that has gone away drops to None: `start()` resolves a stale ID to the
-        // system default, so the menu would otherwise show one device while another is recorded.
-        if let picked = selectedMicrophoneID, !microphones.contains(where: { $0.uniqueID == picked }) {
-            selectedMicrophoneID = nil
-        }
+        // The microphone pick deliberately survives its device's absence: clearing it here
+        // would forget the user's choice every time the AirPods sat in their case at menu-open.
+        // The menu's picker binding shows None while the device is away (`presentMicrophoneID`),
+        // and stream starts resolve picked-device-or-nothing, so nothing lies.
+    }
+
+    /// What the menu's Microphone picker selects: the pick when its device is present, else nil
+    /// (checkmark on None) — the truthful display of a pick whose device is away, without
+    /// forgetting the pick.
+    public var presentMicrophoneID: String? {
+        guard let picked = selectedMicrophoneID,
+              microphones.contains(where: { $0.uniqueID == picked }) else { return nil }
+        return picked
     }
 
     public func refreshRecentRecordings() {
@@ -581,22 +597,23 @@ public final class AppState {
     // MARK: - Helpers
 
     /// SCK needs an explicit device ID or capture fails with an opaque "invalid parameter"
-    /// (02 §1), so a picked microphone goes through the CLI's resolver: it rejects a stale ID and
-    /// falls back to the system default.
+    /// (02 §1). Resolution is picked-device-or-nothing (no default fallback): the persisted
+    /// pick's device may be in its case, and binding a different mic than the menu shows
+    /// would make the menu lie.
     private func resolvedMicrophone() -> MicrophoneSelection {
         guard let picked = selectedMicrophoneID else {
             activeMicrophoneName = nil
             return .none
         }
-        switch Permissions.resolvedMicrophoneID(preferred: picked) {
+        switch Permissions.resolvedMicrophoneID(preferred: picked, fallingBackToDefault: false) {
         case .explicit(let resolved):
-            activeMicrophoneName = microphones.first { $0.uniqueID == resolved }?.name
+            activeMicrophoneName = AudioInputs.available().first { $0.uniqueID == resolved }?.name
             return .device(id: resolved)
-        case .noDevice(let reason):
-            // Record the screen anyway — losing a long capture over a missing microphone is the
+        case .noDevice:
+            // Record the screen anyway — losing a capture over a missing microphone is the
             // worse outcome (ADR-012) — but never silently (ADR-007).
             activeMicrophoneName = nil
-            lastFailure = reason
+            lastFailure = "The selected microphone isn't connected — recording without it."
             return .none
         }
     }

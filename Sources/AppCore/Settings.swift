@@ -26,6 +26,10 @@ public struct Settings: Sendable, Equatable {
     public var quality: QualityPreset
     /// docs/06 offers 30 or 60.
     public var frameRateCap: Int
+    /// The last user-picked microphone's uniqueID; nil ⇒ None. Deliberately NOT validated
+    /// against connected devices at load — the pick must survive the device sitting in its
+    /// case (resolution happens at every stream start, and falls back to no mic).
+    public var microphoneID: String?
     public var replayArmed: Bool
     /// docs/06 offers 30, 60 or 120.
     public var replaySeconds: Int
@@ -39,6 +43,7 @@ public struct Settings: Sendable, Equatable {
             outputDirectory: OutputLocation.defaultDirectory(),
             quality: .balanced,
             frameRateCap: 60,
+            microphoneID: nil,
             replayArmed: false,
             replaySeconds: 60,
             replayHotkey: .standard)
@@ -55,6 +60,7 @@ public enum SettingsStore {
         public static let outputDirectory = "outputDirectory"
         public static let qualityPreset = "qualityPreset"
         public static let fpsCap = "fpsCap"
+        public static let microphoneID = "microphoneID"
         public static let replayArmed = "replayArmed"
         public static let replaySeconds = "replaySeconds"
         public static let replayHotkey = "replayHotkey"
@@ -96,6 +102,12 @@ public enum SettingsStore {
             settings.frameRateCap = fps
         }
 
+        // No device-presence validation, on purpose: launching with the AirPods in their case
+        // must not forget the pick (see the field's comment).
+        if let microphoneID = defaults.string(forKey: Key.microphoneID), !microphoneID.isEmpty {
+            settings.microphoneID = microphoneID
+        }
+
         settings.replayArmed = defaults.bool(forKey: Key.replayArmed)
 
         // Same shape as fps: only the documented values, or a ring gets sized by garbage.
@@ -123,6 +135,11 @@ public enum SettingsStore {
         defaults.set(settings.outputDirectory.path, forKey: Key.outputDirectory)
         defaults.set(settings.quality.rawValue, forKey: Key.qualityPreset)
         defaults.set(settings.frameRateCap, forKey: Key.fpsCap)
+        if let microphoneID = settings.microphoneID {
+            defaults.set(microphoneID, forKey: Key.microphoneID)
+        } else {
+            defaults.removeObject(forKey: Key.microphoneID)
+        }
         defaults.set(settings.replayArmed, forKey: Key.replayArmed)
         defaults.set(settings.replaySeconds, forKey: Key.replaySeconds)
         defaults.set(

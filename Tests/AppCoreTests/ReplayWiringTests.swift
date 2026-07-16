@@ -107,19 +107,19 @@ import RecorderCore
         #expect(spy.calls.count == 4)
     }
 
-    @Test func sourceRehomingNeverRestartsTheArmedStream() {
-        // `refreshSources` re-homes stale picks on every menu open. Those writes are
-        // housekeeping, not user intent — a restart here wipes the buffer on the first open
-        // after launch, or right after a mic vanished (the moment someone opens the menu to
-        // save what they still have).
+    @Test func sourceRehomingNeverRestartsTheArmedStreamNorForgetsThePick() {
+        // `refreshSources` runs on every menu open. It must neither restart the armed stream
+        // (wiping the buffer at the worst moment) nor clear the persisted mic pick — the pick
+        // survives its device's absence so AirPods work automatically when they return.
         let (state, spy, _) = makeState()
         state.isReplayArmed = true
         state.selectedMicrophoneID = "vanished-mic"
         spy.calls = []
 
-        state.refreshSources(displays: [])   // picked mic absent from the fresh list → nil re-home
-        #expect(state.selectedMicrophoneID == nil)
-        #expect(spy.calls.isEmpty)
+        state.refreshSources(displays: [])   // picked mic absent from the fresh device list
+        #expect(state.selectedMicrophoneID == "vanished-mic")   // pick kept
+        #expect(state.presentMicrophoneID == nil)               // menu shows None, truthfully
+        #expect(spy.calls.isEmpty)                              // buffer untouched
     }
 
     @Test func changesWhileDisarmedTouchNothing() {

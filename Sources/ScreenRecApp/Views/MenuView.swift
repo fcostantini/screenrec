@@ -64,7 +64,12 @@ struct MenuView: View {
             }
         }
 
-        Picker("Microphone", selection: $state.selectedMicrophoneID) {
+        // Reads through `presentMicrophoneID`: the checkmark sits on None while the picked
+        // device is away, without the pick being forgotten. Writes are real user picks.
+        Picker("Microphone", selection: Binding(
+            get: { state.presentMicrophoneID },
+            set: { state.selectedMicrophoneID = $0 }
+        )) {
             Text("None").tag(String?.none)
             ForEach(state.microphones, id: \.uniqueID) { device in
                 Text(device.name).tag(String?.some(device.uniqueID))

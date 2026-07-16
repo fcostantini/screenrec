@@ -113,11 +113,17 @@ public enum Permissions {
 
     /// Live convenience: validate the preferred ID against currently-connected devices
     /// and resolve against the system's default input device.
-    public static func resolvedMicrophoneID(preferred: String? = nil) -> MicrophoneResolution {
+    ///
+    /// `fallingBackToDefault: false` means the picked device or nothing — the app's policy,
+    /// so a persisted pick whose device is in its case can't silently bind a different mic
+    /// than the menu shows. The CLI keeps the default fallback.
+    public static func resolvedMicrophoneID(
+        preferred: String? = nil, fallingBackToDefault: Bool = true
+    ) -> MicrophoneResolution {
         resolveMicrophoneID(
             preferred: preferred,
             deviceExists: { AVCaptureDevice(uniqueID: $0) != nil },
-            defaultDeviceID: defaultMicrophoneID
+            defaultDeviceID: fallingBackToDefault ? defaultMicrophoneID : { nil }
         )
     }
 }

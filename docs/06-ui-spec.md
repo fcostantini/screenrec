@@ -203,6 +203,7 @@ moved):
 | `outputDirectory` | String path | M4-T4 |
 | `qualityPreset` | `efficient`\|`balanced`\|`high` | M4-T4 |
 | `fpsCap` | Int 30\|60 | M4-T4 |
+| `microphoneID` | String uniqueID; absent ⇒ None. **Never cleared by device absence** — the pick survives the AirPods sitting in their case; every stream start resolves picked-device-or-nothing (no default-mic fallback, or the menu would lie), and the menu's checkmark sits on None while the device is away (Franco, 2026-07-16) | M5 follow-up |
 | `replayArmed` | Bool | **M5** |
 | `replaySeconds` | Int 30\|60\|120 | **M5** |
 | `replayHotkey` | Dict: keyCode Int, modifiers Int | **M5** |

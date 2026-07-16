@@ -41,6 +41,7 @@ import RecorderCore
         #expect(SettingsStore.Key.outputDirectory == "outputDirectory")
         #expect(SettingsStore.Key.qualityPreset == "qualityPreset")
         #expect(SettingsStore.Key.fpsCap == "fpsCap")
+        #expect(SettingsStore.Key.microphoneID == "microphoneID")
         #expect(SettingsStore.Key.replayArmed == "replayArmed")
         #expect(SettingsStore.Key.replaySeconds == "replaySeconds")
         #expect(SettingsStore.Key.replayHotkey == "replayHotkey")
@@ -75,6 +76,23 @@ import RecorderCore
         let defaults = makeDefaults().defaults
         SettingsStore.save(makeSettings(), to: defaults)
         #expect(defaults.string(forKey: "outputDirectory") == "/tmp")
+    }
+
+    @Test func microphonePickPersistsAndSurvivesItsDeviceBeingAway() {
+        let defaults = makeDefaults().defaults
+        var settings = makeSettings()
+        settings.microphoneID = "airpods-uuid-that-is-not-connected-right-now"
+        SettingsStore.save(settings, to: defaults)
+        // No presence validation at load: launching with the AirPods in their case must not
+        // forget the pick. Resolution at stream start handles absence.
+        #expect(SettingsStore.load(from: defaults).microphoneID
+            == "airpods-uuid-that-is-not-connected-right-now")
+
+        // None round-trips as key-absent, not as an empty string.
+        settings.microphoneID = nil
+        SettingsStore.save(settings, to: defaults)
+        #expect(defaults.object(forKey: "microphoneID") == nil)
+        #expect(SettingsStore.load(from: defaults).microphoneID == nil)
     }
 
     @Test func hotkeyPersistsAsTheDocumentedDict() {

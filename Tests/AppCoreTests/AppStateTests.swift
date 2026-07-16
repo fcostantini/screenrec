@@ -167,15 +167,16 @@ import RecorderCore
         #expect(state.selectedDisplayID == 2)
     }
 
-    @Test func aVanishedMicrophoneDropsToNone() {
-        // Not cosmetic: `start()` resolves a stale ID to the *system default*, so leaving the
-        // selection put would show one device checked in the menu while a different one was
-        // recorded. Dropping to None makes the menu and the file agree.
+    @Test func aVanishedMicrophonePickIsKeptButDisplaysAsNone() {
+        // The pick survives its device's absence (persisted; AirPods return and just work) —
+        // the menu stays honest through `presentMicrophoneID`, and stream starts resolve
+        // picked-device-or-nothing rather than falling back to the system default, so the
+        // menu and the file always agree.
         let state = makeState()
         state.selectedMicrophoneID = "unplugged-device-uid"
         state.refreshSources(displays: [])
-        #expect(state.selectedMicrophoneID == nil)
-        #expect(state.captureConfiguration.microphone == .none)
+        #expect(state.selectedMicrophoneID == "unplugged-device-uid")
+        #expect(state.presentMicrophoneID == nil)
     }
 
     @Test func noDisplaysAtAllLeavesTheConfigurationOnMain() {
