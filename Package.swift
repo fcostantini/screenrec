@@ -30,7 +30,9 @@ let package = Package(
         .executableTarget(
             name: "ScreenRecApp",
             dependencies: ["AppCore"],
-            exclude: ["Resources/Info.plist"],
+            // Both are assembled into the .app bundle by Scripts/bundle.sh, not compiled —
+            // exclude them so SPM doesn't treat them as unhandled resources.
+            exclude: ["Resources/Info.plist", "Resources/AppIcon.icns"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(

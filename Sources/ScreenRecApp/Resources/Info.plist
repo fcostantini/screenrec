@@ -10,12 +10,16 @@
 	<string>dev.fcostantini.screenrec.app</string>
 	<key>CFBundleExecutable</key>
 	<string>ScreenRec</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<!-- Version keys are placeholders; Scripts/bundle.sh stamps them from the VERSION file, so
+	     the checked-in plist can't drift from the built bundle. -->
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>__VERSION__</string>
 	<key>CFBundleVersion</key>
-	<string>0.1.0</string>
+	<string>__VERSION__</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>15.0</string>
 	<key>LSUIElement</key>

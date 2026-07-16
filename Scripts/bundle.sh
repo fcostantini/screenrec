@@ -16,11 +16,31 @@ CONTENTS="${APP}/Contents"
 echo "▸ Building ${PRODUCT} (release)…"
 swift build -c release --product "$PRODUCT"
 
-echo "▸ Assembling ${APP}…"
+# One source of truth for the version. Fail loudly rather than ship the plist's placeholder.
+if [ ! -f VERSION ]; then
+  echo "✗ VERSION file missing — refusing to build a bundle with an unstamped version" >&2
+  exit 1
+fi
+VERSION="$(tr -d '[:space:]' < VERSION)"
+if [ -z "$VERSION" ]; then
+  echo "✗ VERSION file is empty" >&2
+  exit 1
+fi
+
+ICON="Sources/ScreenRecApp/Resources/AppIcon.icns"
+if [ ! -f "$ICON" ]; then
+  echo "✗ ${ICON} missing — run Scripts/makeicns.sh" >&2
+  exit 1
+fi
+
+echo "▸ Assembling ${APP} (version ${VERSION})…"
 rm -rf "$APP"
 mkdir -p "${CONTENTS}/MacOS" "${CONTENTS}/Resources"
 cp ".build/release/${PRODUCT}" "${CONTENTS}/MacOS/${APP_NAME}"
-cp "Sources/ScreenRecApp/Resources/Info.plist" "${CONTENTS}/Info.plist"
+cp "$ICON" "${CONTENTS}/Resources/AppIcon.icns"
+# Stamp the version placeholders on the way into the bundle, so the checked-in plist can't
+# disagree with the build.
+sed "s/__VERSION__/${VERSION}/g" "Sources/ScreenRecApp/Resources/Info.plist" > "${CONTENTS}/Info.plist"
 printf 'APPL????' > "${CONTENTS}/PkgInfo"
 
 echo "▸ Signing…"

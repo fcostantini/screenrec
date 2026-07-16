@@ -34,9 +34,18 @@
   `--print-delivered-notifications` → `Recording saved · 00:00:05 / Recording … .mov`, docs/06's
   copy exactly. 174 tests. **docs/06's table covered four fewer cases than the engine emits** —
   amended (see field notes). Owed to a human: does a banner appear, and does a click reveal.
-- **Next: M4-T6 — bundle polish** (app icon, version stamping), then **M4 is code-complete** and
-  **G4** is the gate. G4 §5.1's fresh account is where M4-T3's two unobserved paths — the
-  auto-relaunch and the screen row's Grant→Settings switch — finally get watched.
+- **M4-T6 DONE — M4 is CODE-COMPLETE.** App icon (candidate C, a display + record dot; code-drawn
+  via `tools/makeicon.swift` → `.icns` via `Scripts/makeicns.sh`, checked in) and single-source
+  version stamping (`VERSION` → `bundle.sh` stamps `__VERSION__`, fails loud if either missing).
+  docs/03's three checks green: Finder icon resolves from the bundle (NSWorkspace), version ==
+  VERSION, `codesign --verify --strict`. ⚠️ **The notification BANNER still shows the generic
+  placeholder icon** — my own T5/T6 stretch claim, not a docs/03 requirement. `usernoted` caches
+  the icon per bundle-id and cached the icon-less build; `lsregister -f` didn't clear it and I'm
+  not restarting a system daemon to force it. Expected to resolve at M6 (real install path +
+  notarization). Recorded, not faked.
+- **Next: G4 — the gate.** §5.1's fresh account is where M4-T3's two unobserved paths — the
+  auto-relaunch and the screen row's Grant→Settings switch — finally get watched, and where
+  M4-T5's fail-stop notification (and the banner icon above) get checked for real.
 - **The `/simplify` sweep over M3 was run** (commits `fff901e`, `2522e26`) — an ARC cycle that
   made `CaptureEngine.deinit` unreachable, and the M3-T7 spike held to the CLI's bar.
 - **Replay-armed toggle + icon badge: deferred to M4-T4** (Franco, 2026-07-15), which owns the
@@ -180,6 +189,26 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-16 (M4-T6 bundle polish): small task, one honest miss.
+  - **The icon is code-drawn, not a checked-in mystery PNG.** `tools/makeicon.swift` renders the
+    1024 master; `Scripts/makeicns.sh` runs `sips` + `iconutil` to the 10-slot `.icns`. Same
+    reproducible-not-binary reasoning as `busyscene.swift`. Candidate C — a display with a record
+    dot — because the icon most needs telling apart in the Screen Recording permission list,
+    where every neighbour is also a recorder.
+  - **Version has one source now.** `Info.plist` carries `__VERSION__` placeholders; `bundle.sh`
+    stamps them from `VERSION` and fails loud if `VERSION` or the icon is missing. The checked-in
+    plist literally cannot disagree with the built bundle — you can't stamp what you didn't read.
+  - 🐞 **"icon renders in Finder" ≠ "icon renders on the notification banner" — I conflated them.**
+    `NSWorkspace.icon(forFile:)` resolves the icon from the assembled bundle immediately (docs/03's
+    actual check, passing). But the notification banner still shows the generic placeholder:
+    `usernoted` caches the icon per bundle-id, cached the icon-less earlier build, and `lsregister
+    -f` doesn't flush that cache. The clean flush (`killall usernoted`) is restarting a system
+    daemon, which the sandbox correctly refused on my own initiative. **Two different icon caches
+    with different flush rules** — Finder/LaunchServices vs the notification daemon. The banner
+    icon is expected to come good at M6 (app at a real path + notarized); until then it's a known
+    gap, watched at G4, not a claimed pass. It was never a docs/03 requirement — it was my stretch
+    goal in the T5/T6 plans, so no gate is blocked, but the plan overpromised.
 
 - 2026-07-15 (M4-T5 notifications): mostly wiring; the value was in the copy.
   - 🔴 **docs/06's copy table covered four fewer cases than the engine emits**, and the gaps were

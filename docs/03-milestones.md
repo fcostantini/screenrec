@@ -400,10 +400,17 @@ UI layout, states, notification copy, and onboarding flow are specified in
       an unreachable state (M3-T4). **Still owed to a human:** whether a banner appears, and
       click-to-reveal. **Fail-stop copy is unit-tested but never delivered live** — the app has no
       `--test-disk-floor`, so provoking one needs a patch; G4 §5.3 covers it.
-- [ ] M4-T6 Bundle polish: app icon (placeholder ok, iconutil-built .icns),
+- [x] M4-T6 Bundle polish: app icon (placeholder ok, iconutil-built .icns),
       `bundle.sh` produces the final artifact, version stamping.
       **Verify:** Info.plist version matches a `VERSION` file; icon renders in Finder;
       `codesign --verify --strict` passes on the final bundle.
+      DONE 2026-07-16, all three green: `defaults read …/Info.plist CFBundleShortVersionString`
+      == `VERSION` (0.1.0); `NSWorkspace.icon(forFile:)` resolves the display+dot icon from the
+      assembled bundle (screenshot in the task artifact); `codesign --verify --strict` passes.
+      Icon (candidate C — Franco chose) is code-drawn (`tools/makeicon.swift`) → `.icns` via
+      `Scripts/makeicns.sh`, checked in. `VERSION` is the single source; `bundle.sh` stamps the
+      `__VERSION__` placeholders and fails loudly if VERSION or the icon is missing. **M4 is now
+      code-complete.**
 
 **Gate G4**: 04-testing §5 (fresh-account onboarding < 2 min; menu flows; app-identity
 TCC grants — app appears by name in System Settings, grants survive rebuild).
