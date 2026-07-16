@@ -5,7 +5,9 @@
 
 ## Now
 
-- **Current milestone: M5 — instant replay.** Next task: **M5-T1 (`RingBuffer`)**. M4 is
+- **Current milestone: M5 — instant replay. M5-T1 DONE** (`RingBuffer`: generic, duration-bounded,
+  keyframe-aligned clip, NSLock-guarded, TSan-clean, 7 tests; /code-review medium applied). **Next:
+  M5-T2 (`ReplayEncoder` — VTCompressionSession → the ring, CLI `replay-arm`).** M4 is
   code-complete; G4 is §5.1 ✅ / §5.2 ✅ / §5.3 ✅, and **§5.4's fix landed** (the unwritable-folder
   wedge — see field note + `fix:` commit) with the **fresh-account re-run DEFERRED (Franco,
   2026-07-16)** along with the two /code-review follow-ups. M5 core (T1–T4) is CLI-driven and

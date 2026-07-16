@@ -419,9 +419,18 @@ TCC grants — app appears by name in System Settings, grants survive rebuild).
 
 ## M5 — Instant replay (est. 2–3 sessions)
 
-- [ ] M5-T1 `RingBuffer` (generic, duration-bounded, lock-guarded).
+- [x] M5-T1 `RingBuffer` (generic, duration-bounded, lock-guarded).
       **Verify:** unit tests — eviction by duration, keyframe search, snapshot during
       concurrent append; clean under `swift test --sanitize=thread`.
+      DONE 2026-07-16: `Sources/RecorderCore/Replay/RingBuffer.swift` — generic
+      `RingBuffer<Element>` over `(element, pts, isKeyframe)`; eviction from the head while span >
+      `capacity + 2 s slack`; keyframe-aligned `clip(seconds:)` starting at the tightest keyframe
+      ≤ `newest − N` (+ a pure `clipStartIndex` the M5-T4 muxer will reuse). NSLock-guarded; kept
+      `internal` until M5-T2 needs it cross-module. 7 tests (eviction boundary, keyframe selection
+      incl. both empty cases, direct `clipStartIndex`, and a concurrent append/snapshot/clip run) —
+      **clean under `--sanitize=thread`**. /code-review (medium) applied: precompute the eviction
+      limit off the hot path; document the non-decreasing-pts precondition (ADR-005 no-B-frames
+      guarantees it). `ReplayBuffer` protocol (ADR-005) deferred to when T2/T4 give it a consumer.
 - [ ] M5-T2 `ReplayEncoder`: VTCompressionSession per 02 §9; consume `.screen` via
       SampleRouter; keyframe flag extraction; ring append. CLI `replay-arm --seconds 60`
       boots the engine with ONLY the replay consumer attached (no MovieRecorder) and
