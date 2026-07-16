@@ -5,7 +5,13 @@
 
 ## Now
 
-- **Current milestone:** M4 — the menu-bar app. M3 COMPLETE, G3 PASSED (all legs).
+- **Current milestone: M5 — instant replay.** Next task: **M5-T1 (`RingBuffer`)**. M4 is
+  code-complete; G4 is §5.1 ✅ / §5.2 ✅ / §5.3 ✅, and **§5.4's fix landed** (the unwritable-folder
+  wedge — see field note + `fix:` commit) with the **fresh-account re-run DEFERRED (Franco,
+  2026-07-16)** along with the two /code-review follow-ups. M5 core (T1–T4) is CLI-driven and
+  doesn't need G4 (dependency graph); M5-T5's app integration does. Also shipped: the menu now
+  shows the output folder (`Open Recordings Folder — ~/Movies`).
+- **Current milestone (was):** M4 — the menu-bar app. M3 COMPLETE, G3 PASSED (all legs).
 - **M4-T1 DONE.** `AppCore` library target exists (RecorderCore-only deps, no AppKit/SwiftUI):
   `AppState` (@MainActor @Observable) folds `EngineEvent` → `StatusIcon`; SwiftUI views stay in
   `ScreenRecApp`. All three icon states verified by screenshot, not by eye-of-faith — including
