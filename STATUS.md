@@ -182,7 +182,9 @@ video (deterministic, reproducible).
 ## Needs Franco (human-only items)
 
 - [ ] **G4 §5.4 fresh-account re-run (with the FIXED build).** §5.1 ✅ + §5.3 ✅ done live. §5.4
-      found the wedge bug (now fixed). Copy the new `dist/ScreenRec.app` to the fresh account and:
+      found the wedge bug (now fixed). **`/Users/Shared/ScreenRec.app` is already the current
+      build (refreshed 2026-07-16, post-M5-T5 — it's also what Launchpad launches);** on the
+      fresh account:
       Settings → Choose → **Desktop without Files & Folders** → **rejected at selection** (Fix B);
       and if bypassed (`defaults write … outputDirectory <Desktop>`), Start → **clean "Couldn't
       write…" notification, app alive** (Fix A). Note: launching the app via `open` from the agent's
