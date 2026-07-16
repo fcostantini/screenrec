@@ -35,7 +35,23 @@ public enum MenuHeader {
 
     /// The output folder shown on `Open Recordings Folder` (docs/06 item 9): the destination as a
     /// home-relative path (`~/Movies`), so the menu says where recordings go without opening it.
+    ///
+    /// Long paths keep only their tail: a menu sizes itself to its widest row and can't
+    /// truncate visually, so a deep folder would stretch the whole menu across the screen. The
+    /// tail is the part the user chose; elided ancestry is one click away in Finder.
     public static func recordingsFolder(_ directory: URL) -> String {
-        (directory.path as NSString).abbreviatingWithTildeInPath
+        let abbreviated = (directory.path as NSString).abbreviatingWithTildeInPath
+        guard abbreviated.count > maxFolderDisplayLength else { return abbreviated }
+
+        var tail = ""
+        for component in abbreviated.split(separator: "/").reversed() {
+            let candidate = "/\(component)\(tail)"
+            if !tail.isEmpty, candidate.count + 1 > maxFolderDisplayLength { break }
+            tail = candidate
+        }
+        // A single component longer than the budget keeps its end — the most specific part.
+        return "…" + tail.suffix(maxFolderDisplayLength)
     }
+
+    private static let maxFolderDisplayLength = 40
 }

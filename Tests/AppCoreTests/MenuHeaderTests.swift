@@ -75,4 +75,26 @@ import RecorderCore
         #expect(MenuHeader.recordingsFolder(URL(fileURLWithPath: "/Volumes/Ext/Recordings"))
             == "/Volumes/Ext/Recordings")
     }
+
+    @Test func recordingsFolderKeepsOnlyTheTailOfADeepPath() {
+        // A menu sizes itself to its widest row: a deep path would stretch the whole menu
+        // across the screen. The kept tail is the part the user actually chose.
+        let deep = URL(fileURLWithPath:
+            "/private/tmp/claude-501/some-sandbox-name/0314-0040-4615/scratchpad/replays")
+        let shown = MenuHeader.recordingsFolder(deep)
+        // The contract: within budget, elision marked, the chosen folder's tail intact —
+        // how many ancestors fit is the algorithm's business.
+        #expect(shown.hasPrefix("…/"))
+        #expect(shown.hasSuffix("/scratchpad/replays"))
+        #expect(shown.count <= 41)   // budget + the ellipsis
+    }
+
+    @Test func recordingsFolderTrimsAnOversizedSingleComponent() {
+        let absurd = URL(fileURLWithPath:
+            "/Volumes/" + String(repeating: "x", count: 80))
+        let shown = MenuHeader.recordingsFolder(absurd)
+        #expect(shown.hasPrefix("…"))
+        #expect(shown.count <= 41)
+        #expect(shown.hasSuffix("x"))   // the end survives — the most specific part
+    }
 }
