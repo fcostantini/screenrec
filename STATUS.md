@@ -43,9 +43,32 @@
   the icon per bundle-id and cached the icon-less build; `lsregister -f` didn't clear it and I'm
   not restarting a system daemon to force it. Expected to resolve at M6 (real install path +
   notarization). Recorded, not faked.
-- **Next: G4 — the gate.** §5.1's fresh account is where M4-T3's two unobserved paths — the
-  auto-relaunch and the screen row's Grant→Settings switch — finally get watched, and where
-  M4-T5's fail-stop notification (and the banner icon above) get checked for real.
+- **G4 IN PROGRESS — headless legs closed, human legs handed to Franco (walkthrough artifact).**
+  - **§5.2 grants-survive-rebuild — PASSED headlessly.** Designated requirement byte-identical
+    across an A→B `bundle.sh` rebuild (`codesign -d -r-` diff empty), `--verify --strict` passes,
+    and — the behavioral half — the rebuilt app launched to `ScreenRec — Ready` and a menu-driven
+    Start→Pause→Resume→Stop produced a playable 19.43 s file (hvc1 4112×2570 + aac 48k/2ch) with
+    no re-grant. Grants attach to that identical DR, so screen (and by the same mechanism mic,
+    proven live in M4-T3) survive.
+  - **§5.3 menu-flow + notification delivery — PASSED headlessly.** `menudriver` drove
+    Start→Pause→Resume→Stop; the `Pause`→`Resume` label swap and the recording/paused headers
+    match docs/06. Both notification copies delivered with fresh dates: normal stop
+    `Recording saved · 00:00:19` and — via a **temporary `--force-fail-stop` disk-floor probe,
+    reverted, tree clean** — the fail-stop `Recording saved · 00:00:02 / Ended: disk almost full.
+    File is playable.` (playable 2.05 s file). Exact match to `RecordingNotification.swift`.
+  - **§5.1 ✅ + §5.3 ✅ LIVE (Franco, 2026-07-16, fresh account + this one).** Auto-relaunch on the
+    screen-grant transition confirmed (had to force the ungranted state — the fresh account's
+    Screen Recording was already on); banner renders + click reveals in Finder confirmed. The
+    macOS 15 "bypass the private window picker" consent shows our icon as the badge (LaunchServices
+    resolves it — the notification-banner cache is the separate stale one). §5.1 WATCH ② (Grant→
+    Settings switch) is reasoned-not-watched.
+  - **§5.4 ❌ FOUND A REAL BUG, now FIXED (see field note + the fix commit).** Choosing an
+    unwritable output folder (Desktop w/o Files & Folders) **wedged the app** — swallowed
+    `startWriting()` failure, no terminal event, live SCStream stuck. Fixed both halves: the
+    recorder now surfaces the failure → clean `.failed` (no wedge), and preflight probes with the
+    real `AVAssetWriter` API so Desktop is rejected at selection. Verified: unit + headless
+    forced-failure integration (no wedge, "Couldn't write…" notification). **Owed: fresh-account
+    end-to-end re-run with the fixed build.**
 - **The `/simplify` sweep over M3 was run** (commits `fff901e`, `2522e26`) — an ARC cycle that
   made `CaptureEngine.deinit` unreachable, and the M3-T7 spike held to the CLI's bar.
 - **Replay-armed toggle + icon badge: deferred to M4-T4** (Franco, 2026-07-15), which owns the
@@ -117,6 +140,15 @@ video (deterministic, reproducible).
 
 ## Needs Franco (human-only items)
 
+- [ ] **G4 §5.4 fresh-account re-run (with the FIXED build).** §5.1 ✅ + §5.3 ✅ done live. §5.4
+      found the wedge bug (now fixed). Copy the new `dist/ScreenRec.app` to the fresh account and:
+      Settings → Choose → **Desktop without Files & Folders** → **rejected at selection** (Fix B);
+      and if bypassed (`defaults write … outputDirectory <Desktop>`), Start → **clean "Couldn't
+      write…" notification, app alive** (Fix A). Note: launching the app via `open` from the agent's
+      Terminal appears to lend it Terminal's Desktop access, so this-account repro is unreliable —
+      the fresh account (Finder-launched) is the honest environment.
+  - **§5.1 WATCH ② (Grant… → Open System Settings…)** — reasoned-not-watched; catch it if convenient.
+
 - [x] DONE 2026-07-14: Franco granted the Claude Code runtime ("2.1.209") Screen
       Recording AND Microphone, so capture tests (engine-smoke/record/probe) run directly
       via the agent's shell. Both applied immediately, no restart. If Claude Code's
@@ -184,11 +216,70 @@ video (deterministic, reproducible).
 | G1   | ✅ passed 2026-07-14 | probe-stream: all 3 sources flowing. video 4112×2570 420v (PTS Δ 0.008–0.09s, frame-on-change); system audio 48kHz/2ch/32-bit (Δ 0.02s); mic native format device-dependent — AirPods 24kHz/1ch, built-in 48kHz/1ch (both differ from system audio → separate tracks required, M2) |
 | G2   | ✅ passed 2026-07-14 | §3.1 tracks hvc1+2×aac ✅; §3.2 kill-9 ✅ (kill@6s→5.04s playable AFTER fragment fix 10s→1s — 10s was unparseable if killed <10s); §3.3 sync-clap ✅ (Franco); §3.4 static-tail ✅ (14s static→14.4s @7.9fps, tail patch holds); §3.5 30-min drift ✅ (Franco ran real 30-min record + beepflash; per-track dur match 50ms; flash↔beep offset constant ~−67ms±10 from min 5→29 = no drift) |
 | G3   | ✅ **PASSED 2026-07-15** | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears ✅ PASSED 2026-07-15 (Franco, post-M3-T6, per the ADR-012 definition): AirPods cased at ~22s of a 60s run → CLI printed `⚠️ microphone disconnected — still recording` at ~25s (≈3.2s latency = 3s timeout + ≤1s poll), recording ran to the end, `finished (userStopped)`, file playable, mic track 21.82s vs video 59.83s. First run (pre-M3-T6) disproved the gate's premise — no takeover, buffers just stop → docs/02 §4 corrected, ADR-012 written. Also proved: a reconnected device NEVER resumes (mic gone for the session). §4.4 disk-guard ✅ PASSED: `--test-disk-floor 500000` (GB) vs 676 GiB free → `finished (diskAlmostFull)`, file playable (2.25s); negative verified on a real non-boot volume (4 GB HFS+ image, importantUsage reads 0 → records the full 8s, `userStopped`) after /code-review caught that the recommended capacity key reads 0 on every external volume. §4.1 cross-seam clap-sync ✅ (Franco — sync holds across the seam). §4.3 ✅ both ways in: display sleep (headless via `pmset`) → playable 3.3s, and lid-close/system sleep (Franco) → `finished (displayDisconnected)` + playable 11.2s file finalized on wake, confirming lid-close is the same -3815 and that `.systemSleep` is genuinely unreachable. §4.3 monitor-unplug N/A — built-in display only. |
-| G4   | ⬜ not run | — |
+| G4   | 🟡 in progress | §5.2 ✅ headless: DR byte-identical across A→B rebuild + `--verify --strict` + rebuilt app `Ready` → menu-driven 19.43 s playable file, no re-grant. §5.3 ✅ headless (delivery) + ✅ live (Franco: banner renders + click reveals). §5.1 ✅ live (Franco: auto-relaunch on grant transition, forced the ungranted state). §5.4 ❌→**FIXED**: choosing an unwritable folder (Desktop) wedged the app (swallowed `startWriting()` failure); fix landed (recorder surfaces failure → clean `.failed`; preflight probes the real AVAssetWriter API → Desktop rejected at selection). Verified unit + headless forced-failure integration (no wedge). **Owed:** fresh-account end-to-end re-run of §5.4 with the fixed build. |
 | G5   | ⬜ not run | — |
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-16 (G4 §5.4 — the wedge bug the gate caught, and its fix): the whole reason gates exist.
+  - 🔴 **An unwritable output folder WEDGED the app — a live SCStream with no way out.** Choosing
+    Desktop without Files & Folders (or any folder that becomes unwritable): `AVAssetWriter.
+    startWriting()` returns `false`, `MovieRecorder.beginWriting()` **swallowed it**, `consume()`
+    then `guard didStartWriting else { return }` on every frame, and the recorder had **no channel
+    to report "I couldn't begin."** `RecordingSession`'s event loop only ends when `engine.events`
+    finishes — but the engine happily keeps capturing — so **no `.failed`/`.finished` ever reached
+    the app.** Symptoms Franco hit: idle icon (no first frame written) + a menu stuck on "Stop &
+    Save" (session ≠ nil) + inert Stop + dead screenshot shortcut (live capture holding the display).
+  - **Fix A (the wedge):** `MovieRecorder` gained `onWriteFailure` (mirrors `onMicrophoneFormatChange`);
+    `beginWriting` latches the failure and fires once, outside the lock; `RecordingSession` stops
+    the engine and yields `.failed("Couldn't write the recording to …")`. Any `startWriting()`
+    failure now ends in a plain message + a live app.
+  - **Fix B (catch it early):** `OutputLocation.preflight` probed with a POSIX `createFile`, which
+    **succeeds on a TCC-protected Desktop where `AVAssetWriter` fails** (measured: createFile→true,
+    startWriting→NSCocoa 513/-12204). Now it probes with a throwaway `AVAssetWriter.startWriting()`
+    (one input, self-cleaning) — the exact call a recording makes — so Desktop is rejected at
+    selection. **Check a preflight against the API that actually gets blocked, not a cheaper proxy.**
+  - ⚠️ **`~/Movies` is safe for a fresh user** — it is NOT TCC-protected, so the default path needs
+    no grant (the whole point of the M0-T4 default). Only *changing* the output to Desktop/Documents/
+    Downloads triggers this.
+  - 🐞 **I could not reproduce the unwritable-Desktop state on the dev account** — launching the app
+    via `open` from the agent's Terminal appears to lend it Terminal's Desktop access (the app is in
+    NEITHER Files & Folders NOR Full Disk Access, yet wrote to Desktop). Don't state the mechanism as
+    fact, but the lesson stands: **the honest repro is a Finder-launched app on a fresh account.** I
+    verified the *integration* headlessly instead via a temporary forced-`startWriting`-failure hook
+    (reverted): Start → no wedge, back to Ready, "Couldn't write…" delivered.
+  - **Two /code-review follow-ups (deferred, out of scope for the RecorderCore fix):**
+    - **Finding 1 (confirmed, observed live):** the write-fail `.failed` fires *after* `.started`
+      (StartedDetector on the first complete frame is writer-independent), so `AppState` computes
+      `hadStarted = statusIcon != .idle = true` → notification titled **"Couldn't save the recording"**
+      when nothing was ever written (should be "Couldn't start"). Body is clear, so low-harm. Fix
+      touches M4-T5's title heuristic — a small AppCore follow-up.
+    - **Finding 3 (plausible):** preflight now does `AVAssetWriter` I/O synchronously on the main
+      thread in `SettingsView.chooseFolder`; on a slow/network volume the folder pick could briefly
+      hang. One-time action already behind a modal panel; move off-main if it ever bites.
+
+- 2026-07-16 (G4 headless prep): docs/04 §5 is labelled "human-driven", but **half of it isn't**.
+  - **§5.2 grants-survive-rebuild is fully headless on this account.** Two-part proof: (1) the
+    signing half — `codesign -d -r-` designated requirement is byte-identical across an A→B
+    `bundle.sh` rebuild (diff the `designated =>` line), `--verify --strict` passes; (2) the
+    behavioral half — after the rebuild, launch the app, confirm the menu header reads
+    `ScreenRec — Ready` (readiness is a *live* TCC read, so `Ready` == grant still attached), then
+    `menudriver` a real recording. A successful post-rebuild capture IS the proof the grant survived.
+  - **The fail-stop notification IS deliverable headlessly — the seam already exists.** The app has
+    no `--test-disk-floor` (that's the CLI's), but `RecordingSession.init(diskFloorBytes:)` is
+    public and the app just passes `nil`. A ~4-line temporary launch-arg hook at `AppState.start()`
+    (`--force-fail-stop` → `diskFloorBytes: 500_000 GB`) trips the disk guard right after the first
+    frame → `finished(.diskAlmostFull)` → the app posts its real fail-stop copy. Verified the exact
+    docs/06 string delivered live, then reverted (tree clean). No product change needed for the gate.
+  - **`--print-delivered-notifications` stamps dates in UTC (`…Z`), not local.** For the "is this
+    *this* run?" check (M4-T5's warning), convert: on this box local = UTC−3, so a 09:53 local run
+    shows `12:53Z`. Assert against the converted time or the whole thing looks stale.
+  - **What stays human, and why it can't be faked:** a *rendered banner* and a *click* (Notification
+    Center draws them; delivery ≠ appearance), the fresh-account never-granted paths (this Mac holds
+    every grant — the throwaway-bundle trick proves TCC *logic* but not the *onboarding UX*), and
+    the `NSOpenPanel` Desktop-preflight (`menudriver` can't drive a system file panel). Those three
+    are the whole of what's left, and they're in the walkthrough artifact.
 
 - 2026-07-16 (M4-T6 bundle polish): small task, one honest miss.
   - **The icon is code-drawn, not a checked-in mystery PNG.** `tools/makeicon.swift` renders the
