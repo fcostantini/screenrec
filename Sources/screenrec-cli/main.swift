@@ -14,6 +14,10 @@ func printUsage() {
       screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
       screenrec-cli probe-stream [--duration N] [--mic <id>] [--no-mic]
                                        Capture and report per-source buffers/formats/PTS
+      screenrec-cli replay-arm [--seconds N] [--duration N]
+                                       Arm instant replay: encode the screen into a
+                                       rolling N-second ring (default 60; no file —
+                                       saving lands in M5-T4). Prints occupancy every 2 s.
       screenrec-cli mic-swap-spike [mode]  How SCK binds mic devices (M3-T7 evidence, 02 §4)
       screenrec-cli --help
 
@@ -131,12 +135,9 @@ func runEngineSmoke(_ args: [String]) async {
 
     await engine.start()
     // Cancelled if the stream ends first, so a failed start doesn't wait out the timer.
-    let stopTimer = Task {
-        try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
-        await engine.stop()
-    }
+    let timer = stopTimer(after: duration) { await engine.stop() }
     let ok = await consumer.value
-    stopTimer.cancel()
+    timer.cancel()
 
     print(ok ? "engine-smoke: OK" : "engine-smoke: FAILED")
     exit(ok ? 0 : 1)
@@ -347,6 +348,15 @@ func preciseSleep(_ seconds: Double) async {
     try? await clock.sleep(until: clock.now.advanced(by: .seconds(seconds)), tolerance: .milliseconds(2))
 }
 
+/// A timer task that stops capture after `seconds` — the `--duration` stop control shared by
+/// engine-smoke, record and replay-arm.
+func stopTimer(after seconds: Double, stop: @escaping @Sendable () async -> Void) -> Task<Void, Never> {
+    Task {
+        await preciseSleep(seconds)
+        await stop()
+    }
+}
+
 /// Runs a `--script` timeline against a live session, then stops it. A record step is a wait;
 /// a pause step brackets its wait with `pause()`/`resume()`.
 func runScript(_ steps: [ScriptStep], session: RecordingSession) async {
@@ -428,10 +438,7 @@ func performRecording(_ options: RecordOptions) async {
         controls.append(Task { await runScript(steps, session: session) })
     } else {
         if let duration = options.duration {
-            controls.append(Task {
-                await preciseSleep(duration)
-                await session.stop()
-            })
+            controls.append(stopTimer(after: duration) { await session.stop() })
         }
         // Only when stdin is a terminal, so a piped/automated run isn't stopped by stdin EOF.
         if interactive {
@@ -488,6 +495,8 @@ case "engine-smoke":
     await runEngineSmoke(Array(arguments.dropFirst()))
 case "probe-stream":
     await runProbeStream(Array(arguments.dropFirst()))
+case "replay-arm":
+    await runReplayArm(Array(arguments.dropFirst()))
 case "mic-swap-spike":
     await runMicSwapSpike(Array(arguments.dropFirst()))
 case "-h", "--help":

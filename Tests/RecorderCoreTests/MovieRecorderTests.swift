@@ -42,7 +42,7 @@ import Testing
             let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
             let frameDuration = CMTime(value: 1, timescale: CMTimeScale(Self.fps))
             recorder.consume(
-                Self.videoSample(width: Self.width, height: Self.height,
+                makeVideoSampleBuffer(width: Self.width, height: Self.height,
                                  pts: pts, duration: frameDuration),
                 type: .screen)
             recorder.consume(
@@ -90,7 +90,7 @@ import Testing
         for index in 0..<(Self.fps * Self.seconds) {
             let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
             recorder.consume(
-                Self.videoSample(width: Self.width, height: Self.height, pts: pts,
+                makeVideoSampleBuffer(width: Self.width, height: Self.height, pts: pts,
                                  duration: CMTime(value: 1, timescale: CMTimeScale(Self.fps))),
                 type: .screen)
             recorder.consume(
@@ -128,7 +128,7 @@ import Testing
             for index in 0..<frames {
                 let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
                 recorder.consume(
-                    Self.videoSample(width: Self.width, height: Self.height, pts: pts,
+                    makeVideoSampleBuffer(width: Self.width, height: Self.height, pts: pts,
                                      duration: frameDuration),
                     type: .screen)
                 recorder.consume(
@@ -262,7 +262,7 @@ import Testing
             for index in 0..<2 {
                 let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
                 recorder.consume(
-                    Self.videoSample(width: Self.width, height: Self.height, pts: pts,
+                    makeVideoSampleBuffer(width: Self.width, height: Self.height, pts: pts,
                                      duration: CMTime(value: 1, timescale: CMTimeScale(Self.fps))),
                     type: .screen)
             }
@@ -282,32 +282,6 @@ import Testing
     private static func subtype(of track: AVAssetTrack) async throws -> FourCharCode {
         let descriptions = try await track.load(.formatDescriptions)
         return CMFormatDescriptionGetMediaSubType(descriptions[0])
-    }
-
-    private static func videoSample(
-        width: Int, height: Int, pts: CMTime, duration: CMTime
-    ) -> CMSampleBuffer {
-        var pixelBuffer: CVPixelBuffer?
-        CVPixelBufferCreate(kCFAllocatorDefault, width, height,
-                            kCVPixelFormatType_32BGRA, nil, &pixelBuffer)
-        let buffer = pixelBuffer!
-        CVPixelBufferLockBaseAddress(buffer, [])
-        memset(CVPixelBufferGetBaseAddress(buffer), 0x40,
-               CVPixelBufferGetBytesPerRow(buffer) * height)
-        CVPixelBufferUnlockBaseAddress(buffer, [])
-
-        var formatDescription: CMVideoFormatDescription?
-        CMVideoFormatDescriptionCreateForImageBuffer(
-            allocator: kCFAllocatorDefault, imageBuffer: buffer,
-            formatDescriptionOut: &formatDescription)
-        var timing = CMSampleTimingInfo(
-            duration: duration, presentationTimeStamp: pts, decodeTimeStamp: .invalid)
-        var sampleBuffer: CMSampleBuffer?
-        CMSampleBufferCreateForImageBuffer(
-            allocator: kCFAllocatorDefault, imageBuffer: buffer, dataReady: true,
-            makeDataReadyCallback: nil, refcon: nil, formatDescription: formatDescription!,
-            sampleTiming: &timing, sampleBufferOut: &sampleBuffer)
-        return sampleBuffer!
     }
 
     private static func audioFormat(sampleRate: Double, channels: UInt32) -> CMAudioFormatDescription {

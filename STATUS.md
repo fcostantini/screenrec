@@ -5,9 +5,14 @@
 
 ## Now
 
-- **Current milestone: M5 — instant replay. M5-T1 DONE** (`RingBuffer`: generic, duration-bounded,
-  keyframe-aligned clip, NSLock-guarded, TSan-clean, 7 tests; /code-review medium applied). **Next:
-  M5-T2 (`ReplayEncoder` — VTCompressionSession → the ring, CLI `replay-arm`).** M4 is
+- **Current milestone: M5 — instant replay. M5-T2 DONE** (`ReplayEncoder`: VTCompressionSession →
+  the ring; CLI `replay-arm --seconds 60 --duration N`; verify green — 3-min run plateaued at
+  62.0 s / keyframes ≈ 1/s / ring bytes flat; 194 tests, TSan-clean; /code-review high applied —
+  see field note). **Next: M5-T3 (audio rings — PCM copies of `.audio` + `.microphone`, occupancy
+  printout grows audio columns).** ⚠️ Verifies needing a busy screen: ask Franco before running
+  `busyscene` — it takes over his display (his ruling, 2026-07-16).
+- **M5-T1 DONE** (`RingBuffer`: generic, duration-bounded,
+  keyframe-aligned clip, NSLock-guarded, TSan-clean, 7 tests; /code-review medium applied). M4 is
   code-complete; G4 is §5.1 ✅ / §5.2 ✅ / §5.3 ✅, and **§5.4's fix landed** (the unwritable-folder
   wedge — see field note + `fix:` commit) with the **fresh-account re-run DEFERRED (Franco,
   2026-07-16)** along with the two /code-review follow-ups. M5 core (T1–T4) is CLI-driven and
@@ -229,6 +234,57 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-16 (M5-T2 ReplayEncoder): the encoder went in clean; the surprises were measurements.
+  - 🔴 **/code-review (high) caught VT session bring-up running on SCK's screen queue** —
+    `VTCompressionSessionCreate` + `PrepareToEncodeFrames` allocates the hardware encoder
+    (tens–hundreds of ms) and my first pass did it inside `consume()` under the lock, on the
+    same serial queue MovieRecorder shares. With queueDepth 5 at 60 fps (~83 ms of headroom),
+    arming replay during a live recording would have visibly stuttered it — invisible in every
+    T2 verify because nothing else consumed the queue yet. Bring-up now runs on a dedicated
+    setup queue; frames arriving before readiness are dropped (the ring just starts a beat
+    later). **"Doesn't block the callback queue" has to be checked against the slowest call on
+    the path, not the average one** — the same docs/01 rule, still finding new ways to break.
+  - Also from the review, all applied: `replay-arm`'s encoder failure now routes through
+    `engine.stop(reason: .streamError(…))` (the M3-T2 seam) instead of `exit(1)` from a VT
+    thread; `ReplayEncoder.init` preconditions on a finite positive window (a negative/NaN
+    ring capacity silently evicts everything); `frameRateCap` is passed from the engine's
+    `CaptureConfiguration` instead of a duplicated default; the synthesized-frame fixture is
+    consolidated into `SyntheticBuffers.swift` (MovieRecorderTests' copy deleted); the
+    keyframe-cadence test asserts cadence against *retained* span rather than absolute counts
+    (RealTime sessions may shed frames, and the old assertions contradicted each other's
+    tolerance); a test's captured `var` in the `@Sendable` onFailure closure became a locked
+    latch; `stats()` is single-pass; the `--seconds 600` cap comment now states the real cost
+    (~1.4 GB, not 0.9).
+  - 📏 **`phys_footprint` attribution of VT output varies run to run.** Same code, same 3-min
+    verify: one run plateaued at 16–17 MB (with `ps` RSS at 33 MB), the next at 113–128 MB with
+    a slow upward drift — while the ring's payload bytes sat flat at ~141 MB in both. Whatever
+    memory the HW encoder's output block buffers land in, the task-level number is not a stable
+    measure of it. For §6.1, treat "RSS ≲ 200 MB" as satisfied but weak evidence; M5-T6's
+    30-min audit should watch the drift and system-wide pressure, not one instrument.
+  - ⚠️ **`tools/busyscene.swift` takes over Franco's screen — never run it without asking him
+    first** (his ruling, mid-verify). Future busy-screen verifies: name the run and its length,
+    let him pick the moment.
+  - **VideoToolbox needs no TCC grant — the replay encoder is fully unit-testable headlessly.**
+    Real HEVC encodes against synthesized IOSurface-backed pixel buffers, in-process, no
+    permissions: keyframe cadence, eviction and stats are all asserted against actual encoder
+    output, not mocks. The suite runs in ~0.7 s. This generalizes: anything VT-only in M5 (the
+    muxer's AAC encode at T4, likely) can be tested the same way.
+  - 📏 **Compressed VT output is NOT attributed to our process's memory.** The 3-min run held
+    ~141 MB of compressed payload in the ring (measured by `CMSampleBufferGetTotalSampleSize`,
+    and it matches Balanced's 19 Mbps × 62 s math exactly) while in-process `phys_footprint`
+    read 17 MB and external `ps` RSS read 33 MB — both flat. The HW encoder's output block
+    buffers live in memory the kernel doesn't charge to the task. Two consequences: (1) §6.1's
+    "RSS plateau ≲ 200 MB" will pass trivially and is therefore a *leak* check, not a *usage*
+    check; (2) M5-T6's audit should also watch system-wide memory pressure, not just our RSS,
+    or the ring's real cost is invisible. Both instruments agreeing on "flat" is the part that
+    matters for T2.
+  - **02 §9's "~80 MB video @ 60 s" estimate is ~2× low for this display.** It assumed ~10 Mbps;
+    Balanced at 4112×2570@60 computes 19 Mbps → ~141 MB/62 s. Not a bug — the model is doing
+    what M2-T6 calibrated — but worth knowing before anyone sizes a 120 s ring (docs/06 offers
+    one: ~282 MB payload).
+  - **`--seconds` is capped at 600** so a typo can't ask for a multi-GB ring; docs/06's largest
+    offered buffer is 120 s, so the cap is generous.
 
 - 2026-07-16 (G4 §5.4 — the wedge bug the gate caught, and its fix): the whole reason gates exist.
   - 🔴 **An unwritable output folder WEDGED the app — a live SCStream with no way out.** Choosing

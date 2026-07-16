@@ -431,12 +431,20 @@ TCC grants — app appears by name in System Settings, grants survive rebuild).
       **clean under `--sanitize=thread`**. /code-review (medium) applied: precompute the eviction
       limit off the hot path; document the non-decreasing-pts precondition (ADR-005 no-B-frames
       guarantees it). `ReplayBuffer` protocol (ADR-005) deferred to when T2/T4 give it a consumer.
-- [ ] M5-T2 `ReplayEncoder`: VTCompressionSession per 02 §9; consume `.screen` via
+- [x] M5-T2 `ReplayEncoder`: VTCompressionSession per 02 §9; consume `.screen` via
       SampleRouter; keyframe flag extraction; ring append. CLI `replay-arm --seconds 60`
       boots the engine with ONLY the replay consumer attached (no MovieRecorder) and
       prints ring occupancy/memory every 2 s.
       **Verify:** 3-min `replay-arm` run — occupancy climbs then plateaus at ~60 s;
       keyframes counted ≈ 1/s; RSS stable (§6.1 short form).
+      DONE 2026-07-16: `Sources/RecorderCore/Replay/ReplayEncoder.swift` (session lazily
+      sized from the first frame, Balanced bitrate via BitrateModel, one-shot `onFailure`
+      mirroring `onWriteFailure`) + CLI `replay-arm [--seconds N] [--duration N]`.
+      3-min live run (final code): occupancy 0 → pinned 62.0 s (60 + 2 slack), keyframes
+      62–63 ≈ 1/s, ring bytes flat ~141 MB, RSS ≪ 200 MB (but attribution varies run to
+      run — field note; M5-T6's 30-min audit decides drift). 6 headless VT tests (no TCC
+      needed), TSan-clean. /code-review high applied (async session bring-up off the SCK
+      queue, failure routed through `stop(reason:)`, init validation, shared test fixture).
 - [ ] M5-T3 Audio rings (PCM copies of `.audio` + `.microphone`).
       **Verify:** `replay-arm` occupancy printout includes both audio rings; PCM byte
       counts match duration × format math; rings stay duration-aligned with video ring.
