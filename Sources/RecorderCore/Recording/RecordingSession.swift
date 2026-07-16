@@ -43,6 +43,12 @@ public final class RecordingSession: @unchecked Sendable {
             // capture closes the cycle and makes `CaptureEngine.deinit` unreachable.
             onMicrophoneFormatChange: { [weak engine] in
                 Task { await engine?.stop(reason: .microphoneChanged) }
+            },
+            // The writer can never begin (unwritable output folder, 02 §2). Stop capture so the
+            // event loop below ends and fails the session — nothing playable exists, so this is
+            // `.failed`, not a `.finished` reason. Same `[weak engine]` cycle-break as above.
+            onWriteFailure: { [weak engine] in
+                Task { await engine?.stop() }
             })
         // Watches the output DIRECTORY, not the file: same volume, but it exists before the file
         // does — probing a not-yet-created path returns nil forever and disables the guard.
@@ -97,6 +103,13 @@ public final class RecordingSession: @unchecked Sendable {
             if let startFailure {
                 recorder.cancel()
                 continuation.yield(.failed(message: startFailure))
+            } else if recorder.failedToBeginWriting {
+                // The writer never began (unwritable output, 02 §2). Cancel to drop the O_EXCL
+                // placeholder; fail with the folder named — there is nothing to finalize.
+                recorder.cancel()
+                let folder = recorder.outputURL.deletingLastPathComponent().lastPathComponent
+                continuation.yield(.failed(message:
+                    "Couldn't write the recording to \"\(folder)\". Choose another folder."))
             } else {
                 do {
                     let url = try await recorder.finish()

@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 /// Where recordings are written, plus the naming and collision rules.
@@ -54,9 +55,11 @@ public struct OutputLocation: Sendable {
         case inaccessible(reason: String)
     }
 
-    /// An unwritable output directory surfaces later as an opaque SCK/AVFoundation "invalid
-    /// parameter" (docs/02 §2); catch it here. Probes *write* access rather than `opendir`,
-    /// which only proves read/execute.
+    /// An unwritable output directory surfaces later as an opaque AVFoundation permission error
+    /// (docs/02 §2); catch it here. Probes with a throwaway `AVAssetWriter.startWriting()` — the
+    /// exact call a recording makes — because a plain POSIX create passes on the TCC-protected
+    /// folders (Desktop/Documents/Downloads) where the writer fails, so a `createFile` probe would
+    /// wave them through and the recording then wedge at capture.
     public static func preflight(_ directory: URL) -> DirectoryAccess {
         let fileManager = FileManager.default
         var isDirectory: ObjCBool = false
@@ -67,14 +70,25 @@ public struct OutputLocation: Sendable {
                 Choose a different folder in Settings.
                 """)
         }
-        let probe = directory.appendingPathComponent(".screenrec-write-\(UUID().uuidString)")
-        guard fileManager.createFile(atPath: probe.path, contents: nil) else {
+        // One input, so the probe matches a real writer: an input-less writer can be refused on
+        // some runtimes, which would wrongly reject even a writable folder. `startWriting()`
+        // creates the probe file; `cancelWriting()` removes it.
+        let probe = directory.appendingPathComponent(".screenrec-preflight-\(UUID().uuidString).mov")
+        let writer = try? AVAssetWriter(outputURL: probe, fileType: .mov)
+        if let writer {
+            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 2])
+            if writer.canAdd(input) { writer.add(input) }
+        }
+        guard let writer, writer.startWriting() else {
+            try? fileManager.removeItem(at: probe)
             return .inaccessible(reason: """
                 Can't write to the output folder: \(directory.path)
                 If this is Desktop, Documents, or Downloads, grant Files and Folders access in \
                 System Settings → Privacy & Security. The default folder (~/Movies) needs no grant.
                 """)
         }
+        writer.cancelWriting()
         try? fileManager.removeItem(at: probe)
         return .accessible
     }

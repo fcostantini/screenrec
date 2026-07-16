@@ -31,6 +31,10 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     /// Fired once on a mic device switch mid-recording (docs/02 §4); the owner stops cleanly
     /// (ADR-007). Invoked on a capture queue with `lock` released — must not block that queue.
     private let onMicrophoneFormatChange: (@Sendable () -> Void)?
+    /// Fired once if the writer can't begin — `startWriting()` failed, e.g. an unwritable output
+    /// folder (02 §2). The writer never starts, so the owner must stop capture and fail the
+    /// session (ADR-007) rather than wait forever. Invoked on a capture queue, `lock` released.
+    private let onWriteFailure: (@Sendable () -> Void)?
 
     private let lock = NSLock()
     private let writer: AVAssetWriter
@@ -45,6 +49,9 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     private var didStartSession = false
     private var isFinished = false
     private var droppedFrames = 0
+    /// Latched when `startWriting()` fails (an unwritable output folder — 02 §2), so the writer
+    /// isn't re-attempted and the owner can fail the session. `true` ⇒ writing never began.
+    private var didFailToBeginWriting = false
 
     /// Retained for the tail-frame patch (docs/02 §5): a static screen stops delivering frames,
     /// so on finish the last frame is re-appended at the end time to match the audio length.
@@ -70,13 +77,15 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         frameRate: Int,
         preset: QualityPreset,
         includesMicrophone: Bool,
-        onMicrophoneFormatChange: (@Sendable () -> Void)? = nil
+        onMicrophoneFormatChange: (@Sendable () -> Void)? = nil,
+        onWriteFailure: (@Sendable () -> Void)? = nil
     ) throws {
         self.outputURL = outputURL
         self.frameRate = frameRate
         self.preset = preset
         self.includesMicrophone = includesMicrophone
         self.onMicrophoneFormatChange = onMicrophoneFormatChange
+        self.onWriteFailure = onWriteFailure
 
         writer = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
         // Fragmented .mov for crash safety: flushed every second, so a kill -9 loses at most
@@ -113,16 +122,25 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         return didStartSession
     }
 
+    /// Whether the writer failed to begin (`startWriting()` failed). The owner reads it to fail the
+    /// session — nothing playable exists (ADR-007). Set once; see `onWriteFailure`.
+    var failedToBeginWriting: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return didFailToBeginWriting
+    }
+
     // MARK: - Consume
 
     /// Route a captured buffer to its track (`SampleConsumer`). Safe to call from the separate
     /// screen / system-audio / microphone capture queues concurrently.
     public func consume(_ buffer: CMSampleBuffer, type: SourceType) {
         lock.lock()
-        // Notify outside the lock: defers run LIFO, so this one registered before the unlock
-        // runs after it. `lock` is non-reentrant — firing a handler under it could deadlock.
+        // Notify outside the lock: defers run LIFO, so these registered before the unlock run
+        // after it. `lock` is non-reentrant — firing a handler under it could deadlock.
         var notifyMicrophoneChange = false
+        var notifyWriteFailure = false
         defer { if notifyMicrophoneChange { onMicrophoneFormatChange?() } }
+        defer { if notifyWriteFailure { onWriteFailure?() } }
         defer { lock.unlock() }
         guard !isFinished else { return }
 
@@ -159,7 +177,13 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         // so past the grace proceed without the mic track.
         let micSettled = !includesMicrophone || microphoneInput != nil
             || microphoneGraceExpired(now: rawPTS)
-        if !didStartWriting, videoInput != nil, micSettled { beginWriting() }
+        if !didStartWriting, !didFailToBeginWriting, videoInput != nil, micSettled {
+            beginWriting()
+            // `startWriting()` failed (unwritable folder, 02 §2): fire once so the owner can stop
+            // capture and fail the session. The `didFailToBeginWriting` guard above then keeps it
+            // from re-attempting or re-notifying on later frames.
+            if didFailToBeginWriting { notifyWriteFailure = true }
+        }
         guard didStartWriting else { return }
 
         // A mic swap mid-recording changes the audio format; such a buffer would corrupt the
@@ -328,6 +352,10 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     private func beginWriting() {
         try? FileManager.default.removeItem(at: outputURL)
         didStartWriting = writer.startWriting()
+        // Don't swallow the `false`: an unwritable folder fails here (NSCocoa 513, 02 §2). Latch
+        // it so the owner fails the session instead of the stream running on with a writer that
+        // will never accept a frame.
+        if !didStartWriting { didFailToBeginWriting = true }
     }
 
     /// Copies `buffer` shifting every timing entry so its presentation timestamp becomes

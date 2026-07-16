@@ -237,6 +237,41 @@ import Testing
         #expect(!fileManager.fileExists(atPath: url.path))
     }
 
+    @Test func unwritableOutputReportsWriteFailureExactlyOnce() async throws {
+        let fileManager = FileManager.default
+        // A read-only directory: `AVAssetWriter` init succeeds (it touches no disk) but
+        // `startWriting()` — the call that creates the file — fails, exactly as an ungranted
+        // Desktop does (02 §2). The failure must be surfaced, not swallowed: a swallowed `false`
+        // leaves the stream running with no terminal event for the owner to act on.
+        let dir = fileManager.temporaryDirectory
+            .appendingPathComponent("moverec-readonly-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer {
+            try? fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dir.path)
+            try? fileManager.removeItem(at: dir)
+        }
+        try fileManager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: dir.path)
+        let url = dir.appendingPathComponent("Recording.mov")
+
+        // Fires exactly once (default confirmation count) even across two frames — the second
+        // proves it neither re-attempts the writer nor re-notifies after the first failure.
+        try await confirmation("write failure reported exactly once") { failed in
+            let recorder = try MovieRecorder(
+                outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: false,
+                onWriteFailure: { failed() })
+            for index in 0..<2 {
+                let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
+                recorder.consume(
+                    Self.videoSample(width: Self.width, height: Self.height, pts: pts,
+                                     duration: CMTime(value: 1, timescale: CMTimeScale(Self.fps))),
+                    type: .screen)
+            }
+            #expect(recorder.failedToBeginWriting)   // the failure is surfaced for the owner
+            #expect(!recorder.hasStartedSession)     // nothing playable exists
+            recorder.cancel()
+        }
+    }
+
     // MARK: - Synthetic buffer fixtures
 
     private static func temporaryOutputURL() -> URL {
