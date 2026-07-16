@@ -333,7 +333,11 @@ approaches if it matters.
   Output callback pushes compressed `CMSampleBuffer` + keyframe flag (from attachments,
   `kCMSampleAttachmentKey_NotSync` absent ⇒ keyframe) into the video ring.
 - Rings are duration-bounded (target N + 2 s slack). Keyframe every 1 s bounds clip
-  start error to ≤ 1 s. Memory at 60 s: ~80 MB video + ~46 MB PCM audio. Fine.
+  start error to ≤ 1 s. Memory at 60 s, measured: video ≈ Balanced bitrate × 62 s
+  (~145 MB busy at 4112×2570 — the original ~80 MB assumed ~10 Mbps) + ~29 MB PCM audio.
+  Accepted uncapped (Franco 2026-07-16): replay quality stays at recording parity;
+  VT `DataRateLimits` is the ready lever if a cap is ever wanted (unavailable through
+  AVAssetWriter, available here — M2-T6).
 - Mux on demand: snapshot under lock → oldest keyframe ≥ N s back → rebase PTS → one
   AVAssetWriter: video input `outputSettings: nil` + `sourceFormatHint` (passthrough);
   two AAC audio inputs encoded from PCM at mux time. Write on a utility queue; the ring

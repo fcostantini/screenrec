@@ -89,8 +89,15 @@ Pass criteria:
 
 ## §6 — G5: Instant replay
 
-1. `replay-arm --seconds 60` for 3 min: ring occupancy stabilizes at ~60 s; RSS plateau
-   ≲ 200 MB (`footprint` or Activity Monitor); CPU < 10% average (`top -pid`).
+1. `replay-arm --seconds 60` for 3 min: ring occupancy stabilizes at ~60 s; CPU < 10%
+   average (cumulative cpu-time / wall-time, not spot samples). Memory: ring payload ≈
+   Balanced bitrate × (window + 2 s slack) — ~145 MB busy at 4112×2570 — so the RSS
+   plateau bound is **≲ 400 MB busy** (AMENDED 2026-07-16, Franco: replay keeps Balanced
+   parity with recordings, no dedicated cap; the original ≲ 200 MB assumed ~10 Mbps).
+   ⚠️ Task-level RSS attribution of VT/CM buffer memory varies run-to-run on identical
+   binaries (02 §9 / STATUS field notes) — **flatness over minutes 5→30 is the leak
+   check; the absolute number is advisory.** VT `DataRateLimits` on the replay session
+   remains the lever if the uncapped ring ever matters (we drive VT directly).
 2. Save timing: with `replay-arm` running, `kill -USR1 $PID`, then poll for the output
    file — signal-to-file-exists < 1 s. Probe: hvc1 + 2 AAC; duration 60 + ≤ 1 s; starts
    on a keyframe; content is genuinely the LAST minute (human check: on-screen clock

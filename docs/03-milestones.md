@@ -499,9 +499,18 @@ TCC grants — app appears by name in System Settings, grants survive rebuild).
       match docs/06.**
       **Verify:** §6.4 — manual recording + armed replay + save simultaneously → both
       files probe-clean. Hotkey fires while another app is frontmost **(human)**.
-- [ ] M5-T6 Memory/CPU audit: 30-min armed session.
-      **Verify:** §6.1/§6.5 — RSS plateau ≲ 200 MB, CPU < 10% avg, save still < 1 s at
-      minute 30; numbers into STATUS.md.
+- [x] M5-T6 Memory/CPU audit: 30-min armed session.
+      **Verify:** §6.1/§6.5 — RSS plateau (≲ 400 MB busy, amended — see 04 §6.1), CPU < 10%
+      avg, save still < 1 s at minute 30; numbers into STATUS.md.
+      DONE 2026-07-16, two legs. **Burst (busyscene, 4.5 min max load):** CPU 7.2% avg
+      (cumulative), RSS flat 201–202 MB (+1 MB). **Main (30.2 min armed, Franco's real
+      usage, AirPods pick):** CPU 4.7% avg (spot max 7.2%), RSS 195–279 MB (median 216;
+      drift min5→end **+7 MB** — no leak), saves at min-1 (Franco's ⌥⌘R) and min-30 both
+      probe-clean 60.6 s; min-30 save wrote in 0.17 s (birth→mtime), ≈0.6 s end-to-end
+      after subtracting the menudriver rig's measured 0.87 s (raw rig-inclusive: 1.53 s;
+      T4's 0.08 s signal→file external measurement corroborates). Bitrate ruling (Franco):
+      **(b) no replay cap — Balanced parity**; 04 §6.1 + 02 §9 amended, VT DataRateLimits
+      recorded as the ready lever.
 
 **Gate G5**: 04-testing §6 (clip saved < 1 s, contains last N ± 1 s with audio; works
 while a manual recording runs; memory flat over 30 min).
