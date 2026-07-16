@@ -38,6 +38,10 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let content = UNMutableNotificationContent()
         content.title = notification.title
         content.body = notification.body
+        // Time-sensitive, or banners never render for the app's own headline feature: macOS
+        // suppresses ordinary banners whenever the display is captured, and replay saves fire
+        // exactly then. Needs the matching entitlement (Scripts/entitlements.plist).
+        content.interruptionLevel = .timeSensitive
         if let url = notification.fileURL {
             content.userInfo = [Self.fileURLKey: url.path]
         }

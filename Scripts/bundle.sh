@@ -56,6 +56,9 @@ printf 'APPL????' > "${CONTENTS}/PkgInfo"
 
 echo "▸ Signing…"
 IDENTITY="$(Scripts/devsign.sh)"   # prints the identity name on stdout; instructions on stderr
+# NOT signed with Scripts/entitlements.plist: AMFI refuses to launch a self-signed app carrying
+# the restricted time-sensitive entitlement (POSIX 153 spawn failure). It needs a provisioning
+# profile — Developer ID territory, M6-T4. The plist waits there.
 codesign --force --sign "$IDENTITY" "$APP"
 
 echo "▸ Verifying signature…"

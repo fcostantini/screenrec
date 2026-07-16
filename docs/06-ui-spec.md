@@ -105,6 +105,19 @@ the raw SCK string, never the word "error")
   `EndReason.systemSleep` is unreachable. The enum case stays (docs/01 defines it; M5/M6 may find
   a source) but nothing renders it.
 
+⚠️ **AMENDED 2026-07-16 (M5-T5 follow-up): banners are suppressed while the screen is captured —
+which is whenever replay is armed.** macOS hides ordinary banners when the display is shared or
+captured ("Allow notifications when mirroring or sharing the display", off by default), and the
+replay-saved notification fires exactly then; it lands in Notification Center's list but never
+renders. Measured live (Franco, 2026-07-16). Every earlier banner check passed because those
+notifications fire after capture ends. Remedies, in order:
+- **Now:** the user enables *System Settings → Notifications → Allow notifications when
+  mirroring or sharing the display*. Candidate onboarding copy for the Notifications row.
+- **M6-T4:** `interruptionLevel = .timeSensitive` is already set on every notification, but the
+  required entitlement (`Scripts/entitlements.plist`, parked) needs a provisioning profile —
+  AMFI refuses to launch a self-signed app carrying it (POSIX 153), and without the entitlement
+  the level is silently downgraded (measured, both ways).
+
 ## Onboarding window (first launch, or any missing permission)
 
 Single window, checklist of two rows, each with live status (✓ green / ○ pending) and

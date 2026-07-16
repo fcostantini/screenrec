@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Replay notifications fire WHILE the screen is captured, and macOS suppresses ordinary
+	     banners whenever the display is shared/captured — a screen recorder's banners would
+	     otherwise never render for its own headline feature. Time-sensitive is the sanctioned
+	     break-through for "relevant right now". -->
+	<key>com.apple.developer.usernotifications.time-sensitive</key>
+	<true/>
+</dict>
+</plist>

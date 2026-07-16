@@ -265,6 +265,20 @@ video (deterministic, reproducible).
 
 ## Field notes (append; things learned that docs don't cover yet)
 
+- 2026-07-16 (M5-T5 follow-up — the banner that can't render): **macOS suppresses notification
+  banners while the display is captured, and armed replay means the display is always captured.**
+  Franco pressed ⌥⌘R from another app: file saved, notification delivered (in the Center's
+  list), no banner — the first notification this app fires *mid-capture*, so the first time the
+  suppression could show. Both remedies measured:
+  - `.timeSensitive` **with** its entitlement, self-signed: AMFI refuses to launch the app
+    (POSIX 153 spawn failure) — restricted entitlements need a provisioning profile.
+  - `.timeSensitive` **without** the entitlement: silently downgraded, no break-through.
+  So: `interruptionLevel` stays set (free once M6-T4's Developer ID signing carries the parked
+  `Scripts/entitlements.plist`); until then the user-side fix is System Settings → Notifications
+  → "Allow notifications when mirroring or sharing the display". docs/06 amended. Also settled:
+  the capture indicator itself is OS-mandated for any SCK stream — no opt-out exists, armed
+  replay always shows it.
+
 - 2026-07-16 (M5-T5 app replay): the widest review haul yet (10 confirmed), and the pattern is
   worth naming: **every serious one was a second writer to state I'd only considered the user
   writing.**
