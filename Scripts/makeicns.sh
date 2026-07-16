@@ -6,10 +6,13 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-MASTER="$(mktemp -t screenrec-icon).png"
-ICONSET="$(mktemp -d -t screenrec-iconset)/AppIcon.iconset"
+# One temp dir for everything, so cleanup is a single rm and nothing orphans. (`mktemp -t
+# foo).png` would append `.png` to a name mktemp already created, leaving the original behind.)
+WORK="$(mktemp -d -t screenrec-icon)"
+MASTER="${WORK}/master.png"
+ICONSET="${WORK}/AppIcon.iconset"
 OUT="Sources/ScreenRecApp/Resources/AppIcon.icns"
-trap 'rm -rf "$MASTER" "$(dirname "$ICONSET")"' EXIT
+trap 'rm -rf "$WORK"' EXIT
 
 echo "▸ Rendering master…"
 swift tools/makeicon.swift "$MASTER" >/dev/null

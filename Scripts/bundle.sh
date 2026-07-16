@@ -38,9 +38,20 @@ rm -rf "$APP"
 mkdir -p "${CONTENTS}/MacOS" "${CONTENTS}/Resources"
 cp ".build/release/${PRODUCT}" "${CONTENTS}/MacOS/${APP_NAME}"
 cp "$ICON" "${CONTENTS}/Resources/AppIcon.icns"
-# Stamp the version placeholders on the way into the bundle, so the checked-in plist can't
-# disagree with the build.
-sed "s/__VERSION__/${VERSION}/g" "Sources/ScreenRecApp/Resources/Info.plist" > "${CONTENTS}/Info.plist"
+cp "Sources/ScreenRecApp/Resources/Info.plist" "${CONTENTS}/Info.plist"
+
+# Stamp the version. PlistBuddy sets the keys by value rather than editing text, so a VERSION
+# containing sed-special characters (/ & \) can't corrupt the plist or truncate it mid-write.
+PB=/usr/libexec/PlistBuddy
+"$PB" -c "Set :CFBundleShortVersionString ${VERSION}" "${CONTENTS}/Info.plist"
+"$PB" -c "Set :CFBundleVersion ${VERSION}" "${CONTENTS}/Info.plist"
+# Read the value back and confirm it landed: a token rename or a PlistBuddy miss must fail the
+# build, never ship the literal placeholder as the version (notarization would reject it later).
+STAMPED="$("$PB" -c "Print :CFBundleShortVersionString" "${CONTENTS}/Info.plist")"
+if [ "$STAMPED" != "$VERSION" ]; then
+  echo "✗ version stamp failed: plist reads '${STAMPED}', expected '${VERSION}'" >&2
+  exit 1
+fi
 printf 'APPL????' > "${CONTENTS}/PkgInfo"
 
 echo "▸ Signing…"

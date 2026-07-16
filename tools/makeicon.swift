@@ -17,23 +17,27 @@ let ink = NSColor(calibratedWhite: 0.13, alpha: 1)
 let bezel = NSColor(calibratedWhite: 0.82, alpha: 1)
 let red = NSColor(calibratedRed: 0.88, green: 0.24, blue: 0.19, alpha: 1)
 
+// The artwork was laid out on a 512 grid; `scaled` maps it to whatever `size` is, so changing
+// `size` re-renders correctly rather than drawing into one quadrant.
+let scale = size / 512
 func scaled(_ rect: NSRect) -> NSRect {
-    // The candidates were drawn on a 512 grid; keep those proportions at 1024.
-    NSRect(x: rect.origin.x * 2, y: rect.origin.y * 2,
-           width: rect.size.width * 2, height: rect.size.height * 2)
+    NSRect(x: rect.origin.x * scale, y: rect.origin.y * scale,
+           width: rect.size.width * scale, height: rect.size.height * scale)
 }
 
 let image = NSImage(size: NSSize(width: size, height: size))
 image.lockFocus()
 
-let full = NSRect(x: 0, y: 0, width: size, height: size)
+// Everything below is in the 512 grid and scaled once, so the whole icon tracks `size`.
 ink.setFill()
-NSBezierPath(roundedRect: full.insetBy(dx: 48, dy: 48), xRadius: 224, yRadius: 224).fill()
+NSBezierPath(roundedRect: scaled(NSRect(x: 24, y: 24, width: 464, height: 464)),
+             xRadius: 112 * scale, yRadius: 112 * scale).fill()
 
-let screen = scaled(NSRect(x: 108, y: 150, width: 296, height: 208))
 bezel.setStroke()
-let display = NSBezierPath(roundedRect: screen, xRadius: 36, yRadius: 36)
-display.lineWidth = 40
+let display = NSBezierPath(
+    roundedRect: scaled(NSRect(x: 108, y: 150, width: 296, height: 208)),
+    xRadius: 18 * scale, yRadius: 18 * scale)
+display.lineWidth = 20 * scale
 display.stroke()
 
 red.setFill()
@@ -41,7 +45,7 @@ NSBezierPath(ovalIn: scaled(NSRect(x: 218, y: 208, width: 76, height: 76))).fill
 
 bezel.setFill()
 NSBezierPath(roundedRect: scaled(NSRect(x: 226, y: 112, width: 60, height: 20)),
-             xRadius: 20, yRadius: 20).fill()
+             xRadius: 10 * scale, yRadius: 10 * scale).fill()
 
 image.unlockFocus()
 
