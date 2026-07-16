@@ -474,8 +474,21 @@ TCC grants — app appears by name in System Settings, grants survive rebuild).
       (incl. real-HEVC end-to-end mux, static-tail + fully-stale-window), TSan-clean.
       /code-review presented → Franco approved batch. Owed **(human)**: "genuinely the
       last minute" content check.
-- [ ] M5-T5 App integration: "Arm instant replay" toggle (persists), hotkey ⌥⌘R via
+- [x] M5-T5 App integration: "Arm instant replay" toggle (persists), hotkey ⌥⌘R via
       Carbon (02 §9), menu item + notification on save.
+      DONE 2026-07-16: `ReplayController` (AppCore) owns the armed pipeline — its own
+      CaptureEngine when idle, the recording's stream while one runs (docs/01's shared-stream
+      design; buffer resets at record start/stop, Franco-approved semantics), auto-restart
+      through display sleep. Toggle + Save Replay Now + armed info row in the menu; Instant
+      Replay Settings section (buffer 30/60/120 + shortcut recorder, ⌥/⌃ required); armed dot
+      badge on all icon states; docs/06's two replay notifications + two amendments (mic-lost
+      while armed, shortcut unavailable). Keys `replayArmed`/`replaySeconds`/`replayHotkey`
+      persisted + validated. §6.4 ✅ headless (recording 35.99 s + mid-recording replay 32.29 s,
+      both probe-clean, one stream); armed state survives relaunch; buffer survives menu-open
+      re-homing (regression-tested). 222 tests. /code-review: 10 confirmed findings presented
+      → approved batch applied (re-home wipe, launch permission gate, hotkey failure surfacing,
+      system-shortcut hijack, mid-recording buffer change, stale-mic retry loop, and more).
+      **(human) owed:** ⌥⌘R while another app is frontmost; badge/menu taste pass.
       **Inherits from M4-T4 (Franco, 2026-07-15):** the replay Settings rows (buffer length
       30/60/120, hotkey recorder) and the status-icon's replay-armed badge, plus the keys they
       write — `replayArmed`, `replaySeconds`, `replayHotkey` (names contractual, docs/06). They

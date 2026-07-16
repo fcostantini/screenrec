@@ -42,10 +42,36 @@ struct SettingsView: View {
                     Text("\(fps) fps").tag(fps)
                 }
             }
+
+            Section("Instant Replay") {
+                Picker("Replay buffer", selection: $state.replaySeconds) {
+                    ForEach(Settings.allowedReplaySeconds, id: \.self) { seconds in
+                        Text(Self.bufferTitle(seconds)).tag(seconds)
+                    }
+                }
+                LabeledContent("Save replay shortcut") {
+                    HotkeyRecorderButton(
+                        hotkey: $state.replayHotkey,
+                        suspendGlobalHotkey: { _ = state.hotkeyRegistrar?(nil) },
+                        restoreGlobalHotkey: {
+                            if state.isReplayArmed { _ = state.hotkeyRegistrar?(state.replayHotkey) }
+                        })
+                }
+                Text("Shortcuts must include ⌥ or ⌃."
+                    + (state.isReplayArmed
+                        ? " Changing the buffer or sources restarts replay from empty." : ""))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .frame(width: 420)
         .fixedSize()
+    }
+
+    /// docs/06's values, spelled the way a human says them.
+    private static func bufferTitle(_ seconds: Int) -> String {
+        seconds == 120 ? "2 minutes" : "\(seconds) seconds"
     }
 
     private var abbreviatedOutputPath: String {

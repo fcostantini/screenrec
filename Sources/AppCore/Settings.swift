@@ -1,22 +1,47 @@
 import Foundation
 import RecorderCore
 
+/// The global shortcut that saves a replay. Raw Carbon values — `keyCode` is a virtual key
+/// code (kVK_*) and `modifiers` a Carbon modifier mask (cmdKey/optionKey/…), because that's
+/// what `RegisterEventHotKey` takes; the app layer owns the Carbon import and the display
+/// formatting.
+public struct ReplayHotkey: Sendable, Equatable {
+    public var keyCode: Int
+    public var modifiers: Int
+
+    public init(keyCode: Int, modifiers: Int) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers
+    }
+
+    /// ⌥⌘R (docs/06): kVK_ANSI_R with optionKey | cmdKey.
+    public static let standard = ReplayHotkey(keyCode: 15, modifiers: 2048 | 256)
+}
+
 /// The app's persisted preferences (docs/06 "Settings window").
 ///
-/// Replay (M5) and launch-at-login (M6) settings arrive with the features they configure.
+/// Launch-at-login (M6) arrives with the feature it configures.
 public struct Settings: Sendable, Equatable {
     public var outputDirectory: URL
     public var quality: QualityPreset
     /// docs/06 offers 30 or 60.
     public var frameRateCap: Int
+    public var replayArmed: Bool
+    /// docs/06 offers 30, 60 or 120.
+    public var replaySeconds: Int
+    public var replayHotkey: ReplayHotkey
 
     public static let allowedFrameRateCaps = [30, 60]
+    public static let allowedReplaySeconds = [30, 60, 120]
 
     public static var standard: Settings {
         Settings(
             outputDirectory: OutputLocation.defaultDirectory(),
             quality: .balanced,
-            frameRateCap: 60)
+            frameRateCap: 60,
+            replayArmed: false,
+            replaySeconds: 60,
+            replayHotkey: .standard)
     }
 }
 
@@ -30,6 +55,12 @@ public enum SettingsStore {
         public static let outputDirectory = "outputDirectory"
         public static let qualityPreset = "qualityPreset"
         public static let fpsCap = "fpsCap"
+        public static let replayArmed = "replayArmed"
+        public static let replaySeconds = "replaySeconds"
+        public static let replayHotkey = "replayHotkey"
+        /// `replayHotkey` is a Dict (docs/06): these are its inner keys.
+        public static let hotkeyKeyCode = "keyCode"
+        public static let hotkeyModifiers = "modifiers"
     }
 
     /// Reads settings, replacing anything unusable with the default.
@@ -65,6 +96,24 @@ public enum SettingsStore {
             settings.frameRateCap = fps
         }
 
+        settings.replayArmed = defaults.bool(forKey: Key.replayArmed)
+
+        // Same shape as fps: only the documented values, or a ring gets sized by garbage.
+        let replaySeconds = defaults.integer(forKey: Key.replaySeconds)
+        if Settings.allowedReplaySeconds.contains(replaySeconds) {
+            settings.replaySeconds = replaySeconds
+        }
+
+        // A malformed hotkey falls back whole — half a shortcut is not a shortcut. Zero
+        // modifiers is rejected (a bare key would fire on ordinary typing), and both values
+        // are bounded: they feed trapping UInt32 conversions at registration, so an oversized
+        // plist value would otherwise crash every launch.
+        if let dict = defaults.dictionary(forKey: Key.replayHotkey),
+           let keyCode = dict[Key.hotkeyKeyCode] as? Int, (0...0xFFFF).contains(keyCode),
+           let modifiers = dict[Key.hotkeyModifiers] as? Int, (1...0xFFFF).contains(modifiers) {
+            settings.replayHotkey = ReplayHotkey(keyCode: keyCode, modifiers: modifiers)
+        }
+
         return settings
     }
 
@@ -74,5 +123,11 @@ public enum SettingsStore {
         defaults.set(settings.outputDirectory.path, forKey: Key.outputDirectory)
         defaults.set(settings.quality.rawValue, forKey: Key.qualityPreset)
         defaults.set(settings.frameRateCap, forKey: Key.fpsCap)
+        defaults.set(settings.replayArmed, forKey: Key.replayArmed)
+        defaults.set(settings.replaySeconds, forKey: Key.replaySeconds)
+        defaults.set(
+            [Key.hotkeyKeyCode: settings.replayHotkey.keyCode,
+             Key.hotkeyModifiers: settings.replayHotkey.modifiers],
+            forKey: Key.replayHotkey)
     }
 }

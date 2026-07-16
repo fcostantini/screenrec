@@ -17,39 +17,74 @@ enum StatusIconImage {
     /// The status item's accessible name. `Image(nsImage:)` doesn't adopt an `NSImage`'s
     /// `accessibilityDescription` and a label-based `MenuBarExtra` has no title, so the view must
     /// apply this explicitly.
-    static func label(for icon: StatusIcon) -> String {
-        switch icon {
+    static func label(for icon: StatusIcon, isReplayArmed: Bool) -> String {
+        let base = switch icon {
         case .idle: "ScreenRec: ready"
         case .recording: "ScreenRec: recording"
         case .paused: "ScreenRec: paused"
         }
+        return isReplayArmed ? base + ", replay armed" : base
     }
 
     // Built once each; the pulse would otherwise redo the lookup and palette render every frame.
     private static let idleImage = template("record.circle")
     private static let recordingImage = tinted("record.circle.fill", .systemRed)
     private static let pausedImage = tinted("circle.lefthalf.filled", .systemOrange)
+    private static let idleArmedImage = badged(template("record.circle"))
+    private static let recordingArmedImage = badged(tinted("record.circle.fill", .systemRed))
+    private static let pausedArmedImage = badged(tinted("circle.lefthalf.filled", .systemOrange))
 
-    static func image(for icon: StatusIcon) -> NSImage {
-        switch icon {
-        case .idle: idleImage
-        case .recording: recordingImage
-        case .paused: pausedImage
+    static func image(for icon: StatusIcon, isReplayArmed: Bool = false) -> NSImage {
+        switch (icon, isReplayArmed) {
+        case (.idle, false): idleImage
+        case (.recording, false): recordingImage
+        case (.paused, false): pausedImage
+        case (.idle, true): idleArmedImage
+        case (.recording, true): recordingArmedImage
+        case (.paused, true): pausedArmedImage
         }
     }
 
     /// The recording icon faded for the pulse; `alpha` comes from `pulseAlpha(atPhase:)`.
-    static func recordingImage(fadedTo alpha: Double) -> NSImage {
+    /// The armed badge does not fade — armed is a steady state, only recording breathes.
+    static func recordingImage(fadedTo alpha: Double, isReplayArmed: Bool = false) -> NSImage {
         let base = recordingImage
-        guard alpha < 1 else { return base }
+        guard alpha < 1 else { return isReplayArmed ? recordingArmedImage : base }
         // `NSImage(size:flipped:)` re-renders per representation, so the fade survives a scale
         // change between Retina and non-Retina displays.
         let faded = NSImage(size: base.size, flipped: false) { rect in
             base.draw(in: rect, from: .zero, operation: .sourceOver, fraction: alpha)
+            if isReplayArmed { drawBadge(in: rect, onTemplate: false) }
             return true
         }
         faded.isTemplate = base.isTemplate
         return faded
+    }
+
+    /// docs/06 status-item row 4: a small filled dot, bottom-trailing. Template bases keep the
+    /// badge in the mask (it adapts with the bar); colored bases get a white dot with a clear
+    /// gap so it reads against red and amber alike.
+    private static func badged(_ base: NSImage) -> NSImage {
+        let image = NSImage(size: base.size, flipped: false) { rect in
+            base.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+            drawBadge(in: rect, onTemplate: base.isTemplate)
+            return true
+        }
+        image.isTemplate = base.isTemplate
+        return image
+    }
+
+    private static func drawBadge(in rect: NSRect, onTemplate: Bool) {
+        let diameter = rect.width * 0.38
+        let badgeRect = NSRect(
+            x: rect.maxX - diameter, y: rect.minY, width: diameter, height: diameter)
+        // The gap ring separates the dot from the glyph; in a template it's punched out of the
+        // mask, on a colored base it clears whatever is behind.
+        NSGraphicsContext.current?.cgContext.setBlendMode(.destinationOut)
+        NSBezierPath(ovalIn: badgeRect.insetBy(dx: -1.5, dy: -1.5)).fill()
+        NSGraphicsContext.current?.cgContext.setBlendMode(.normal)
+        (onTemplate ? NSColor.black : NSColor.white).setFill()
+        NSBezierPath(ovalIn: badgeRect).fill()
     }
 
     /// Maps the pulse's phase in [0,1) to an alpha: a raised cosine, so it eases at both ends.
@@ -83,15 +118,18 @@ enum StatusIconImage {
 /// The status item's label. Pulses while recording, unless the user asked for less motion.
 struct StatusIconView: View {
     let icon: StatusIcon
+    var isReplayArmed = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         if icon == .recording && !reduceMotion {
-            PulsingRecordingIcon(label: StatusIconImage.label(for: icon))
+            PulsingRecordingIcon(
+                label: StatusIconImage.label(for: icon, isReplayArmed: isReplayArmed),
+                isReplayArmed: isReplayArmed)
         } else {
-            Image(nsImage: StatusIconImage.image(for: icon))
-                .accessibilityLabel(StatusIconImage.label(for: icon))
+            Image(nsImage: StatusIconImage.image(for: icon, isReplayArmed: isReplayArmed))
+                .accessibilityLabel(StatusIconImage.label(for: icon, isReplayArmed: isReplayArmed))
         }
     }
 }
@@ -104,6 +142,7 @@ private struct PulsingRecordingIcon: View {
     private static let framesPerCycle: Double = 12
 
     let label: String
+    let isReplayArmed: Bool
 
     @State private var phase: Double = 0
 
@@ -113,7 +152,7 @@ private struct PulsingRecordingIcon: View {
 
     var body: some View {
         Image(nsImage: StatusIconImage.recordingImage(
-            fadedTo: StatusIconImage.pulseAlpha(atPhase: phase)))
+            fadedTo: StatusIconImage.pulseAlpha(atPhase: phase), isReplayArmed: isReplayArmed))
             .accessibilityLabel(label)
             .onReceive(ticker) { _ in
                 phase = (phase + 1 / Self.framesPerCycle).truncatingRemainder(dividingBy: 1)

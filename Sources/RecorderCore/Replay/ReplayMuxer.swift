@@ -27,6 +27,11 @@ public final class ReplayMuxer: @unchecked Sendable {
     public struct SavedReplay: Sendable {
         public let url: URL
         public let duration: Double
+
+        public init(url: URL, duration: Double) {
+            self.url = url
+            self.duration = duration
+        }
     }
 
     private let encoder: ReplayEncoder

@@ -149,6 +149,10 @@ public final class RecordingSession: @unchecked Sendable {
         await engine.stop()
     }
 
+    /// The stream's fan-out, so replay consumers can share a recording's capture
+    /// (docs/01's key property — the armed replay pipeline attaches here).
+    public var router: SampleRouter { engine.router }
+
     /// Media duration written so far, for a progress ticker; `.invalid` before capture starts.
     public var recordedDuration: CMTime { recorder.recordedDuration }
 

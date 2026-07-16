@@ -121,9 +121,18 @@ func describe(_ menu: AXUIElement, indent: String = "  ") {
         let enabled = (attribute(item, kAXEnabledAttribute as String) as? Bool) ?? true
         let mark = attribute(item, "AXMenuItemMarkChar") as? String ?? ""
         let shortcut = attribute(item, "AXMenuItemCmdChar") as? String ?? ""
+        // AXMenuItemCmdModifiers is a mask: 1 shift, 2 option, 4 control, 8 command-absent.
+        let modifiers = attribute(item, "AXMenuItemCmdModifiers") as? Int ?? 0
 
         var line = "\(indent)\(mark.isEmpty ? " " : mark) \(title)"
-        if !shortcut.isEmpty { line += "  [⌘\(shortcut)]" }
+        if !shortcut.isEmpty {
+            var symbols = ""
+            if modifiers & 4 != 0 { symbols += "⌃" }
+            if modifiers & 2 != 0 { symbols += "⌥" }
+            if modifiers & 1 != 0 { symbols += "⇧" }
+            if modifiers & 8 == 0 { symbols += "⌘" }
+            line += "  [\(symbols)\(shortcut)]"
+        }
         if !enabled { line += "  (disabled)" }
         print(line)
 

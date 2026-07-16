@@ -26,14 +26,73 @@ public final class AppState {
     /// The user's picks, as the plain identifiers the menu selects by: RecorderCore's
     /// `DisplaySelection`/`MicrophoneSelection` carry associated values and aren't `Hashable`,
     /// so they can't be SwiftUI picker tags. `captureConfiguration` translates.
-    public var selectedDisplayID: CGDirectDisplayID?      // nil ⇒ whatever is the main display
-    public var selectedMicrophoneID: String?              // nil ⇒ record no microphone
+    public var selectedDisplayID: CGDirectDisplayID? {    // nil ⇒ whatever is the main display
+        didSet {
+            if selectedDisplayID != oldValue, !isRehomingSources { replayConfigurationChanged() }
+        }
+    }
+    public var selectedMicrophoneID: String? {            // nil ⇒ record no microphone
+        didSet {
+            if selectedMicrophoneID != oldValue, !isRehomingSources { replayConfigurationChanged() }
+        }
+    }
+
+    /// True while `refreshSources` re-homes stale picks. Its writes are housekeeping, not user
+    /// intent — every menu open runs it, and restarting the armed stream there would wipe the
+    /// replay buffer on the first open after launch, or right after a mic vanished (the exact
+    /// moment someone opens the menu to save).
+    private var isRehomingSources = false
 
     // Persisted (docs/06). The display and microphone picks deliberately are not: they name
     // hardware that may not be there next launch, and `refreshSources` already re-homes it.
-    public var quality: QualityPreset { didSet { persist() } }
+    public var quality: QualityPreset {
+        didSet {
+            persist()
+            if quality != oldValue { replayConfigurationChanged() }
+        }
+    }
     /// docs/06 offers 30 or 60; `Settings.allowedFrameRateCaps` is the source of truth.
-    public var frameRateCap: Int { didSet { persist() } }
+    public var frameRateCap: Int {
+        didSet {
+            persist()
+            if frameRateCap != oldValue { replayConfigurationChanged() }
+        }
+    }
+
+    // MARK: - Instant replay (docs/06 idle item 3, Settings "Instant Replay")
+
+    /// Arming starts the rolling buffer (its own capture stream while idle; a recording's
+    /// stream while one runs) and registers the hotkey. Persisted; restored at launch via
+    /// `activateReplayIfArmed()` — never from `init`, which tests construct freely.
+    public var isReplayArmed: Bool {
+        didSet {
+            guard isReplayArmed != oldValue else { return }
+            persist()
+            syncReplayArming()
+        }
+    }
+
+    /// The rolling window; docs/06 offers 30/60/120. Changing it re-sizes the rings, which
+    /// restarts the buffer.
+    public var replaySeconds: Int {
+        didSet {
+            persist()
+            if replaySeconds != oldValue { replayConfigurationChanged() }
+        }
+    }
+
+    public var replayHotkey: ReplayHotkey {
+        didSet {
+            persist()
+            if isReplayArmed { registerReplayHotkey() }
+        }
+    }
+
+    /// Registers/unregisters the global save shortcut, reporting whether the system accepted
+    /// it. Injected by the app (Carbon lives there, not in AppCore); nil means unregister.
+    public var hotkeyRegistrar: (@MainActor (ReplayHotkey?) -> Bool)?
+
+    private let replay: any ReplayControlling
 
     // MARK: - Header row
 
@@ -151,6 +210,8 @@ public final class AppState {
             outputLocation = OutputLocation(directory: outputDirectory)
             persist()
             refreshRecentRecordings()
+            // Replays follow recordings; only the muxer changes, the buffer survives.
+            if isReplayArmed { replay.setOutputDirectory(outputDirectory) }
         }
     }
     private var outputLocation: OutputLocation
@@ -177,16 +238,36 @@ public final class AppState {
     public var notifier: (@MainActor (RecordingNotification) -> Void)?
 
     /// `defaults` is injected so the persistence round-trip is testable without touching the
-    /// real user's preferences.
-    public init(defaults: UserDefaults = .standard) {
+    /// real user's preferences; `replayController` so transition wiring is testable without
+    /// live capture engines.
+    public init(
+        defaults: UserDefaults = .standard,
+        replayController: (any ReplayControlling)? = nil
+    ) {
         self.defaults = defaults
         let settings = SettingsStore.load(from: defaults)
         outputDirectory = settings.outputDirectory
         outputLocation = OutputLocation(directory: settings.outputDirectory)
         quality = settings.quality
         frameRateCap = settings.frameRateCap
+        isReplayArmed = settings.replayArmed
+        replaySeconds = settings.replaySeconds
+        replayHotkey = settings.replayHotkey
+        replay = replayController ?? ReplayController()
         screenWasGrantedAtLaunch = Permissions.screenRecordingState() == .granted
         refreshOnboarding()          // populated before the first render, or the window flickers
+
+        replay.onMicrophoneLost = { [weak self] in
+            self?.notifier?(RecordingNotifications.replayMicrophoneLost())
+        }
+        replay.onPipelineFailure = { [weak self] message in
+            guard let self else { return }
+            // Mirror the controller's self-disarm in the persisted state. The didSet runs
+            // (persist, unregister hotkey, call disarm) — disarm is a no-op on the already-dead
+            // pipeline.
+            isReplayArmed = false
+            notifier?(RecordingNotifications.replayStopped(message: message))
+        }
     }
 
     private let defaults: UserDefaults
@@ -196,8 +277,100 @@ public final class AppState {
     private func persist() {
         SettingsStore.save(
             Settings(
-                outputDirectory: outputDirectory, quality: quality, frameRateCap: frameRateCap),
+                outputDirectory: outputDirectory, quality: quality, frameRateCap: frameRateCap,
+                replayArmed: isReplayArmed, replaySeconds: replaySeconds,
+                replayHotkey: replayHotkey),
             to: defaults)
+    }
+
+    // MARK: - Replay actions
+
+    /// Starts the armed pipeline for a state restored from defaults. The app calls this once at
+    /// launch; `init` never arms so tests can construct freely without spinning capture.
+    ///
+    /// A launch that can't capture stays armed-but-dormant: an ungranted stream would spin the
+    /// controller's retry loop forever behind a lying badge. The grant → auto-relaunch flow
+    /// lands here again with the permission usable.
+    public func activateReplayIfArmed() {
+        guard isReplayArmed,
+              Permissions.screenRecordingState() == .granted,
+              !needsRelaunchForScreenGrant else { return }
+        syncReplayArming()
+    }
+
+    /// Saves the last `replaySeconds`. Fire-and-forget from the hotkey and the menu row; the
+    /// outcome arrives as a notification (docs/06). A trigger while a save runs coalesces.
+    public func saveReplay() {
+        guard isReplayArmed else { return }
+        replay.requestSave { [weak self] result in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                switch result {
+                case .success(let saved):
+                    notifier?(RecordingNotifications.replaySaved(url: saved.url, duration: saved.duration))
+                    refreshRecentRecordings()      // the new clip belongs at the top
+                case .failure(let error):
+                    notifier?(RecordingNotifications.replaySaveFailed(message: error.localizedDescription))
+                }
+            }
+        }
+    }
+
+    private func syncReplayArming() {
+        if isReplayArmed {
+            if let session {
+                replay.recordingStarted(
+                    router: session.router, configuration: captureConfiguration,
+                    seconds: Double(replaySeconds), outputDirectory: outputDirectory)
+            } else {
+                replay.arm(
+                    configuration: replayCaptureConfiguration(), seconds: Double(replaySeconds),
+                    outputDirectory: outputDirectory)
+            }
+            registerReplayHotkey()
+        } else {
+            replay.disarm()
+            _ = hotkeyRegistrar?(nil)
+        }
+    }
+
+    private func replayConfigurationChanged() {
+        guard isReplayArmed else { return }
+        if let session {
+            // Mid-recording only the Settings knobs (buffer length, quality, fps) can change;
+            // rebuild on the recording's stream so e.g. a new buffer length actually applies.
+            replay.recordingStarted(
+                router: session.router, configuration: captureConfiguration,
+                seconds: Double(replaySeconds), outputDirectory: outputDirectory)
+        } else {
+            replay.configurationChanged(
+                configuration: replayCaptureConfiguration(), seconds: Double(replaySeconds),
+                outputDirectory: outputDirectory)
+        }
+    }
+
+    /// The configuration for replay's own stream: the current picks with the mic ID resolved
+    /// the way `start()` resolves it — a stale ID fed raw to SCK fails with the opaque
+    /// "invalid parameter" (02 §1), which would spin the armed retry loop forever.
+    private func replayCaptureConfiguration() -> CaptureConfiguration {
+        var configuration = captureConfiguration
+        if let picked = selectedMicrophoneID {
+            switch Permissions.resolvedMicrophoneID(preferred: picked) {
+            case .explicit(let id): configuration.microphone = .device(id: id)
+            case .noDevice: configuration.microphone = .none
+            }
+        }
+        return configuration
+    }
+
+    /// Registers the shortcut and tells the user if the system refused it (combo taken by
+    /// another app) — every UI surface advertises the combo, so a silent failure means a
+    /// keypress that saves nothing.
+    private func registerReplayHotkey() {
+        guard let hotkeyRegistrar else { return }
+        if !hotkeyRegistrar(replayHotkey) {
+            notifier?(RecordingNotifications.replayHotkeyUnavailable())
+        }
     }
 
     // MARK: - Menu refresh
@@ -212,6 +385,8 @@ public final class AppState {
     /// the current one, so the selection must name a row that exists — covering first launch and
     /// the picked display going away.
     public func refreshSources(displays: [DisplayOption]) {
+        isRehomingSources = true
+        defer { isRehomingSources = false }
         self.displays = displays
         microphones = AudioInputs.available()
 
@@ -292,6 +467,14 @@ public final class AppState {
         currentOutputURL = outputURL
         elapsedSeconds = 0
         recordedBytes = 0
+
+        // Armed replay rides the recording's stream from here (docs/01's key property; the
+        // buffer restarts — a new stream is a new pts epoch).
+        if isReplayArmed {
+            replay.recordingStarted(
+                router: session.router, configuration: configuration,
+                seconds: Double(replaySeconds), outputDirectory: outputDirectory)
+        }
 
         let events = session.events
         consumeTask = Task { [weak self] in
@@ -378,6 +561,12 @@ public final class AppState {
         session = nil
         currentOutputURL = nil
         consumeTask = nil
+        // The recording's stream is going away; an armed replay resumes on a private one.
+        if isReplayArmed {
+            replay.recordingEnded(
+                configuration: replayCaptureConfiguration(), seconds: Double(replaySeconds),
+                outputDirectory: outputDirectory)
+        }
         activeMicrophoneName = nil
         elapsedSeconds = 0
         recordedBytes = 0

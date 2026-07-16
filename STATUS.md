@@ -5,7 +5,18 @@
 
 ## Now
 
-- **Current milestone: M5 — instant replay. M5-T4 DONE — replay saves real files.**
+- **Current milestone: M5 — instant replay. M5-T5 DONE — replay is in the app.** Arm toggle +
+  ⌥⌘R Carbon hotkey + Save Replay Now + armed badge + Settings section + notifications, all on
+  the shared-stream design (recording and armed replay are consumers of ONE stream; the buffer
+  deliberately resets at record start/stop — Franco's ruling, and record-start implies the
+  replay was already saved if wanted). §6.4 ✅ headless; armed survives relaunch and display
+  sleep (5 s retry); 222 tests. /code-review found 10 confirmed bugs (presented first, batch
+  approved) — see field note; the re-home buffer wipe was verified fixed live (53.9 s clip
+  after two menu opens). **Next: M5-T6 (30-min memory/CPU audit — ASK FRANCO before any
+  busy-screen leg).** Needs Franco (quick): ⌥⌘R while another app is frontmost; badge/menu
+  taste pass; §6.2 content check from T4. Also owed (small, separate commit): trim long
+  output-folder paths in the menu row (Franco, 2026-07-16).
+- **M5-T4 DONE — replay saves real files.**
   (`ReplayMuxer`: rings → keyframe-trimmed, rebased, passthrough-video + AAC `Replay … .mov` in
   ~0.3 s; SIGUSR1 + `s`+Return triggers, coalescing, drain-before-exit; window anchored at the
   newest pts across all rings + docs/02 §5 tail patch so a static screen still saves the true
@@ -251,6 +262,33 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-16 (M5-T5 app replay): the widest review haul yet (10 confirmed), and the pattern is
+  worth naming: **every serious one was a second writer to state I'd only considered the user
+  writing.**
+  - 🔴 **`refreshSources` re-homes picks on every menu open — my source-change `didSet`s
+    treated those writes as user intent and restarted the armed pipeline**, wiping the replay
+    buffer on the first menu open after launch, and right after a mic vanished (the exact
+    moment someone opens the menu to save). A suppression flag scopes the didSets to genuine
+    picks; regression test pins it; verified live (53.9 s clip after two menu opens). **When
+    adding a didSet to a property, grep for every existing writer first** — one of them is
+    usually not the user.
+  - 🔴 **"Restore persisted state at launch" must re-check the permissions the state assumes.**
+    Armed + revoked screen grant would have spun a 5 s SCK retry loop forever behind a lying
+    badge. Launch activation now requires the grant usable; the grant→relaunch flow re-arms.
+  - **Carbon hotkey lessons:** `RegisterEventHotKey` fails silently for combos other apps own
+    (now surfaced as a notification); a registered hotkey intercepts its own combo before any
+    local NSEvent monitor (the recorder must suspend it while listening); and a recorder that
+    accepts plain-⌘ combos lets one reflexive ⌘C hijack copy system-wide — combos now require
+    ⌥ or ⌃. Also: hotkey ints from the plist feed trapping `UInt32()` — bounded at load
+    (the M4-T4 "bad plist is forever" rule, again).
+  - **Replay's own streams must resolve the mic ID the way `start()` does** — a stale picked ID
+    fed raw to SCK is the opaque "invalid parameter" (02 §1), which under the armed retry loop
+    becomes an infinite failing respawn. One resolver, both paths.
+  - **docs/06 amendments:** two notification rows added (mic lost while armed — the docs table
+    predates armed replay; shortcut unavailable). The armed badge shows on all icon states, not
+    just idle ("armed is orthogonal to recording"); menudriver now renders shortcut modifiers
+    (it printed plain ⌘ for everything — a dump-only artifact that mislabelled ⌥⌘R).
 
 - 2026-07-16 (M5-T4 ReplayMuxer): instant replay produces files; two findings worth keeping.
   - 🔴 **The clip window must be anchored at the newest pts across ALL rings, never the video

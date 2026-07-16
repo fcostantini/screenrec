@@ -61,6 +61,49 @@ public enum RecordingNotifications {
         }
     }
 
+    // MARK: - Replay (docs/06 notifications table, M5 rows)
+
+    /// docs/06: `Replay saved` / `Replay … .mov — last 60 s. Click to reveal.` The count is the
+    /// clip's real duration, so a save moments after arming says "last 10 s" honestly.
+    public static func replaySaved(url: URL, duration: TimeInterval) -> RecordingNotification {
+        RecordingNotification(
+            title: "Replay saved",
+            body: "\(url.lastPathComponent) — last \(Int(duration.rounded())) s. Click to reveal.",
+            fileURL: url)
+    }
+
+    /// docs/06: the one place "Couldn't" is right — there is no playable file.
+    public static func replaySaveFailed(message: String) -> RecordingNotification {
+        RecordingNotification(title: "Couldn't save replay", body: message, fileURL: nil)
+    }
+
+    /// The armed stream's mic died (docs/02 §4: it can never rebind to this stream). Amends
+    /// docs/06's table, which predates armed replay. Mirrors the recording row's outcome-first
+    /// shape: replay is still working, and the one remedy is named.
+    public static func replayMicrophoneLost() -> RecordingNotification {
+        RecordingNotification(
+            title: "Replay still armed · microphone disconnected",
+            body: "Replays saved from now on have no microphone. Re-arm to reconnect it.",
+            fileURL: nil)
+    }
+
+    /// The armed pipeline itself died (encoder failure) — replay is off, not degraded, so this
+    /// is a disarm notice, not a warning.
+    public static func replayStopped(message: String) -> RecordingNotification {
+        RecordingNotification(
+            title: "Instant replay turned off", body: message, fileURL: nil)
+    }
+
+    /// The system refused the shortcut registration (another app owns the combo). Replay still
+    /// works from the menu, so this is a heads-up, not a failure.
+    public static func replayHotkeyUnavailable() -> RecordingNotification {
+        RecordingNotification(
+            title: "Replay shortcut unavailable",
+            body: "Another app may be using that shortcut. Choose a different one in "
+                + "ScreenRec Settings. Saving from the menu still works.",
+            fileURL: nil)
+    }
+
     /// One phrase per reachable `EndReason` (docs/06). Never the raw SCK string, never the word
     /// "error" — the user can't act on either.
     private static func cause(_ reason: EndReason) -> String {

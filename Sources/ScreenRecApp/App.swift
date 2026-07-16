@@ -16,10 +16,16 @@ struct ScreenRecApp: App {
         let notifier = ScreenRecApp.notifier
         // Posting is the app's job; AppCore may not import UserNotifications (docs/01).
         state.notifier = { [weak notifier] in notifier?.post($0) }
+        // Same split for the hotkey: Carbon lives here, AppCore stays framework-free.
+        let hotkeys = ScreenRecApp.hotkeys
+        state.hotkeyRegistrar = { [weak hotkeys] in hotkeys?.setHotkey($0) ?? false }
+        let state = state
+        hotkeys.onHotkey = { state.saveReplay() }
     }
 
     /// Shared with the delegate, which installs it before launch completes.
     fileprivate static let notifier = Notifier()
+    fileprivate static let hotkeys = HotkeyCenter()
 
     var body: some Scene {
         MenuBarExtra {
@@ -68,8 +74,11 @@ private struct StatusIconLabel: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        StatusIconView(icon: state.statusIcon)
+        StatusIconView(icon: state.statusIcon, isReplayArmed: state.isReplayArmed)
             .task {
+                // A persisted armed state resumes at launch; `init` never arms (tests
+                // construct AppState freely and must not spin capture).
+                state.activateReplayIfArmed()
                 // docs/06: appears on first launch or any missing permission, never once
                 // satisfied.
                 if state.needsOnboarding {

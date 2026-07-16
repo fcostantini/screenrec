@@ -46,6 +46,14 @@ struct MenuView: View {
         Button("Start Recording") { Task { await state.start() } }
             .disabled(state.readiness != .ready)
 
+        // docs/06 item 3. The "⌥⌘R saves" hint rides the Save row below as its shortcut
+        // column — a `.menu` MenuBarExtra has no right-aligned hint slot (header-row limitation).
+        Toggle("Arm Instant Replay", isOn: $state.isReplayArmed)
+            .disabled(state.readiness != .ready && !state.isReplayArmed)
+        if state.isReplayArmed {
+            saveReplayRow
+        }
+
         Divider()
 
         // A `Picker` in menu content renders as docs/06 items 5–7 ask: a submenu with a
@@ -106,8 +114,25 @@ struct MenuView: View {
             Text("\(microphone) · separate track")
         }
 
+        // docs/06 recording item 5: armed replay stays visible (and saveable) mid-recording.
+        if state.isReplayArmed {
+            Text("Replay still armed · \(HotkeyDisplay.string(for: state.replayHotkey))")
+            saveReplayRow
+        }
+
         // docs/06: the pickers are hidden while recording, not disabled — this row says why.
         Text("Sources locked while recording")
+    }
+
+    /// The save action both menus share; the shortcut column shows the user's actual combo
+    /// (docs/06's "⌥⌘R saves" hint, live). Unmappable custom keys just lose the visual.
+    @ViewBuilder private var saveReplayRow: some View {
+        let button = Button("Save Replay Now") { state.saveReplay() }
+        if let key = HotkeyDisplay.keyEquivalent(for: state.replayHotkey) {
+            button.keyboardShortcut(key, modifiers: HotkeyDisplay.eventModifiers(for: state.replayHotkey))
+        } else {
+            button
+        }
     }
 
     /// Always a button, never inert text: docs/06 draws it disabled outside blocking conditions,
