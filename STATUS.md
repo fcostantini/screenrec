@@ -278,6 +278,12 @@ video (deterministic, reproducible).
   → "Allow notifications when mirroring or sharing the display". docs/06 amended. Also settled:
   the capture indicator itself is OS-mandated for any SCK stream — no opt-out exists, armed
   replay always shows it.
+  - **The likely wider blast radius — armed replay suppressing EVERY app's banners — is
+    documented (docs/06 + 02 §9) but deliberately marked inferred:** the policy is global by
+    design, our own banner's suppression is measured, third-party suppression is not yet
+    observed (the osascript probe has no notification grant of its own, so the headless A/B
+    was inconclusive — the confirmation is Franco arming and Slacking himself). Franco's call
+    2026-07-16: document now, decide on remedies later.
 
 - 2026-07-16 (M5-T5 app replay): the widest review haul yet (10 confirmed), and the pattern is
   worth naming: **every serious one was a second writer to state I'd only considered the user

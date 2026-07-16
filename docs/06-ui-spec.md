@@ -118,6 +118,19 @@ notifications fire after capture ends. Remedies, in order:
   AMFI refuses to launch a self-signed app carrying it (POSIX 153), and without the entitlement
   the level is silently downgraded (measured, both ways).
 
+⚠️ **The wider consequence (2026-07-16, partly inferred — see the caveat): armed replay likely
+suppresses EVERY app's banners, not just ours.** The suppression state is Notification Center's
+global "display is being shared" policy — the same one a Zoom screen-share trips — so while
+replay is armed, Slack/Messages/calendar banners should all land silently in the list. Users
+will blame Slack or macOS, never the dot badge. **Measured:** our own banner is suppressed while
+armed. **Inferred, not yet observed:** third-party banners (the toggle's design is global; the
+30-second confirmation is "arm, then Slack yourself" — pending, Franco). Remedies are the same
+two above, but note the asymmetry: the M6 time-sensitive entitlement fixes only OUR banners;
+the user-side toggle un-suppresses everything, including during genuine screen-shares — a
+privacy trade to make knowingly. Decision deferred (Franco, 2026-07-16): document now, act
+later — candidates are onboarding copy, a product-brief honesty note, or nothing until users
+hit it.
+
 ## Onboarding window (first launch, or any missing permission)
 
 Single window, checklist of two rows, each with live status (✓ green / ○ pending) and

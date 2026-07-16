@@ -344,6 +344,12 @@ approaches if it matters.
 - OS note: Apple ships `SCClipBufferingOutput` (native rolling buffer) in the macOS 27
   beta cycle — our design keeps `ReplayEncoder+RingBuffer` behind a small interface so it
   can be swapped for the OS implementation later (ADR-005).
+- ⚠️ **Armed = a live SCK stream, and macOS treats any live stream as "display being shared":**
+  the capture indicator is mandatory (no API opts out; the OS rolling-buffer API won't either),
+  and Notification Center suppresses banners under its global mirroring/sharing policy —
+  measured for our own notifications (delivered, never drawn); by that policy's design this
+  should suppress every app's banners while armed (not yet directly observed — docs/06 has the
+  full write-up and remedies).
 
 ## 10. CLI/dev environment gotchas (bit us in the PoC)
 
