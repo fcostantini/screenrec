@@ -43,7 +43,10 @@ Order and grouping (separators between groups):
    Disabled while recording.
 7. `Quality ▸` submenu: Efficient / Balanced / High (docs/02 §3 presets).
 8. — separator —
-9. `Open Recordings Folder` — reveals output dir in Finder.
+9. `Open Recordings Folder — <~/path>` — reveals the output dir in Finder, and **shows the current
+   destination** as a home-relative path (e.g. `~/Movies`) so it's visible without opening (Franco,
+   2026-07-16). One title string — a SwiftUI `.menu` can't two-tone the path (same limitation as
+   item 10).
 10. Recent recordings: up to 5 most-recent files from the output dir, **indented one level**
     under `Open Recordings Folder` so they read as its contents rather than as more commands
     (Franco, 2026-07-15 — inline rows, not a submenu, settling this against 03's wording);

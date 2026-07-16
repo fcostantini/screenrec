@@ -63,4 +63,16 @@ import RecorderCore
         // blow out the menu's width to say something the user can't act on from there.
         #expect(MenuHeader.idleStatus(readiness) == "Permissions needed…")
     }
+
+    @Test func recordingsFolderIsHomeRelative() {
+        // Built from NSHomeDirectory so the abbreviation has the same home to match against.
+        let movies = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Movies")
+        #expect(MenuHeader.recordingsFolder(movies) == "~/Movies")
+    }
+
+    @Test func recordingsFolderOutsideHomeStaysAbsolute() {
+        // An external drive can't be shortened — the user sees exactly where it goes.
+        #expect(MenuHeader.recordingsFolder(URL(fileURLWithPath: "/Volumes/Ext/Recordings"))
+            == "/Volumes/Ext/Recordings")
+    }
 }

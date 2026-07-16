@@ -1,9 +1,8 @@
 import Foundation
 import RecorderCore
 
-/// Text for the menu's header row (docs/06 "Menu — idle state" item 1, "Menu — recording
-/// state" item 1). Pure string-making, kept out of the views so docs/06's copy rules are
-/// testable.
+/// Text for the menu's rows (docs/06 "Menu"). Pure string-making, kept out of the views so
+/// docs/06's copy rules are testable.
 public enum MenuHeader {
 
     /// Elapsed time, always `HH:MM:SS` per docs/06's copy rules.
@@ -32,5 +31,11 @@ public enum MenuHeader {
         case .ready: "Ready"
         case .needsScreenRecording, .needsMicrophone, .blocked: "Permissions needed…"
         }
+    }
+
+    /// The output folder shown on `Open Recordings Folder` (docs/06 item 9): the destination as a
+    /// home-relative path (`~/Movies`), so the menu says where recordings go without opening it.
+    public static func recordingsFolder(_ directory: URL) -> String {
+        (directory.path as NSString).abbreviatingWithTildeInPath
     }
 }

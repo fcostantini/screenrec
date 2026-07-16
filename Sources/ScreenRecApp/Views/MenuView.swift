@@ -71,7 +71,9 @@ struct MenuView: View {
 
         Divider()
 
-        Button("Open Recordings Folder") { Finder.open(state.outputDirectory) }
+        Button("Open Recordings Folder — \(MenuHeader.recordingsFolder(state.outputDirectory))") {
+            Finder.open(state.outputDirectory)
+        }
         // Indented under the folder above. The indent is in the title because a SwiftUI menu
         // gives no access to `NSMenuItem.indentationLevel` — hence the accessibility label.
         ForEach(state.recentRecordings, id: \.self) { url in
