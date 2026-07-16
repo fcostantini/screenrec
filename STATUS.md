@@ -5,6 +5,19 @@
 
 ## Now
 
+- **M6-T1 IN PROGRESS — acceptance run against 00-product-brief. C3 (instant replay)
+  PASSED 2026-07-16, headless, against the live install** (`/Users/Shared/ScreenRec.app`,
+  byte-identical to today's dist, v0.1.0): not recording, armed via menu, 70 s fill,
+  Save Replay Now → signal→file **0.30 s** adjusted (raw 1.17 s incl. the measured 0.87 s
+  menudriver overhead), write-complete ≈0.8 s; probe: 60.55 s (60 + ≤1 keyframe interval),
+  hvc1 + aac 48k/2ch + aac 24k/1ch (AirPods mic), first video sample pts 0.000 sync=true
+  (keyframe start). Content-is-last-minute carried from G5 §6.2 (Franco). Plan rulings
+  (Franco, 2026-07-16): **C1 delegated to M6-T2's soak** (one 2-h run counts for both);
+  **C4 (fresh-account <2 min) and C5 (player/NLE matrix) WAIVED** ("no need for this
+  test" — recorded as waivers, not passes). **Remaining: C2 (≤1.5 GB/h at Balanced) —
+  a 30-min menu-driven recording during Franco's real usage; he'll name the moment.**
+  C2 is the known at-risk criterion (Balanced floors ~19 Mbps busy; frame-on-change is
+  what makes typical work fit). T1 closes on C2 + the recorded delegations/waivers.
 - **🎉 M5 COMPLETE — GATE G5 PASSED 2026-07-16 (all legs).** T6's audit: burst leg (busyscene,
   4.5 min max load) CPU 7.2% avg / RSS flat 201–202 MB; main leg (30.2 min armed during Franco's
   real usage) CPU 4.7% avg / RSS median 216 MB, drift min5→end +7 MB (no leak) / min-30 save
@@ -190,6 +203,9 @@ video (deterministic, reproducible).
 
 ## Needs Franco (human-only items)
 
+- [ ] **M6-T1 C2 — the ≤1.5 GB/h measurement:** a 30-min Balanced menu-driven recording
+      while Franco works normally (his screen, his moment — he said "I'll let you know",
+      2026-07-16). Agent runs the mechanics; Franco just picks the window.
 - [x] ~~G4 §5.4 fresh-account re-run~~ — **DISCARDED by Franco 2026-07-16** ("let's discard it,
       not worried about it"). The fix itself stands verified: unit + headless forced-failure
       integration (no wedge, clean "Couldn't write…"), plus Fix B's preflight probing the real
@@ -273,6 +289,17 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-16 (M6-T1 C3): two observations from the acceptance leg.
+  - **The app has a live install at `/Users/Shared/ScreenRec.app`** (found running there;
+    binary byte-identical to today's dist build). A stable path outside `dist/` — which
+    `bundle.sh` deletes every run — is exactly what M6-T5's login item needs, but no doc or
+    STATUS entry records who put it there or whether it's the intended permanent address.
+    Settle at M6-T4/T5.
+  - **The menu's recent-replay rows list files that no longer exist** (~/Movies had zero
+    Replay files; the menu showed two — moved/deleted externally). Recents don't revalidate
+    on menu open; what a click on a dead row does is unverified. Candidate for M6-T3's
+    error-path audit, not fixed here.
 
 - 2026-07-16 (M5-T5 follow-up — the banner that can't render): **macOS suppresses notification
   banners while the display is captured, and armed replay means the display is always captured.**
