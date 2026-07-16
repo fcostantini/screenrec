@@ -181,16 +181,16 @@ video (deterministic, reproducible).
 
 ## Needs Franco (human-only items)
 
-- [ ] **G4 §5.4 fresh-account re-run (with the FIXED build).** §5.1 ✅ + §5.3 ✅ done live. §5.4
-      found the wedge bug (now fixed). **`/Users/Shared/ScreenRec.app` is already the current
-      build (refreshed 2026-07-16, post-M5-T5 — it's also what Launchpad launches);** on the
-      fresh account:
-      Settings → Choose → **Desktop without Files & Folders** → **rejected at selection** (Fix B);
-      and if bypassed (`defaults write … outputDirectory <Desktop>`), Start → **clean "Couldn't
-      write…" notification, app alive** (Fix A). Note: launching the app via `open` from the agent's
-      Terminal appears to lend it Terminal's Desktop access, so this-account repro is unreliable —
-      the fresh account (Finder-launched) is the honest environment.
+- [x] ~~G4 §5.4 fresh-account re-run~~ — **DISCARDED by Franco 2026-07-16** ("let's discard it,
+      not worried about it"). The fix itself stands verified: unit + headless forced-failure
+      integration (no wedge, clean "Couldn't write…"), plus Fix B's preflight probing the real
+      AVAssetWriter API. Only the fresh-account *end-to-end* rerun is waived. G4 closes on this.
   - **§5.1 WATCH ② (Grant… → Open System Settings…)** — reasoned-not-watched; catch it if convenient.
+- [x] **M5-T5 human legs — PASSED 2026-07-16 (Franco):** ⌥⌘R fired from another app (saves worked,
+      and with the mirroring/sharing toggle enabled the banner renders — the user-side remedy is
+      now MEASURED); "the UI looks great" (badge, menu rows, Settings section).
+- [x] **G5 §6.2 content check — PASSED 2026-07-16 (Franco):** the saved clip is genuinely the
+      last minute.
 
 - [x] DONE 2026-07-14: Franco granted the Claude Code runtime ("2.1.209") Screen
       Recording AND Microphone, so capture tests (engine-smoke/record/probe) run directly
@@ -259,7 +259,7 @@ video (deterministic, reproducible).
 | G1   | ✅ passed 2026-07-14 | probe-stream: all 3 sources flowing. video 4112×2570 420v (PTS Δ 0.008–0.09s, frame-on-change); system audio 48kHz/2ch/32-bit (Δ 0.02s); mic native format device-dependent — AirPods 24kHz/1ch, built-in 48kHz/1ch (both differ from system audio → separate tracks required, M2) |
 | G2   | ✅ passed 2026-07-14 | §3.1 tracks hvc1+2×aac ✅; §3.2 kill-9 ✅ (kill@6s→5.04s playable AFTER fragment fix 10s→1s — 10s was unparseable if killed <10s); §3.3 sync-clap ✅ (Franco); §3.4 static-tail ✅ (14s static→14.4s @7.9fps, tail patch holds); §3.5 30-min drift ✅ (Franco ran real 30-min record + beepflash; per-track dur match 50ms; flash↔beep offset constant ~−67ms±10 from min 5→29 = no drift) |
 | G3   | ✅ **PASSED 2026-07-15** | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears ✅ PASSED 2026-07-15 (Franco, post-M3-T6, per the ADR-012 definition): AirPods cased at ~22s of a 60s run → CLI printed `⚠️ microphone disconnected — still recording` at ~25s (≈3.2s latency = 3s timeout + ≤1s poll), recording ran to the end, `finished (userStopped)`, file playable, mic track 21.82s vs video 59.83s. First run (pre-M3-T6) disproved the gate's premise — no takeover, buffers just stop → docs/02 §4 corrected, ADR-012 written. Also proved: a reconnected device NEVER resumes (mic gone for the session). §4.4 disk-guard ✅ PASSED: `--test-disk-floor 500000` (GB) vs 676 GiB free → `finished (diskAlmostFull)`, file playable (2.25s); negative verified on a real non-boot volume (4 GB HFS+ image, importantUsage reads 0 → records the full 8s, `userStopped`) after /code-review caught that the recommended capacity key reads 0 on every external volume. §4.1 cross-seam clap-sync ✅ (Franco — sync holds across the seam). §4.3 ✅ both ways in: display sleep (headless via `pmset`) → playable 3.3s, and lid-close/system sleep (Franco) → `finished (displayDisconnected)` + playable 11.2s file finalized on wake, confirming lid-close is the same -3815 and that `.systemSleep` is genuinely unreachable. §4.3 monitor-unplug N/A — built-in display only. |
-| G4   | 🟡 in progress | §5.2 ✅ headless: DR byte-identical across A→B rebuild + `--verify --strict` + rebuilt app `Ready` → menu-driven 19.43 s playable file, no re-grant. §5.3 ✅ headless (delivery) + ✅ live (Franco: banner renders + click reveals). §5.1 ✅ live (Franco: auto-relaunch on grant transition, forced the ungranted state). §5.4 ❌→**FIXED**: choosing an unwritable folder (Desktop) wedged the app (swallowed `startWriting()` failure); fix landed (recorder surfaces failure → clean `.failed`; preflight probes the real AVAssetWriter API → Desktop rejected at selection). Verified unit + headless forced-failure integration (no wedge). **Owed:** fresh-account end-to-end re-run of §5.4 with the fixed build. |
+| G4   | ✅ **PASSED 2026-07-16** (§5.4 fresh-account rerun waived by Franco) | §5.2 ✅ headless: DR byte-identical across A→B rebuild + `--verify --strict` + rebuilt app `Ready` → menu-driven 19.43 s playable file, no re-grant. §5.3 ✅ headless (delivery) + ✅ live (Franco: banner renders + click reveals). §5.1 ✅ live (Franco: auto-relaunch on grant transition, forced the ungranted state). §5.4 ❌→**FIXED + verified** (unit + headless forced-failure integration: no wedge, clean "Couldn't write…"; preflight probes the real AVAssetWriter API → Desktop rejected at selection); the fresh-account end-to-end rerun was **discarded by Franco 2026-07-16** — the waiver, not a pass, is the record. |
 | G5   | ⬜ not run | — |
 | G6   | ⬜ not run | — |
 

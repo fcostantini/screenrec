@@ -464,7 +464,7 @@ TCC grants — app appears by name in System Settings, grants survive rebuild).
       **Verify:** 04-testing §6.2 + §6.3 — `kill -USR1 <pid>` → file exists < 1 s
       later; probe: hvc1 + 2 aac, duration N + ≤ 1 s, starts on keyframe; two rapid
       signals → one clean file, no crash. "Genuinely the last minute" content check
-      **(human)**.
+      **(human)** — ✅ PASSED 2026-07-16 (Franco).
       DONE 2026-07-16: §6.2 ✅ signal→file-exists 0.08 s external / 0.29 s to finalized;
       probe hvc1 4112×2570 + 2 aac, 60.56 s (60 + ≤1). §6.3 ✅ two rapid SIGUSR1s → one
       coalesced, 2 clean files total. `s`+Return verified through a pty. The clip window
@@ -488,7 +488,8 @@ TCC grants — app appears by name in System Settings, grants survive rebuild).
       re-homing (regression-tested). 222 tests. /code-review: 10 confirmed findings presented
       → approved batch applied (re-home wipe, launch permission gate, hotkey failure surfacing,
       system-shortcut hijack, mid-recording buffer change, stale-mic retry loop, and more).
-      **(human) owed:** ⌥⌘R while another app is frontmost; badge/menu taste pass.
+      **(human) ✅ 2026-07-16 (Franco):** ⌥⌘R from another app works (banner renders with the
+      mirroring/sharing toggle on); "the UI looks great".
       **Inherits from M4-T4 (Franco, 2026-07-15):** the replay Settings rows (buffer length
       30/60/120, hotkey recorder) and the status-icon's replay-armed badge, plus the keys they
       write — `replayArmed`, `replaySeconds`, `replayHotkey` (names contractual, docs/06). They

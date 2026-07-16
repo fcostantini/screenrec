@@ -112,7 +112,9 @@ replay-saved notification fires exactly then; it lands in Notification Center's 
 renders. Measured live (Franco, 2026-07-16). Every earlier banner check passed because those
 notifications fire after capture ends. Remedies, in order:
 - **Now:** the user enables *System Settings → Notifications → Allow notifications when
-  mirroring or sharing the display*. Candidate onboarding copy for the Notifications row.
+  mirroring or sharing the display* — **measured working 2026-07-16 (Franco): with the toggle
+  on, the replay-saved banner renders while armed.** Candidate onboarding copy for the
+  Notifications row (deferred by Franco, same day).
 - **M6-T4:** `interruptionLevel = .timeSensitive` is already set on every notification, but the
   required entitlement (`Scripts/entitlements.plist`, parked) needs a provisioning profile —
   AMFI refuses to launch a self-signed app carrying it (POSIX 153), and without the entitlement
