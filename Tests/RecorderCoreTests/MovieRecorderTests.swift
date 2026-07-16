@@ -27,13 +27,13 @@ import Testing
 
         // System audio: 48 kHz stereo. Mic: 24 kHz mono — a deliberately different format,
         // so the lazily-built mic input can't share the system input (docs/02 §4).
-        let systemFormat = Self.audioFormat(sampleRate: 48_000, channels: 2)
-        let micFormat = Self.audioFormat(sampleRate: 24_000, channels: 1)
+        let systemFormat = makeAudioFormat(sampleRate: 48_000, channels: 2)
+        let micFormat = makeAudioFormat(sampleRate: 24_000, channels: 1)
 
         // Prime the lazy mic input with one throwaway buffer so the writer can start before
         // the first video frame; it's pre-epoch (no session yet) and is dropped by design.
         recorder.consume(
-            Self.audioSample(format: micFormat, sampleRate: 24_000, channels: 1,
+            makeAudioSampleBuffer(format: micFormat,
                              frames: 800, pts: .zero),
             type: .microphone)
 
@@ -46,11 +46,11 @@ import Testing
                                  pts: pts, duration: frameDuration),
                 type: .screen)
             recorder.consume(
-                Self.audioSample(format: systemFormat, sampleRate: 48_000, channels: 2,
+                makeAudioSampleBuffer(format: systemFormat,
                                  frames: 48_000 / Self.fps, pts: pts),
                 type: .systemAudio)
             recorder.consume(
-                Self.audioSample(format: micFormat, sampleRate: 24_000, channels: 1,
+                makeAudioSampleBuffer(format: micFormat,
                                  frames: 24_000 / Self.fps, pts: pts),
                 type: .microphone)
         }
@@ -86,7 +86,7 @@ import Testing
         // and no mic track appears (the M2-T5 `--no-mic` path).
         let recorder = try MovieRecorder(
             outputURL: url, frameRate: Self.fps, preset: .balanced, includesMicrophone: false)
-        let systemFormat = Self.audioFormat(sampleRate: 48_000, channels: 2)
+        let systemFormat = makeAudioFormat(sampleRate: 48_000, channels: 2)
         for index in 0..<(Self.fps * Self.seconds) {
             let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
             recorder.consume(
@@ -94,7 +94,7 @@ import Testing
                                  duration: CMTime(value: 1, timescale: CMTimeScale(Self.fps))),
                 type: .screen)
             recorder.consume(
-                Self.audioSample(format: systemFormat, sampleRate: 48_000, channels: 2,
+                makeAudioSampleBuffer(format: systemFormat,
                                  frames: 48_000 / Self.fps, pts: pts),
                 type: .systemAudio)
         }
@@ -110,9 +110,9 @@ import Testing
         try? FileManager.default.removeItem(at: url)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let systemFormat = Self.audioFormat(sampleRate: 48_000, channels: 2)
-        let micA = Self.audioFormat(sampleRate: 24_000, channels: 1)  // e.g. AirPods
-        let micB = Self.audioFormat(sampleRate: 48_000, channels: 1)  // built-in mic takes over
+        let systemFormat = makeAudioFormat(sampleRate: 48_000, channels: 2)
+        let micA = makeAudioFormat(sampleRate: 24_000, channels: 1)  // e.g. AirPods
+        let micB = makeAudioFormat(sampleRate: 48_000, channels: 1)  // built-in mic takes over
         let frameDuration = CMTime(value: 1, timescale: CMTimeScale(Self.fps))
 
         // The handler fires exactly once: not on the buffer that establishes the format, once on
@@ -132,11 +132,11 @@ import Testing
                                      duration: frameDuration),
                     type: .screen)
                 recorder.consume(
-                    Self.audioSample(format: systemFormat, sampleRate: 48_000, channels: 2,
+                    makeAudioSampleBuffer(format: systemFormat,
                                      frames: 48_000 / Self.fps, pts: pts),
                     type: .systemAudio)
                 recorder.consume(
-                    Self.audioSample(format: micA, sampleRate: 24_000, channels: 1,
+                    makeAudioSampleBuffer(format: micA,
                                      frames: 24_000 / Self.fps, pts: pts),
                     type: .microphone)
             }
@@ -144,7 +144,7 @@ import Testing
             for index in frames..<(frames + 3) {
                 let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
                 recorder.consume(
-                    Self.audioSample(format: micB, sampleRate: 48_000, channels: 1,
+                    makeAudioSampleBuffer(format: micB,
                                      frames: 48_000 / Self.fps, pts: pts),
                     type: .microphone)
             }
@@ -163,8 +163,8 @@ import Testing
         try? FileManager.default.removeItem(at: url)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let micA = Self.audioFormat(sampleRate: 24_000, channels: 1)
-        let micB = Self.audioFormat(sampleRate: 48_000, channels: 1)
+        let micA = makeAudioFormat(sampleRate: 24_000, channels: 1)
+        let micB = makeAudioFormat(sampleRate: 48_000, channels: 1)
 
         // A swap before the first video frame starts the writer session must NOT fail-stop:
         // nothing is written yet, so stopping would discard the whole recording as `.failed`
@@ -175,11 +175,11 @@ import Testing
                 outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: true,
                 onMicrophoneFormatChange: { detected() })
             recorder.consume(
-                Self.audioSample(format: micA, sampleRate: 24_000, channels: 1, frames: 800,
+                makeAudioSampleBuffer(format: micA, frames: 800,
                                  pts: CMTime(value: 1, timescale: 100)),
                 type: .microphone)
             recorder.consume(
-                Self.audioSample(format: micB, sampleRate: 48_000, channels: 1, frames: 1600,
+                makeAudioSampleBuffer(format: micB, frames: 1600,
                                  pts: CMTime(value: 2, timescale: 100)),
                 type: .microphone)
             recorder.cancel()
@@ -197,8 +197,7 @@ import Testing
         // Only audio was fed — no video frame ever started the session, so there is nothing
         // to finalize and finish() reports it rather than emitting an empty file.
         recorder.consume(
-            Self.audioSample(format: Self.audioFormat(sampleRate: 48_000, channels: 2),
-                             sampleRate: 48_000, channels: 2, frames: 1600, pts: .zero),
+            makeAudioSampleBuffer(format: makeAudioFormat(sampleRate: 48_000, channels: 2), frames: 1600, pts: .zero),
             type: .systemAudio)
 
         await #expect(throws: MovieRecorderError.noFramesWritten) {
@@ -216,8 +215,7 @@ import Testing
             outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: false)
         // Only audio — no video frame ever starts the session, so nothing is written.
         recorder.consume(
-            Self.audioSample(format: Self.audioFormat(sampleRate: 48_000, channels: 2),
-                             sampleRate: 48_000, channels: 2, frames: 1600, pts: .zero),
+            makeAudioSampleBuffer(format: makeAudioFormat(sampleRate: 48_000, channels: 2), frames: 1600, pts: .zero),
             type: .systemAudio)
         await #expect(throws: MovieRecorderError.noFramesWritten) { _ = try await recorder.finish() }
         // The reservation placeholder must be cleaned up, not left as 0-byte litter that would
@@ -284,43 +282,4 @@ import Testing
         return CMFormatDescriptionGetMediaSubType(descriptions[0])
     }
 
-    private static func audioFormat(sampleRate: Double, channels: UInt32) -> CMAudioFormatDescription {
-        let bytesPerFrame = 2 * channels  // 16-bit signed samples, interleaved
-        var asbd = AudioStreamBasicDescription(
-            mSampleRate: sampleRate,
-            mFormatID: kAudioFormatLinearPCM,
-            mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
-            mBytesPerPacket: bytesPerFrame,
-            mFramesPerPacket: 1,
-            mBytesPerFrame: bytesPerFrame,
-            mChannelsPerFrame: channels,
-            mBitsPerChannel: 16,
-            mReserved: 0)
-        var format: CMAudioFormatDescription?
-        CMAudioFormatDescriptionCreate(
-            allocator: kCFAllocatorDefault, asbd: &asbd, layoutSize: 0, layout: nil,
-            magicCookieSize: 0, magicCookie: nil, extensions: nil, formatDescriptionOut: &format)
-        return format!
-    }
-
-    private static func audioSample(
-        format: CMAudioFormatDescription, sampleRate: Double, channels: UInt32,
-        frames: Int, pts: CMTime
-    ) -> CMSampleBuffer {
-        let dataSize = frames * Int(2 * channels)
-        var blockBuffer: CMBlockBuffer?
-        CMBlockBufferCreateWithMemoryBlock(
-            allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: dataSize,
-            blockAllocator: kCFAllocatorDefault, customBlockSource: nil, offsetToData: 0,
-            dataLength: dataSize, flags: kCMBlockBufferAssureMemoryNowFlag, blockBufferOut: &blockBuffer)
-        CMBlockBufferFillDataBytes(with: 0, blockBuffer: blockBuffer!,
-                                   offsetIntoDestination: 0, dataLength: dataSize)  // silence
-
-        var sampleBuffer: CMSampleBuffer?
-        CMAudioSampleBufferCreateReadyWithPacketDescriptions(
-            allocator: kCFAllocatorDefault, dataBuffer: blockBuffer!, formatDescription: format,
-            sampleCount: frames, presentationTimeStamp: pts, packetDescriptions: nil,
-            sampleBufferOut: &sampleBuffer)
-        return sampleBuffer!
-    }
 }

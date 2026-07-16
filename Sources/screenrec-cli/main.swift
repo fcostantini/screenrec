@@ -14,9 +14,9 @@ func printUsage() {
       screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
       screenrec-cli probe-stream [--duration N] [--mic <id>] [--no-mic]
                                        Capture and report per-source buffers/formats/PTS
-      screenrec-cli replay-arm [--seconds N] [--duration N]
-                                       Arm instant replay: encode the screen into a
-                                       rolling N-second ring (default 60; no file —
+      screenrec-cli replay-arm [--seconds N] [--duration N] [--mic <id>] [--no-mic]
+                                       Arm instant replay: screen + system audio + mic
+                                       into rolling N-second rings (default 60; no file —
                                        saving lands in M5-T4). Prints occupancy every 2 s.
       screenrec-cli mic-swap-spike [mode]  How SCK binds mic devices (M3-T7 evidence, 02 §4)
       screenrec-cli --help
@@ -271,10 +271,10 @@ func reserveOutputURL(_ options: RecordOptions) throws -> URL {
 }
 
 /// Microphone selection, plus the reason when a mic was requested but none is usable.
-/// Shared by the dry-run and real capture so they can't disagree.
-func resolveMicrophone(_ options: RecordOptions) -> (selection: MicrophoneSelection, unavailable: String?) {
-    guard options.micEnabled else { return (.none, nil) }
-    switch Permissions.resolvedMicrophoneID(preferred: options.micID) {
+/// Shared by record (dry-run and real capture) and replay-arm so they can't disagree.
+func resolveMicrophone(micEnabled: Bool, preferredID: String?) -> (selection: MicrophoneSelection, unavailable: String?) {
+    guard micEnabled else { return (.none, nil) }
+    switch Permissions.resolvedMicrophoneID(preferred: preferredID) {
     case .explicit(let id): return (.device(id: id), nil)
     case .noDevice(let reason): return (.none, reason)
     }
@@ -289,7 +289,7 @@ func printRecordDryRun(_ options: RecordOptions) {
 
     if options.micEnabled {
         print("  Microphone permission: \(describe(Permissions.microphoneState()))")
-        let mic = resolveMicrophone(options)
+        let mic = resolveMicrophone(micEnabled: options.micEnabled, preferredID: options.micID)
         switch mic.selection {
         case .device(let id):
             let name = AudioInputs.available().first { $0.uniqueID == id }?.name ?? "unknown"
@@ -406,7 +406,7 @@ func performRecording(_ options: RecordOptions) async {
         die("Couldn't create the output file: \(error.localizedDescription)", code: 74)
     }
 
-    let mic = resolveMicrophone(options)
+    let mic = resolveMicrophone(micEnabled: options.micEnabled, preferredID: options.micID)
     if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
     let configuration = CaptureConfiguration(microphone: mic.selection, quality: options.preset)
     let session: RecordingSession

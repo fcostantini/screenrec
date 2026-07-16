@@ -333,17 +333,14 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         return CMTimeCompare(CMTimeSubtract(now, first), Self.microphoneGrace) > 0
     }
 
-    /// Whether `buffer`'s audio format differs from the mic input's established one — a changed
-    /// sample rate, channel count, or format ID means the device switched (docs/02 §4). Must
-    /// hold `lock`.
+    /// Whether `buffer`'s audio format differs from the mic input's established one — the
+    /// device switched (docs/02 §4; identity fields in `AudioFormatIdentity`). Must hold `lock`.
     private func microphoneFormatDiffers(_ buffer: CMSampleBuffer) -> Bool {
         guard let established = microphoneASBD,
               let format = CMSampleBufferGetFormatDescription(buffer),
               let current = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee
         else { return false }
-        return current.mSampleRate != established.mSampleRate
-            || current.mChannelsPerFrame != established.mChannelsPerFrame
-            || current.mFormatID != established.mFormatID
+        return !current.hasSameIdentity(as: established)
     }
 
     /// Starts the writer, dropping the O_EXCL reservation placeholder in the same synchronous

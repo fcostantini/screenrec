@@ -445,9 +445,17 @@ TCC grants — app appears by name in System Settings, grants survive rebuild).
       run — field note; M5-T6's 30-min audit decides drift). 6 headless VT tests (no TCC
       needed), TSan-clean. /code-review high applied (async session bring-up off the SCK
       queue, failure routed through `stop(reason:)`, init validation, shared test fixture).
-- [ ] M5-T3 Audio rings (PCM copies of `.audio` + `.microphone`).
+- [x] M5-T3 Audio rings (PCM copies of `.audio` + `.microphone`).
       **Verify:** `replay-arm` occupancy printout includes both audio rings; PCM byte
       counts match duration × format math; rings stay duration-aligned with video ring.
+      DONE 2026-07-16: `ReplayAudioRing` (deep PCM copies — never retain SCK's own buffers;
+      ASBD latch that clears + re-latches on a format change, so replay self-heals across
+      codec flips; planar-aware byte math). `replay-arm` gains
+      `--mic/--no-mic` + per-ring format lines + triplet ticker. 2-min live verify: system
+      22.7 MB @ 62.0 s == 62 × 375 KB/s exactly; mic (AirPods, 24 k/1ch) 5.7 MB ✓; all three
+      spans pinned at 62.0 s. **SCK system audio is planar Float32** — the live run caught
+      `CMSampleBufferGetTotalSampleSize` returning 0 and a 2× rate error the interleaved-only
+      fixtures couldn't see (field note). 200 tests, TSan-clean.
 - [ ] M5-T4 `ReplayMuxer`: snapshot → keyframe trim → rebase → passthrough video +
       AAC audio → file. Coalesce concurrent saves. CLI trigger (the ring lives inside
       the running `replay-arm` process — there is NO separate `replay-save`

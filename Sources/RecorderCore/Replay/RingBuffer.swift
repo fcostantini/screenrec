@@ -53,6 +53,21 @@ final class RingBuffer<Element>: @unchecked Sendable {
         return entries
     }
 
+    /// Drop everything (e.g. an audio format change makes the buffered content dead air).
+    func removeAll() {
+        lock.lock(); defer { lock.unlock() }
+        entries.removeAll()
+    }
+
+    /// Oldest-to-newest span of a snapshot, NaN-guarded (docs/02 §10: CMTime → seconds can be
+    /// NaN, and `Int(NaN)` traps downstream). Static and pure so every consumer's `stats()`
+    /// shares one span policy.
+    static func span(of entries: [RingEntry<Element>]) -> Double {
+        guard let first = entries.first, let last = entries.last else { return 0 }
+        let seconds = CMTimeSubtract(last.pts, first.pts).seconds
+        return seconds.isFinite ? seconds : 0
+    }
+
     /// The entries for a clip of the last `seconds`: from the newest keyframe at or before
     /// `newest.pts − seconds` through the newest entry. Empty while the ring holds no qualifying
     /// keyframe yet (still filling). Keyframes ~1 s apart ⇒ the clip runs `seconds + ≤ 1 s`

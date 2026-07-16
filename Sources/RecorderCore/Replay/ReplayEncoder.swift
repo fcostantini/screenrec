@@ -111,19 +111,14 @@ public final class ReplayEncoder: SampleConsumer, @unchecked Sendable {
 
     public func stats() -> Stats {
         let entries = ring.snapshot()
-        guard let first = entries.first, let last = entries.last else {
-            return Stats(spanSeconds: 0, sampleCount: 0, keyframeCount: 0, compressedBytes: 0)
-        }
         var keyframes = 0
         var bytes = 0
         for entry in entries {
             if entry.isKeyframe { keyframes += 1 }
             bytes += CMSampleBufferGetTotalSampleSize(entry.element)
         }
-        // CMTime → seconds can be NaN (docs/02 §10); report 0 rather than trap downstream.
-        let span = CMTimeSubtract(last.pts, first.pts).seconds
         return Stats(
-            spanSeconds: span.isFinite ? span : 0,
+            spanSeconds: RingBuffer<CMSampleBuffer>.span(of: entries),
             sampleCount: entries.count,
             keyframeCount: keyframes,
             compressedBytes: bytes

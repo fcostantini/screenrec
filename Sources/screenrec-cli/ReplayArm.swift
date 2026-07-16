@@ -5,6 +5,8 @@ import RecorderCore
 struct ReplayArmOptions {
     var seconds = 60.0
     var duration: Double?
+    var micID: String?
+    var micEnabled = true
 }
 
 func parseReplayArmOptions(_ args: [String]) -> ReplayArmOptions {
@@ -18,6 +20,11 @@ func parseReplayArmOptions(_ args: [String]) -> ReplayArmOptions {
             options.seconds = parsePositive(iterator.next(), flag: "--seconds", max: 600)
         case "--duration":
             options.duration = parsePositive(iterator.next(), flag: "--duration", max: 86_400)
+        case "--mic":
+            guard let value = iterator.next() else { die("--mic needs a device id") }
+            options.micID = value
+        case "--no-mic":
+            options.micEnabled = false
         default:
             die("Unknown option: \(arg)")
         }
@@ -40,32 +47,75 @@ func currentMemoryFootprint() -> Int64 {
     return Int64(info.phys_footprint)
 }
 
+/// The one-time format announcement for an audio ring, printed when its first buffer latches —
+/// it's what makes the "bytes = duration × rate" verify readable straight off the log.
+private func formatAnnouncement(_ label: String, _ format: ReplayAudioRing.Format, note: String?) -> String {
+    String(
+        format: "  · %@ %4.1f kHz × %d ch × %d B  → %3d KB/s%@",
+        label, format.sampleRate / 1000, format.channels, format.bytesPerSample,
+        format.bytesPerSecond / 1024, note.map { "   (\($0))" } ?? "")
+}
+
+/// Trouble suffix for an audio ring's segment — format changes and copy failures must surface
+/// in the log or a dead audio path looks healthy right up to a bad M5-T4 save.
+private func audioTrouble(_ stats: ReplayAudioRing.Stats) -> String {
+    var notes: [String] = []
+    if stats.formatChanges > 0 { notes.append("format ×\(stats.formatChanges)") }
+    if stats.copyFailures > 0 { notes.append("\(stats.copyFailures) copy-failed") }
+    return notes.isEmpty ? "" : " (⚠︎ \(notes.joined(separator: ", ")))"
+}
+
 /// One occupancy line every 2 s — a scrolling log rather than `record`'s in-place ticker,
 /// because the §6.1 verify asserts a series (climb, then plateau) from the captured output.
-private func runReplayTicker(_ encoder: ReplayEncoder) async {
+private func runReplayTicker(
+    _ encoder: ReplayEncoder, system: ReplayAudioRing, mic: ReplayAudioRing?, micName: String?
+) async {
     let clock = ContinuousClock()
     let start = clock.now
+    var announcedSystem = false
+    var announcedMic = false
     while !Task.isCancelled {
         try? await Task.sleep(nanoseconds: 2_000_000_000)
         if Task.isCancelled { return }
         let elapsed = Int(start.duration(to: clock.now).components.seconds)
-        let stats = encoder.stats()
-        let line = String(
-            format: "  ⟳ %02d:%02d   ring %5.1fs · %4d samples · %3d keyframes · %6.1f MB · RSS %4d MB",
+        let video = encoder.stats()
+        let systemStats = system.stats()
+        let micStats = mic?.stats()
+
+        if !announcedSystem, let format = systemStats.format {
+            print(formatAnnouncement("system audio:", format, note: nil))
+            announcedSystem = true
+        }
+        if !announcedMic, let format = micStats?.format {
+            print(formatAnnouncement("microphone:  ", format, note: micName))
+            announcedMic = true
+        }
+
+        var line = String(
+            format: "  ⟳ %02d:%02d   video %5.1fs ×%-4d %6.1fMB (%d kf) · system %5.1fs %4.1fMB%@",
             elapsed / 60, elapsed % 60,
-            stats.spanSeconds, stats.sampleCount, stats.keyframeCount,
-            Double(stats.compressedBytes) / 1_048_576,
-            currentMemoryFootprint() / 1_048_576)
+            video.spanSeconds, video.sampleCount,
+            Double(video.compressedBytes) / 1_048_576, video.keyframeCount,
+            systemStats.spanSeconds, Double(systemStats.bytes) / 1_048_576,
+            audioTrouble(systemStats))
+        if let micStats {
+            line += String(
+                format: " · mic %5.1fs %4.1fMB%@",
+                micStats.spanSeconds, Double(micStats.bytes) / 1_048_576, audioTrouble(micStats))
+        }
+        line += String(format: " · RSS %4dMB", currentMemoryFootprint() / 1_048_576)
         print(line)
     }
 }
 
-/// Arms instant replay: boots the capture engine with ONLY the replay consumer attached — no
-/// MovieRecorder, no file (docs/03 M5-T2). Audio rings arrive in M5-T3, saving in M5-T4.
+/// Arms instant replay: boots the capture engine with only replay consumers attached (encoder
+/// + audio rings) — no MovieRecorder, no file. Saving arrives in M5-T4.
 func runReplayArm(_ args: [String]) async {
     let options = parseReplayArmOptions(args)
 
-    let configuration = CaptureConfiguration()
+    let mic = resolveMicrophone(micEnabled: options.micEnabled, preferredID: options.micID)
+    if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
+    let configuration = CaptureConfiguration(microphone: mic.selection)
     let engine = CaptureEngine(configuration: configuration)
     // Route encoder failure through the engine's stop seam so the event loop prints it and the
     // process exits once from the main flow — never exit() from a VT/capture thread. `weak`
@@ -75,6 +125,17 @@ func runReplayArm(_ args: [String]) async {
         Task { await engine?.stop(reason: .streamError("replay encoder failed: \(message)")) }
     }
     engine.router.attach(encoder)
+
+    let systemRing = ReplayAudioRing(source: .systemAudio, seconds: options.seconds)
+    engine.router.attach(systemRing)
+    var micRing: ReplayAudioRing?
+    var micName: String?
+    if case .device(let id) = mic.selection {
+        let ring = ReplayAudioRing(source: .microphone, seconds: options.seconds)
+        engine.router.attach(ring)
+        micRing = ring
+        micName = AudioInputs.available().first { $0.uniqueID == id }?.name
+    }
 
     let interactive = isatty(STDIN_FILENO) != 0
     var stopHints: [String] = []
@@ -102,7 +163,13 @@ func runReplayArm(_ args: [String]) async {
     for await event in engine.events {
         switch event {
         case .started:
-            ticker = Task { await runReplayTicker(encoder) }
+            ticker = Task {
+                await runReplayTicker(encoder, system: systemRing, mic: micRing, micName: micName)
+            }
+        case .microphoneLost:
+            // Same warning record prints (ADR-012): screen + system audio keep buffering; the
+            // mic ring just stops filling — without this line its frozen column looks healthy.
+            print("  ⚠️  microphone disconnected — replay continues (screen + system audio)")
         case .stopped(let reason):
             print("replay-arm: stopped (\(describe(reason))) — ring discarded (saving arrives in M5-T4)")
             if reason != .userStopped { exitCode = 1 }

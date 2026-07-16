@@ -5,11 +5,21 @@
 
 ## Now
 
-- **Current milestone: M5 — instant replay. M5-T2 DONE** (`ReplayEncoder`: VTCompressionSession →
+- **Current milestone: M5 — instant replay. M5-T3 DONE** (`ReplayAudioRing`: deep PCM copies of
+  `.systemAudio` + `.microphone` into per-source rings; ASBD latch that **clears + re-latches on a
+  format change** (Franco picked re-latch over drop-forever, 2026-07-16 — "see how it works in the
+  wild"); `replay-arm` grew `--mic/--no-mic`, format lines and a per-ring ticker; 2-min live verify
+  exact on byte math; 201 tests, TSan-clean; /code-review applied — see field note). **Next: M5-T4
+  (`ReplayMuxer` — snapshot → keyframe trim → rebase → passthrough video + AAC audio → file;
+  SIGUSR1 / `s`+Return trigger in `replay-arm`).**
+  ⚠️ G5 risk to settle by M5-T6: §6.1's "RSS ≲ 200 MB" was written against 02 §9's ~10 Mbps
+  estimate, but Balanced at this display is 19 Mbps ⇒ a busy 60 s video ring alone is ~141–190 MB
+  payload. Candidate fix: VT `DataRateLimits` on the replay session (we drive VT directly, unlike
+  AVAssetWriter — the M2-T6 limitation doesn't apply here). Franco's call at T6.
+- **M5-T2 DONE** (`ReplayEncoder`: VTCompressionSession →
   the ring; CLI `replay-arm --seconds 60 --duration N`; verify green — 3-min run plateaued at
   62.0 s / keyframes ≈ 1/s / ring bytes flat; 194 tests, TSan-clean; /code-review high applied —
-  see field note). **Next: M5-T3 (audio rings — PCM copies of `.audio` + `.microphone`, occupancy
-  printout grows audio columns).** ⚠️ Verifies needing a busy screen: ask Franco before running
+  see field note). ⚠️ Verifies needing a busy screen: ask Franco before running
   `busyscene` — it takes over his display (his ruling, 2026-07-16).
 - **M5-T1 DONE** (`RingBuffer`: generic, duration-bounded,
   keyframe-aligned clip, NSLock-guarded, TSan-clean, 7 tests; /code-review medium applied). M4 is
@@ -234,6 +244,47 @@ video (deterministic, reproducible).
 | G6   | ⬜ not run | — |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-16 (M5-T3 audio rings): the live run earned its keep twice in one afternoon.
+  - **/code-review's theme was silent-failure observability, and it was right four ways at once:**
+    a format change pinned a minute of stale audio forever (eviction only runs on append — a ring
+    that stops appending stops evicting, and its stats freeze looking healthy); `.microphoneLost`
+    hit `default: break` in replay-arm while record prints a warning for the same event; the
+    system ring's trouble counter was computed but never printed; and the T3 ticker redesign had
+    dropped the video sample count, the only signal separating "spans 60 s" from "spans 60 s
+    holding half the frames". All fixed. **Policy call (Franco): on a format change the ring
+    clears + re-latches** rather than dropping forever — replay self-heals across AirPods codec
+    flips (the only realistic trigger; SCK never re-binds devices, M3-T7, and the stream config
+    pins system audio's format) at the cost of a second policy besides MovieRecorder's fail-stop.
+    Revisit if the wild shows format thrash (`format ×N` in the ticker is the tell).
+  - **The "device switched" ASBD identity now lives in one place** (`AudioFormatIdentity`,
+    Support/) and gained the layout fields (`mFormatFlags`, `mBitsPerChannel`) — same
+    rate/channels in a different layout is just as unmixable. MovieRecorder's fail-stop uses it
+    too, so recording and replay can't disagree on what "switched" means. Note this slightly
+    widens M3-T2's fail-stop trigger (a pure layout flip now also stops); that's more correct —
+    the welded mic input corrupts on layout changes exactly as on rate changes.
+  - 🔴 **SCK's system audio is planar (non-interleaved) Float32 — and two APIs quietly mislead on
+    planar buffers.** (1) `CMSampleBufferGetTotalSampleSize` returns **0** for them (the live
+    symptom: system ring at 62 s span, "0.0 MB"); count payload via
+    `CMBlockBufferGetDataLength` instead. (2) The ASBD's `mBytesPerFrame` is **per-plane** when
+    `kAudioFormatFlagIsNonInterleaved` is set, so naive rate math is short by the channel count
+    (187 vs 375 KB/s). The mic (mono) hid both bugs. G1's probe recorded "48kHz/2ch/32-bit" but
+    not the interleave — **when a format has a layout dimension, record the layout.**
+  - 🔁 **The fixture-blind-spot pattern again** (sixth occurrence, still the same shape): every
+    unit test fed 16-bit *interleaved* PCM, the one family where the code was right, and passed.
+    The fix ships with a planar Float32 fixture (`makeAudioFormat(planarFloat32:)`) and a test
+    that reproduces the live bug. When a code path branches on a format flag, the suite needs a
+    fixture on **each side of the flag**.
+  - 📏 **Second data point on RSS attribution variance** (see M5-T2 note): identical binary, two
+    2-min runs — buggy-run RSS climbed to ~536 MB tracking ring fill; post-fix run plateaued at
+    ~147 MB with a similar-sized ring. Whatever governs whether VT/CM buffer memory lands in our
+    `phys_footprint`, it isn't our code. Also: **§6.1's ≲ 200 MB target collides with the
+    19 Mbps reality** (02 §9 estimated ~10) — a busy 60 s ring can't fit. Flagged in "Now" as a
+    T6 decision: VT `DataRateLimits` is available on the replay session (we drive VT directly,
+    so M2-T6's AVAssetWriter limitation doesn't bind here).
+  - **Deep-copying the audio was the right call for an unexpected reason too:** the copy is where
+    the planar byte-length truth lives (`CMBlockBufferGetDataLength` of what we allocated) — a
+    retained SCK buffer would have left us trusting the same lying sample-size bookkeeping.
 
 - 2026-07-16 (M5-T2 ReplayEncoder): the encoder went in clean; the surprises were measurements.
   - 🔴 **/code-review (high) caught VT session bring-up running on SCK's screen queue** —
