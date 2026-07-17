@@ -130,8 +130,12 @@ Then run the current task's **Verify** step (docs/03) on top of this loop.
 Other tools:
 ```sh
 swift tools/probe.swift <file>          # inspect a recording's tracks/codecs/durations
+swift tools/frames.swift <f> 1 3 1 out  # PNG frames at timestamps (clip *content*, vs probe's metadata)
 swift tools/menudriver.swift dump       # the menu-bar app's open menu, as assertable text
 swift tools/menudriver.swift click "Pause"
+swift tools/settingsdriver.swift toggle # drive the Settings *window* via AX (menudriver does the menu)
+swift tools/hoverprobe.swift "Settings…" 5 out  # screenshot the open menu per-tick (caught M6-T10)
+swift tools/axdump.swift                # dump the app's Accessibility tree (find a control's real role)
 .build/debug/screenrec-cli --help
 ```
 
