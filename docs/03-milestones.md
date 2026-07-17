@@ -544,6 +544,26 @@ while a manual recording runs; memory flat over 30 min).
 - [ ] M6-T5 README for the repo: build, sign, install, use. Update all docs to
       match reality; close out STATUS.md v1 section.
 
+- [ ] M6-T6 Replay-window resize preserves the buffer (Franco, 2026-07-17; plan approved).
+      Grow retains contents and fills to the new length; shrink evicts eagerly (eviction
+      must not wait for an append — a static screen's video ring stops appending);
+      quality/fps keep the rebuild path. `RingBuffer.setCapacity`, encoder/audio-ring
+      forwarding, `ReplayController.windowChanged` (no teardown, muxer recreated per the
+      `setOutputDirectory` pattern), AppState routes the `replaySeconds` didSet.
+      **Verify:** unit (grow-retains / shrink-evicts / didSet routing via the
+      `ReplayControlling` seam) + in-process live capture: arm own-stream → 40 s → grow →
+      immediate save ≈ pre-change span; fill → shrink → save ≈ new window.
+- [ ] M6-T7 Safeguard the in-progress recording file (Franco's pick 2026-07-17: options
+      1+3 from the 2-h-soak trash incident). (1) vnode event source on the writer's fd:
+      file moved out of the output folder → surface it immediately (menu-header warning;
+      notification — banners may be suppressed while armed, the menu is the reliable
+      surface) and/or rename back; file *unlinked* (Trash emptied) → fail-stop on the
+      spot with a clear reason instead of writing into a doomed fd. (3) in-progress file
+      named `….mov.partial`, renamed at finalize — keeps crash-salvage visible in the
+      folder. **Verify:** unit + live: mv the file mid-recording → warning fires, stop
+      still yields the complete file at the restored path; simulate unlink → clean
+      fail-stop; kill -9 mid-recording → `.partial` present and playable after rename.
+
 **Gate G6** = v1 done.
 
 ---
