@@ -563,6 +563,13 @@ while a manual recording runs; memory flat over 30 min).
       folder. **Verify:** unit + live: mv the file mid-recording → warning fires, stop
       still yields the complete file at the restored path; simulate unlink → clean
       fail-stop; kill -9 mid-recording → `.partial` present and playable after rename.
+- [ ] M6-T8 Arm/disarm replay while recording (Franco, 2026-07-17). The state layer already
+      supports it (`syncReplayArming`'s `session != nil` branch attaches to the live
+      stream); the recording-state menu just never rendered the toggle — docs/06's
+      recording menu predates armed replay. Show the arm toggle + Save Replay Now row in
+      the recording menu; amend docs/06.
+      **Verify:** menudriver mid-recording: arm → badge + Save row appear, save produces a
+      clip, recording unharmed (probe both); disarm mid-recording → recording continues.
 
 **Gate G6** = v1 done.
 
