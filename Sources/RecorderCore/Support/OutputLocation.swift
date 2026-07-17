@@ -116,6 +116,9 @@ public struct OutputLocation: Sendable {
         case cannotCreate(path: String, code: Int32)
         /// An explicit user-specified output path already exists (we won't overwrite it).
         case alreadyExists(path: String)
+        /// The path's `.partial` companion exists — an interrupted recording is in the way,
+        /// and the user never typed that name, so the message must explain what it is.
+        case interruptedRecordingInTheWay(path: String)
 
         public var errorDescription: String? {
             switch self {
@@ -124,6 +127,9 @@ public struct OutputLocation: Sendable {
                 return "Couldn't create \"\(path)\" (\(reason)). Check the output folder in Settings."
             case .alreadyExists(let path):
                 return "\"\(path)\" already exists — choose a different name or move the file."
+            case .interruptedRecordingInTheWay(let path):
+                return "\"\(path)\" is an interrupted recording. Rename it to end in .mov to "
+                    + "recover it, or delete it, then try again."
             }
         }
     }
@@ -144,19 +150,30 @@ public struct OutputLocation: Sendable {
     }
 
     /// Atomically reserves the first non-colliding auto-named recording URL, so two recordings
-    /// started in the same second get different names (`… 2.mov`).
+    /// started in the same second get different names (`… 2.mov`). With `asPartial` (the
+    /// default) the claim is made on the name's `.partial` companion — the in-progress file —
+    /// so nothing that looks finished exists until finalize renames it; replay saves pass
+    /// false (they finish in well under a second, so a partial phase buys nothing).
     public func reserveRecordingURL(
         prefix: String = "Recording",
         ext: String = "mov",
         date: Date,
-        timeZone: TimeZone = .current
+        timeZone: TimeZone = .current,
+        asPartial: Bool = true
     ) throws -> URL {
         let base = "\(prefix) \(Self.timestamp(for: date, timeZone: timeZone))"
         var suffix = 1
         while true {
             let name = suffix == 1 ? "\(base).\(ext)" : "\(base) \(suffix).\(ext)"
             let url = directory.appendingPathComponent(name)
-            if try Self.claim(url) { return url }
+            if asPartial {
+                if !FileManager.default.fileExists(atPath: url.path),
+                   try Self.claim(Self.partialURL(for: url)) {
+                    return url
+                }
+            } else if try Self.claim(url) {
+                return url
+            }
             suffix += 1
         }
     }
@@ -164,7 +181,64 @@ public struct OutputLocation: Sendable {
     /// Reserves an exact, user-specified output path (the `record` positional argument).
     /// Throws `.alreadyExists` instead of overwriting a file that's already there.
     public static func reserveExact(_ url: URL) throws -> URL {
-        guard try claim(url) else { throw ReservationError.alreadyExists(path: url.path) }
+        guard !FileManager.default.fileExists(atPath: url.path) else {
+            throw ReservationError.alreadyExists(path: url.path)
+        }
+        guard try claim(partialURL(for: url)) else {
+            throw ReservationError.interruptedRecordingInTheWay(path: partialURL(for: url).path)
+        }
         return url
+    }
+
+    // MARK: - The .partial lifecycle
+
+    /// The in-progress companion of a final recording URL: `… .mov` → `… .mov.partial`.
+    public static func partialURL(for url: URL) -> URL {
+        url.appendingPathExtension("partial")
+    }
+
+    /// Renames a finished `.partial` to its final name, resolving collisions the same way
+    /// reservation does (`… 2.mov`). An extension-less intended name (CLI exact path) must
+    /// not grow a trailing dot. Returns the final URL.
+    public static func finalizePartial(_ partial: URL) throws -> URL {
+        let intended = partial.deletingPathExtension()
+        let directory = intended.deletingLastPathComponent()
+        let exists = { (candidate: String) in
+            FileManager.default.fileExists(atPath: directory.appendingPathComponent(candidate).path)
+        }
+        let ext = intended.pathExtension
+        let name: String
+        if ext.isEmpty {
+            let base = intended.lastPathComponent
+            name = exists(base) ? resolvedFileName(base: base, ext: "", exists: exists) : base
+        } else {
+            name = resolvedFileName(
+                base: intended.deletingPathExtension().lastPathComponent, ext: ext, exists: exists)
+        }
+        let final = directory.appendingPathComponent(name)
+        try FileManager.default.moveItem(at: partial, to: final)
+        return final
+    }
+
+    /// Orphaned `.partial`s are already-playable fragmented movies a crash left behind
+    /// (docs/04 §3.2); recovery is a rename, not a repair. Returns the recovered final URLs.
+    /// `olderThan` keeps hands off anything a live writer may own: a recording's partial is
+    /// touched about once a second, so one untouched for a minute has no living owner —
+    /// the in-process "no recording running" guarantee can't see other processes (the CLI).
+    public func recoverOrphanedPartials(olderThan minimumAge: TimeInterval = 60) -> [URL] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return names.filter { $0.hasSuffix(".partial") }.compactMap { name in
+            let partial = directory.appendingPathComponent(name)
+            let attributes = try? FileManager.default.attributesOfItem(atPath: partial.path)
+            let modified = attributes?[.modificationDate] as? Date ?? .distantPast
+            guard Date().timeIntervalSince(modified) > minimumAge else { return nil }
+            // A 0-byte partial is a reservation placeholder that never became a recording —
+            // nothing to recover, just litter.
+            guard let size = attributes?[.size] as? Int, size > 0 else {
+                try? FileManager.default.removeItem(at: partial)
+                return nil
+            }
+            return try? Self.finalizePartial(partial)
+        }
     }
 }

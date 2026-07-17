@@ -41,6 +41,8 @@ Pass criteria:
 2. **Kill test (required)**: start 30 s recording in background, `kill -9` at ~6 s,
    probe the file. Pass: readable, duration ≥ 5 s (10 s fragment interval ⇒ worst-case
    loss ≤ 10 s; typical sub-second like the PoC). This gate is non-negotiable.
+   Since M6-T7 the in-progress/killed file is `….mov.partial` (rename to `.mov` before
+   probing — that IS the recovery path; probe judges by extension and refuses `.partial`).
 3. **Sync clap test (human)**: record while playing a video with a hard cut AND
    clapping near the mic; scrub in QuickTime: video event, system-audio event, and mic
    clap align within ~2 frames at start AND end of a 2-min recording.

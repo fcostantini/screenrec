@@ -79,6 +79,9 @@ private struct StatusIconLabel: View {
                 // A persisted armed state resumes at launch; `init` never arms (tests
                 // construct AppState freely and must not spin capture).
                 state.activateReplayIfArmed()
+                // Before any recording can start, so a live partial is never mistaken
+                // for a crash orphan.
+                state.recoverInterruptedRecordings()
                 // docs/06: appears on first launch or any missing permission, never once
                 // satisfied.
                 if state.needsOnboarding {

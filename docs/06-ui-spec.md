@@ -87,6 +87,9 @@ form). Never the word "error" for a fail-stop.
 | Never started | `Couldn't start recording` | the engine's own message, e.g. `No displays available — the screen may be asleep or locked.` | — |
 | Replay saved — **M5** | `Replay saved` | `Replay … .mov — last 60 s. Click to reveal.` | reveal |
 | Replay save failed — **M5** | `Couldn't save replay` | one-line cause + what to do | — |
+| Recording file moved — **M6-T7** | `Still recording · file moved back` | `The recording file was moved while recording, so it was moved back.` | — |
+| Recording file deleted — **M6-T7** | via `failed`: | `The recording file was deleted while recording, so the video couldn't be saved.` | — |
+| Recovered interrupted recording — **M6-T7** | `Recovered an interrupted recording` | `Recording … .mov is ready to play.` | reveal |
 
 Fail-stop causes, one per reachable `EndReason`:
 `display disconnected` · `microphone changed` · `disk almost full` ·
@@ -104,6 +107,13 @@ the raw SCK string, never the word "error")
   that SCK reports sleep, lock and unplug as the same code (-3815 → `displayDisconnected`), so
   `EndReason.systemSleep` is unreachable. The enum case stays (docs/01 defines it; M5/M6 may find
   a source) but nothing renders it.
+
+**M6-T7 — the in-progress file defends itself.** The active recording is written as
+`Recording ….mov.partial` (renamed to `.mov` at finalize, so the recents rows never list an
+unfinished file); a vnode sentinel on the writer's descriptor renames a moved/trashed partial
+straight back (same-volume rename — a cross-volume move arrives as delete), and an unlink
+fail-stops the session immediately instead of writing an hour into a doomed inode. Launch
+scans the output folder for orphaned partials and renames them back to playable `.mov`s.
 
 ⚠️ **AMENDED 2026-07-16 (M5-T5 follow-up): banners are suppressed while the screen is captured —
 which is whenever replay is armed.** macOS hides ordinary banners when the display is shared or

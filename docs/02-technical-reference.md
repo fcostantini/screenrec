@@ -268,6 +268,23 @@ Consequences for anyone designing mic recovery:
   (Monitor unplug stays untested — this machine has only a built-in display.)
   `CaptureEngine.endReason(forStreamError:)` maps it; unmapped SCK errors keep their code in the
   message, which is how -3815 was identified rather than guessed.
+- **The recording file itself is guarded (M6-T7).** The active file is `….mov.partial`
+  (finalize renames it; `OutputLocation` owns the lifecycle) and `RecordingFileSentinel`
+  watches it via a private `O_EVTONLY` fd: a rename is reversed in place (the writer's fd
+  follows the inode, so moves — the Trash included — never hurt the data), an unlink ends the
+  session as `.failed` (no relink API exists; the bytes die at close). Two traps encoded there:
+  the sentinel must attach only from `MovieRecorder.onDidBeginWriting` — earlier attachment
+  races `startWriting()` and can watch the reservation placeholder's replaced inode (a false
+  delete on a healthy start, caught live) — and path comparison must use `realpath(3)`, because
+  `F_GETPATH` resolves `/private` while Foundation's `resolvingSymlinksInPath` strips it.
+  Teardown uses `cancelAndWait()` (drains an in-flight rename-back so finalize can't race it)
+  and a torn-down latch (a late `onDidBeginWriting` must not install an uncancellable
+  sentinel). Recovery sweeps only partials untouched for 60 s — a live writer touches its
+  file about once a second, and in-process "no recording running" can't see other processes.
+  Accepted trade-off: the final `.mov` name is NOT held during a recording (the claim sits on
+  the partial), so a collision at finalize steps to `… 2.mov` — timestamped names make that
+  cosmetic. A `movedAndUnrestorable` file is finalized in place via the writer's fd and
+  reported *saved* at its new location, never "deleted".
 - ⚠️ **Zero displays needs lock AND display-off — neither alone does it** (measured 2026-07-15,
   after getting this wrong twice by testing one condition at a time):
 

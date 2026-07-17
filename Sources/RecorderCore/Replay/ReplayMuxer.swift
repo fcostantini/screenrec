@@ -154,7 +154,7 @@ public final class ReplayMuxer: @unchecked Sendable {
             }
         }
 
-        let url = try outputLocation.reserveRecordingURL(prefix: "Replay", date: Date())
+        let url = try outputLocation.reserveRecordingURL(prefix: "Replay", date: Date(), asPartial: false)
         do {
             try write(
                 to: url, videoFormat: videoFormat,

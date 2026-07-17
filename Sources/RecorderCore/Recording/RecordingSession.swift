@@ -16,6 +16,22 @@ public final class RecordingSession: @unchecked Sendable {
 
     private let engine: CaptureEngine
     private let recorder: MovieRecorder
+    /// The final `.mov` the caller asked for; the writer works on its `.partial` companion.
+    private let finalURL: URL
+    /// What the sentinel decided the file's fate was; set from its queue, read at teardown.
+    private enum FileFate {
+        case deleted
+        /// Moved somewhere the rename-back failed from; the fragments there are intact.
+        case strandedAt(String)
+    }
+    private let fileFate = LockedBox<FileFate>()
+    /// Written from the capture queue (`onDidBeginWriting`), cancelled from the event-loop
+    /// task — hence the lock. `sentinelTornDown` latches teardown so a late-firing attach
+    /// can't install a sentinel nobody will ever cancel (it would rename the finished
+    /// movie back to `.partial`).
+    private let sentinelLock = NSLock()
+    private var sentinel: RecordingFileSentinel?
+    private var sentinelTornDown = false
     /// Guards the output volume; owned here because the engine doesn't know where the file lives.
     private let diskMonitor: DiskSpaceMonitor
     /// Held so `deinit` can cancel it: dropping a `Task` reference does not cancel it, and this
@@ -32,10 +48,11 @@ public final class RecordingSession: @unchecked Sendable {
     ) throws {
         let engine = CaptureEngine(configuration: configuration)
         self.engine = engine
+        finalURL = outputURL
         // A mic swap mid-recording can't be handled transparently (ADR-007): stop cleanly so the
         // file finalizes with `.microphoneChanged`, flowing through the normal `.stopped` path.
         recorder = try MovieRecorder(
-            outputURL: outputURL,
+            outputURL: OutputLocation.partialURL(for: outputURL),
             frameRate: configuration.frameRateCap,
             preset: configuration.quality,
             includesMicrophone: configuration.microphone != .none,
@@ -65,6 +82,8 @@ public final class RecordingSession: @unchecked Sendable {
 
     /// Attaches the recorder, begins forwarding/finalizing engine events, and starts capture.
     public func start() async {
+        // Set before capture starts so the write is visible to the capture queue that fires it.
+        recorder.onDidBeginWriting = { [weak self] in self?.attachSentinel() }
         engine.router.attach(recorder)
         let engine = self.engine
         let recorder = self.recorder
@@ -93,16 +112,43 @@ public final class RecordingSession: @unchecked Sendable {
                     startFailure = message
                 case .stopped(let reason):
                     endReason = reason
-                case .finished:
-                    break                              // engine never emits this
+                case .finished, .recordingFileRestored:
+                    break                              // session-emitted; engine never sends them
                 }
             }
             diskTask.cancel()
             engine.router.detach(recorder)
+            // Before finalize's own rename, or the sentinel would fight it.
+            self.cancelSentinel()
 
             if let startFailure {
                 recorder.cancel()
                 continuation.yield(.failed(message: startFailure))
+            } else if let fate = fileFate.value {
+                switch fate {
+                case .deleted:
+                    // The partial was unlinked mid-recording; the writer has been feeding a
+                    // doomed inode ever since. Unsalvageable (no relink API) — say so plainly.
+                    recorder.cancel()
+                    continuation.yield(.failed(message:
+                        "The recording file was deleted while recording, so the video couldn't be saved."))
+                case .strandedAt(let path):
+                    // The file is intact wherever it went, and the writer's fd still points at
+                    // it — finalize there and report a save, never a loss.
+                    do {
+                        _ = try await recorder.finish()
+                        var url = URL(fileURLWithPath: path)
+                        if url.pathExtension == "partial",
+                           let final = try? OutputLocation.finalizePartial(url) {
+                            url = final
+                        }
+                        continuation.yield(.finished(
+                            url: url, reason: endReason, droppedFrames: recorder.droppedFrameCount))
+                    } catch {
+                        continuation.yield(.failed(message:
+                            "Couldn't finalize the recording: \(error.localizedDescription)"))
+                    }
+                }
             } else if recorder.failedToBeginWriting {
                 // The writer never began (unwritable output, 02 §2). Cancel to drop the O_EXCL
                 // placeholder; fail with the folder named — there is nothing to finalize.
@@ -112,7 +158,11 @@ public final class RecordingSession: @unchecked Sendable {
                     "Couldn't write the recording to \"\(folder)\". Choose another folder."))
             } else {
                 do {
-                    let url = try await recorder.finish()
+                    let partial = try await recorder.finish()
+                    // Rename failure after a successful finish is NOT a lost recording — the
+                    // complete movie sits at the partial path. Report it saved there; the next
+                    // launch's recovery sweep renames it.
+                    let url = (try? OutputLocation.finalizePartial(partial)) ?? partial
                     continuation.yield(.finished(
                         url: url, reason: endReason, droppedFrames: recorder.droppedFrameCount))
                 } catch {
@@ -123,6 +173,48 @@ public final class RecordingSession: @unchecked Sendable {
             continuation.finish()
         }
         await engine.start()
+    }
+
+    /// Guards the partial. Runs from `onDidBeginWriting` — the one moment that's provably
+    /// after `startWriting()` created the real file. Attaching any earlier (e.g. on the
+    /// engine's `.started`, which races the writer) can open the reservation placeholder's
+    /// inode, which `beginWriting` replaces — a false `.deleted` on a healthy start.
+    /// `movedAndUnrestorable` is treated as deleted: finalize could no longer find the file,
+    /// so failing now with the truth beats failing later opaquely.
+    private func attachSentinel() {
+        let engine = self.engine
+        let continuation = self.continuation
+        let fileFate = self.fileFate
+        let sentinel = RecordingFileSentinel(url: recorder.outputURL) { incident in
+            switch incident {
+            case .movedAndRestored:
+                continuation.yield(.recordingFileRestored)
+            case .deleted:
+                fileFate.set(.deleted)
+                Task { await engine.stop() }
+            case .movedAndUnrestorable(let path):
+                fileFate.set(.strandedAt(path))
+                Task { await engine.stop() }
+            }
+        }
+        sentinelLock.lock()
+        if sentinelTornDown {
+            sentinelLock.unlock()
+            sentinel?.cancel()      // teardown already ran; nobody would ever cancel this one
+            return
+        }
+        self.sentinel = sentinel
+        sentinelLock.unlock()
+    }
+
+    private func cancelSentinel() {
+        sentinelLock.lock()
+        sentinelTornDown = true
+        let sentinel = self.sentinel
+        self.sentinel = nil
+        sentinelLock.unlock()
+        // Waits out an in-flight handler: finalize's rename must not race a rename-back.
+        sentinel?.cancelAndWait()
     }
 
     /// Pause the recording: the output timeline stops advancing and the paused span is removed

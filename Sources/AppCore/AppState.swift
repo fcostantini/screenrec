@@ -307,6 +307,15 @@ public final class AppState {
         syncReplayArming()
     }
 
+    /// Renames any orphaned `.partial` a crash left behind — already a playable fragmented
+    /// movie (docs/04 §3.2), so recovery is a rename — and tells the user. The app calls this
+    /// once at launch, before any recording can start; a live session's partial is no orphan.
+    public func recoverInterruptedRecordings() {
+        for url in outputLocation.recoverOrphanedPartials() {
+            notifier?(RecordingNotifications.recoveredRecording(url: url))
+        }
+    }
+
     /// Saves the last `replaySeconds`. Fire-and-forget from the hotkey and the menu row; the
     /// outcome arrives as a notification (docs/06). A trigger while a save runs coalesces.
     public func saveReplay() {
@@ -474,9 +483,9 @@ public final class AppState {
         do {
             session = try RecordingSession(configuration: configuration, outputURL: outputURL)
         } catch {
-            // The reservation is an O_EXCL placeholder the recorder would have consumed; with no
+            // The reservation is an O_EXCL placeholder at the `.partial` companion; with no
             // recorder, drop it rather than leave a 0-byte file and the name taken.
-            try? FileManager.default.removeItem(at: outputURL)
+            try? FileManager.default.removeItem(at: OutputLocation.partialURL(for: outputURL))
             apply(.failed(message: "Couldn't set up the recorder: \(error.localizedDescription)"))
             return
         }
@@ -554,6 +563,8 @@ public final class AppState {
             // The one mid-recording problem that does not end the session (ADR-012): the mic
             // track ends, the recording continues, and the icon must keep saying so.
             lastFailure = "Microphone disconnected — still recording."
+        case .recordingFileRestored:
+            break   // recording unaffected; the notification carries the news
         case .fileProgress:
             break   // nothing emits this; `refreshProgress()` polls instead
         }
@@ -621,8 +632,14 @@ public final class AppState {
     }
 
     private static func fileSize(_ url: URL) -> Int64 {
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let size = attributes[.size] as? NSNumber else { return 0 }
-        return size.int64Value
+        // In-progress recordings live at the `.partial` companion; the final name appears
+        // only at finalize. Probe the partial first so the header's size isn't stuck at zero.
+        for candidate in [OutputLocation.partialURL(for: url), url] {
+            if let attributes = try? FileManager.default.attributesOfItem(atPath: candidate.path),
+               let size = attributes[.size] as? NSNumber {
+                return size.int64Value
+            }
+        }
+        return 0
     }
 }

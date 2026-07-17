@@ -46,6 +46,13 @@ public enum RecordingNotifications {
                 body: "The rest of the recording has no microphone track.",
                 fileURL: nil)
 
+        case .recordingFileRestored:
+            // Same not-an-ending family as microphoneLost: lead with "still recording".
+            return RecordingNotification(
+                title: "Still recording · file moved back",
+                body: "The recording file was moved while recording, so it was moved back.",
+                fileURL: nil)
+
         case .failed(let message):
             // `.failed` means two different things despite its doc comment saying only one:
             // a start that never got off the ground, and a finalize that threw after a full
@@ -80,6 +87,13 @@ public enum RecordingNotifications {
     /// The armed stream's mic died (docs/02 §4: it can never rebind to this stream). Amends
     /// docs/06's table, which predates armed replay. Mirrors the recording row's outcome-first
     /// shape: replay is still working, and the one remedy is named.
+    public static func recoveredRecording(url: URL) -> RecordingNotification {
+        RecordingNotification(
+            title: "Recovered an interrupted recording",
+            body: "\(url.lastPathComponent) is ready to play.",
+            fileURL: url)
+    }
+
     public static func replayMicrophoneLost() -> RecordingNotification {
         RecordingNotification(
             title: "Replay still armed · microphone disconnected",

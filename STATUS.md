@@ -5,6 +5,24 @@
 
 ## Now
 
+- **M6-T7 DONE — the recording file defends itself.** `RecordingFileSentinel` (vnode watch
+  on the writer's fd): move/trash → renamed back within a beat + "Still recording · file
+  moved back"; unlink → immediate honest fail-stop; unrestorable move → finalized in place
+  via the fd and reported *saved* at its new location, never "deleted". `.partial`
+  lifecycle: reserve claims the partial, finalize renames (collision-resolving,
+  extension-less-safe), launch + CLI-start sweeps recover stale orphans (60 s mtime gate so
+  a live cross-process writer is never touched). /code-review (high) returned **10
+  findings; triaged with Franco** — GUI-relevant subset all fixed (drain-cancel, teardown
+  latch, truthful stranded copy, finalize-failure never claims loss, staleness gate), CLI
+  paper cuts all fixed (placeholder cleanup, interrupted-recording error copy, no trailing
+  dot, startup sweep), one accepted-as-designed (final name unheld during recording → " 2"
+  step at collision; 02 §7 note). Live legs on the final build: move → one warning +
+  restore + clean probe; delete → clean fail-stop; kill -9 → playable partial (0.47 s-class
+  loss), recovery rename proven. 240 tests, TSan clean (caught a real sentinel init race).
+  **Next: M6-T8 (arm/disarm while recording) — then the app swap** (dist now carries T6+T7;
+  /Users/Shared still runs the pre-T6 build). Also open: the leg-2 armed-state-drop
+  follow-up (retry vs self-disarm on arm-time stream failure), unslotted.
+
 - **M6-T2 DONE — the soak passed whole (2026-07-17).** Leg 1 (2-h battery, real usage,
   Zoom, replay armed, 3 mid-recording replay saves): 19.5 GB / 2:00:23, tracks within
   110 ms, battery 99→62%, CPU avg 12.9%, RSS trendless, no thermal events; Franco's scrub:

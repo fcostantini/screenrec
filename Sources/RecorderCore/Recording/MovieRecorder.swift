@@ -35,6 +35,10 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     /// folder (02 §2). The writer never starts, so the owner must stop capture and fail the
     /// session (ADR-007) rather than wait forever. Invoked on a capture queue, `lock` released.
     private let onWriteFailure: (@Sendable () -> Void)?
+    /// Fires once, from the capture queue, after `startWriting()` has created the real output
+    /// file — the earliest moment a file watcher can safely open it (before that, the path
+    /// holds the reservation placeholder, a different inode). Set before capture starts.
+    var onDidBeginWriting: (@Sendable () -> Void)?
 
     private let lock = NSLock()
     private let writer: AVAssetWriter
@@ -139,8 +143,10 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         // after it. `lock` is non-reentrant — firing a handler under it could deadlock.
         var notifyMicrophoneChange = false
         var notifyWriteFailure = false
+        var notifyDidBeginWriting = false
         defer { if notifyMicrophoneChange { onMicrophoneFormatChange?() } }
         defer { if notifyWriteFailure { onWriteFailure?() } }
+        defer { if notifyDidBeginWriting { onDidBeginWriting?() } }
         defer { lock.unlock() }
         guard !isFinished else { return }
 
@@ -183,6 +189,7 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
             // capture and fail the session. The `didFailToBeginWriting` guard above then keeps it
             // from re-attempting or re-notifying on later frames.
             if didFailToBeginWriting { notifyWriteFailure = true }
+            if didStartWriting { notifyDidBeginWriting = true }
         }
         guard didStartWriting else { return }
 

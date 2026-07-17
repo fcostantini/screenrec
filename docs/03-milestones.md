@@ -553,7 +553,7 @@ while a manual recording runs; memory flat over 30 min).
       **Verify:** unit (grow-retains / shrink-evicts / didSet routing via the
       `ReplayControlling` seam) + in-process live capture: arm own-stream → 40 s → grow →
       immediate save ≈ pre-change span; fill → shrink → save ≈ new window.
-- [ ] M6-T7 Safeguard the in-progress recording file (Franco's pick 2026-07-17: options
+- [x] M6-T7 Safeguard the in-progress recording file (Franco's pick 2026-07-17: options
       1+3 from the 2-h-soak trash incident). (1) vnode event source on the writer's fd:
       file moved out of the output folder → surface it immediately (menu-header warning;
       notification — banners may be suppressed while armed, the menu is the reliable

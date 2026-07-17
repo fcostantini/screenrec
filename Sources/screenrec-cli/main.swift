@@ -97,6 +97,7 @@ func describe(_ event: EngineEvent) -> String {
     case .paused: return "paused"
     case .resumed: return "resumed"
     case .microphoneLost: return "microphoneLost"
+    case .recordingFileRestored: return "recordingFileRestored"
     case .fileProgress(let seconds, let bytes):
         return "fileProgress(\(seconds.isFinite ? Int(seconds) : 0)s, \(bytes) bytes)"
     case .stopped(let reason): return "stopped(\(describe(reason)))"
@@ -331,10 +332,16 @@ func plannedOutputURL(_ options: RecordOptions) -> URL {
 }
 
 /// Current on-disk size of the growing recording (fragmented .mov grows as it's written).
+/// The in-progress file is the `.partial` companion; the final name exists only after
+/// finalize, so probe the partial first.
 func recordingFileSize(_ url: URL) -> Int64 {
-    guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-          let size = attributes[.size] as? NSNumber else { return 0 }
-    return size.int64Value
+    for candidate in [OutputLocation.partialURL(for: url), url] {
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: candidate.path),
+           let size = attributes[.size] as? NSNumber {
+            return size.int64Value
+        }
+    }
+    return 0
 }
 
 /// In-place progress line, refreshed twice a second. `recordedDuration` is NaN before the first
@@ -406,6 +413,16 @@ func runInteractiveControls(_ session: RecordingSession) async {
 func performRecording(_ options: RecordOptions) async {
     let outputURL: URL
     do {
+        // Crashed runs leave `.partial`s only an app launch would otherwise sweep; the CLI
+        // sweeps its own target folder so a CLI-only user gets their recordings back too.
+        let targetDirectory: URL
+        switch outputTarget(options) {
+        case .directory(let directory): targetDirectory = directory
+        case .file(let url): targetDirectory = url.deletingLastPathComponent()
+        }
+        for recovered in OutputLocation(directory: targetDirectory).recoverOrphanedPartials() {
+            print("recovered interrupted recording: \(recovered.path)")
+        }
         outputURL = try reserveOutputURL(options)
     } catch CLIError.message(let reason) {
         die(reason, code: 74)
@@ -423,7 +440,8 @@ func performRecording(_ options: RecordOptions) async {
         session = try RecordingSession(
             configuration: configuration, outputURL: outputURL, diskFloorBytes: options.diskFloorBytes)
     } catch {
-        try? FileManager.default.removeItem(at: outputURL)  // drop the unused reservation placeholder
+        // Drop the unused reservation placeholder — it lives at the `.partial` companion.
+        try? FileManager.default.removeItem(at: OutputLocation.partialURL(for: outputURL))
         die("Couldn't set up the recorder: \(error.localizedDescription)", code: 74)
     }
 
@@ -465,6 +483,8 @@ func performRecording(_ options: RecordOptions) async {
         case .microphoneLost:
             // Not a stop: screen + system audio keep recording, the mic track ends here (ADR-012).
             print("\n  ⚠️  microphone disconnected — still recording (screen + system audio)")
+        case .recordingFileRestored:
+            print("\n  ⚠️  recording file was moved — moved it back (recording continues)")
         case .finished(let url, let reason, let dropped):
             ticker.cancel()
             print("\n  ✓ finished (\(describe(reason))), dropped frames: \(dropped)")

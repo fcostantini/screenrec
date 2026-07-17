@@ -94,6 +94,95 @@ import Testing
         let second = try location.reserveRecordingURL(date: Self.fixedDate, timeZone: Self.utc)
         #expect(first.lastPathComponent == "Recording 2026-07-14 at 10.12.34.mov")
         #expect(second.lastPathComponent == "Recording 2026-07-14 at 10.12.34 2.mov")
-        #expect(fileManager.fileExists(atPath: first.path))   // placeholder held until the writer
+        // The claim lives on the .partial companion; nothing that looks finished exists yet.
+        #expect(fileManager.fileExists(atPath: OutputLocation.partialURL(for: first).path))
+        #expect(!fileManager.fileExists(atPath: first.path))
+    }
+
+    @Test func reserveSkipsNamesWhoseFinalFileExists() throws {
+        let fileManager = FileManager.default
+        let dir = fileManager.temporaryDirectory.appendingPathComponent("reserve-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: dir) }
+        let location = OutputLocation(directory: dir)
+
+        try Data().write(to: dir.appendingPathComponent("Recording 2026-07-14 at 10.12.34.mov"))
+        let reserved = try location.reserveRecordingURL(date: Self.fixedDate, timeZone: Self.utc)
+        #expect(reserved.lastPathComponent == "Recording 2026-07-14 at 10.12.34 2.mov")
+    }
+
+    @Test func finalizePartialRenamesAndResolvesCollisions() throws {
+        let fileManager = FileManager.default
+        let dir = fileManager.temporaryDirectory.appendingPathComponent("finalize-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: dir) }
+
+        let partial = dir.appendingPathComponent("Recording A.mov.partial")
+        try Data("movie".utf8).write(to: partial)
+        let final = try OutputLocation.finalizePartial(partial)
+        #expect(final.lastPathComponent == "Recording A.mov")
+        #expect(!fileManager.fileExists(atPath: partial.path))
+
+        // A second partial finalizing into an occupied name steps to ` 2`.
+        try Data("movie2".utf8).write(to: partial)
+        let second = try OutputLocation.finalizePartial(partial)
+        #expect(second.lastPathComponent == "Recording A 2.mov")
+    }
+
+    @Test func recoverySalvagesOrphansAndSweepsPlaceholders() throws {
+        let fileManager = FileManager.default
+        let dir = fileManager.temporaryDirectory.appendingPathComponent("recover-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: dir) }
+        let location = OutputLocation(directory: dir)
+        let staleDate = Date(timeIntervalSinceNow: -300)
+
+        let orphan = dir.appendingPathComponent("Recording crashed.mov.partial")
+        try Data("fragments".utf8).write(to: orphan)
+        try fileManager.setAttributes([.modificationDate: staleDate], ofItemAtPath: orphan.path)
+        let placeholder = dir.appendingPathComponent("Recording empty.mov.partial")
+        try Data().write(to: placeholder)                       // 0-byte reservation, no recording
+        try fileManager.setAttributes([.modificationDate: staleDate], ofItemAtPath: placeholder.path)
+        let bystander = dir.appendingPathComponent("Recording done.mov")
+        try Data("done".utf8).write(to: bystander)
+        // Fresh mtime = possibly another process's LIVE recording; recovery must not touch it.
+        let live = dir.appendingPathComponent("Recording live.mov.partial")
+        try Data("growing".utf8).write(to: live)
+
+        let recovered = location.recoverOrphanedPartials()
+        #expect(recovered.map(\.lastPathComponent) == ["Recording crashed.mov"])
+        #expect(!fileManager.fileExists(atPath: orphan.path))
+        #expect(!fileManager.fileExists(atPath: placeholder.path))   // litter swept
+        #expect(fileManager.fileExists(atPath: bystander.path))      // untouched
+        #expect(fileManager.fileExists(atPath: live.path))           // live partial left alone
+    }
+
+    @Test func finalizePartialKeepsExtensionlessNamesIntact() throws {
+        let fileManager = FileManager.default
+        let dir = fileManager.temporaryDirectory.appendingPathComponent("noext-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: dir) }
+
+        let partial = dir.appendingPathComponent("take1.partial")
+        try Data("movie".utf8).write(to: partial)
+        let final = try OutputLocation.finalizePartial(partial)
+        #expect(final.lastPathComponent == "take1")   // no trailing dot
+    }
+
+    @Test func reserveExactNamesTheInterruptedRecordingInItsError() throws {
+        let fileManager = FileManager.default
+        let dir = fileManager.temporaryDirectory.appendingPathComponent("exact-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: dir) }
+
+        let target = dir.appendingPathComponent("demo.mov")
+        try Data("leftover".utf8).write(to: OutputLocation.partialURL(for: target))
+        #expect {
+            try OutputLocation.reserveExact(target)
+        } throws: { error in
+            guard case OutputLocation.ReservationError.interruptedRecordingInTheWay(let path) = error
+            else { return false }
+            return path.hasSuffix("demo.mov.partial")
+        }
     }
 }
