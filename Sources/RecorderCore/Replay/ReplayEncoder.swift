@@ -42,13 +42,7 @@ public final class ReplayEncoder: SampleConsumer, @unchecked Sendable {
     /// `seconds` is the replay window; the ring keeps `seconds + 2 s` slack so a keyframe at or
     /// before the window's start is still present when a clip is taken (docs/01).
     public init(seconds: Double, frameRateCap: Int, onFailure: (@Sendable (String) -> Void)? = nil) {
-        // A non-finite or non-positive window silently breaks ring retention (eviction limit
-        // ≤ 0 evicts everything); callers validate their inputs (M4-T4 pattern), so this is a
-        // programmer error.
-        precondition(
-            seconds.isFinite && seconds > 0,
-            "replay window must be a positive, finite number of seconds")
-        ring = RingBuffer(capacity: CMTime(seconds: seconds, preferredTimescale: 600))
+        ring = RingBuffer(capacity: ReplayWindow.capacity(seconds))
         self.frameRateCap = frameRateCap
         self.onFailure = onFailure
     }
@@ -107,6 +101,11 @@ public final class ReplayEncoder: SampleConsumer, @unchecked Sendable {
         } catch {
             fail((error as? EncoderError)?.message ?? error.localizedDescription)
         }
+    }
+
+    /// Change the replay window in place; buffered frames survive.
+    public func updateWindow(seconds: Double) {
+        ring.setCapacity(ReplayWindow.capacity(seconds))
     }
 
     public func stats() -> Stats {

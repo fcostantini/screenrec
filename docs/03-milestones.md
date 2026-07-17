@@ -544,7 +544,7 @@ while a manual recording runs; memory flat over 30 min).
 - [ ] M6-T5 README for the repo: build, sign, install, use. Update all docs to
       match reality; close out STATUS.md v1 section.
 
-- [ ] M6-T6 Replay-window resize preserves the buffer (Franco, 2026-07-17; plan approved).
+- [x] M6-T6 Replay-window resize preserves the buffer (Franco, 2026-07-17; plan approved).
       Grow retains contents and fills to the new length; shrink evicts eagerly (eviction
       must not wait for an append — a static screen's video ring stops appending);
       quality/fps keep the rebuild path. `RingBuffer.setCapacity`, encoder/audio-ring

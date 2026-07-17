@@ -186,6 +186,9 @@ the old line is simply false above three green ticks.
 - Output folder (choose → `opendir` preflight immediately, friendly error per 02 §2)
 - Quality preset · Frame-rate cap (30/60)
 - Instant replay: buffer length 30 s / 60 s / 2 min · hotkey recorder (default ⌥⌘R) — **M5**
+  - Changing the length while armed resizes the buffer **in place** (M6-T6): grow keeps
+    everything and fills to the new length; shrink drops the excess immediately. Quality/
+    fps/source changes still restart the armed stream (SCK binds sources per stream, 02 §4).
 - Launch at login (`SMAppService`) — **M6**
 
 ⚠️ **AMENDED 2026-07-15 (Franco): the last two rows do not ship with M4-T4.**

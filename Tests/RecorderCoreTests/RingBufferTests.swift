@@ -26,6 +26,33 @@ import Testing
         #expect(ring.snapshot().count == 6)
     }
 
+    @Test func growingCapacityRetainsContentsAndFillsToTheNewBound() {
+        let ring = RingBuffer<Int>(capacity: Self.t(4), slack: Self.t(2))   // keep ≤ 6 s
+        for i in 0...10 { ring.append(i, pts: Self.t(Double(i)), isKeyframe: true) }
+        let before = ring.snapshot()
+
+        ring.setCapacity(Self.t(20))                                        // keep ≤ 22 s
+        #expect(ring.snapshot().count == before.count)                      // nothing evicted
+        for i in 11...30 { ring.append(i, pts: Self.t(Double(i)), isKeyframe: true) }
+        let after = ring.snapshot()
+        // Old bound would cap the span at 6 s; the pre-grow entries are still the head.
+        #expect(after.first?.pts == Self.t(8))                              // 30 − 22
+        #expect(after.count == 23)
+    }
+
+    @Test func shrinkingCapacityEvictsEagerlyWithoutAnAppend() {
+        // Eviction otherwise runs only on append, and a static screen's ring stops appending —
+        // the shrink itself must do the work.
+        let ring = RingBuffer<Int>(capacity: Self.t(60))
+        for i in 0...50 { ring.append(i, pts: Self.t(Double(i)), isKeyframe: true) }
+
+        ring.setCapacity(Self.t(10))                                        // keep ≤ 12 s
+        let snap = ring.snapshot()
+        #expect(snap.first?.pts == Self.t(38))                              // 50 − 12
+        #expect(snap.last?.pts == Self.t(50))                               // newest survives
+        #expect(snap.count == 13)
+    }
+
     @Test func clipStartsAtTheTightestKeyframeBeforeTheCut() {
         let ring = RingBuffer<Int>(capacity: Self.t(60))
         // Keyframes on even seconds, plain frames on odd; pts 0…8, no eviction.
@@ -77,6 +104,9 @@ import Testing
             }
             group.addTask { for _ in 0..<2000 { _ = ring.snapshot() } }
             group.addTask { for _ in 0..<2000 { _ = ring.clip(seconds: Self.t(0.5)) } }
+            group.addTask {
+                for i in 0..<2000 { ring.setCapacity(Self.t(i % 2 == 0 ? 0.5 : 2)) }
+            }
         }
         // No content assertion — the point is a clean run under the thread sanitizer, no crash.
         #expect(ring.snapshot().isEmpty == false)

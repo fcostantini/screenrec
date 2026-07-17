@@ -106,6 +106,75 @@ struct ReplayMuxerTests {
         #expect(files.count == accepted)
     }
 
+    @Test func coalescingSurvivesAWindowUpdate() async throws {
+        // The muxer is never replaced on a settings change — `update` must leave the isSaving
+        // latch intact, or a save triggered mid-change runs concurrently with the first.
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let (encoder, system, mic) = makeRings(videoSeconds: 3, ringSeconds: 60)
+        let muxer = ReplayMuxer(
+            encoder: encoder, systemRing: system, microphoneRing: mic,
+            seconds: 60, outputDirectory: directory)
+
+        var accepted = 0
+        let done = DispatchSemaphore(value: 0)
+        if muxer.requestSave(completion: { _ in done.signal() }) { accepted += 1 }
+        muxer.update(seconds: 30)
+        if muxer.requestSave(completion: { _ in done.signal() }) { accepted += 1 }
+        for _ in 0..<accepted { done.wait() }
+
+        let files = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        #expect(accepted >= 1)
+        #expect(files.count == accepted)
+    }
+
+    /// `requestSave`'s completion runs off-thread; a bare captured var would race the test's
+    /// read (the ReplayEncoderTests FailureLatch lesson).
+    private final class SavedBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored: Result<ReplayMuxer.SavedReplay, Error>?
+        func set(_ result: Result<ReplayMuxer.SavedReplay, Error>) {
+            lock.lock(); stored = result; lock.unlock()
+        }
+        var value: Result<ReplayMuxer.SavedReplay, Error>? {
+            lock.lock(); defer { lock.unlock() }
+            return stored
+        }
+    }
+
+    @Test func shrinkBehindPendingSaveDoesNotTruncateIt() throws {
+        // A triggered save owns the window it was accepted under: ring eviction routed through
+        // `perform(afterPendingSaves:)` must run after the save's snapshot, not before. The
+        // save is requested synchronously first — main-thread order, as the hotkey path does it.
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let (encoder, system, mic) = makeRings(videoSeconds: 8, ringSeconds: 60)
+        let muxer = ReplayMuxer(
+            encoder: encoder, systemRing: system, microphoneRing: mic,
+            seconds: 60, outputDirectory: directory)
+
+        let first = SavedBox()
+        let firstDone = DispatchSemaphore(value: 0)
+        #expect(muxer.requestSave { first.set($0); firstDone.signal() })
+        muxer.update(seconds: 1)
+        muxer.perform(afterPendingSaves: {
+            encoder.updateWindow(seconds: 1)
+            system.updateWindow(seconds: 1)
+            mic.updateWindow(seconds: 1)
+        })
+        firstDone.wait()
+        let saved = try #require(first.value).get()
+        // The 8 s buffered at trigger time, not the 1 s window applied behind it.
+        #expect(saved.duration > 6.5)
+
+        let second = SavedBox()
+        let secondDone = DispatchSemaphore(value: 0)
+        #expect(muxer.requestSave { second.set($0); secondDone.signal() })
+        secondDone.wait()
+        let after = try #require(second.value).get()
+        #expect(after.duration < 3.2)   // 1 s window + slack + keyframe reach-back
+    }
+
     @Test func emptyRingsReportNothingBuffered() async {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

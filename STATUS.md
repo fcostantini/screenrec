@@ -5,6 +5,23 @@
 
 ## Now
 
+- **M6-T6 DONE — replay-window resize preserves the buffer.** Grow retains + fills to the
+  new length (the muxer's existing short-clip fallback covers the gap); shrink evicts
+  eagerly, single-pass, under the ring lock. `replaySeconds` routes to a new
+  `windowChanged` (no pipeline teardown); quality/fps keep the rebuild path. **/code-review
+  (high) found 2 real bugs in the first cut, both fixed by never replacing the muxer:**
+  it now takes `update(seconds:)`/`update(outputDirectory:)` + `perform(afterPendingSaves:)`
+  on its serial mux queue, so (1) the `isSaving` coalescing latch survives settings changes
+  (was: rapid ⌥⌘R around a length change → two concurrent writer passes), and (2) ring
+  eviction is serialized *behind* any in-flight save (was: save 120 s → instant shrink →
+  the triggered save silently truncated to 30 s). `setOutputDirectory` got the same
+  treatment (its rebuild had the same latent latch loss). 231 tests (+2 muxer regression
+  tests), TSan clean; live in-process verify: save racing a grow returned 31.08 s of
+  pre-change buffer, post-shrink save 10.03 s. **Not covered by a unit test: the
+  mid-recording routing** — `session` is private with no fake seam and the didSet has no
+  session branch (structurally can't mis-route); M6-T8's live verify exercises it for real.
+  **Next: M6-T2 leg 2 completes (~13:52 kill), then M6-T7 (plan artifact first).**
+
 - **M6-T2 LEG 1 (2-h battery soak) — agent legs PASSED 2026-07-17; human legs pending.**
   Run 10:38:33→12:38:33, Franco's real mixed usage incl. a Zoom call, AirPods mic, replay
   armed throughout, High preset (his setting; §7 is preset-silent). File: 19.5 GB,

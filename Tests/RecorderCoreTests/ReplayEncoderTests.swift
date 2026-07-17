@@ -46,6 +46,26 @@ struct ReplayEncoderTests {
         #expect(entries.first?.isKeyframe == true)
     }
 
+    @Test func updateWindowResizesInPlacePreservingFrames() {
+        // Grow keeps everything and fills to the new bound; shrink evicts without waiting
+        // for the next frame (a static screen may never send one).
+        let encoder = ReplayEncoder(seconds: 2, frameRateCap: 30)
+        encodeSyntheticFrames(into: encoder, count: 120)                   // 4 s at 30 fps
+        let before = encoder.stats()
+
+        encoder.updateWindow(seconds: 60)
+        #expect(encoder.stats().sampleCount == before.sampleCount)         // grow evicted nothing
+
+        encodeSyntheticFrames(into: encoder, count: 120, startingAt: 120)  // 8 s buffered total
+        let grown = encoder.stats()
+        #expect(grown.spanSeconds > 4.5)                                   // past the old 2+2 bound
+
+        encoder.updateWindow(seconds: 2)                                   // eager shrink
+        let shrunk = encoder.stats()
+        #expect(shrunk.spanSeconds <= 4.1)
+        #expect(shrunk.sampleCount < grown.sampleCount)
+    }
+
     @Test func evictsBeyondCapacityPlusSlack() {
         let encoder = ReplayEncoder(seconds: 2, frameRateCap: 30)
         encodeSyntheticFrames(into: encoder, count: 240)  // 8 s at 30 fps into a 2 s ring

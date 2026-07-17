@@ -6,15 +6,16 @@ import CoreVideo
 /// Feeds `count` synthesized 30 fps frames through the real VT encoder and drains it. The
 /// first frame only triggers the encoder's asynchronous bring-up (and is dropped), so this
 /// waits for readiness before feeding the rest — the one ritual every replay suite shares.
-func encodeSyntheticFrames(into encoder: ReplayEncoder, count: Int) {
-    for index in 0..<count {
+/// `startingAt` continues a prior batch's pts run — ring appends must stay monotonic.
+func encodeSyntheticFrames(into encoder: ReplayEncoder, count: Int, startingAt first: Int = 0) {
+    for index in first..<(first + count) {
         encoder.consume(
             makeVideoSampleBuffer(
                 width: 640, height: 360,
                 pts: CMTime(value: CMTimeValue(index), timescale: 30),
                 shade: UInt8(truncatingIfNeeded: index &* 7)),
             type: .screen)
-        if index == 0 {
+        if index == first {
             var waited = 0
             while !encoder.isReadyForTesting, waited < 400 {
                 usleep(10_000)

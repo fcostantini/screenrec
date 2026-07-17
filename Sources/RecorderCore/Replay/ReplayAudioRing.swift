@@ -48,11 +48,8 @@ public final class ReplayAudioRing: SampleConsumer, @unchecked Sendable {
     /// ring consumes; everything else routed to it is ignored.
     public init(source: SourceType, seconds: Double) {
         precondition(source != .screen, "an audio ring cannot consume screen frames")
-        precondition(
-            seconds.isFinite && seconds > 0,
-            "replay window must be a positive, finite number of seconds")
         self.source = source
-        ring = RingBuffer(capacity: CMTime(seconds: seconds, preferredTimescale: 600))
+        ring = RingBuffer(capacity: ReplayWindow.capacity(seconds))
     }
 
     public func consume(_ buffer: CMSampleBuffer, type: SourceType) {
@@ -84,6 +81,11 @@ public final class ReplayAudioRing: SampleConsumer, @unchecked Sendable {
         // Every PCM sample is a valid clip start, so the ring's keyframe search degenerates
         // to the tightest cut — exactly right for audio.
         ring.append(copy, pts: CMSampleBufferGetPresentationTimeStamp(buffer), isKeyframe: true)
+    }
+
+    /// Change the replay window in place; buffered audio survives.
+    public func updateWindow(seconds: Double) {
+        ring.setCapacity(ReplayWindow.capacity(seconds))
     }
 
     public func stats() -> Stats {

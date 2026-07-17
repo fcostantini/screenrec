@@ -19,10 +19,13 @@ public protocol ReplayControlling: AnyObject {
     func recordingStarted(router: SampleRouter, configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL)
     /// The recording ended (any reason): leave its stream and, if armed, resume a private one.
     func recordingEnded(configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL)
-    /// A capture-affecting setting changed (sources, quality, fps, buffer length): restart the
-    /// armed stream so it captures what the pickers now say. The buffer resets — unavoidable,
-    /// SCK binds sources once per stream (docs/02 §4).
+    /// A capture-affecting setting changed (sources, quality, fps): restart the armed stream so
+    /// it captures what the pickers now say. The buffer resets — unavoidable, SCK binds sources
+    /// once per stream (docs/02 §4).
     func configurationChanged(configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL)
+    /// The buffer length changed: resize the rings in place — the buffer survives. Grow fills
+    /// to the new length over time; shrink evicts the excess immediately.
+    func windowChanged(seconds: Double)
     /// Output folder changes rebuild only the muxer — the buffer survives.
     func setOutputDirectory(_ url: URL)
     @discardableResult
@@ -101,12 +104,27 @@ public final class ReplayController: ReplayControlling {
         startOwnStream(configuration: configuration, seconds: seconds, outputDirectory: outputDirectory)
     }
 
+    public func windowChanged(seconds: Double) {
+        guard isArmed else { return }
+        // Even with the pipeline down (display-sleep retry loop), the new length must stick —
+        // the restart rebuilds from `currentSeconds`.
+        currentSeconds = seconds
+        guard let encoder, let systemRing, let muxer else { return }
+        let microphoneRing = microphoneRing
+        muxer.update(seconds: seconds)
+        // Behind pending saves: an eager shrink evicting frames a triggered save was about to
+        // snapshot would silently truncate the clip the user asked for.
+        muxer.perform(afterPendingSaves: {
+            encoder.updateWindow(seconds: seconds)
+            systemRing.updateWindow(seconds: seconds)
+            microphoneRing?.updateWindow(seconds: seconds)
+        })
+    }
+
     public func setOutputDirectory(_ url: URL) {
-        guard isArmed, let encoder, let systemRing else { return }
-        muxer = ReplayMuxer(
-            encoder: encoder, systemRing: systemRing, microphoneRing: microphoneRing,
-            seconds: currentSeconds, outputDirectory: url)
+        guard isArmed, let muxer else { return }
         currentOutputDirectory = url
+        muxer.update(outputDirectory: url)
     }
 
     @discardableResult

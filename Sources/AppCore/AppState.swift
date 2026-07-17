@@ -77,12 +77,14 @@ public final class AppState {
         }
     }
 
-    /// The rolling window; docs/06 offers 30/60/120. Changing it re-sizes the rings, which
-    /// restarts the buffer.
+    /// The rolling window; docs/06 offers 30/60/120. Changing it resizes the rings in place —
+    /// the buffer survives: grow fills over time, shrink evicts the excess now.
     public var replaySeconds: Int {
         didSet {
             persist()
-            if replaySeconds != oldValue { replayConfigurationChanged() }
+            if replaySeconds != oldValue, isReplayArmed {
+                replay.windowChanged(seconds: Double(replaySeconds))
+            }
         }
     }
 
@@ -344,8 +346,8 @@ public final class AppState {
     private func replayConfigurationChanged() {
         guard isReplayArmed else { return }
         if let session {
-            // Mid-recording only the Settings knobs (buffer length, quality, fps) can change;
-            // rebuild on the recording's stream so e.g. a new buffer length actually applies.
+            // Mid-recording only quality/fps can reach here (sources are locked, and the buffer
+            // length takes `windowChanged` instead); rebuild on the recording's stream.
             replay.recordingStarted(
                 router: session.router, configuration: captureConfiguration,
                 seconds: Double(replaySeconds), outputDirectory: outputDirectory)

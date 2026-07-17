@@ -37,8 +37,11 @@ public final class ReplayMuxer: @unchecked Sendable {
     private let encoder: ReplayEncoder
     private let systemRing: ReplayAudioRing
     private let microphoneRing: ReplayAudioRing?
-    private let seconds: Double
-    private let outputLocation: OutputLocation
+    /// Mux-queue confined after init: `performSave` and the `update` setters all run on
+    /// `muxQueue`, so a queued save always reads the values that were current when it was
+    /// accepted — an update enqueued behind it can't retroactively change its window.
+    private var seconds: Double
+    private var outputLocation: OutputLocation
 
     private let lock = NSLock()
     private var isSaving = false
@@ -84,6 +87,25 @@ public final class ReplayMuxer: @unchecked Sendable {
             completion(result)
         }
         return true
+    }
+
+    /// Changes the save window for saves accepted after this call; a save already in flight or
+    /// queued keeps the window it was triggered under. The muxer itself is never replaced on a
+    /// settings change — the `isSaving` latch must survive so rapid triggers keep coalescing.
+    public func update(seconds: Double) {
+        muxQueue.async { [self] in self.seconds = seconds }
+    }
+
+    /// Same contract as `update(seconds:)`, for the output folder.
+    public func update(outputDirectory: URL) {
+        muxQueue.async { [self] in outputLocation = OutputLocation(directory: outputDirectory) }
+    }
+
+    /// Runs `work` on the mux queue, behind any in-flight or queued save. Ring mutations that
+    /// could starve a triggered save (an eager shrink evicting frames it was about to snapshot)
+    /// must go through here.
+    public func perform(afterPendingSaves work: @escaping @Sendable () -> Void) {
+        muxQueue.async(execute: work)
     }
 
     /// Blocks until no save is in flight. The CLI calls this before exiting so a stop can't

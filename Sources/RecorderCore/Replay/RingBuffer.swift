@@ -8,6 +8,20 @@ struct RingEntry<Element> {
     let isKeyframe: Bool
 }
 
+/// The one statement of the replay-window contract: every ring capacity and resize goes through
+/// here, so validation and the pts timescale can't drift between the video and audio rings.
+enum ReplayWindow {
+    static func capacity(_ seconds: Double) -> CMTime {
+        // A non-finite or non-positive window silently breaks ring retention (eviction limit
+        // ≤ 0 evicts everything); callers validate their inputs (M4-T4 pattern), so this is a
+        // programmer error.
+        precondition(
+            seconds.isFinite && seconds > 0,
+            "replay window must be a positive, finite number of seconds")
+        return CMTime(seconds: seconds, preferredTimescale: 600)
+    }
+}
+
 /// A duration-bounded, lock-guarded rolling window of timestamped samples — the store behind
 /// instant replay (docs/01, 02 §9). Generic so the video ring (compressed `CMSampleBuffer`s, M5-T2)
 /// and the audio rings (PCM, M5-T3) share one implementation; the ring only ever looks at `pts`
@@ -19,14 +33,25 @@ struct RingEntry<Element> {
 final class RingBuffer<Element>: @unchecked Sendable {
     /// `capacity + slack`, precomputed — the widest span the ring retains. Recomputing it per
     /// append would put constant arithmetic on the sample hot path.
-    private let limit: CMTime
+    private var limit: CMTime
+    private let slack: CMTime
     private let lock = NSLock()
     private var entries: [RingEntry<Element>] = []
 
     /// `capacity` is the target window (e.g. 60 s); `slack` (default 2 s, docs/01) keeps a little
     /// more so a keyframe at or before the N-second mark is still present when a clip is taken.
     init(capacity: CMTime, slack: CMTime = CMTime(seconds: 2, preferredTimescale: 600)) {
+        self.slack = slack
         limit = CMTimeAdd(capacity, slack)
+    }
+
+    /// Change the retention window in place; contents survive. Shrinking evicts eagerly rather
+    /// than on the next append — a static screen's ring may not append for minutes (02 §9), and
+    /// the freed memory shouldn't wait for it.
+    func setCapacity(_ capacity: CMTime) {
+        lock.lock(); defer { lock.unlock() }
+        limit = CMTimeAdd(capacity, slack)
+        evictLocked()
     }
 
     /// Append the newest sample and evict from the head while the span exceeds `capacity + slack`.
@@ -38,12 +63,19 @@ final class RingBuffer<Element>: @unchecked Sendable {
     func append(_ element: Element, pts: CMTime, isKeyframe: Bool) {
         lock.lock(); defer { lock.unlock() }
         entries.append(RingEntry(element: element, pts: pts, isKeyframe: isKeyframe))
-        // `removeFirst()` is O(n), but eviction is ~1/append and n is a few thousand → negligible;
-        // a hand-rolled circular buffer isn't worth the complexity (ADR-010, no deps).
-        while let oldest = entries.first, let newest = entries.last,
-              CMTimeCompare(CMTimeSubtract(newest.pts, oldest.pts), limit) > 0 {
-            entries.removeFirst()
+        evictLocked()
+    }
+
+    /// Caller holds `lock`. Single-pass: a shrink can evict thousands of entries at once, and
+    /// per-entry `removeFirst()` would go quadratic while an SCK-queue append waits on the lock.
+    private func evictLocked() {
+        guard let newest = entries.last else { return }
+        var drop = 0
+        while drop < entries.count - 1,
+              CMTimeCompare(CMTimeSubtract(newest.pts, entries[drop].pts), limit) > 0 {
+            drop += 1
         }
+        if drop > 0 { entries.removeFirst(drop) }
     }
 
     /// A consistent copy of every entry (oldest → newest), taken under the lock so it can't tear

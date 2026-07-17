@@ -14,7 +14,8 @@ import RecorderCore
         var onPipelineFailure: (@MainActor (String) -> Void)?
 
         enum Call: Equatable {
-            case arm, disarm, recordingStarted, recordingEnded, configurationChanged, setOutputDirectory
+            case arm, disarm, recordingStarted, recordingEnded, configurationChanged,
+                 windowChanged, setOutputDirectory
         }
         var calls: [Call] = []
         var lastConfiguration: CaptureConfiguration?
@@ -39,6 +40,10 @@ import RecorderCore
         func configurationChanged(configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL) {
             calls.append(.configurationChanged)
             (lastConfiguration, lastSeconds) = (configuration, seconds)
+        }
+        func windowChanged(seconds: Double) {
+            calls.append(.windowChanged)
+            lastSeconds = seconds
         }
         func setOutputDirectory(_ url: URL) {
             calls.append(.setOutputDirectory)
@@ -98,13 +103,25 @@ import RecorderCore
         state.selectedMicrophoneID = "some-mic"
         state.quality = .efficient
         state.frameRateCap = 30
+        #expect(spy.calls == Array(repeating: .configurationChanged, count: 3))
+        // The restart must carry the *current* window — a stale seconds here silently rebuilds
+        // the armed buffer at the wrong length.
+        #expect(spy.lastSeconds == 60)
+    }
+
+    @Test func windowChangesResizeInPlaceInsteadOfRestarting() {
+        // A length change must never take the rebuild path — that wipes the buffer.
+        let (state, spy, _) = makeState()
+        state.isReplayArmed = true
+        spy.calls = []
+
         state.replaySeconds = 120
-        #expect(spy.calls == Array(repeating: .configurationChanged, count: 4))
+        #expect(spy.calls == [.windowChanged])
         #expect(spy.lastSeconds == 120)
 
-        // Same value again ⇒ no churn; the stream restart wipes the buffer.
+        // Same value again ⇒ no churn.
         state.replaySeconds = 120
-        #expect(spy.calls.count == 4)
+        #expect(spy.calls.count == 1)
     }
 
     @Test func sourceRehomingNeverRestartsTheArmedStreamNorForgetsThePick() {
