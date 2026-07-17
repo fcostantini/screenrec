@@ -1,4 +1,5 @@
 import AppCore
+import ServiceManagement
 import SwiftUI
 
 /// Window IDs for `openWindow`.
@@ -19,6 +20,8 @@ struct ScreenRecApp: App {
         // Same split for the hotkey: Carbon lives here, AppCore stays framework-free.
         let hotkeys = ScreenRecApp.hotkeys
         state.hotkeyRegistrar = { [weak hotkeys] in hotkeys?.setHotkey($0) ?? false }
+        // SMAppService is a system service, not UI, but the seam keeps AppState testable.
+        state.loginItem = SMLoginItem()
         let state = state
         hotkeys.onHotkey = { state.saveReplay() }
     }
@@ -79,6 +82,7 @@ private struct StatusIconLabel: View {
                 // A persisted armed state resumes at launch; `init` never arms (tests
                 // construct AppState freely and must not spin capture).
                 state.activateReplayIfArmed()
+                state.syncLaunchAtLogin()
                 // Before any recording can start, so a live partial is never mistaken
                 // for a crash orphan.
                 state.recoverInterruptedRecordings()

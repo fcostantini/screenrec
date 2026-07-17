@@ -3,8 +3,8 @@ import AppKit
 import RecorderCore
 import SwiftUI
 
-/// The Settings window (docs/06 "Settings window"): where recordings go, and the two knobs that
-/// shape them. Replay (M5) and launch-at-login (M6) have nothing to act on yet.
+/// The Settings window (docs/06 "Settings window"): output folder, capture knobs, launch-at-login,
+/// and the instant-replay buffer and shortcut.
 struct SettingsView: View {
     @Bindable var state: AppState
 
@@ -42,6 +42,8 @@ struct SettingsView: View {
                     Text("\(fps) fps").tag(fps)
                 }
             }
+
+            Toggle("Launch at login", isOn: $state.launchAtLogin)
 
             Section("Instant Replay") {
                 Picker("Replay buffer", selection: $state.replaySeconds) {

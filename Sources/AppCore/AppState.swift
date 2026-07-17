@@ -102,6 +102,44 @@ public final class AppState {
     /// it. Injected by the app (Carbon lives there, not in AppCore); nil means unregister.
     public var hotkeyRegistrar: (@MainActor (ReplayHotkey?) -> Bool)?
 
+    /// Launch-at-login backing (docs/06). Injected by the app; nil in tests that don't exercise it.
+    /// Set before `syncLaunchAtLogin()`.
+    public var loginItem: (any LoginItemManaging)?
+
+    /// The Settings toggle's state. The OS is the truth (`SMAppService` self-persists), so this is
+    /// seeded from `loginItem` at launch and written back on a real user change. A failed write
+    /// reverts to actual status rather than lying.
+    public var launchAtLogin = false {
+        didSet {
+            guard !isSyncingLoginItem, launchAtLogin != oldValue else { return }
+            applyLaunchAtLogin(launchAtLogin)
+        }
+    }
+    private var isSyncingLoginItem = false
+
+    private func applyLaunchAtLogin(_ enabled: Bool) {
+        do {
+            try loginItem?.setEnabled(enabled)
+            // register() can succeed into `.requiresApproval` (the user disabled it in System
+            // Settings before); the toggle stays on, but they must re-enable it there.
+            if enabled, loginItem?.needsApproval == true {
+                notifier?(RecordingNotifications.loginItemNeedsApproval())
+            }
+        } catch {
+            Self.log.error("login-item toggle failed: \(error.localizedDescription, privacy: .public)")
+            notifier?(RecordingNotifications.loginItemFailed())
+            // Revert on the next runloop, not synchronously: SwiftUI has already committed the
+            // tapped state to the Toggle, and a same-tick revert can leave the switch visually
+            // stuck on while the model reads off.
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                isSyncingLoginItem = true
+                launchAtLogin = loginItem?.isEnabled ?? false
+                isSyncingLoginItem = false
+            }
+        }
+    }
+
     private let replay: any ReplayControlling
 
     // MARK: - Header row
@@ -309,6 +347,14 @@ public final class AppState {
               Permissions.screenRecordingState() == .granted,
               !needsRelaunchForScreenGrant else { return }
         syncReplayArming()
+    }
+
+    /// Seeds the toggle from the OS's actual login-item state (the truth), without the didSet
+    /// re-registering. The app calls this once at launch after injecting `loginItem`.
+    public func syncLaunchAtLogin() {
+        isSyncingLoginItem = true
+        launchAtLogin = loginItem?.isEnabled ?? false
+        isSyncingLoginItem = false
     }
 
     /// Renames any orphaned `.partial` a crash left behind — already a playable fragmented

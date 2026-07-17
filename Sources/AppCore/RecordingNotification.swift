@@ -91,6 +91,24 @@ public enum RecordingNotifications {
     /// The armed stream's mic died (docs/02 §4: it can never rebind to this stream). Amends
     /// docs/06's table, which predates armed replay. Mirrors the recording row's outcome-first
     /// shape: replay is still working, and the one remedy is named.
+    /// Launch-at-login registration threw (M6-T5) — the toggle reverted, so point the user at
+    /// where they can change it directly.
+    public static func loginItemFailed() -> RecordingNotification {
+        RecordingNotification(
+            title: "Couldn't change launch at login",
+            body: "Turn it on or off in System Settings › General › Login Items.",
+            fileURL: nil)
+    }
+
+    /// register() landed in `.requiresApproval` — registered, but macOS won't launch it until the
+    /// user re-enables it in System Settings (they turned it off there before).
+    public static func loginItemNeedsApproval() -> RecordingNotification {
+        RecordingNotification(
+            title: "Approve launch at login",
+            body: "Enable ScreenRec in System Settings › General › Login Items to finish turning it on.",
+            fileURL: nil)
+    }
+
     public static func recoveredRecording(url: URL) -> RecordingNotification {
         RecordingNotification(
             title: "Recovered an interrupted recording",
