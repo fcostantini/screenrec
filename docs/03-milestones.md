@@ -520,8 +520,8 @@ while a manual recording runs; memory flat over 30 min).
 ## M6 — Ship-quality pass (est. 1–2 sessions)
 
 - [x] M6-T1 Full acceptance run: every item in 00-product-brief "Success criteria".
-- [ ] M6-T2 The 2-hour soak test (04-testing §7) on battery **(human — physical
-      unplug)**.
+- [x] M6-T2 The 2-hour soak test (04-testing §7) on battery **(human — physical
+      unplug)**. Kill leg amended to 1 h (Franco, 2026-07-17).
 - [ ] M6-T3 Error-message audit: force each failure path; every message says what
       happened AND what to do.
 - [ ] M6-T5 Launch at login (`SMAppService`, key `launchAtLogin` — docs/06). **Moved here from
