@@ -571,6 +571,15 @@ while a manual recording runs; memory flat over 30 min).
       **Verify:** menudriver mid-recording: arm → badge + Save row appear, save produces a
       clip, recording unharmed (probe both); disarm mid-recording → recording continues.
 
+- [ ] M6-T9 Armed state survives crash-relaunch (from the M6-T2 leg-2 finding). Arm-time
+      stream failure at launch currently hits the pipeline-failure bucket → permanent
+      self-disarm + `replayArmed=0`, though the condition is transient (SCK still reaping
+      the dead process's stream — re-arm by hand worked seconds later). Fix: launch/arm
+      stream failures join the 5 s retry bucket (armed is a standing intent, ADR-style);
+      self-disarm stays for genuine pipeline failures. **Verify:** unit (failure routing) +
+      live: kill -9 the armed app → relaunch → armed badge back without human help;
+      display-sleep retry regression stays green.
+
 **Gate G6** = v1 done.
 
 ---
