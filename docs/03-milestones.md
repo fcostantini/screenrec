@@ -597,6 +597,18 @@ while a manual recording runs; memory flat over 30 min).
       measured, not eyeballed (M4-T1 rule); idle menu provably rebuild-free (no publish
       without change).
 
+- [ ] M6-T11 Mic list goes stale in a long-running app (Franco, 2026-07-17: AirPods
+      connected + actively captured by armed replay, yet absent from the Microphone picker
+      across multiple fresh menu opens; checkmark on None). Measured: a fresh process's
+      `AVCaptureDevice.DiscoverySession` lists them, the running app's doesn't — while the
+      same process's `AVCaptureDevice(uniqueID:)` lookup (the capture-side resolver) finds
+      them, which is why the replay had his voice. The filtered DiscoverySession list is
+      the stale layer. Fix: enumerate via CoreAudio HAL (`kAudioHardwarePropertyDevices` +
+      input-stream check — live per call, probe-verified, UIDs identical to what SCK
+      binds), keeping `AudioInputDevice` as the seam. **Verify:** unit (CoreAudio
+      enumeration shape) + live: connect/disconnect AirPods with the app running →
+      the picker reflects it on the next menu open, both directions.
+
 **Gate G6** = v1 done.
 
 ---
