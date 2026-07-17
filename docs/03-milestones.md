@@ -548,23 +548,38 @@ while a manual recording runs; memory flat over 30 min).
 
 ---
 
-## Post-v1 backlog (noted, not scheduled)
+## M7 — Per-app capture (post-v1; requested by Franco 2026-07-17)
 
-- **Record a single app instead of the whole screen, including for armed replay**
-  (Franco, 2026-07-17). Assessment: moderate, ~2 tasks. `SCContentFilter(display:including:)`
-  filters video AND system audio per-app; frames stay display-sized so BitrateModel/timing
-  are untouched; a `content` case on `CaptureConfiguration` propagates to replay for free
-  (both paths build from the same seam, and shared-stream mode rides the recording's filter).
-  The real work: the app picker (dynamic list, refreshed on menu open — the M5-T5
-  `refreshSources` re-home suppression applies), an end-reason ruling for "target app quit
-  mid-recording", and StallWatchdog's idle cross-check (user-active ⇒ frames-expected is
-  false under an app filter — it would log wolf-cries). **Window-level capture is a separate,
-  harder feature** (independent-window streams, live resize) — do not bundle.
+Record a single application instead of the whole screen — recording AND armed replay.
+`SCContentFilter(display:including:)` filters video and system audio per-app; frames stay
+display-sized, so BitrateModel/timing are untouched, and a `content` case on
+`CaptureConfiguration` reaches replay for free (both paths build from the same seam;
+shared-stream mode rides the recording's filter). **Window-level capture is explicitly NOT
+this milestone** — independent-window streams and live resize are a different, harder
+feature; do not bundle.
+
+- [ ] M7-T1 Core: `CaptureConfiguration.content` (`.display(id)` / `.app(bundleID)`),
+      filter construction, CLI `record --app <bundle-id>`. Rulings to make here: the
+      end-reason for "target app quit mid-recording" (the display-gone precedent, 02 §7),
+      and StallWatchdog scoping (user-active ⇒ frames-expected is false under an app
+      filter — the idle cross-check must not cry wolf).
+      **Verify:** CLI capture of one app while another app animates on screen → the other
+      app appears in NO frame; system audio contains only the target's audio; app-quit
+      mid-run → clean `finished(reason:)`, playable file.
+- [ ] M7-T2 App: source picker in the menu (Entire Screen / running apps — dynamic list,
+      refreshed on open; the M5-T5 `refreshSources` re-home suppression applies), settings
+      persistence, sources-locked-while-recording behavior, armed replay follows the pick.
+      **Verify:** menudriver-driven app-scoped recording + mid-recording replay save, both
+      probe clean and both contain only the target app.
+
+**Gate G7**: an app-scoped recording and an app-scoped armed-replay save, each verified
+content-clean (no bystander app visible, no bystander audio), app-quit handled, plus a
+no-regression pass of G5 §6.4 (simultaneity) under an app filter.
 
 ## Dependency graph
 
 ```
-M0 ──▶ M1 ──▶ M2 ──▶ M3 ──▶ M4 ──▶ M6
+M0 ──▶ M1 ──▶ M2 ──▶ M3 ──▶ M4 ──▶ M6 ──▶ M7 (post-v1)
               │                    ▲
               └────────▶ M5 ───────┘   (M5 needs M1's router + M2's BitrateModel;
                                         app integration M5-T5 needs M4)
