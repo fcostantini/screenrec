@@ -16,10 +16,10 @@
   scale, all clips + the main file clean. ⚠️ **Incident, survived: Franco accidentally
   trashed the in-progress file at 11:39** while tidying ~/Movies; the writer's fd followed
   the rename, finalize completed *in the Trash*, file restored intact (probe above).
-  Safeguard options presented to Franco (vnode-watch/react is the recommendation —
-  candidate M6-T7, his pick pending). **Pending T2 closure: leg 2 (kill -9 at ~1:59 of a
-  second 2-h run — timing is Franco's call) + human legs (clap-sync scrub at 0/1/2 h,
-  stutter judgment — file kept at `~/Movies/Recording 2026-07-17 at 10.38.11.mov`).**
+  Safeguard: Franco picked options 1+3 → task M6-T7 (docs/03). **Human legs PASSED
+  2026-07-17 (Franco): "smooth throughout, no desync" — the §3.3 clap scrub at 0/1/2 h
+  holds and no visible stutter. Leg 1 is fully closed; the 19.5 GB file may be deleted.
+  Pending T2 closure: leg 2 only (kill -9 at ~1:59 of a second 2-h run).**
   **Next now: M6-T6 (replay-window resize preserves buffer — plan approved 2026-07-17).**
 
 - **M6-T1 DONE — acceptance run adjudicated, all five rows closed (2026-07-17).**
