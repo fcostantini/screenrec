@@ -609,6 +609,21 @@ while a manual recording runs; memory flat over 30 min).
       enumeration shape) + live: connect/disconnect AirPods with the app running →
       the picker reflects it on the next menu open, both directions.
 
+- [ ] M6-T12 Discard an ongoing recording (Franco, 2026-07-17). Today every start lands a
+      file (Stop & Save finalizes; quit-mid-recording finalizes; T7 even recovers a
+      force-quit `.partial`) — no "throw this take away." Add a **subordinate, confirmed**
+      Discard action to the recording menu (below Stop & Save, not adjacent-and-equal —
+      it's the one irreversible button; an accidental hit must not sit under Stop's muscle
+      memory). Seam exists: `RecordingSession` gains `discard()` → stop the engine, route to
+      `MovieRecorder.cancel()` (writer teardown + file removal, already used on failure
+      paths) instead of `finish()`; the `.partial` name makes the half-file trivial to drop.
+      Confirmation alert like the quit-mid-recording one. **Decide at build:** does an
+      intentional discard-by-force-quit want T7 recovery suppressed, or is recovery-on-crash
+      the right default (explicit Discard is the clean path; recovery is for the *un*intended
+      exit — probably leave it). **Verify:** menudriver discard mid-recording → no file in
+      ~/Movies (no `.mov`, no `.partial`), recording ended, app back to Ready; Stop & Save
+      unaffected.
+
 **Gate G6** = v1 done.
 
 ---

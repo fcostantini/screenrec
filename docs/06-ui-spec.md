@@ -62,7 +62,12 @@ Order and grouping (separators between groups):
 ## Menu — recording state
 
 1. Header row: pulsing red dot + elapsed `HH:MM:SS` (tabular numerals) + right-aligned
-   `<size> · HEVC`. Updates ≤ 1 Hz (menu open only; no timers while closed).
+   `<size> · HEVC`. Values stamp at menu open (`NSMenu.didBeginTracking`) and hold while
+   the menu stays open; every reopen is fresh. *Amended 2026-07-17 from "updates ≤ 1 Hz"
+   (M6-T10, measured): any state publish rebuilds the OPEN menu's AppKit rows and garbles
+   hover/highlight — a per-second tick corrupted rows under the cursor — and
+   `Text(timerInterval:)` doesn't animate through the menu bridge, so a live clock in a
+   `.menu` MenuBarExtra is not implementable without the corruption.*
 2. **Pause** / **Resume** (swaps by state).
 3. **Stop & Save** — primary.
 4. — separator —
