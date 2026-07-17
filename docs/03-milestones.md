@@ -522,7 +522,7 @@ while a manual recording runs; memory flat over 30 min).
 - [x] M6-T1 Full acceptance run: every item in 00-product-brief "Success criteria".
 - [x] M6-T2 The 2-hour soak test (04-testing §7) on battery **(human — physical
       unplug)**. Kill leg amended to 1 h (Franco, 2026-07-17).
-- [ ] M6-T3 Error-message audit: force each failure path; every message says what
+- [x] M6-T3 Error-message audit: force each failure path; every message says what
       happened AND what to do.
 - [ ] M6-T5 Launch at login (`SMAppService`, key `launchAtLogin` — docs/06). **Moved here from
       M4-T4 (Franco, 2026-07-15):** `SMAppService.mainApp` registers a login item pointing at the

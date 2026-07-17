@@ -100,6 +100,20 @@ import RecorderCore
         #expect(start?.title != finalize?.title)
     }
 
+    // MARK: - M6-T3: every failure message says what happened AND what to do
+
+    @Test func diskAlmostFullNamesTheRemedy() {
+        let n = RecordingNotifications.notification(
+            for: .finished(url: Self.url, reason: .diskAlmostFull, droppedFrames: 0), duration: 4)
+        #expect(n?.body.contains("free up space") == true)
+        #expect(n?.body.contains("playable") == true)
+    }
+
+    @Test func replayFailureCopyIsActionable() {
+        #expect(RecordingNotifications.replaySaveFailed().body.contains("writable"))
+        #expect(RecordingNotifications.replayStopped().body.contains("Re-arm"))
+    }
+
     // MARK: - Silence
 
     @Test(arguments: [

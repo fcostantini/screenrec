@@ -67,7 +67,7 @@ public struct OutputLocation: Sendable {
               isDirectory.boolValue else {
             return .inaccessible(reason: """
                 The output folder doesn't exist: \(directory.path)
-                Choose a different folder in Settings.
+                Choose an existing folder.
                 """)
         }
         // One input, so the probe matches a real writer: an input-less writer can be refused on
@@ -124,7 +124,7 @@ public struct OutputLocation: Sendable {
             switch self {
             case .cannotCreate(let path, let code):
                 let reason = String(cString: strerror(code))
-                return "Couldn't create \"\(path)\" (\(reason)). Check the output folder in Settings."
+                return "Couldn't create \"\(path)\" (\(reason)). Check that the output folder exists and is writable."
             case .alreadyExists(let path):
                 return "\"\(path)\" already exists — choose a different name or move the file."
             case .interruptedRecordingInTheWay(let path):

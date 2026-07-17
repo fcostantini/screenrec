@@ -5,6 +5,21 @@
 
 ## Now
 
+- **M6-T3 DONE — error-message audit.** Tested all 21 user-facing failure paths against "says
+  what happened AND what to do"; 15 passed, 6 fixed (plan approved by Franco). (1) the write-fail
+  title lied — the G4 §5.4 follow-up: `hadStarted` now reads `session?.hasStartedSession` not the
+  icon (which flips to `.recording` before the write failure surfaces) → **live-observed "Couldn't
+  start recording"** via a temporary forced-write-fail hook (reverted). (2) three raw-NSError
+  bodies → plain actionable copy + the raw string to the unified log (recorder setup, finalize,
+  replay save). (3) disk-almost-full names the remedy. (4) the CLI no longer says "in Settings"
+  (surface-neutral copy). (5) the app's reserve-failure surfaces `OutputLocation`'s specific reason
+  instead of a generic line. (6) replay-pipeline-died names the re-arm recovery. /code-review
+  (medium) → 4 minor findings, all applied: the shared finalize message over-promised recovery for
+  the stranded-file path (now names where the file actually is), a duplicated catch → `finalizeFailed`
+  helper, a redundant `@ObservationIgnored` on a static, a 4-line comment trimmed. Verified: #1 live,
+  #4/#5 live via CLI, #2/#3/#6 unit-tested on the pure mapper; 248 tests. **Next: M6-T5 (launch-at-
+  login + README + docs closeout).** Also queued: T11 (stale mic list), T12 (discard recording).
+
 - **M6-T10 DONE — the open-menu highlight corruption is fixed.** Root cause: a per-second
   refresh published through @Observable and rebuilt every AppKit row of the OPEN menu,
   garbling hover/highlight (the artifact Franco filmed). Fix: refresh once per open

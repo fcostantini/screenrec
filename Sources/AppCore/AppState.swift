@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import Observation
 import RecorderCore
+import os
 
 /// The menu-bar app's view state.
 ///
@@ -13,6 +14,8 @@ import RecorderCore
 @MainActor
 @Observable
 public final class AppState {
+
+    private static let log = Logger(subsystem: "dev.fcostantini.screenrec", category: "app")
 
     // MARK: - What the status item shows
 
@@ -274,7 +277,8 @@ public final class AppState {
             // (persist, unregister hotkey, call disarm) — disarm is a no-op on the already-dead
             // pipeline.
             isReplayArmed = false
-            notifier?(RecordingNotifications.replayStopped(message: message))
+            Self.log.error("replay pipeline failed: \(message, privacy: .public)")
+            notifier?(RecordingNotifications.replayStopped())
         }
     }
 
@@ -328,7 +332,8 @@ public final class AppState {
                     notifier?(RecordingNotifications.replaySaved(url: saved.url, duration: saved.duration))
                     refreshRecentRecordings()      // the new clip belongs at the top
                 case .failure(let error):
-                    notifier?(RecordingNotifications.replaySaveFailed(message: error.localizedDescription))
+                    Self.log.error("replay save failed: \(error.localizedDescription, privacy: .public)")
+                    notifier?(RecordingNotifications.replaySaveFailed())
                 }
             }
         }
@@ -487,8 +492,12 @@ public final class AppState {
             // Through `apply`, not a bare assignment: these failures produce no session and so
             // no event stream, and `lastFailure` alone reaches no surface — Start looks
             // unchanged and the user walks away believing they are recording (ADR-007).
-            apply(.failed(message: "Couldn't create a recording in "
-                + "\"\(outputDirectory.lastPathComponent)\". Choose another folder."))
+            // `OutputLocation`'s own errors name the specific cause (missing/unwritable/interrupted
+            // file); surface it rather than flattening to a generic line.
+            let message = (error as? OutputLocation.ReservationError)?.errorDescription
+                ?? "Couldn't create a recording in \"\(outputDirectory.lastPathComponent)\". "
+                    + "Choose another folder."
+            apply(.failed(message: message))
             return
         }
 
@@ -499,7 +508,9 @@ public final class AppState {
             // The reservation is an O_EXCL placeholder at the `.partial` companion; with no
             // recorder, drop it rather than leave a 0-byte file and the name taken.
             try? FileManager.default.removeItem(at: OutputLocation.partialURL(for: outputURL))
-            apply(.failed(message: "Couldn't set up the recorder: \(error.localizedDescription)"))
+            Self.log.error("recorder setup failed: \(error.localizedDescription, privacy: .public)")
+            apply(.failed(message: "Couldn't start recording. Try a different output folder, "
+                + "or restart ScreenRec if it keeps happening."))
             return
         }
 
@@ -593,9 +604,9 @@ public final class AppState {
         guard let notification = RecordingNotifications.notification(
             for: event,
             duration: duration.isFinite ? duration : 0,
-            // `.failed` covers both a start that never happened and a finalize that threw after
-            // a full recording; the icon is the only thing that knows which.
-            hadStarted: statusIcon != .idle) else { return }
+            // `hasStartedSession`, not the icon: the icon flips to `.recording` on the first
+            // frame, before an unwritable-folder write failure surfaces (02 §2).
+            hadStarted: session?.hasStartedSession ?? false) else { return }
         notifier?(notification)
     }
 

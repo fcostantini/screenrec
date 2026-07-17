@@ -1,5 +1,6 @@
 import CoreMedia
 import Foundation
+import os
 
 /// Drives a full recording: owns a `CaptureEngine` and a `MovieRecorder`, wires the recorder
 /// onto the engine's `SampleRouter`, and republishes one `EngineEvent` stream that adds the
@@ -9,6 +10,20 @@ import Foundation
 /// Fail-stop (ADR-007): whatever ends the engine is carried through as the `finished` reason,
 /// so the outcome is a playable file plus a cause, or `failed` if nothing was written.
 public final class RecordingSession: @unchecked Sendable {
+    private static let log = Logger(subsystem: "dev.fcostantini.screenrec", category: "recording")
+    /// A finish that threw leaves a `.partial` on disk (fragmented, playable) that the next
+    /// launch's recovery sweep renames — so point there, not at an opaque NSError.
+    static let finalizeFailureMessage =
+        "Couldn't finish saving the recording. A recovered copy may appear the next time you open ScreenRec."
+
+    /// Logs the raw error (opaque to the user) and yields a plain `.failed` with `message`.
+    private static func finalizeFailed(
+        _ error: Error, message: String, on continuation: AsyncStream<EngineEvent>.Continuation
+    ) {
+        log.error("finalize failed: \(error.localizedDescription, privacy: .public)")
+        continuation.yield(.failed(message: message))
+    }
+
     /// Unified event surface: `started`, forwarded progress/pause events, then exactly one of
     /// `finished` (file finalized) or `failed` (nothing playable), after which it finishes.
     public nonisolated let events: AsyncStream<EngineEvent>
@@ -145,8 +160,11 @@ public final class RecordingSession: @unchecked Sendable {
                         continuation.yield(.finished(
                             url: url, reason: endReason, droppedFrames: recorder.droppedFrameCount))
                     } catch {
-                        continuation.yield(.failed(message:
-                            "Couldn't finalize the recording: \(error.localizedDescription)"))
+                        // The file is at the moved-to path, outside the output folder, so launch
+                        // recovery won't sweep it — name where it actually is.
+                        Self.finalizeFailed(error, message:
+                            "Couldn't finish saving the recording. The file is at \(path).",
+                            on: continuation)
                     }
                 }
             } else if recorder.failedToBeginWriting {
@@ -166,8 +184,8 @@ public final class RecordingSession: @unchecked Sendable {
                     continuation.yield(.finished(
                         url: url, reason: endReason, droppedFrames: recorder.droppedFrameCount))
                 } catch {
-                    continuation.yield(.failed(message:
-                        "Couldn't finalize the recording: \(error.localizedDescription)"))
+                    // The `.partial` sits in the output folder; the next launch's sweep renames it.
+                    Self.finalizeFailed(error, message: Self.finalizeFailureMessage, on: continuation)
                 }
             }
             continuation.finish()

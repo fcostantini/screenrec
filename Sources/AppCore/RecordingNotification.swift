@@ -79,9 +79,13 @@ public enum RecordingNotifications {
             fileURL: url)
     }
 
-    /// docs/06: the one place "Couldn't" is right — there is no playable file.
-    public static func replaySaveFailed(message: String) -> RecordingNotification {
-        RecordingNotification(title: "Couldn't save replay", body: message, fileURL: nil)
+    /// docs/06: the one place "Couldn't" is right — there is no playable file. The raw error
+    /// goes to the log; the user gets the two realistic causes and their actions.
+    public static func replaySaveFailed() -> RecordingNotification {
+        RecordingNotification(
+            title: "Couldn't save replay",
+            body: "Check that the output folder is writable, or try again in a moment.",
+            fileURL: nil)
     }
 
     /// The armed stream's mic died (docs/02 §4: it can never rebind to this stream). Amends
@@ -102,10 +106,12 @@ public enum RecordingNotifications {
     }
 
     /// The armed pipeline itself died (encoder failure) — replay is off, not degraded, so this
-    /// is a disarm notice, not a warning.
-    public static func replayStopped(message: String) -> RecordingNotification {
+    /// is a disarm notice, not a warning. Names the one recovery; the raw cause goes to the log.
+    public static func replayStopped() -> RecordingNotification {
         RecordingNotification(
-            title: "Instant replay turned off", body: message, fileURL: nil)
+            title: "Instant replay turned off",
+            body: "Screen encoding stopped. Re-arm from the menu to try again.",
+            fileURL: nil)
     }
 
     /// The system refused the shortcut registration (another app owns the combo). Replay still
@@ -124,7 +130,7 @@ public enum RecordingNotifications {
         switch reason {
         case .displayDisconnected: "display disconnected"
         case .microphoneChanged: "microphone changed"
-        case .diskAlmostFull: "disk almost full"
+        case .diskAlmostFull: "disk almost full — free up space before recording again"
         case .streamError: "screen capture stopped unexpectedly"
         // Unreachable: SCK reports sleep, lock and unplug as one code (-3815 →
         // displayDisconnected). Mapped anyway so the switch stays total.
