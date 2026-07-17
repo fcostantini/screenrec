@@ -524,7 +524,7 @@ while a manual recording runs; memory flat over 30 min).
       unplug)**. Kill leg amended to 1 h (Franco, 2026-07-17).
 - [x] M6-T3 Error-message audit: force each failure path; every message says what
       happened AND what to do.
-- [ ] M6-T5 Launch at login (`SMAppService`, key `launchAtLogin` — docs/06). **Moved here from
+- [x] M6-T5 Launch at login (`SMAppService`, key `launchAtLogin` — docs/06). **Moved here from
       M4-T4 (Franco, 2026-07-15):** `SMAppService.mainApp` registers a login item pointing at the
       bundle's *current path*, and until the app has a permanent address that path is
       `dist/ScreenRec.app` — a build directory `bundle.sh` deletes on every run. Registering it
@@ -541,7 +541,7 @@ while a manual recording runs; memory flat over 30 min).
       to be worth touching the sample path? If yes, prefer the rebuild-a-mic-only-stream
       route (it also fixes reconnect, which re-pointing provably never can) and settle
       its PTS-coherence assumption first via the §3.5 drift method.
-- [ ] M6-T5 README for the repo: build, sign, install, use. Update all docs to
+- [x] M6-T5 README for the repo: build, sign, install, use. Update all docs to
       match reality; close out STATUS.md v1 section.
 
 - [x] M6-T6 Replay-window resize preserves the buffer (Franco, 2026-07-17; plan approved).

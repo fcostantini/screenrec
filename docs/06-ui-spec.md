@@ -208,7 +208,12 @@ the old line is simply false above three green ticks.
   - Changing the length while armed resizes the buffer **in place** (M6-T6): grow keeps
     everything and fills to the new length; shrink drops the excess immediately. Quality/
     fps/source changes still restart the armed stream (SCK binds sources per stream, 02 §4).
-- Launch at login (`SMAppService`) — **M6**
+- Launch at login (`SMAppService`) — **M6 ✅ shipped M6-T5.** A top-level toggle between
+  Frame rate and Instant Replay. `SMAppService.mainApp.register()`/`unregister()`; its
+  `.status` is the source of truth (self-persisting), seeded into the toggle at launch. The
+  `.requiresApproval` status (user disabled it in System Settings) counts as on, with a
+  notification pointing them there; a failed register reverts the toggle and notifies.
+  **Works for the self-signed dev build — no notarization needed (measured M6-T5).**
 
 ⚠️ **AMENDED 2026-07-15 (Franco): the last two rows do not ship with M4-T4.**
 - **Instant replay settings move to M5, with the feature.** M4-T4 was going to store the keys
@@ -216,11 +221,10 @@ the old line is simply false above three green ticks.
   that does not exist for a whole milestone. Nothing about replay appears in the UI until the
   ring buffer behind it does. (This toggle had been re-homed three times — T1→T2→T4 — before
   Franco ruled: it belongs to the feature.)
-- **Launch at login moves to M6.** `SMAppService` registers a login item pointing at the
-  bundle's *current path*, and until M6 the app has no permanent address — `dist/ScreenRec.app`
-  is a build directory `bundle.sh` deletes on every run. Registering it now aims a login item at
-  a folder that will not exist. It belongs with notarization and installability, which are the
-  same problem: the app needs somewhere to live.
+- **Launch at login moved to M6 — shipped M6-T5.** The path-stability worry (a login item aimed
+  at `dist/`, which `bundle.sh` deletes) resolved once the app lived at a stable path; the toggle
+  registers wherever the app actually runs from. The feared notarization dependency didn't
+  materialize either — `SMAppService.register()` works for the self-signed build (measured).
 
 UserDefaults keys (contractual — **do not rename**; the names are fixed even where the writer
 moved):
@@ -233,7 +237,11 @@ moved):
 | `replayArmed` | Bool | **M5** |
 | `replaySeconds` | Int 30\|60\|120 | **M5** |
 | `replayHotkey` | Dict: keyCode Int, modifiers Int | **M5** |
-| `launchAtLogin` | Bool | **M6** |
+
+⚠️ **`launchAtLogin` is NOT a UserDefaults key (amended M6-T5).** The spec originally listed
+one, but `SMAppService` persists the login-item registration itself, so a stored bool would be
+a redundant second source of truth that can drift. The toggle reads `SMAppService.mainApp.status`
+live and writes through `register()`/`unregister()`. No key.
 
 ## Copy rules
 
