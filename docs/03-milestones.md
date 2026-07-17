@@ -548,6 +548,19 @@ while a manual recording runs; memory flat over 30 min).
 
 ---
 
+## Post-v1 backlog (noted, not scheduled)
+
+- **Record a single app instead of the whole screen, including for armed replay**
+  (Franco, 2026-07-17). Assessment: moderate, ~2 tasks. `SCContentFilter(display:including:)`
+  filters video AND system audio per-app; frames stay display-sized so BitrateModel/timing
+  are untouched; a `content` case on `CaptureConfiguration` propagates to replay for free
+  (both paths build from the same seam, and shared-stream mode rides the recording's filter).
+  The real work: the app picker (dynamic list, refreshed on menu open — the M5-T5
+  `refreshSources` re-home suppression applies), an end-reason ruling for "target app quit
+  mid-recording", and StallWatchdog's idle cross-check (user-active ⇒ frames-expected is
+  false under an app filter — it would log wolf-cries). **Window-level capture is a separate,
+  harder feature** (independent-window streams, live resize) — do not bundle.
+
 ## Dependency graph
 
 ```
