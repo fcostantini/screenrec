@@ -151,6 +151,71 @@ import RecorderCore
         #expect(controller.isPipelineBuiltForTesting)
     }
 
+    @Test func recoveryActionRetriesResetsAndConcedes() {
+        // The bounded-patience rule, pure: five transient failures retry, the sixth
+        // concedes and clears; a failure after a healthy run starts a fresh count.
+        var count = 0
+        for expected in 1...5 {
+            #expect(ReplayController.recoveryAction(
+                failureCount: &count, elapsedSinceAttempt: .seconds(1)) == .retry)
+            #expect(count == expected)
+        }
+        #expect(ReplayController.recoveryAction(
+            failureCount: &count, elapsedSinceAttempt: .seconds(1)) == .concede)
+        #expect(count == 0)
+
+        count = 4
+        #expect(ReplayController.recoveryAction(
+            failureCount: &count,
+            elapsedSinceAttempt: ReplayController.healthyRunThreshold + .seconds(1)) == .retry)
+        #expect(count == 1)   // the healthy run wiped the stale streak
+    }
+
+    @Test func pipelineFailureRetriesBeforeConceding() {
+        // Encoder death is transient more often than not (a dying process can hold the HW
+        // encoder); the controller must stay armed until failure is persistent. Rebuilds
+        // are interval-delayed, so mid-streak the pipeline is legitimately down.
+        let controller = ReplayController()
+        var surrendered = 0
+        controller.onPipelineFailure = { _ in surrendered += 1 }
+        controller.recordingStarted(
+            router: SampleRouter(), configuration: CaptureConfiguration(microphone: .none),
+            seconds: 30, outputDirectory: FileManager.default.temporaryDirectory)
+        defer { controller.disarm() }
+
+        for _ in 1...5 {
+            controller.simulatePipelineFailureForTesting()
+        }
+        #expect(surrendered == 0)
+
+        controller.simulatePipelineFailureForTesting()   // the sixth: persistent — concede
+        #expect(surrendered == 1)
+        #expect(!controller.isPipelineBuiltForTesting)
+    }
+
+    @Test func deliberateTransitionsClearTheFailureStreak() {
+        // A stale streak from a previous outage must not make a fresh session concede on
+        // its first hiccup.
+        let controller = ReplayController()
+        var surrendered = 0
+        controller.onPipelineFailure = { _ in surrendered += 1 }
+        controller.recordingStarted(
+            router: SampleRouter(), configuration: CaptureConfiguration(microphone: .none),
+            seconds: 30, outputDirectory: FileManager.default.temporaryDirectory)
+        defer { controller.disarm() }
+
+        for _ in 1...5 {
+            controller.simulatePipelineFailureForTesting()
+        }
+        controller.recordingStarted(                     // deliberate fresh attach
+            router: SampleRouter(), configuration: CaptureConfiguration(microphone: .none),
+            seconds: 30, outputDirectory: FileManager.default.temporaryDirectory)
+        for _ in 1...5 {
+            controller.simulatePipelineFailureForTesting()
+        }
+        #expect(surrendered == 0)                        // 5 + 5 across a reset never concedes
+    }
+
     @Test func changesWhileDisarmedTouchNothing() {
         let (state, spy, _) = makeState()
         state.quality = .efficient

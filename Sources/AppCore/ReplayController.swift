@@ -62,18 +62,44 @@ public final class ReplayController: ReplayControlling {
     private var epoch = 0
 
     private static let restartRetryInterval: Duration = .seconds(5)
+    /// Six strikes = five retry sleeps ≈ 25 s of encoder-death patience before conceding.
+    static let maxConsecutivePipelineFailures = 6
+    /// A pipeline that lived this long was healthy; a later death starts a fresh count.
+    static let healthyRunThreshold: Duration = .seconds(60)
+    private static let clock = ContinuousClock()
+
+    private var consecutivePipelineFailures = 0
+    private var attemptStartedAt = ReplayController.clock.now
+
+    enum RecoveryAction: Equatable { case retry, concede }
+
+    /// The bounded-patience rule, pure so both retry branches and the healthy-run reset are
+    /// testable without wall-clock or live capture.
+    static func recoveryAction(
+        failureCount: inout Int, elapsedSinceAttempt: Duration
+    ) -> RecoveryAction {
+        if elapsedSinceAttempt > healthyRunThreshold { failureCount = 0 }
+        failureCount += 1
+        guard failureCount < maxConsecutivePipelineFailures else {
+            failureCount = 0
+            return .concede
+        }
+        return .retry
+    }
 
     public init() {}
 
     public func arm(configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL) {
         guard !isArmed else { return }
         isArmed = true
+        consecutivePipelineFailures = 0
         startOwnStream(configuration: configuration, seconds: seconds, outputDirectory: outputDirectory)
     }
 
     public func disarm() {
         guard isArmed else { return }
         isArmed = false
+        consecutivePipelineFailures = 0
         tearDown()
     }
 
@@ -84,6 +110,16 @@ public final class ReplayController: ReplayControlling {
         // entry the mid-recording toggle reaches. Every caller gates on the user's armed
         // intent, so a disarmed controller here always means "arm onto this stream".
         isArmed = true
+        consecutivePipelineFailures = 0
+        attachPipeline(
+            to: router, configuration: configuration, seconds: seconds,
+            outputDirectory: outputDirectory)
+    }
+
+    private func attachPipeline(
+        to router: SampleRouter, configuration: CaptureConfiguration, seconds: Double,
+        outputDirectory: URL
+    ) {
         tearDown()
         buildPipeline(
             on: router, configuration: configuration, seconds: seconds,
@@ -95,6 +131,7 @@ public final class ReplayController: ReplayControlling {
         configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL
     ) {
         guard isArmed else { return }
+        consecutivePipelineFailures = 0
         tearDown()
         startOwnStream(configuration: configuration, seconds: seconds, outputDirectory: outputDirectory)
     }
@@ -104,6 +141,7 @@ public final class ReplayController: ReplayControlling {
     ) {
         // Own-stream mode only; while riding a recording, `recordingStarted` is the rebuild path.
         guard isArmed, attachedRouter == nil else { return }
+        consecutivePipelineFailures = 0
         tearDown()
         startOwnStream(configuration: configuration, seconds: seconds, outputDirectory: outputDirectory)
     }
@@ -126,8 +164,11 @@ public final class ReplayController: ReplayControlling {
     }
 
     public func setOutputDirectory(_ url: URL) {
-        guard isArmed, let muxer else { return }
+        guard isArmed else { return }
+        // Stamped before the muxer guard: with the pipeline down (retry window) the change
+        // must still stick — the rebuild reads `currentOutputDirectory`.
         currentOutputDirectory = url
+        guard let muxer else { return }
         muxer.update(outputDirectory: url)
     }
 
@@ -146,6 +187,12 @@ public final class ReplayController: ReplayControlling {
     /// empty rings" from "no pipeline at all" (both complete `nothingBuffered`).
     var isPipelineBuiltForTesting: Bool { muxer != nil }
 
+    /// Drives `pipelineFailed` directly — the real trigger is the encoder's VT thread, which
+    /// a unit test can't summon on demand.
+    func simulatePipelineFailureForTesting() {
+        pipelineFailed("simulated", inEpoch: epoch)
+    }
+
     // MARK: - Pipeline
 
     // The live pipeline's parameters — what a retry rebuilds from, so a folder or setting
@@ -158,6 +205,7 @@ public final class ReplayController: ReplayControlling {
         on router: SampleRouter, configuration: CaptureConfiguration, seconds: Double,
         outputDirectory: URL
     ) {
+        attemptStartedAt = Self.clock.now
         currentConfiguration = configuration
         currentSeconds = seconds
         currentOutputDirectory = outputDirectory
@@ -247,10 +295,42 @@ public final class ReplayController: ReplayControlling {
         startOwnStream(configuration: configuration, seconds: seconds, outputDirectory: outputDirectory)
     }
 
+    /// Encoder death gets bounded patience, not instant surrender: a quick relaunch can find
+    /// the HW encoder still held by a dying process, so retry like a stream death and
+    /// self-disarm only when the failure is persistent. Stream deaths stay infinitely
+    /// patient (display sleep can last hours); encoder deaths get ~25 s.
     private func pipelineFailed(_ message: String, inEpoch failedEpoch: Int) {
         guard epoch == failedEpoch, isArmed else { return }
-        isArmed = false
+        let action = Self.recoveryAction(
+            failureCount: &consecutivePipelineFailures,
+            elapsedSinceAttempt: Self.clock.now - attemptStartedAt)
+        let ridingRouter = attachedRouter
         tearDown()
-        onPipelineFailure?("Screen encoding stopped working: \(message)")
+        switch action {
+        case .concede:
+            isArmed = false
+            onPipelineFailure?("Screen encoding stopped working: \(message)")
+        case .retry:
+            // Both branches wait out the interval — a fast-failing encoder must not burn
+            // the whole budget in milliseconds.
+            let epochAfterTearDown = epoch
+            if let ridingRouter {
+                Task { [weak self] in
+                    await self?.retryOnRouter(ridingRouter, epoch: epochAfterTearDown)
+                }
+            } else {
+                Task { [weak self] in await self?.retryOwnStream(epoch: epochAfterTearDown) }
+            }
+        }
+    }
+
+    /// Riding a recording: the stream is alive, only our pipeline died — rebuild on it after
+    /// the interval. The epoch guard covers the recording ending mid-sleep.
+    private func retryOnRouter(_ router: SampleRouter, epoch: Int) async {
+        try? await Task.sleep(for: Self.restartRetryInterval)
+        guard isArmed, self.epoch == epoch else { return }
+        attachPipeline(
+            to: router, configuration: currentConfiguration, seconds: currentSeconds,
+            outputDirectory: currentOutputDirectory)
     }
 }

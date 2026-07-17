@@ -571,7 +571,7 @@ while a manual recording runs; memory flat over 30 min).
       **Verify:** menudriver mid-recording: arm → badge + Save row appear, save produces a
       clip, recording unharmed (probe both); disarm mid-recording → recording continues.
 
-- [ ] M6-T9 Armed state survives relaunch (from the M6-T2 leg-2 finding; also reproduced
+- [x] M6-T9 Armed state survives relaunch (from the M6-T2 leg-2 finding; also reproduced
       on a *graceful* quit→relaunch 2026-07-17 — the SCK stream-reap race is a coin flip
       on any quick restart, roughly 1-in-3 across the day's cycles, not kill-specific). Arm-time
       stream failure at launch currently hits the pipeline-failure bucket → permanent

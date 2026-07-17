@@ -5,6 +5,20 @@
 
 ## Now
 
+- **M6-T9 DONE — armed state survives relaunch.** Encoder death now gets bounded patience
+  (the pure `recoveryAction` rule: 6 strikes = 5 interval sleeps ≈ 25 s, healthy-run reset,
+  deliberate transitions clear the streak) instead of instant self-disarm; stream deaths
+  keep infinite patience. /code-review (high) caught 3 real bugs in my first cut, all
+  fixed: the riding-a-recording retry had no delay (burned the whole budget in ms — the
+  exact transient the task targets), `setOutputDirectory` dropped folder changes while the
+  pipeline was down (stamp-first, the `windowChanged` pattern), and the failure streak
+  never cleared on deliberate transitions. Retry decision extracted pure → both branches +
+  the reset unit-tested without wall-clock; 244 tests. Live: **3× kill→relaunch cycles,
+  armed survived each unaided** (plus a 30 s per-second watch), display-sleep regression
+  green. One false alarm en route: a cycle run without asserting the armed precondition
+  read a pre-existing 0 as a failure — assert the precondition before measuring.
+  **Next: M6-T10 (open-menu rebuild artifact), then T11 (stale mic list), T3, T5, T4.**
+
 - **M6-T8 DONE — arm/disarm works mid-recording.** The recording menu carries the shared
   arm toggle + save row (one `replayControls` builder for both menus; readiness-gated; a
   hotkey SwiftUI can't map falls back into the button title so the combo hint never
