@@ -337,8 +337,10 @@ public final class AppState {
     private func syncReplayArming() {
         if isReplayArmed {
             if let session {
+                // Resolved, not raw: an absent picked mic must not attach a ring the
+                // recording's router will never feed (picked-device-or-nothing, 02 §1).
                 replay.recordingStarted(
-                    router: session.router, configuration: captureConfiguration,
+                    router: session.router, configuration: replayCaptureConfiguration(),
                     seconds: Double(replaySeconds), outputDirectory: outputDirectory)
             } else {
                 replay.arm(
@@ -356,9 +358,10 @@ public final class AppState {
         guard isReplayArmed else { return }
         if let session {
             // Mid-recording only quality/fps can reach here (sources are locked, and the buffer
-            // length takes `windowChanged` instead); rebuild on the recording's stream.
+            // length takes `windowChanged` instead); rebuild on the recording's stream, with
+            // the mic pick resolved the same way every replay path resolves it.
             replay.recordingStarted(
-                router: session.router, configuration: captureConfiguration,
+                router: session.router, configuration: replayCaptureConfiguration(),
                 seconds: Double(replaySeconds), outputDirectory: outputDirectory)
         } else {
             replay.configurationChanged(

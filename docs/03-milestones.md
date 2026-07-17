@@ -563,7 +563,7 @@ while a manual recording runs; memory flat over 30 min).
       folder. **Verify:** unit + live: mv the file mid-recording → warning fires, stop
       still yields the complete file at the restored path; simulate unlink → clean
       fail-stop; kill -9 mid-recording → `.partial` present and playable after rename.
-- [ ] M6-T8 Arm/disarm replay while recording (Franco, 2026-07-17). The state layer already
+- [x] M6-T8 Arm/disarm replay while recording (Franco, 2026-07-17). The state layer already
       supports it (`syncReplayArming`'s `session != nil` branch attaches to the live
       stream); the recording-state menu just never rendered the toggle — docs/06's
       recording menu predates armed replay. Show the arm toggle + Save Replay Now row in
@@ -571,7 +571,9 @@ while a manual recording runs; memory flat over 30 min).
       **Verify:** menudriver mid-recording: arm → badge + Save row appear, save produces a
       clip, recording unharmed (probe both); disarm mid-recording → recording continues.
 
-- [ ] M6-T9 Armed state survives crash-relaunch (from the M6-T2 leg-2 finding). Arm-time
+- [ ] M6-T9 Armed state survives relaunch (from the M6-T2 leg-2 finding; also reproduced
+      on a *graceful* quit→relaunch 2026-07-17 — the SCK stream-reap race is a coin flip
+      on any quick restart, roughly 1-in-3 across the day's cycles, not kill-specific). Arm-time
       stream failure at launch currently hits the pipeline-failure bucket → permanent
       self-disarm + `replayArmed=0`, though the condition is transient (SCK still reaping
       the dead process's stream — re-arm by hand worked seconds later). Fix: launch/arm

@@ -139,6 +139,18 @@ import RecorderCore
         #expect(spy.calls.isEmpty)                              // buffer untouched
     }
 
+    @Test func recordingStartedArmsADisarmedController() {
+        // The mid-recording toggle's path: callers gate on the user's armed intent, so a
+        // disarmed controller must treat recordingStarted as the arming act itself.
+        let controller = ReplayController()
+        #expect(!controller.isPipelineBuiltForTesting)
+        controller.recordingStarted(
+            router: SampleRouter(), configuration: CaptureConfiguration(microphone: .none),
+            seconds: 30, outputDirectory: FileManager.default.temporaryDirectory)
+        defer { controller.disarm() }
+        #expect(controller.isPipelineBuiltForTesting)
+    }
+
     @Test func changesWhileDisarmedTouchNothing() {
         let (state, spy, _) = makeState()
         state.quality = .efficient

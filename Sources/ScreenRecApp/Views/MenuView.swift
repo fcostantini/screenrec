@@ -46,13 +46,7 @@ struct MenuView: View {
         Button("Start Recording") { Task { await state.start() } }
             .disabled(state.readiness != .ready)
 
-        // docs/06 item 3. The "⌥⌘R saves" hint rides the Save row below as its shortcut
-        // column — a `.menu` MenuBarExtra has no right-aligned hint slot (header-row limitation).
-        Toggle("Arm Instant Replay", isOn: $state.isReplayArmed)
-            .disabled(state.readiness != .ready && !state.isReplayArmed)
-        if state.isReplayArmed {
-            saveReplayRow
-        }
+        replayControls
 
         Divider()
 
@@ -119,24 +113,33 @@ struct MenuView: View {
             Text("\(microphone) · separate track")
         }
 
-        // docs/06 recording item 5: armed replay stays visible (and saveable) mid-recording.
-        if state.isReplayArmed {
-            Text("Replay still armed · \(HotkeyDisplay.string(for: state.replayHotkey))")
-            saveReplayRow
-        }
+        replayControls
 
         // docs/06: the pickers are hidden while recording, not disabled — this row says why.
         Text("Sources locked while recording")
     }
 
-    /// The save action both menus share; the shortcut column shows the user's actual combo
-    /// (docs/06's "⌥⌘R saves" hint, live). Unmappable custom keys just lose the visual.
+    /// Arm toggle + save row, shared by both menus (docs/06 idle item 3 / recording item 5:
+    /// arming mid-recording attaches to the live stream, disarming detaches; the recording is
+    /// unaffected). The readiness gate also guards a permission revoked mid-recording.
+    @ViewBuilder private var replayControls: some View {
+        Toggle("Arm Instant Replay", isOn: $state.isReplayArmed)
+            .disabled(state.readiness != .ready && !state.isReplayArmed)
+        if state.isReplayArmed {
+            saveReplayRow
+        }
+    }
+
+    /// The shortcut column shows the user's combo (docs/06's "⌥⌘R saves" hint, live); a combo
+    /// SwiftUI can't map falls back into the title so the hint never disappears entirely.
     @ViewBuilder private var saveReplayRow: some View {
-        let button = Button("Save Replay Now") { state.saveReplay() }
         if let key = HotkeyDisplay.keyEquivalent(for: state.replayHotkey) {
-            button.keyboardShortcut(key, modifiers: HotkeyDisplay.eventModifiers(for: state.replayHotkey))
+            Button("Save Replay Now") { state.saveReplay() }
+                .keyboardShortcut(key, modifiers: HotkeyDisplay.eventModifiers(for: state.replayHotkey))
         } else {
-            button
+            Button("Save Replay Now · \(HotkeyDisplay.string(for: state.replayHotkey))") {
+                state.saveReplay()
+            }
         }
     }
 

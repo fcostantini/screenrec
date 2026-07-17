@@ -5,6 +5,24 @@
 
 ## Now
 
+- **M6-T8 DONE — arm/disarm works mid-recording.** The recording menu carries the shared
+  arm toggle + save row (one `replayControls` builder for both menus; readiness-gated; a
+  hotkey SwiftUI can't map falls back into the button title so the combo hint never
+  vanishes). **The live verify caught the task's real bug:** arming mid-recording was a
+  silent no-op — `recordingStarted` guarded on the controller's own `isArmed`, which only
+  the idle path set; it now self-arms (all call sites gate on the user's intent; protocol
+  doc states the contract; non-vacuous regression test via `isPipelineBuiltForTesting` —
+  `requestSave`'s acceptance can't distinguish no-pipeline from empty rings). Mid-recording
+  arm/settings paths now resolve the mic pick through `replayCaptureConfiguration()` (no
+  dead ring when the picked mic is away). /code-review (high): 8 findings, batch-approved,
+  all applied. Live verified on the installed app: toggle unchecked mid-recording → arm →
+  16.64 s clip (= span since arming) → disarm mid-recording → recording ran on → 44.61 s
+  clean file. 241 tests. ⚠️ **The armed-state drop reproduced on a GRACEFUL quit→relaunch
+  during the final redeploy** — the SCK reap race isn't kill-specific (M6-T9's row updated;
+  ~1-in-3 across today's restart cycles). /Users/Shared runs the full T6+T7+T8 build.
+  **Next: M6-T9 (armed state survives relaunch).** Then T10 (menu rebuild artifact), T3,
+  T5, T4 decisions.
+
 - **M6-T7 DONE — the recording file defends itself.** `RecordingFileSentinel` (vnode watch
   on the writer's fd): move/trash → renamed back within a beat + "Still recording · file
   moved back"; unlink → immediate honest fail-stop; unrestorable move → finalized in place

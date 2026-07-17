@@ -13,9 +13,10 @@ public protocol ReplayControlling: AnyObject {
 
     func arm(configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL)
     func disarm()
-    /// A recording started: share its stream (docs/01's key property). The replay buffer
-    /// restarts — a new stream is a new pts epoch; the pre-record buffer is deliberately not
-    /// carried over.
+    /// A recording started: share its stream (docs/01's key property). Arms a disarmed
+    /// controller — this is also the mid-recording toggle's entry, and callers gate on the
+    /// user's armed intent. The replay buffer restarts — a new stream is a new pts epoch;
+    /// the pre-record buffer is deliberately not carried over.
     func recordingStarted(router: SampleRouter, configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL)
     /// The recording ended (any reason): leave its stream and, if armed, resume a private one.
     func recordingEnded(configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL)
@@ -79,7 +80,10 @@ public final class ReplayController: ReplayControlling {
     public func recordingStarted(
         router: SampleRouter, configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL
     ) {
-        guard isArmed else { return }
+        // Arms if not already armed: riding a recording IS an armed state, and this is the
+        // entry the mid-recording toggle reaches. Every caller gates on the user's armed
+        // intent, so a disarmed controller here always means "arm onto this stream".
+        isArmed = true
         tearDown()
         buildPipeline(
             on: router, configuration: configuration, seconds: seconds,
@@ -137,6 +141,10 @@ public final class ReplayController: ReplayControlling {
         }
         return muxer.requestSave(completion: completion)
     }
+
+    /// Whether a pipeline exists — `requestSave`'s acceptance can't distinguish "armed with
+    /// empty rings" from "no pipeline at all" (both complete `nothingBuffered`).
+    var isPipelineBuiltForTesting: Bool { muxer != nil }
 
     // MARK: - Pipeline
 

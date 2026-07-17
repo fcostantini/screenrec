@@ -66,8 +66,12 @@ Order and grouping (separators between groups):
 2. **Pause** / **Resume** (swaps by state).
 3. **Stop & Save** — primary.
 4. — separator —
-5. Dimmed info rows: active mic + `separate track`; `Replay still armed · ⌥⌘R` when
-   armed.
+5. Dimmed info row: active mic + `separate track`. Then the **Arm Instant Replay toggle
+   — live mid-recording** (amended 2026-07-17, M6-T8: arming attaches replay to the live
+   stream, disarming detaches; the recording is unaffected either way) and, when armed,
+   **Save Replay Now** with the shortcut column carrying the combo (this replaces the old
+   `Replay still armed · ⌥⌘R` info row — the checkmark and shortcut column say the same
+   thing interactively).
 6. — separator —
 7. Dimmed: `Sources locked while recording` (pickers hidden, not disabled-but-present).
 8. Settings/Quit remain.
