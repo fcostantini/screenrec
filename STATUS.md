@@ -5,6 +5,23 @@
 
 ## Now
 
+- **M6-T2 LEG 1 (2-h battery soak) — agent legs PASSED 2026-07-17; human legs pending.**
+  Run 10:38:33→12:38:33, Franco's real mixed usage incl. a Zoom call, AirPods mic, replay
+  armed throughout, High preset (his setting; §7 is preset-silent). File: 19.5 GB,
+  **7223.42 s (2:00:23), hvc1 + aac 48k/2ch + aac 24k/1ch, track ends within 110 ms** —
+  probes clean. Battery **99%→62% (37% drain, Zoom-inflated)**; app CPU **avg 12.9% / max
+  19.3%** of one core (recording + armed replay + the menudriver rig); RSS 98–485 MB
+  oscillating, **no upward trend, no thermal warnings** (120 samples, 60 s cadence).
+  Bonus: **3 replay saves mid-recording** (10:52/11:02/11:39) — §6.4 simultaneity at 2-h
+  scale, all clips + the main file clean. ⚠️ **Incident, survived: Franco accidentally
+  trashed the in-progress file at 11:39** while tidying ~/Movies; the writer's fd followed
+  the rename, finalize completed *in the Trash*, file restored intact (probe above).
+  Safeguard options presented to Franco (vnode-watch/react is the recommendation —
+  candidate M6-T7, his pick pending). **Pending T2 closure: leg 2 (kill -9 at ~1:59 of a
+  second 2-h run — timing is Franco's call) + human legs (clap-sync scrub at 0/1/2 h,
+  stutter judgment — file kept at `~/Movies/Recording 2026-07-17 at 10.38.11.mov`).**
+  **Next now: M6-T6 (replay-window resize preserves buffer — plan approved 2026-07-17).**
+
 - **M6-T1 DONE — acceptance run adjudicated, all five rows closed (2026-07-17).**
   C3 PASSED (measured). **C2 resolved by AMENDMENT (Franco: "not that concerned about the
   size")** — 00-product-brief's ≤1.5 GB/h is now "meaningfully smaller than Tier-1", met
