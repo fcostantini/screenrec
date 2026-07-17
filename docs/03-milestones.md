@@ -580,6 +580,21 @@ while a manual recording runs; memory flat over 30 min).
       live: kill -9 the armed app → relaunch → armed badge back without human help;
       display-sleep retry regression stays green.
 
+- [ ] M6-T10 Open-menu rebuild corrupts rows (Franco, 2026-07-17; replay-clip evidence at
+      00:11 of his capture — highlight parked on the disabled "Sources locked" row, its
+      label displaced, persisting across ticks while the cursor sat on Settings…).
+      Cause: `refreshWhileOpen` → `refreshProgress()` reassigns `elapsedSeconds`/
+      `recordedBytes` at 1 Hz → @Observable publishes → SwiftUI rebuilds every AppKit row
+      of the OPEN menu; the hover/highlight machinery garbles rows across the swap.
+      Fix directions, in order: (1) free win — assign progress values only on real change
+      (the M4-T3 @Observable lesson; the idle menu stops rebuilding entirely since its
+      values sit at 0); (2) recording menu: stable row identity (`.id`) so SwiftUI updates
+      the header Text in place instead of rebuilding siblings; (3) if the bridge still
+      glitches, measure and decide (slower tick vs docs/06 header-fidelity trade).
+      **Verify:** screen-record the open menu across ≥5 ticks while hovering each row —
+      measured, not eyeballed (M4-T1 rule); idle menu provably rebuild-free (no publish
+      without change).
+
 **Gate G6** = v1 done.
 
 ---
