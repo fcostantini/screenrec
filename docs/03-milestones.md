@@ -582,7 +582,7 @@ while a manual recording runs; memory flat over 30 min).
       live: kill -9 the armed app → relaunch → armed badge back without human help;
       display-sleep retry regression stays green.
 
-- [ ] M6-T10 Open-menu rebuild corrupts rows (Franco, 2026-07-17; replay-clip evidence at
+- [x] M6-T10 Open-menu rebuild corrupts rows (Franco, 2026-07-17; replay-clip evidence at
       00:11 of his capture — highlight parked on the disabled "Sources locked" row, its
       label displaced, persisting across ticks while the cursor sat on Settings…).
       Cause: `refreshWhileOpen` → `refreshProgress()` reassigns `elapsedSeconds`/

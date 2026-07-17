@@ -409,8 +409,12 @@ public final class AppState {
     public func refreshSources(displays: [DisplayOption]) {
         isRehomingSources = true
         defer { isRehomingSources = false }
-        self.displays = displays
-        microphones = AudioInputs.available()
+        // Assign only on real change: @Observable publishes on every set, and a publish rebuilds
+        // the open menu's AppKit rows (garbling hover/highlight, M6-T10). Menu opens re-read
+        // these, usually to the same values.
+        if self.displays != displays { self.displays = displays }
+        let microphones = AudioInputs.available()
+        if self.microphones != microphones { self.microphones = microphones }
 
         if selectedDisplayID == nil || !displays.contains(where: { $0.id == selectedDisplayID }) {
             selectedDisplayID = (displays.first(where: \.isMain) ?? displays.first)?.id
@@ -431,7 +435,8 @@ public final class AppState {
     }
 
     public func refreshRecentRecordings() {
-        recentRecordings = RecentRecordings.inDirectory(outputDirectory)
+        let recents = RecentRecordings.inDirectory(outputDirectory)
+        if recentRecordings != recents { recentRecordings = recents }
     }
 
     /// Re-reads the writer's duration and the file's size on disk.
@@ -441,8 +446,13 @@ public final class AppState {
     public func refreshProgress() {
         let duration = session?.recordedDuration.seconds ?? 0
         // NaN until the first frame starts the session (docs/02 §10).
-        elapsedSeconds = duration.isFinite ? duration : 0
-        recordedBytes = currentOutputURL.map(Self.fileSize) ?? 0
+        let seconds = duration.isFinite ? duration : 0
+        let bytes = currentOutputURL.map(Self.fileSize) ?? 0
+        // Assign only on real change: @Observable publishes on every set, and a publish
+        // rebuilds the OPEN menu's AppKit rows — which garbles hover/highlight state.
+        // Idle both values sit at zero, so the idle menu never rebuilds at all.
+        if elapsedSeconds != seconds { elapsedSeconds = seconds }
+        if recordedBytes != bytes { recordedBytes = bytes }
     }
 
     // MARK: - Configuration

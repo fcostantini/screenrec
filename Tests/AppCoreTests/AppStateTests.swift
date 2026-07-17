@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Testing
 @testable import AppCore
 import RecorderCore
@@ -6,6 +7,14 @@ import RecorderCore
 /// Pure state folding — no capture, no UI host, no real time.
 @MainActor
 @Suite struct AppStateTests {
+
+    /// A thread-safe latch for `withObservationTracking`'s `@Sendable onChange`.
+    final class Flag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var raised = false
+        var isRaised: Bool { lock.lock(); defer { lock.unlock() }; return raised }
+        func raise() { lock.lock(); raised = true; lock.unlock() }
+    }
 
     private static let outputURL = URL(fileURLWithPath: "/tmp/screenrec-test.mov")
 
@@ -234,5 +243,43 @@ import RecorderCore
 
         await state.consume(events)
         #expect(state.statusIcon == .idle)
+    }
+
+    @Test func refreshProgressPublishesOnlyOnRealChange() {
+        // A publish rebuilds the open menu's AppKit rows and garbles hover state, so the
+        // idle 1 Hz poll (values pinned at zero) must be observation-silent.
+        let state = makeState()
+        state.refreshProgress()
+
+        let published = Flag()
+        withObservationTracking {
+            _ = state.elapsedSeconds
+            _ = state.recordedBytes
+        } onChange: {
+            published.raise()
+        }
+        state.refreshProgress()
+        #expect(!published.isRaised)
+    }
+
+    @Test func refreshSourcesAndRecentsAreSilentOnNoChange() {
+        // Same open-menu-rebuild hazard as refreshProgress: identical displays/mics/recents
+        // must not republish (M6-T10).
+        let state = makeState()
+        let displays = [DisplayOption(id: 1, name: "Main", isMain: true)]
+        state.refreshSources(displays: displays)
+        state.refreshRecentRecordings()
+
+        let published = Flag()
+        withObservationTracking {
+            _ = state.displays
+            _ = state.microphones
+            _ = state.recentRecordings
+        } onChange: {
+            published.raise()
+        }
+        state.refreshSources(displays: displays)
+        state.refreshRecentRecordings()
+        #expect(!published.isRaised)
     }
 }

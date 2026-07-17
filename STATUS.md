@@ -5,6 +5,26 @@
 
 ## Now
 
+- **M6-T10 DONE — the open-menu highlight corruption is fixed.** Root cause: a per-second
+  refresh published through @Observable and rebuilt every AppKit row of the OPEN menu,
+  garbling hover/highlight (the artifact Franco filmed). Fix: refresh once per open
+  (`RefreshOnMenuOpen` = `.task` for first appearance + `NSMenu.didBeginTracking` for
+  reopens), and every refresher (`refreshProgress`/`refreshSources`/`refreshRecentRecordings`)
+  publishes ONLY on a real change — the M4-T3 lesson, applied to all three. The recording
+  header consequently **stamps at open and holds** (a live clock isn't implementable in a
+  `.menu` MenuBarExtra without the corruption — `Text(timerInterval:)` doesn't animate
+  through the bridge); docs/06 amended from "≤ 1 Hz" to "stamps at open". Measured fixed:
+  5 one-second hover captures, cursor on Settings, highlight clean in every frame, header
+  frozen — not eyeballed (M4-T1 rule). /code-review (high): the adversarial pass REFUTED
+  the submenu-refire hazard (didBeginTracking fires once per tracking session, not per
+  submenu); 3 real findings applied (unguarded source/recents publishes, stale/lying
+  comments, first-open subscription race → the `.task`+notification belt-and-suspenders).
+  246 tests. **The armed-drop scare was a MEASUREMENT ARTIFACT** — a single `replayArmed=0`
+  read had a stale precondition (disarmed earlier in a messy measurement session); three
+  clean trajectories (graceful-quit, hot-swap deploy, kill-relaunch) all hold armed=1
+  through 30 s+. T9 stands. **Same lesson as before: assert the precondition before reading
+  a persisted flag.** **Next: M6-T3 (error-message audit).**
+
 - **M6-T9 DONE — armed state survives relaunch.** Encoder death now gets bounded patience
   (the pure `recoveryAction` rule: 6 strikes = 5 interval sleeps ≈ 25 s, healthy-run reset,
   deliberate transitions clear the streak) instead of instant self-disarm; stream deaths

@@ -39,7 +39,7 @@ struct MenuView: View {
         // The refresh hangs off the header rather than a `Group` around the whole menu: a Group
         // hands its modifiers to each child, so a `.task` there runs once per row.
         idleHeader
-            .task { await refreshWhileOpen() }
+            .modifier(RefreshOnMenuOpen(refresh: refreshAtOpen))
 
         Divider()
 
@@ -92,9 +92,11 @@ struct MenuView: View {
     // MARK: - Recording / paused (docs/06 items 1–7)
 
     @ViewBuilder private var recordingItems: some View {
+        // Header values stamp per open and hold: a publish rebuilds the open menu's AppKit
+        // rows and garbles hover (M6-T10), so nothing may tick while it's up.
         Text("\(MenuHeader.elapsed(state.elapsedSeconds)) — "
              + MenuHeader.recordingDetail(bytes: state.recordedBytes))
-            .task { await refreshWhileOpen() }
+            .modifier(RefreshOnMenuOpen(refresh: refreshAtOpen))
 
         Divider()
 
@@ -164,18 +166,14 @@ struct MenuView: View {
 
     // MARK: - Lifecycle
 
-    /// Refreshes on open, then ticks the elapsed clock at 1 Hz while the menu is up. SwiftUI
-    /// tears down menu content on close, so cancellation delivers docs/06's "no timers while
-    /// closed".
-    private func refreshWhileOpen() async {
+    /// Re-reads sources/recents/progress once per menu open. Each callee assigns only on a real
+    /// change, so a no-op reopen publishes nothing and the open menu isn't rebuilt (M6-T10).
+    private func refreshAtOpen() {
         state.refreshRecentRecordings()
         if !state.isSessionActive {
             state.refreshSources(displays: DisplayOption.liveScreens())
         }
-        while !Task.isCancelled {
-            state.refreshProgress()
-            try? await Task.sleep(for: .seconds(1))
-        }
+        state.refreshProgress()
     }
 
     /// docs/06 item 12: quitting mid-recording confirms, then finalizes before exit (ADR-007).
@@ -194,6 +192,21 @@ struct MenuView: View {
             await state.stopAndWaitForFinalize()
             NSApplication.shared.terminate(nil)
         }
+    }
+}
+
+/// Runs `refresh` once per menu open. `.task` covers the first appearance (no dependency on
+/// subscription timing); `didBeginTracking` covers every reopen (which `.task` doesn't re-fire
+/// for). `refresh` is idempotent — it publishes nothing when nothing changed — so the overlap
+/// on the first open is harmless.
+private struct RefreshOnMenuOpen: ViewModifier {
+    let refresh: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .task { refresh() }
+            .onReceive(NotificationCenter.default.publisher(
+                for: NSMenu.didBeginTrackingNotification)) { _ in refresh() }
     }
 }
 
