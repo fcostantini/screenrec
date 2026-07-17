@@ -16,8 +16,13 @@
   observability) + notifies, a stale comment fixed. 252 tests. README rewritten for humans
   (build/sign/install/use + the "self-signed = this machine only" caveat) and its commands
   dry-run-verified. **Next: nothing forced — the M6 tail is Franco's pick** (see v1 status).
-  Owed (Franco-approved follow-up): graduate the session's testing tools (`settingsdriver`,
-  `hoverprobe`, `frames`, `axdump`) into `tools/` as a `tools:` commit.
+- **Tools graduated (`tools:` commit c04a2af).** The session's four reusable verification tools
+  now live in `tools/`, cleaned to bar (headers, arg-driven, warning-free) and listed in CLAUDE.md:
+  `frames.swift` (PNG frames at timestamps — clip content vs probe's metadata), `settingsdriver.swift`
+  (drive the Settings *window* via AX — the complement to menudriver's menu), `hoverprobe.swift`
+  (per-tick open-menu screenshots — caught M6-T10), `axdump.swift` (dump an app's AX tree). The
+  one-off diagnostics (`interfere.sh`, `micprobe.swift`) stayed scratch — `micprobe`'s logic will
+  land inside the T11 fix.
 
 ## v1 status (M6 in progress — updated M6-T5)
 
