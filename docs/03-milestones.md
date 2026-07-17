@@ -519,7 +519,7 @@ while a manual recording runs; memory flat over 30 min).
 
 ## M6 — Ship-quality pass (est. 1–2 sessions)
 
-- [ ] M6-T1 Full acceptance run: every item in 00-product-brief "Success criteria".
+- [x] M6-T1 Full acceptance run: every item in 00-product-brief "Success criteria".
 - [ ] M6-T2 The 2-hour soak test (04-testing §7) on battery **(human — physical
       unplug)**.
 - [ ] M6-T3 Error-message audit: force each failure path; every message says what

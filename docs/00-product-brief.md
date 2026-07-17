@@ -57,15 +57,25 @@ demos, bug reports, and meetings" — not streamers, not video editors.
 
 ## Success criteria / acceptance for v1
 
+(Adjudicated by M6-T1's acceptance run, 2026-07-16/17 — evidence in STATUS.md.)
+
 - [ ] 2-hour recording on battery: no dropped-frame visible stutter, in-sync audio at the
       2 h mark (clap test §4 of 04-testing), file playable after `kill -9` at 1:59.
-- [ ] Output for typical desktop work ≤ 1.5 GB/hour at "Balanced" preset, full Retina.
-- [ ] Instant replay clip saved while a manual recording is NOT running, in < 1 s,
-      containing the last 60 s ± 1 keyframe interval, with audio.
-- [ ] Fresh macOS user account: onboarding flow yields working recording in < 2 minutes
-      without reading docs.
-- [ ] QuickTime, IINA, Premiere, and DaVinci Resolve all open the files; NLEs show the
-      mic as an independent track.
+      *Satisfied by M6-T2's soak — one run counts for both (Franco, 2026-07-16).*
+- [x] Output for typical desktop work meaningfully smaller than Tier-1 at "Balanced",
+      full Retina — met: ≈5.7 Mbps over a 30-min active-screen real-usage run vs Tier-1's
+      ~34 Mbps (≈6×; goal 1's 2–4× exceeded). *Amended from "≤ 1.5 GB/hour" 2026-07-17
+      (Franco): absolute size is not a v1 concern; the ratio to Tier-1 is the bar. The
+      measured 2.59 GB/h at Balanced stands on record in STATUS.md.*
+- [x] Instant replay clip saved while a manual recording is NOT running, in < 1 s,
+      containing the last 60 s ± 1 keyframe interval, with audio. *Measured 2026-07-16:
+      0.30 s signal→file, 60.55 s window, keyframe start, both audio tracks.*
+- [x] ~~Fresh macOS user account: onboarding flow yields working recording in < 2 minutes
+      without reading docs.~~ **Waived** (Franco, 2026-07-16 — not run; G4 §5.1's
+      walkthrough proved the flow works, untimed).
+- [x] ~~QuickTime, IINA, Premiere, and DaVinci Resolve all open the files; NLEs show the
+      mic as an independent track.~~ **Waived** (Franco, 2026-07-16 — only QuickTime is
+      installed here; not run).
 
 ## Naming
 

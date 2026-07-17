@@ -5,7 +5,15 @@
 
 ## Now
 
-- **M6-T1 IN PROGRESS — acceptance run against 00-product-brief. C3 (instant replay)
+- **M6-T1 DONE — acceptance run adjudicated, all five rows closed (2026-07-17).**
+  C3 PASSED (measured). **C2 resolved by AMENDMENT (Franco: "not that concerned about the
+  size")** — 00-product-brief's ≤1.5 GB/h is now "meaningfully smaller than Tier-1", met
+  at ≈6×; the 2.59 GB/h measurement stays on record below. C1 delegated to M6-T2's soak;
+  C4/C5 waived. Brief checkboxes ticked/annotated accordingly; evidence recording deleted
+  per ruling. **Next: M6-T2 (2-h battery soak — HUMAN, physical unplug + 2 h of Franco's
+  mixed usage; agent preps the rig when he schedules it). Next agent-actionable task:
+  M6-T3 (error-message audit).**
+- **M6-T1 detail (was in progress) — C3 (instant replay)
   PASSED 2026-07-16, headless, against the live install** (`/Users/Shared/ScreenRec.app`,
   byte-identical to today's dist, v0.1.0): not recording, armed via menu, 70 s fill,
   Save Replay Now → signal→file **0.30 s** adjusted (raw 1.17 s incl. the measured 0.87 s
@@ -210,11 +218,11 @@ video (deterministic, reproducible).
 
 ## Needs Franco (human-only items)
 
-- [ ] **M6-T1 C2 ruling — the measurement FAILED (2.59 GB/h vs ≤1.5 at Balanced):**
-      amend the criterion, retune Balanced's average-bitrate target (+re-run), or the
-      direct-VT hard-cap route (M6-T4-sized)? The 30-min evidence file is kept at
-      `~/Movies/Recording 2026-07-17 at 09.58.06.mov` (his own screen+mic) so he can
-      judge Balanced's quality before choosing; delete after ruling.
+- [x] **M6-T1 C2 ruling — RESOLVED 2026-07-17 (Franco): amend the criterion** ("I'm not
+      that concerned about the size of the video"). Brief updated; the 2.59 GB/h Balanced
+      measurement stands on record; evidence file deleted after the ruling.
+- [ ] **M6-T2 — the 2-h battery soak (physical unplug + 2 h mixed real usage, AirPods,
+      replay armed):** needs Franco to pick the block; agent preps and instruments it.
 - [x] ~~G4 §5.4 fresh-account re-run~~ — **DISCARDED by Franco 2026-07-16** ("let's discard it,
       not worried about it"). The fix itself stands verified: unit + headless forced-failure
       integration (no wedge, clean "Couldn't write…"), plus Fix B's preflight probing the real
