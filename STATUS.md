@@ -14,10 +14,17 @@
   (keyframe start). Content-is-last-minute carried from G5 §6.2 (Franco). Plan rulings
   (Franco, 2026-07-16): **C1 delegated to M6-T2's soak** (one 2-h run counts for both);
   **C4 (fresh-account <2 min) and C5 (player/NLE matrix) WAIVED** ("no need for this
-  test" — recorded as waivers, not passes). **Remaining: C2 (≤1.5 GB/h at Balanced) —
-  a 30-min menu-driven recording during Franco's real usage; he'll name the moment.**
-  C2 is the known at-risk criterion (Balanced floors ~19 Mbps busy; frame-on-change is
-  what makes typical work fit). T1 closes on C2 + the recorded delegations/waivers.
+  test" — recorded as waivers, not passes). **C2 MEASURED 2026-07-17 — FAILED:** 30.5-min
+  Balanced menu-driven recording during Franco's real usage → 1.295 GB ⇒ **2.59 GB/h** vs
+  the brief's ≤1.5 (≈5.7 Mbps avg vs the ≈3.4 implied; retained video averaged 25.9 fps —
+  an active-screen morning). File probes clean (1829.06 s, hvc1 + 2×AAC, tracks within
+  40 ms). The measurement stands; remedy is **Franco's open decision**: (a) amend the
+  criterion (the brief's actual differentiator — 2–4× smaller than Tier-1 — is met at ~6×
+  vs Tier-1's ~34 Mbps), (b) retune Balanced's AVVideoAverageBitRateKey target + re-run,
+  or (c) hard caps, which for the *recording* path means leaving AVAssetWriter for direct
+  VT (M2-T6: DataRateLimits isn't reachable through AVAssetWriter) — M6-T4-sized. T1's
+  run itself is complete (C1 delegated, C2 measured-failed, C3 passed, C4/C5 waived);
+  the checkbox stays unticked until Franco rules on C2.
 - **🎉 M5 COMPLETE — GATE G5 PASSED 2026-07-16 (all legs).** T6's audit: burst leg (busyscene,
   4.5 min max load) CPU 7.2% avg / RSS flat 201–202 MB; main leg (30.2 min armed during Franco's
   real usage) CPU 4.7% avg / RSS median 216 MB, drift min5→end +7 MB (no leak) / min-30 save
@@ -203,9 +210,11 @@ video (deterministic, reproducible).
 
 ## Needs Franco (human-only items)
 
-- [ ] **M6-T1 C2 — the ≤1.5 GB/h measurement:** a 30-min Balanced menu-driven recording
-      while Franco works normally (his screen, his moment — he said "I'll let you know",
-      2026-07-16). Agent runs the mechanics; Franco just picks the window.
+- [ ] **M6-T1 C2 ruling — the measurement FAILED (2.59 GB/h vs ≤1.5 at Balanced):**
+      amend the criterion, retune Balanced's average-bitrate target (+re-run), or the
+      direct-VT hard-cap route (M6-T4-sized)? The 30-min evidence file is kept at
+      `~/Movies/Recording 2026-07-17 at 09.58.06.mov` (his own screen+mic) so he can
+      judge Balanced's quality before choosing; delete after ruling.
 - [x] ~~G4 §5.4 fresh-account re-run~~ — **DISCARDED by Franco 2026-07-16** ("let's discard it,
       not worried about it"). The fix itself stands verified: unit + headless forced-failure
       integration (no wedge, clean "Couldn't write…"), plus Fix B's preflight probing the real
