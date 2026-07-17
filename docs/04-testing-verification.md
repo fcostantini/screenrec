@@ -111,7 +111,10 @@ Pass criteria:
 2-hour recording on battery, mixed real usage, AirPods mic, replay armed:
 - File plays end to end; §3.3 sync check at 0:00, 1:00, 2:00.
 - No thermal runaway; battery drain noted in STATUS.md.
-- `kill -9` a second 2-h run at ~1:59 → playable.
+- `kill -9` a second long run near its end → playable. *Amended from "2-h run at ~1:59"
+  to a 1-h run at ~0:59 (Franco, 2026-07-17): the kill mechanics are proven at 6 s (G2
+  §3.2); this leg tests salvage at fragment-count/file-size scale, and 1 h buys most of
+  that scale at half the wall-clock.*
 
 ## Unit-test targets (run in every gate via `swift test`)
 
