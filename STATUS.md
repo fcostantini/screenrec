@@ -87,12 +87,13 @@ Shipped and gated: **M0–M5 complete, G0–G5 passed.** M6 (ship-quality) is mo
   fixes T6 (replay resize) / T7 (recording-file safeguard) / T8 (arm-while-recording) /
   T9 (armed survives relaunch) / T10 (menu-highlight) / T11 (live mic list via CoreAudio HAL) /
   T12 (discard recording) / T13 (Automatic/system-default mic).
-- **Deferred (Franco, 2026-07-20):** T4 decision bucket (Developer ID + notarization, mic
-  recovery, H.264 compat, HDR). Distribution/notarization is revisited **when Franco actually
-  shares the app with someone** (he'd rather not pay for a Developer account until then); the
-  other items are demand-/usage-driven. **v1 is feature-complete** — M0–M5 done, M6 done bar this
-  deferred bucket; G6 is the only unrun gate and it's the sum of what's already green. Post-v1:
-  **M7** (per-app capture).
+- **Deferred (Franco, 2026-07-20):** T4 decision bucket (Developer ID + notarization, H.264 compat,
+  HDR). Distribution/notarization is revisited **when Franco actually shares the app with someone**
+  (he'd rather not pay for a Developer account until then); the others are demand-/usage-driven.
+  **v1 is feature-complete** — M0–M5 done, M6 done bar this deferred bucket; G6 is the only unrun gate
+  and it's the sum of what's already green. **Post-v1 milestones:** **M7** (per-app capture) and
+  **M8** (mic recovery — graduated from M6-T4; Route 2 spike-verified both phases, full plan in
+  docs/03). Order is Franco's pick; they're independent.
 - **G6** = v1 done: not formally run; it's the sum of M6 + the acceptance criteria, most
   already green.
 

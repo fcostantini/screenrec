@@ -534,14 +534,10 @@ while a manual recording runs; memory flat over 30 min).
       running **(human)**; toggle off → the login item is gone.
 - [ ] M6-T4 Optional (**DEFERRED 2026-07-20** — Franco: revisit when actually sharing the app;
       see STATUS). Developer ID + notarization for distribution
-      beyond this machine; `--h264-downscale` compat mode; HDR spike (ADR stretch);
-      **mic recovery after device loss** — ADR-012 deferred it to here. Not a research
-      question any more: M3-T7 verified both routes and 02 §4 costs them (~2 tasks; a
-      fixed-format resampled mic input is a hard prerequisite for either). Decide with
-      real usage in hand — does an AirPod dying mid-recording actually bite often enough
-      to be worth touching the sample path? If yes, prefer the rebuild-a-mic-only-stream
-      route (it also fixes reconnect, which re-pointing provably never can) and settle
-      its PTS-coherence assumption first via the §3.5 drift method.
+      beyond this machine; `--h264-downscale` compat mode; HDR spike (ADR stretch).
+      **Mic recovery after device loss GRADUATED to its own milestone M8** (2026-07-20): the
+      decision is made (Route 2), the PTS-coherence gate is spike-verified (both phases), and it's
+      post-v1 by ADR-012 — so it's no longer a T4 "decide then" item.
 - [x] M6-T5 README for the repo: build, sign, install, use. Update all docs to
       match reality; close out STATUS.md v1 section.
 
@@ -672,13 +668,71 @@ feature; do not bundle.
 content-clean (no bystander app visible, no bystander audio), app-quit handled, plus a
 no-regression pass of G5 §6.4 (simultaneity) under an app filter.
 
+---
+
+## M8 — Mic recovery after device loss (post-v1; graduated from M6-T4 2026-07-20)
+
+Recover the **microphone** after a mid-capture device loss — for both recording and armed replay —
+instead of the mic track ending permanently (today's ADR-012 notify-and-continue). Deferred from v1
+by ADR-012, so it's post-v1 by design; it lands here, not in M6 (M6 is v1 ship-quality). **Armed
+replay is the priority scenario** — it runs all day, AirPods case/reconnect constantly, and
+MEASURED 2026-07-20 that a reconnect does NOT restore the mic today (the armed stream binds it once;
+only a manual re-arm recovers it, which wipes nothing but requires noticing).
+
+**The approach is Route 2 (rebuild a mic-only 2nd `SCStream`), and it is already de-risked** — the
+PTS-coherence gate passed both phases (docs/02 §4 · STATUS field notes 2026-07-20): two `SCStream`s
+share a coherent host clock (drift ≈ 0), and an end-to-end two-stream recording stays synced
+(constant ~16 ms offset, no drift). The working reference is `screenrec-cli mic-swap-spike
+--two-streams / --two-streams-pts / --two-streams-record` (the two-stream setup + the mux). **NOT
+this milestone:** the re-point-to-a-live-device route (one-way, can't handle reconnect — ADR-012);
+the video / system-audio / replay-buffer are never disturbed (that's the whole point vs the rejected
+auto-re-arm, which wiped the last minutes of buffer). Constraint reminder: SCK binds the mic once at
+`startCapture` (02 §4) and the mic input's format is welded to the first buffer (M3-T2 / ADR-007) —
+hence T1 is a hard prerequisite for T2.
+
+- [ ] M8-T1 **Fixed-format resampled mic input** (prerequisite). Normalize any incoming mic buffer
+      (any ASBD — AirPods 24 kHz, built-in 48 kHz, …) into ONE fixed writer-input format, so a mic
+      buffer from a *rebuilt* stream (a different device/rate) can append to the same track without
+      the M3-T2 format-change corruption. Insert an `AVAudioConverter` resample stage in the mic
+      path, PTS preserved (host-clock in → host-clock out, sample-accurate, no drift).
+      **Seams:** `MovieRecorder`'s lazy mic input (today welded to the first buffer — becomes a fixed
+      target); `AudioFormatIdentity` (Support/); `ReplayAudioRing` (today re-latches on format change,
+      M5-T3 — instead resamples). **Decisions (pre-made):** target = 48 kHz mono; the resampler is a
+      shared `ResampledMicInput` seam used by BOTH recorder and replay ring (so they can't disagree);
+      M3-T2's same-device fail-stop is retired for the mic path (the resampler absorbs a codec flip
+      now — amend ADR-007's mic-format note). **Verify:** unit — a 24 kHz and a 48 kHz mono buffer
+      both emerge as the fixed target with correct sample counts/durations and monotonic PTS (fixture
+      on each side of the rate); live — a mid-stream device change keeps the mic track valid/playable.
+
+- [ ] M8-T2 **Reconnect watchdog + mic-only stream rebuild.** When the picked mic (or, under
+      Automatic, the current system default) returns after a loss, build a fresh mic-only `SCStream`
+      and splice its buffers through T1's fixed-format input against the shared epoch, so the mic
+      track / replay ring resumes (a silent gap over the loss→reconnect window is expected). Wire into
+      BOTH `RecordingSession` and `ReplayController` (armed replay first). **Seams:** the spike's
+      `spikeConfiguration(micID:)` + `RecordingSink` (the `--two-streams-record` reference);
+      `MicrophoneWatchdog` (M3-T6) already fires the LOSS; a CoreAudio HAL device-list listener
+      (`AudioObjectAddPropertyListener` on `kAudioHardwarePropertyDevices` — the M6-T11 API) for the
+      RETURN; `AppState.microphoneResolution` / `MicrophonePreference` (M6-T13) picks which device to
+      rebind; `SampleRouter`/`MovieRecorder.consume` for the splice. **Decisions (pre-made):** honor
+      the pick (a specific pick rebinds that device on return; Automatic rebinds the current default);
+      the replay buffer (video + system audio) is NEVER reset — only the mic-only stream is rebuilt
+      underneath; recovery is best-effort (device never returns ⇒ today's ADR-012 outcome). **Verify:**
+      live — arm replay, case the mic, reconnect → the mic RESUMES in the buffer with no re-arm (probe
+      a saved clip: mic track present after the reconnect) and A/V sync holds (§3.5 drift); same for an
+      active recording; no-regression on a stable-mic capture.
+
+**Gate G8**: (1) armed replay — case the mic mid-armed → reconnect → mic auto-recovers into the
+buffer (saved clip's mic resumes, no re-arm), video+system-audio buffer uninterrupted, A/V sync holds
+(§3.5); (2) recording — mic dies mid-recording → reconnect → mic track resumes, file playable, sync
+holds; (3) no regression — a stable-mic recording/replay is unaffected and G2 §3.5 drift still passes.
+
 ## Dependency graph
 
 ```
-M0 ──▶ M1 ──▶ M2 ──▶ M3 ──▶ M4 ──▶ M6 ──▶ M7 (post-v1)
-              │                    ▲
+M0 ──▶ M1 ──▶ M2 ──▶ M3 ──▶ M4 ──▶ M6 ──┬─▶ M7 (post-v1; per-app capture)
+              │                    ▲     └─▶ M8 (post-v1; mic recovery — Route 2, spike-verified)
               └────────▶ M5 ───────┘   (M5 needs M1's router + M2's BitrateModel;
-                                        app integration M5-T5 needs M4)
+                                        app integration M5-T5 needs M4. M7 & M8 are independent.)
 ```
 
 M5-T1..T4 (core replay, CLI-driven) can proceed in parallel with M3/M4 if two agents
