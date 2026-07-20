@@ -83,9 +83,37 @@ Order and grouping (separators between groups):
    thing interactively).
 6. — separator —
 7. Dimmed: `Sources locked while recording` (pickers hidden, not disabled-but-present).
-8. Settings/Quit remain.
+8. — separator —
+9. **Discard Recording…** (M6-T12) — throw the take away. Subordinate to Stop & Save and set
+   apart from it (two separators + the replay/sources block between them): the one irreversible
+   action must not sit under Stop's muscle memory. **Red** title (see "Menu text styling"). Ellipsis
+   ⇒ it confirms first, and the confirmation's **safe** choice is the default so a reflexive Return
+   can't destroy a take. On confirm: the file is removed (no `.mov`, no `.partial`) and the app
+   returns to Ready, **silently** — the alert was the acknowledgement, so no notification fires.
+   *Known edge (documented, not fixed for v1): a hardware fail-stop (mic/disk/display) landing in
+   the few seconds the alert is open finalizes and saves the take (ADR-007), and a discard confirmed
+   after that keeps the resulting playable file — the recording had already completed. See STATUS
+   field notes.*
+10. Settings/Quit remain.
 
 Paused state: header dot goes amber, timer freezes, `Resume` primary.
+
+### Menu text styling (`.menu` MenuBarExtra bridge)
+
+The `.menu`-style `MenuBarExtra` renders rows through AppKit and keeps only their text: SwiftUI
+`.foregroundStyle`/`.foregroundColor` and `Button(role: .destructive)` are **dropped** (measured,
+M6-T12 — a destructive role rendered plain gray). To color a row, give the `Button` an
+**attributed** label whose color is an `NSColor`, which the bridge *does* honor:
+
+```swift
+Button(role: .destructive) { … } label: { Text(discardTitle) }
+// discardTitle = AttributedString(NSAttributedString(
+//     string: "Discard Recording…", attributes: [.foregroundColor: NSColor.systemRed]))
+```
+
+The plain string still reaches Accessibility as the row's title, so `menudriver` finds and clicks
+it. Same family of limitation as the header's frozen clock (item 1) and the un-two-toned folder
+path (item 10): for a `.menu` MenuBarExtra, style through AppKit, not SwiftUI modifiers.
 
 ## Notifications (UserNotifications; click always reveals the file in Finder)
 

@@ -609,7 +609,7 @@ while a manual recording runs; memory flat over 30 min).
       enumeration shape) + live: connect/disconnect AirPods with the app running →
       the picker reflects it on the next menu open, both directions.
 
-- [ ] M6-T12 Discard an ongoing recording (Franco, 2026-07-17). Today every start lands a
+- [x] M6-T12 Discard an ongoing recording (Franco, 2026-07-17). Today every start lands a
       file (Stop & Save finalizes; quit-mid-recording finalizes; T7 even recovers a
       force-quit `.partial`) — no "throw this take away." Add a **subordinate, confirmed**
       Discard action to the recording menu (below Stop & Save, not adjacent-and-equal —

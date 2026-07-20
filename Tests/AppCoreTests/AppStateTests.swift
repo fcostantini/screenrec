@@ -88,6 +88,12 @@ import RecorderCore
         #expect(state.statusIcon == .idle)
     }
 
+    @Test func discardingReturnsToIdle() {
+        let state = recordingState()
+        state.apply(.discarded)
+        #expect(state.statusIcon == .idle)
+    }
+
     @Test func losingTheMicrophoneKeepsRecording() {
         // ADR-012: mic loss notifies and the recording continues. An icon that dropped to idle
         // here would tell the user their 90-minute screen capture had stopped when it hadn't.

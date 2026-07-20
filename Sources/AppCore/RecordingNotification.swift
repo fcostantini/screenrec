@@ -63,7 +63,8 @@ public enum RecordingNotifications {
                 title: hadStarted ? "Couldn't save the recording" : "Couldn't start recording",
                 body: message, fileURL: nil)
 
-        case .started, .paused, .resumed, .fileProgress, .stopped:
+        case .started, .paused, .resumed, .fileProgress, .stopped, .discarded:
+            // `.discarded` is silent: the confirmation alert was the acknowledgement.
             return nil
         }
     }

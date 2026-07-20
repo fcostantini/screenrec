@@ -588,6 +588,12 @@ public final class AppState {
         await session?.stop()
     }
 
+    /// Throw the current take away: the file is removed and the session ends at `.discarded`,
+    /// which — like every ending — returns to idle via `endSession`.
+    public func discard() async {
+        await session?.discard()
+    }
+
     public func pause() async {
         await session?.pause()
     }
@@ -622,9 +628,9 @@ public final class AppState {
             statusIcon = .recording
         case .paused:
             statusIcon = .paused
-        case .stopped, .finished:
+        case .stopped, .finished, .discarded:
             // Every ending is the same to the icon, including fail-stops (ADR-007 successes with
-            // a cause). The cause reaches the user as a notification instead.
+            // a cause) and discards. The cause, if any, reaches the user as a notification.
             statusIcon = .idle
         case .failed(let message):
             statusIcon = .idle

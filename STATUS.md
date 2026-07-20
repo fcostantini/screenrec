@@ -5,6 +5,24 @@
 
 ## Now
 
+- **M6-T12 DONE — discard an ongoing recording.** A subordinate, confirmed **Discard Recording…**
+  row (red via an `NSColor` attributed title; placed low and set apart from Stop & Save; the alert's
+  **safe** choice is the default) drops the take instead of finalizing it. Seam:
+  `RecordingSession.discard()` sets a `discardRequested` LockedBox, stops the engine, and the event
+  loop routes to `MovieRecorder.cancel()` + an **unconditional file removal** (covers a `.failed`
+  writer and a stranded/moved path) — never `finish()`; it yields a new session-emitted
+  `EngineEvent.discarded` → `endSession()` → Ready, **silently** (no notification). **Verified LIVE**
+  (menudriver + an AX alert-press): discard mid-recording → no `.mov`/`.partial`, app Ready; the
+  Stop & Save control still saved a clean 3-track file. 260 tests (+3: cancel-after-write removes the
+  file, `.discarded` folds to idle, no notification). /code-review (high, workflow) → 4
+  data-integrity findings, all "a confirmed discard could leave the file": **B (`.failed` writer) +
+  C (stranded path) FIXED** by the unconditional removal; **A + D (a concurrent fail-stop landing in
+  the confirmation window) documented as known edges** (Franco's call — the fail-stop already saved a
+  playable file; see field note). **Menu text styling discovered + documented** (Franco's find):
+  SwiftUI `.foregroundStyle`/`role: .destructive` don't survive the `.menu` MenuBarExtra bridge; an
+  `NSColor` attributed title does (docs/06 "Menu text styling" + field note). **Next: the M6 tail is
+  Franco's pick — the T4 bucket or T13 (auto-mic).**
+
 - **M6-T11 DONE — the mic list is live.** Root cause: `AudioInputs.available()` enumerated via
   `AVCaptureDevice.DiscoverySession`, which caches in a long-running process and misses devices
   hot-plugged after launch (Franco's AirPods — captured by armed replay yet absent from the
@@ -50,10 +68,11 @@ Shipped and gated: **M0–M5 complete, G0–G5 passed.** M6 (ship-quality) is mo
 - **Done:** T1 (acceptance run, C2 criterion amended), T2 (2-h soak — clean + kill-leg 0.47 s
   loss), T3 (error-message audit), T5 (launch-at-login + README + docs), plus the dogfooding
   fixes T6 (replay resize) / T7 (recording-file safeguard) / T8 (arm-while-recording) /
-  T9 (armed survives relaunch) / T10 (menu-highlight) / T11 (live mic list via CoreAudio HAL).
+  T9 (armed survives relaunch) / T10 (menu-highlight) / T11 (live mic list via CoreAudio HAL) /
+  T12 (discard recording).
 - **Open (Franco's call on order):** T4 decision bucket (Developer ID + notarization, mic
-  recovery, H.264 compat), T12 (discard recording), T13 (opt-in Automatic/system-default mic —
-  slotted from M6-T11's dogfooding). Post-v1: **M7** (per-app capture).
+  recovery, H.264 compat), T13 (opt-in Automatic/system-default mic — slotted from M6-T11's
+  dogfooding). Post-v1: **M7** (per-app capture).
 - **G6** = v1 done: not formally run; it's the sum of M6 + the acceptance criteria, most
   already green.
 
@@ -490,6 +509,28 @@ video (deterministic, reproducible).
 | G6   | 🟡 soak legs passed (G6 = v1 done awaits the rest of M6) | §7 leg 1 ✅ 2026-07-17: 2 h battery, real usage + Zoom, replay armed, 3 mid-run replay saves; 19.5 GB / 7223.42 s, tracks ≤110 ms apart; battery 99→62%, CPU avg 12.9% / max 19.3%, RSS 98–485 MB trendless, zero thermal warnings; Franco: "smooth throughout, no desync" (claps at 0/1/2 h). §7 kill leg ✅ (amended to 1 h, Franco): kill -9 at 3540 s → playable 3539.53 s, **0.47 s lost** (≤10 s); app relaunched Ready. ⚠️ relaunch dropped the persisted armed state (transient pipeline failure → self-disarm; field note) — open follow-up, not a gate fail (§7 doesn't cover it). |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-20 (M6-T12 discard): two things worth keeping.
+  - **Menu text styling in a `.menu` MenuBarExtra goes through AppKit, which keeps only the text.**
+    SwiftUI `.foregroundStyle`/`.foregroundColor` and `Button(role: .destructive)` are dropped
+    (measured — a destructive role rendered plain gray). An **attributed** label whose color is an
+    `NSColor` IS honored: `Text(AttributedString(NSAttributedString(string:, attributes:
+    [.foregroundColor: NSColor.systemRed])))`. The plain string still reaches Accessibility as the
+    row title, so `menudriver` finds it. Same family as the frozen header clock and the un-two-toned
+    folder path — style a `.menu` MenuBarExtra through AppKit, not SwiftUI modifiers. Documented in
+    docs/06 "Menu text styling".
+  - **Discard vs a concurrent fail-stop — two known edges left unfixed (Franco's call 2026-07-20).**
+    /code-review found four ways a confirmed discard could still leave a file. B (`.failed` writer)
+    and C (moved/`.strandedAt` path) are fixed by removing the file unconditionally + at the stranded
+    path in the discard branch. A and D are timing races with a *fail-stop that already saved a
+    playable file*: A — a fail-stop finalizes+saves while the confirmation alert is open, and the
+    discard confirmed afterward no-ops on a now-nil session; D — an external move fires the sentinel's
+    stop at the same instant as the discard click, so the loop can read `discardRequested` false and
+    finalize at the moved path. Both need a hardware fail-stop in the exact discard-decision window
+    (rare), and both leave a *complete* recording, not a corrupt one. The robust fix is an
+    AppState-level "convert a concurrent finalize into a discard" (delete the finalized file), but its
+    correctness hinges on whether the MainActor consume task runs during `NSAlert.runModal()` — verify
+    that empirically before building it. Revisit if it bites.
 
 - 2026-07-20 (M6-T11 live mic list): the enumerator and the resolver were two AVFoundation layers
   with *different* freshness. `AVCaptureDevice.DiscoverySession` caches its device list in a

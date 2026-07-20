@@ -40,6 +40,9 @@ public final class RecordingSession: @unchecked Sendable {
         case strandedAt(String)
     }
     private let fileFate = LockedBox<FileFate>()
+    /// Set by `discard()` before it stops the engine; read by the event-loop task once the stream
+    /// ends. When true, the recording is cancelled (file removed) rather than finalized.
+    private let discardRequested = LockedBox<Bool>()
     /// Written from the capture queue (`onDidBeginWriting`), cancelled from the event-loop
     /// task — hence the lock. `sentinelTornDown` latches teardown so a late-firing attach
     /// can't install a sentinel nobody will ever cancel (it would rename the finished
@@ -127,7 +130,7 @@ public final class RecordingSession: @unchecked Sendable {
                     startFailure = message
                 case .stopped(let reason):
                     endReason = reason
-                case .finished, .recordingFileRestored:
+                case .finished, .recordingFileRestored, .discarded:
                     break                              // session-emitted; engine never sends them
                 }
             }
@@ -136,7 +139,19 @@ public final class RecordingSession: @unchecked Sendable {
             // Before finalize's own rename, or the sentinel would fight it.
             self.cancelSentinel()
 
-            if let startFailure {
+            if discardRequested.value == true {
+                // The user threw the take away: never finalize, and make sure the file is gone in
+                // every writer state. `cancel()` removes the `.partial` only while the writer is
+                // still `.writing`; a `.failed` writer, or a file moved out from under us
+                // (`.strandedAt`), would otherwise survive for the launch recovery sweep to
+                // resurrect. Remove it wherever it landed. Wins over every other fate.
+                recorder.cancel()
+                try? FileManager.default.removeItem(at: recorder.outputURL)
+                if case .strandedAt(let path)? = fileFate.value {
+                    try? FileManager.default.removeItem(atPath: path)
+                }
+                continuation.yield(.discarded)
+            } else if let startFailure {
                 recorder.cancel()
                 continuation.yield(.failed(message: startFailure))
             } else if let fate = fileFate.value {
@@ -255,6 +270,14 @@ public final class RecordingSession: @unchecked Sendable {
         // Disarm before teardown (see `pollingTask`): `engine.stop()` suspends for seconds while
         // the engine stays `.running`, so a disk check landing in that window would report
         // `.diskAlmostFull` instead of `.userStopped`.
+        diskTask?.cancel()
+        await engine.stop()
+    }
+
+    /// Throw the take away: stop the engine and remove the file instead of finalizing it. Flagged
+    /// before the stop so the event loop routes to `cancel()`; a `discarded` event follows.
+    public func discard() async {
+        discardRequested.set(true)
         diskTask?.cancel()
         await engine.stop()
     }

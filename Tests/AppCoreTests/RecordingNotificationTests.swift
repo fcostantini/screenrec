@@ -44,6 +44,13 @@ import RecorderCore
         #expect(n?.fileURL == Self.url)          // click reveals it (docs/06)
     }
 
+    // MARK: - Discard (M6-T12)
+
+    @Test func discardPostsNoNotification() {
+        // The confirmation alert was the acknowledgement; a "discarded" banner would be noise.
+        #expect(notification(.discarded) == nil)
+    }
+
     @Test(arguments: failStops)
     func everyFailStopNamesItsOwnCause(reason: EndReason) {
         #expect(finished(reason)?.body.hasPrefix("Ended: ") == true)

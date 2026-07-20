@@ -103,6 +103,7 @@ func describe(_ event: EngineEvent) -> String {
     case .stopped(let reason): return "stopped(\(describe(reason)))"
     case .finished(let url, let reason, let dropped):
         return "finished(\(url.lastPathComponent), \(describe(reason)), dropped \(dropped))"
+    case .discarded: return "discarded"
     case .failed(let message): return "failed: \(message)"
     }
 }

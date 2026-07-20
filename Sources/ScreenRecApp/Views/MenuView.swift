@@ -119,6 +119,16 @@ struct MenuView: View {
 
         // docs/06: the pickers are hidden while recording, not disabled — this row says why.
         Text("Sources locked while recording")
+
+        Divider()
+
+        // docs/06 recording item 9: subordinate to Stop & Save and set apart from it — the one
+        // irreversible action must not sit under Stop's muscle memory. Confirmed before it acts.
+        // Red via NSColor: `.foregroundStyle`/`role: .destructive` don't survive the `.menu`
+        // MenuBarExtra bridge (it keeps only the text) — an attributed title does (docs/06).
+        Button(role: .destructive) { discardRecording() } label: {
+            Text(Self.discardTitle)
+        }
     }
 
     /// Arm toggle + save row, shared by both menus (docs/06 idle item 3 / recording item 5:
@@ -192,6 +202,26 @@ struct MenuView: View {
             await state.stopAndWaitForFinalize()
             NSApplication.shared.terminate(nil)
         }
+    }
+
+    /// The Discard row's red title, built with `NSColor` so the color survives the tray bridge.
+    private static let discardTitle = AttributedString(NSAttributedString(
+        string: "Discard Recording…", attributes: [.foregroundColor: NSColor.systemRed]))
+
+    /// docs/06 recording item 9: discarding confirms first — the safe choice is the default, so a
+    /// reflexive Return can't destroy a take — then drops the file and returns to Ready.
+    private func discardRecording() {
+        guard state.isSessionActive else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Discard this recording?"
+        alert.informativeText = "This take will be deleted and can't be recovered."
+        alert.addButton(withTitle: "Keep Recording")   // default (Return) — the safe choice
+        alert.addButton(withTitle: "Discard").hasDestructiveAction = true
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertSecondButtonReturn else { return }
+
+        Task { await state.discard() }
     }
 }
 

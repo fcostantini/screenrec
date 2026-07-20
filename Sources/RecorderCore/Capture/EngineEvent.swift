@@ -26,5 +26,8 @@ public enum EngineEvent: Sendable, Equatable {
     case fileProgress(seconds: Double, bytes: Int64)
     case stopped(EndReason)                         // engine ran with no writer (e.g. engine-smoke)
     case finished(url: URL, reason: EndReason, droppedFrames: Int)  // file finalized, playable
+    /// The user threw the take away mid-recording: the file is removed, nothing saved.
+    /// Session-emitted (the engine never sends it), like `.finished`.
+    case discarded
     case failed(message: String)                    // nothing playable exists (preflight/start failure)
 }

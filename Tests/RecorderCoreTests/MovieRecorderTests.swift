@@ -235,6 +235,32 @@ import Testing
         #expect(!fileManager.fileExists(atPath: url.path))
     }
 
+    /// Discard routes to `cancel()` mid-recording: once the writer has begun, `cancelWriting()`
+    /// removes its own file, so no `.mov`/`.partial` is left behind (M6-T12).
+    @Test func cancelAfterWritingRemovesTheFile() throws {
+        let fileManager = FileManager.default
+        let url = Self.temporaryOutputURL()
+        try? fileManager.removeItem(at: url)
+        defer { try? fileManager.removeItem(at: url) }
+
+        let recorder = try MovieRecorder(
+            outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: false)
+
+        let frameDuration = CMTime(value: 1, timescale: CMTimeScale(Self.fps))
+        for index in 0..<5 {
+            let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
+            recorder.consume(
+                makeVideoSampleBuffer(width: Self.width, height: Self.height,
+                                 pts: pts, duration: frameDuration),
+                type: .screen)
+        }
+        #expect(recorder.hasStartedSession)                  // the writer created the real file
+        #expect(fileManager.fileExists(atPath: url.path))
+
+        recorder.cancel()
+        #expect(!fileManager.fileExists(atPath: url.path))   // and cancel() dropped it
+    }
+
     @Test func unwritableOutputReportsWriteFailureExactlyOnce() async throws {
         let fileManager = FileManager.default
         // A read-only directory: `AVAssetWriter` init succeeds (it touches no disk) but
