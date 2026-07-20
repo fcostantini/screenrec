@@ -5,6 +5,35 @@
 
 ## Now
 
+- **M8-T1 DONE — fixed-format resampled mic input (M8 mic recovery underway; plan approved).**
+  New public seam `ResampledMicInput` (Support/): every mic buffer converts to **48 kHz mono
+  Float32** via a primeless `AVAudioConverter` (output PTS = input PTS, converter state carries
+  across buffers) in the engine's mic path **before `SampleRouter` fan-out** — no consumer ever
+  sees a device format, including T2's future rebuilt-stream splice. **Retired:** M3-T2's mic
+  format-change fail-stop (`MovieRecorder` latch/diff/callback + `RecordingSession` wiring);
+  `EndReason.microphoneChanged` stays declared-but-unreachable (the `.systemSleep` precedent);
+  the ring's re-latch now guards system audio only. ADR-007 amended; 02 §4 rewritten.
+  **Behavior change (flagged in plan, approved):** a mid-recording mic codec flip no longer ends
+  the recording — the track continues. **Verified:** 6 unit tests (exact scaled counts 480→960,
+  PTS equality, mid-stream 24k→48k flip continuous, stereo downmix, pass-through identity, and
+  a composed resampler→recorder flip that finalizes one full-length mic track) + LIVE
+  `mic-swap-spike --record-repoint`: a real recording rode an AirPods→built-in
+  `updateConfiguration` re-point — **one continuous 31.2 s mic track spanning the swap, signal
+  on both sides** (pre-T1 this fail-stopped at the swap); stable-mic regression clean. 285
+  tests. ⚠️ Observable change: **the mic track is always 48 kHz mono now** — it no longer
+  reveals the device rate, killing M6-T13's verify-by-sample-rate method (02 §4 notes the
+  replacement). Implementation note: `CMSampleBufferCopyPCMDataIntoAudioBufferList` rejects the
+  fixture's valid PCM layouts (-12731) — the retained-ABL wrap works for all. Review (2 agents,
+  4 angles; findings presented, Franco approved batch): mic path is now allocation-minimal —
+  input wraps the buffer's payload no-copy (`AVAudioPCMBuffer(bufferListNoCopy:)`), ABL scratch
+  stack-allocated, the emitted block is the only per-buffer heap allocation (the floor);
+  derivable converter state dropped; shared `PCMSampleBuffer.make` helper (also serves
+  `ReplayAudioRing`'s deep copy); spike sinks merged (RecordingSink now mirrors the production
+  mic path); comment hygiene. **Deferred to T2 (deliberate):** router-level resampler placement
+  — decide when T2's rebuilt stream becomes the third producer. All re-verified live
+  post-refactor (25.6 s re-point file, mic track full-length, post-swap signal −5.7 dB max).
+  **Next: M8-T2 (reconnect watchdog + mic-only stream rebuild) — plan artifact first.**
+
 - **M7-T3 DONE — CLI parity: `replay-arm --app` (Franco's ask, post-G7).** The record
   precedent's flag on the replay harness: one `ContentSelection` line + parsing + help; app-quit
   while armed ends the stream as `stopped (appQuit)` — deliberately NO CLI auto-retry (that loop

@@ -172,7 +172,10 @@ private func retryRepoint(
 }
 
 /// Which experiment to run.
-private enum SpikeMode { case swap, reconnect, fallback, nilDevice, nilFollow, twoStreams, twoStreamsPTS, twoStreamsRecord }
+private enum SpikeMode {
+    case swap, reconnect, fallback, nilDevice, nilFollow, twoStreams, twoStreamsPTS,
+         twoStreamsRecord, recordRepoint
+}
 
 func runMicSwapSpike(_ args: [String]) async {
     var seconds = 4.0
@@ -194,6 +197,8 @@ func runMicSwapSpike(_ args: [String]) async {
             mode = .twoStreamsPTS
         case "--two-streams-record":
             mode = .twoStreamsRecord
+        case "--record-repoint":
+            mode = .recordRepoint
         case "--seconds":
             seconds = parsePositive(iterator.next(), flag: "--seconds")
         default:
@@ -209,6 +214,7 @@ func runMicSwapSpike(_ args: [String]) async {
     case .twoStreams: await runTwoStreamSpike(seconds: seconds)
     case .twoStreamsPTS: await runTwoStreamPTSSpike(seconds: seconds)
     case .twoStreamsRecord: await runTwoStreamRecordSpike(seconds: seconds)
+    case .recordRepoint: await runRecordRepointSpike(seconds: seconds)
     }
 }
 
@@ -504,18 +510,23 @@ private func runTwoStreamPTSSpike(seconds: Double) async {
 /// Route 2 Phase B: routes SCK buffers from two streams into one `MovieRecorder`.
 private final class RecordingSink: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     private let recorder: MovieRecorder
+    /// The engine's mic path normalizes through `ResampledMicInput`; the sink mirrors it so
+    /// spike verdicts generalize to the production pipeline.
+    private let microphoneResampler = ResampledMicInput()
     init(recorder: MovieRecorder) { self.recorder = recorder }
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        let source: SourceType
         switch type {
         case .screen:
             guard isCompleteSpikeVideoFrame(sampleBuffer) else { return }   // drop idle frames (02 §1)
-            source = .screen
-        case .audio: source = .systemAudio
-        case .microphone: source = .microphone
-        @unknown default: return
+            recorder.consume(sampleBuffer, type: .screen)
+        case .audio:
+            recorder.consume(sampleBuffer, type: .systemAudio)
+        case .microphone:
+            guard let normalized = microphoneResampler.convert(sampleBuffer) else { return }
+            recorder.consume(normalized, type: .microphone)
+        @unknown default:
+            return
         }
-        recorder.consume(sampleBuffer, type: source)
     }
     func stream(_ stream: SCStream, didStopWithError error: Error) {}
 }
@@ -578,6 +589,61 @@ private func runTwoStreamRecordSpike(seconds: Double) async {
     do {
         let finalURL = try await recorder.finish()
         print("  saved: \(finalURL.path)")
+    } catch {
+        die("finish failed: \(error.localizedDescription)", code: 74)
+    }
+    exit(0)
+}
+
+/// M8-T1 live verify: a real recording rides a mic re-point between two live devices. The
+/// file must finalize with ONE continuous mic track spanning the swap (probe it afterward).
+private func runRecordRepointSpike(seconds: Double) async {
+    let devices = AudioInputs.available()
+    guard devices.count >= 2 else {
+        die("record-repoint needs two input devices; found \(devices.count). Connect the AirPods.")
+    }
+    let builtIn = devices.first { $0.uniqueID == "BuiltInMicrophoneDevice" } ?? devices[0]
+    guard let other = devices.first(where: { $0.uniqueID != builtIn.uniqueID }) else {
+        die("couldn't find a second distinct input device")
+    }
+    // Start on the non-built-in (AirPods, 24 kHz): the rate jump makes the swap unmistakable
+    // in the saved file's source material.
+    let display = await firstSpikeDisplay()
+    let filter = SCContentFilter(display: display, excludingWindows: [])
+
+    let movies = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first
+        ?? FileManager.default.temporaryDirectory
+    let url = movies.appendingPathComponent("RepointSpike-\(String(UUID().uuidString.prefix(8))).mov")
+    let recorder: MovieRecorder
+    do {
+        recorder = try MovieRecorder(outputURL: url, frameRate: 5, preset: .efficient, includesMicrophone: true)
+    } catch { die("recorder init failed: \(error.localizedDescription)", code: 74) }
+
+    let sink = RecordingSink(recorder: recorder)
+    let stream = SCStream(filter: filter, configuration: spikeConfiguration(micID: other.uniqueID), delegate: sink)
+    print("record-repoint spike (M8-T1 live verify): recording rides a live mic re-point")
+    print("  phase 1 — \(other.name) [\(other.uniqueID)]  ·  \(Int(seconds)) s per phase")
+    do {
+        try stream.addStreamOutput(sink, type: .screen, sampleHandlerQueue: DispatchQueue(label: "repoint.screen"))
+        try stream.addStreamOutput(sink, type: .audio, sampleHandlerQueue: DispatchQueue(label: "repoint.audio"))
+        try stream.addStreamOutput(sink, type: .microphone, sampleHandlerQueue: DispatchQueue(label: "repoint.mic"))
+        try await stream.startCapture()
+    } catch { die("startCapture failed: \(error.localizedDescription)", code: 74) }
+
+    try? await Task.sleep(for: .seconds(seconds))
+    print("  phase 2 — updateConfiguration → \(builtIn.name) [\(builtIn.uniqueID)]")
+    do {
+        try await stream.updateConfiguration(spikeConfiguration(micID: builtIn.uniqueID))
+    } catch {
+        print("    updateConfiguration THREW: \(error.localizedDescription)")
+    }
+    try? await Task.sleep(for: .seconds(seconds))
+    try? await stream.stopCapture()
+
+    do {
+        let finalURL = try await recorder.finish()
+        print("  saved: \(finalURL.path)")
+        print("  probe it: the mic track must span BOTH phases, no fail-stop, playable.")
     } catch {
         die("finish failed: \(error.localizedDescription)", code: 74)
     }

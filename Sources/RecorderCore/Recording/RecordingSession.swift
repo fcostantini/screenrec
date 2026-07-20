@@ -67,21 +67,16 @@ public final class RecordingSession: @unchecked Sendable {
         let engine = CaptureEngine(configuration: configuration)
         self.engine = engine
         finalURL = outputURL
-        // A mic swap mid-recording can't be handled transparently (ADR-007): stop cleanly so the
-        // file finalizes with `.microphoneChanged`, flowing through the normal `.stopped` path.
         recorder = try MovieRecorder(
             outputURL: OutputLocation.partialURL(for: outputURL),
             frameRate: configuration.frameRateCap,
             preset: configuration.quality,
             includesMicrophone: configuration.microphone != .none,
-            // ⚠️ `[weak engine]` is required: engine → router → recorder → closure, so a strong
-            // capture closes the cycle and makes `CaptureEngine.deinit` unreachable.
-            onMicrophoneFormatChange: { [weak engine] in
-                Task { await engine?.stop(reason: .microphoneChanged) }
-            },
             // The writer can never begin (unwritable output folder, 02 §2). Stop capture so the
             // event loop below ends and fails the session — nothing playable exists, so this is
-            // `.failed`, not a `.finished` reason. Same `[weak engine]` cycle-break as above.
+            // `.failed`, not a `.finished` reason.
+            // ⚠️ `[weak engine]` is required: engine → router → recorder → closure, so a strong
+            // capture closes the cycle and makes `CaptureEngine.deinit` unreachable.
             onWriteFailure: { [weak engine] in
                 Task { await engine?.stop() }
             })

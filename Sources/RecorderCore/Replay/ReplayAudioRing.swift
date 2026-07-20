@@ -60,10 +60,10 @@ public final class ReplayAudioRing: SampleConsumer, @unchecked Sendable {
 
         lock.lock()
         if let latched = latchedASBD, !asbd.hasSameIdentity(as: latched) {
-            // The format changed (device/codec switch, 02 §4): the buffered audio is dead air
-            // for "the last N seconds" and mixing layouts would corrupt the mux, so clear and
-            // re-latch — replay keeps working at the new format, and unlike MovieRecorder
-            // there's no welded writer input forcing a fail-stop.
+            // The format changed: the buffered audio is dead air for "the last N seconds" and
+            // mixing layouts would corrupt the mux, so clear and re-latch. The mic arrives
+            // pre-normalized (ResampledMicInput), so in practice this guards the system-audio
+            // ring.
             latchedASBD = asbd
             formatChanges += 1
             ring.removeAll()
@@ -146,31 +146,12 @@ public final class ReplayAudioRing: SampleConsumer, @unchecked Sendable {
         guard let sourceData = CMSampleBufferGetDataBuffer(buffer),
               let format = CMSampleBufferGetFormatDescription(buffer) else { return nil }
         let length = CMBlockBufferGetDataLength(sourceData)
-
-        var copied: CMBlockBuffer?
-        guard CMBlockBufferCreateWithMemoryBlock(
-            allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: length,
-            blockAllocator: kCFAllocatorDefault, customBlockSource: nil, offsetToData: 0,
-            dataLength: length, flags: kCMBlockBufferAssureMemoryNowFlag,
-            blockBufferOut: &copied) == noErr,
-            let destination = copied
-        else { return nil }
-        var pointer: UnsafeMutablePointer<CChar>?
-        guard CMBlockBufferGetDataPointer(
-            destination, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: nil,
-            dataPointerOut: &pointer) == noErr,
-            let raw = pointer,
+        return PCMSampleBuffer.make(
+            format: format, sampleCount: CMSampleBufferGetNumSamples(buffer),
+            pts: CMSampleBufferGetPresentationTimeStamp(buffer), byteLength: length
+        ) { destination in
             CMBlockBufferCopyDataBytes(
-                sourceData, atOffset: 0, dataLength: length, destination: raw) == noErr
-        else { return nil }
-
-        var sample: CMSampleBuffer?
-        guard CMAudioSampleBufferCreateReadyWithPacketDescriptions(
-            allocator: kCFAllocatorDefault, dataBuffer: destination, formatDescription: format,
-            sampleCount: CMSampleBufferGetNumSamples(buffer),
-            presentationTimeStamp: CMSampleBufferGetPresentationTimeStamp(buffer),
-            packetDescriptions: nil, sampleBufferOut: &sample) == noErr
-        else { return nil }
-        return sample
+                sourceData, atOffset: 0, dataLength: length, destination: destination) == noErr
+        }
     }
 }

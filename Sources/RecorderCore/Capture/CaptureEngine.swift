@@ -374,6 +374,9 @@ public actor CaptureEngine {
 private final class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput, @unchecked Sendable {
     private let router: SampleRouter
     private let onStreamStopped: @Sendable (Error) -> Void
+    /// Normalizes mic buffers to the one fixed format before fan-out (M8-T1), so no consumer
+    /// ever sees a device format. Touched only on the microphone queue.
+    private let microphoneResampler = ResampledMicInput()
 
     init(router: SampleRouter, onStreamStopped: @escaping @Sendable (Error) -> Void) {
         self.router = router
@@ -381,14 +384,19 @@ private final class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        let source: SourceType
         switch type {
-        case .screen: source = .screen
-        case .audio: source = .systemAudio
-        case .microphone: source = .microphone
-        @unknown default: return
+        case .screen:
+            router.route(sampleBuffer, type: .screen)
+        case .audio:
+            router.route(sampleBuffer, type: .systemAudio)
+        case .microphone:
+            // A failed conversion drops one ~20 ms buffer — better than routing a format the
+            // welded writer input can't take.
+            guard let normalized = microphoneResampler.convert(sampleBuffer) else { return }
+            router.route(normalized, type: .microphone)
+        @unknown default:
+            return
         }
-        router.route(sampleBuffer, type: source)
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {

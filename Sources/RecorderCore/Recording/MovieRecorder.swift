@@ -28,9 +28,6 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     private let frameRate: Int
     private let preset: QualityPreset
     private let includesMicrophone: Bool
-    /// Fired once on a mic device switch mid-recording (docs/02 §4); the owner stops cleanly
-    /// (ADR-007). Invoked on a capture queue with `lock` released — must not block that queue.
-    private let onMicrophoneFormatChange: (@Sendable () -> Void)?
     /// Fired once if the writer can't begin — `startWriting()` failed, e.g. an unwritable output
     /// folder (02 §2). The writer never starts, so the owner must stop capture and fail the
     /// session (ADR-007) rather than wait forever. Invoked on a capture queue, `lock` released.
@@ -71,24 +68,17 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     /// Newest raw PTS seen on any track — the anchor a `pause()` hands the rebaser (docs/02 §5).
     private var latestRawPTS: CMTime = .invalid
 
-    /// The mic input's established format, plus a one-shot latch so a device switch fires
-    /// `onMicrophoneFormatChange` once and then drops mismatched buffers (docs/02 §4).
-    private var microphoneASBD: AudioStreamBasicDescription?
-    private var microphoneChangeDetected = false
-
     public init(
         outputURL: URL,
         frameRate: Int,
         preset: QualityPreset,
         includesMicrophone: Bool,
-        onMicrophoneFormatChange: (@Sendable () -> Void)? = nil,
         onWriteFailure: (@Sendable () -> Void)? = nil
     ) throws {
         self.outputURL = outputURL
         self.frameRate = frameRate
         self.preset = preset
         self.includesMicrophone = includesMicrophone
-        self.onMicrophoneFormatChange = onMicrophoneFormatChange
         self.onWriteFailure = onWriteFailure
 
         writer = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
@@ -141,10 +131,8 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         lock.lock()
         // Notify outside the lock: defers run LIFO, so these registered before the unlock run
         // after it. `lock` is non-reentrant — firing a handler under it could deadlock.
-        var notifyMicrophoneChange = false
         var notifyWriteFailure = false
         var notifyDidBeginWriting = false
-        defer { if notifyMicrophoneChange { onMicrophoneFormatChange?() } }
         defer { if notifyWriteFailure { onWriteFailure?() } }
         defer { if notifyDidBeginWriting { onDidBeginWriting?() } }
         defer { lock.unlock() }
@@ -166,12 +154,13 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
             writer.add(input)
             videoInput = input
         case .microphone where includesMicrophone && microphoneInput == nil:
+            // Mic buffers arrive normalized to ResampledMicInput's fixed format (M8-T1), so
+            // this "first buffer's format" is the same for every device, forever.
             guard let format = CMSampleBufferGetFormatDescription(buffer),
                   let input = Self.makeMicrophoneInput(format: format),
                   writer.canAdd(input) else { return }
             writer.add(input)
             microphoneInput = input
-            microphoneASBD = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee
         default:
             break
         }
@@ -192,19 +181,6 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
             if didStartWriting { notifyDidBeginWriting = true }
         }
         guard didStartWriting else { return }
-
-        // A mic swap mid-recording changes the audio format; such a buffer would corrupt the
-        // established input (docs/02 §4). Fail-stop (ADR-007): notify once, drop the buffers.
-        // After the writing gate on purpose — a swap before the session starts would otherwise
-        // fail a recording with nothing written, and those buffers are already dropped above.
-        if type == .microphone, microphoneInput != nil {
-            if microphoneChangeDetected { return }
-            if microphoneFormatDiffers(buffer) {
-                microphoneChangeDetected = true
-                notifyMicrophoneChange = true
-                return
-            }
-        }
 
         guard case .emit(let rebasedPTS) = rebaser.rebase(rawPTS: rawPTS, source: type)
         else { return }
@@ -338,16 +314,6 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     private func microphoneGraceExpired(now: CMTime) -> Bool {
         guard let first = firstVideoRawPTS, now.isNumeric else { return false }
         return CMTimeCompare(CMTimeSubtract(now, first), Self.microphoneGrace) > 0
-    }
-
-    /// Whether `buffer`'s audio format differs from the mic input's established one — the
-    /// device switched (docs/02 §4; identity fields in `AudioFormatIdentity`). Must hold `lock`.
-    private func microphoneFormatDiffers(_ buffer: CMSampleBuffer) -> Bool {
-        guard let established = microphoneASBD,
-              let format = CMSampleBufferGetFormatDescription(buffer),
-              let current = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee
-        else { return false }
-        return !current.hasSameIdentity(as: established)
     }
 
     /// Starts the writer, dropping the O_EXCL reservation placeholder in the same synchronous

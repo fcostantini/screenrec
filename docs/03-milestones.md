@@ -697,7 +697,7 @@ auto-re-arm, which wiped the last minutes of buffer). Constraint reminder: SCK b
 `startCapture` (02 §4) and the mic input's format is welded to the first buffer (M3-T2 / ADR-007) —
 hence T1 is a hard prerequisite for T2.
 
-- [ ] M8-T1 **Fixed-format resampled mic input** (prerequisite). Normalize any incoming mic buffer
+- [x] M8-T1 **Fixed-format resampled mic input** (prerequisite). Normalize any incoming mic buffer
       (any ASBD — AirPods 24 kHz, built-in 48 kHz, …) into ONE fixed writer-input format, so a mic
       buffer from a *rebuilt* stream (a different device/rate) can append to the same track without
       the M3-T2 format-change corruption. Insert an `AVAudioConverter` resample stage in the mic

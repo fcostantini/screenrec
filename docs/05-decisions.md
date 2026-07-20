@@ -43,7 +43,10 @@ device loss, display unplug, sleep, disk floor) ⇒ finalize a playable file + n
 cause. No hot-reconfiguration attempts in v1. Rationale: 02 §4/§7; corrupted or silently
 degraded recordings are the unforgivable failure.
 **Amended by ADR-012** for mic *device loss* only (that trigger now notifies and keeps
-recording). Every other trigger here still stands.
+recording). **Amended M8-T1 (2026-07-20) for mic *format change*:** every mic buffer is
+normalized to one fixed format (`ResampledMicInput`, 48 kHz mono) before any consumer, so a
+device/codec flip is absorbed transparently — that trigger no longer exists
+(`EndReason.microphoneChanged` is retired-but-declared). Every other trigger here still stands.
 
 ## ADR-008 🅿 Cursor-as-data (Screen Studio-style) deferred
 v1 burns the cursor in (`showsCursor = true`). The editor-grade alternative (record

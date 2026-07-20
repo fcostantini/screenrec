@@ -233,12 +233,17 @@ Consequences for anyone designing mic recovery:
      end-to-end (`--two-streams-record` muxes both streams into one `.mov`: mic held a constant
      ~16 ms offset to system audio, no drift over 62 s). This is the preferred recovery route (and
      the only one that handles reconnect without wiping the replay buffer).
-- **Format changes mid-stream** remain possible for the *same* device (e.g. an AirPods
-  HFP/A2DP codec flip), so `MovieRecorder` compares each mic buffer's ASBD (sample rate /
-  channels / format ID) against the input's and fail-stops on a diff (M3-T2). With a pinned
-  device ID that is a defensive guard, not the common path. Do not attempt live format
-  switching in v1 (ADR-007): the input's format is welded to the first buffer's, so *any*
-  device swap would first require normalizing the mic into a fixed-format input (ADR-012).
+- **Format changes mid-stream are absorbed since M8-T1**: every mic buffer is normalized to
+  ONE fixed format — 48 kHz mono Float32 (`ResampledMicInput`, `AVAudioConverter`, primeless,
+  output PTS = input PTS) — in the engine's mic path *before* `SampleRouter` fan-out, so no
+  consumer ever sees a device format. M3-T2's fail-stop-on-flip is retired
+  (`EndReason.microphoneChanged` declared-but-unreachable; ADR-007 amended); the ring's
+  re-latch still guards system audio only. Measured live (`mic-swap-spike --record-repoint`):
+  a recording rode an AirPods→built-in `updateConfiguration` re-point with one continuous
+  31 s mic track spanning the swap, signal on both sides.
+  ⚠️ Consequence: **the mic track no longer reveals the source device's rate** — it is always
+  48 kHz mono, so M6-T13's "verify the Automatic pick by track sample rate" method is dead;
+  verify via the active-mic menu line (or volume fingerprinting) instead.
 - Default track layout: system + mic as two separate tracks (the whole point of Tier 2).
   Optional third "mixed" track is out — players play all tracks simultaneously anyway,
   which IS the mixed experience.

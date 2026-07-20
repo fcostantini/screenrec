@@ -35,6 +35,7 @@ func printUsage() {
       --nil-device   Is a nil microphoneCaptureDeviceID accepted?
       --nil-follow   Does nil follow the system default as it changes? (human: case)
       --two-streams  Can a mic-only stream coexist with the recording stream?
+      --record-repoint  M8-T1 live verify: a recording rides a mic re-point (needs 2 mics)
 
     record options:
       --duration <sec>   Stop after N seconds (else p/r/Return on a terminal, or stream end)
