@@ -19,14 +19,19 @@ private final class MicFormatProbe: NSObject, SCStreamOutput, SCStreamDelegate, 
     private var streamError: String?
     private var screenCount = 0
     private var systemAudioCount = 0
+    // Latest host-clock PTS seen per output (seconds) — for the two-stream coherence spike.
+    private var latestScreenPTS: Double?
+    private var latestSystemAudioPTS: Double?
+    private var latestMicPTS: Double?
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
         switch type {
         case .screen:
-            lock.lock(); screenCount += 1; lock.unlock()
+            lock.lock(); screenCount += 1; if pts.isFinite { latestScreenPTS = pts }; lock.unlock()
             return
         case .audio:
-            lock.lock(); systemAudioCount += 1; lock.unlock()
+            lock.lock(); systemAudioCount += 1; if pts.isFinite { latestSystemAudioPTS = pts }; lock.unlock()
             return
         default:
             break
@@ -40,7 +45,14 @@ private final class MicFormatProbe: NSObject, SCStreamOutput, SCStreamDelegate, 
         if counts[key] == nil { order.append(key) }
         counts[key, default: 0] += 1
         lastBufferAt = ProcessInfo.processInfo.systemUptime
+        if pts.isFinite { latestMicPTS = pts }
         lock.unlock()
+    }
+
+    /// The most recent video / system-audio / mic host-clock PTS (seconds), for cross-stream drift.
+    var latestPTS: (screen: Double?, systemAudio: Double?, mic: Double?) {
+        lock.lock(); defer { lock.unlock() }
+        return (latestScreenPTS, latestSystemAudioPTS, latestMicPTS)
     }
 
     /// Non-mic buffer tallies — used to show a co-running stream stays healthy.
@@ -160,7 +172,7 @@ private func retryRepoint(
 }
 
 /// Which experiment to run.
-private enum SpikeMode { case swap, reconnect, fallback, nilDevice, nilFollow, twoStreams }
+private enum SpikeMode { case swap, reconnect, fallback, nilDevice, nilFollow, twoStreams, twoStreamsPTS }
 
 func runMicSwapSpike(_ args: [String]) async {
     var seconds = 4.0
@@ -178,6 +190,8 @@ func runMicSwapSpike(_ args: [String]) async {
             mode = .nilFollow
         case "--two-streams":
             mode = .twoStreams
+        case "--two-streams-pts":
+            mode = .twoStreamsPTS
         case "--seconds":
             seconds = parsePositive(iterator.next(), flag: "--seconds")
         default:
@@ -191,6 +205,7 @@ func runMicSwapSpike(_ args: [String]) async {
     case .nilDevice: await runNilDeviceSpike(seconds: seconds)
     case .nilFollow: await runNilFollowSpike()
     case .twoStreams: await runTwoStreamSpike(seconds: seconds)
+    case .twoStreamsPTS: await runTwoStreamPTSSpike(seconds: seconds)
     }
 }
 
@@ -385,6 +400,100 @@ private func runTwoStreamSpike(seconds: Double) async {
     } else {
         print("  VERDICT: NO — concurrent streams don't both deliver (A screen ×\(a.screen)/audio ×\(a.systemAudio),")
         print("  B mic \(b.formats.isEmpty ? "none" : "ok")). Rebuild-the-mic-stream is not viable.")
+    }
+    exit(0)
+}
+
+/// Slope of a linear fit y = a + b·t (least squares); `b` is the drift rate. nil if degenerate.
+private func driftSlope(_ points: [(t: Double, y: Double)]) -> Double? {
+    let n = Double(points.count)
+    guard n >= 2 else { return nil }
+    let sumT = points.reduce(0) { $0 + $1.t }
+    let sumY = points.reduce(0) { $0 + $1.y }
+    let sumTT = points.reduce(0) { $0 + $1.t * $1.t }
+    let sumTY = points.reduce(0) { $0 + $1.t * $1.y }
+    let denom = n * sumTT - sumT * sumT
+    guard abs(denom) > 1e-9 else { return nil }
+    return (n * sumTY - sumT * sumY) / denom
+}
+
+/// Route 2 gate (M6-T4): does a mic-only 2nd `SCStream` (B) stay time-coherent with the recording
+/// stream (A)? Both carry host-clock PTS on macOS 15 (docs/02 §5) — this measures the drift of
+/// (A's PTS − B's mic PTS) across two SEPARATE streams over the run. Slope ≈ 0 ⇒ coherent, so a
+/// mic can be rebuilt on reconnect without disturbing the replay buffer (ADR-001's concern settled).
+private func runTwoStreamPTSSpike(seconds: Double) async {
+    let devices = AudioInputs.available()
+    guard let mic = devices.first(where: { $0.isDefault }) ?? devices.first else {
+        die("no input devices", code: 74)
+    }
+    let display = await firstSpikeDisplay()
+    let filter = SCContentFilter(display: display, excludingWindows: [])
+
+    let configA = SCStreamConfiguration()
+    configA.width = 640; configA.height = 360
+    configA.minimumFrameInterval = CMTime(value: 1, timescale: 30)
+    configA.queueDepth = 6
+    configA.capturesAudio = true
+    configA.sampleRate = 48_000; configA.channelCount = 2
+    configA.excludesCurrentProcessAudio = true
+
+    let probeA = MicFormatProbe()
+    let streamA = SCStream(filter: filter, configuration: configA, delegate: probeA)
+    let probeB = MicFormatProbe()
+    let streamB = SCStream(filter: filter, configuration: spikeConfiguration(micID: mic.uniqueID), delegate: probeB)
+
+    print("two-stream PTS-coherence spike (Route 2 gate): mic-only stream B vs recording stream A")
+    print("  mic: \(mic.name)  ·  sampling every 5 s for \(Int(seconds)) s")
+    do {
+        try streamA.addStreamOutput(probeA, type: .screen, sampleHandlerQueue: DispatchQueue(label: "pts.a.screen"))
+        try streamA.addStreamOutput(probeA, type: .audio, sampleHandlerQueue: DispatchQueue(label: "pts.a.audio"))
+        try await streamA.startCapture()
+        try streamB.addStreamOutput(probeB, type: .microphone, sampleHandlerQueue: DispatchQueue(label: "pts.b.mic"))
+        try await streamB.startCapture()
+    } catch {
+        die("startCapture failed: \(error.localizedDescription)", code: 74)
+    }
+
+    // delta = (stream A PTS) − (stream B mic PTS). Video is frame-on-change (jittery on a static
+    // screen); system audio is continuous, so it's the cleaner measure. Track both.
+    var audioVsMic: [(t: Double, y: Double)] = []
+    var videoVsMic: [(t: Double, y: Double)] = []
+    let start = ProcessInfo.processInfo.systemUptime
+    while ProcessInfo.processInfo.systemUptime - start < seconds {
+        try? await Task.sleep(for: .seconds(5))
+        let t = ProcessInfo.processInfo.systemUptime - start
+        let a = probeA.latestPTS, b = probeB.latestPTS
+        guard let micPTS = b.mic else { continue }
+        if let sa = a.systemAudio { audioVsMic.append((t, sa - micPTS)) }
+        if let sc = a.screen { videoVsMic.append((t, sc - micPTS)) }
+        let saStr = a.systemAudio.map { String(format: "%+.4f", $0 - micPTS) } ?? "  —   "
+        let scStr = a.screen.map { String(format: "%+.4f", $0 - micPTS) } ?? "  —   "
+        print(String(format: "  t=%5.0fs  sysAudio−mic=%@s  video−mic=%@s", t, saStr, scStr))
+    }
+    try? await streamB.stopCapture()
+    try? await streamA.stopCapture()
+
+    print("")
+    guard let audioSlope = driftSlope(audioVsMic) else {
+        print("  VERDICT: INCONCLUSIVE — too few paired samples (a stream didn't deliver).")
+        exit(0)
+    }
+    print(String(format: "  sysAudio↔mic drift: %+.6f s/s  (%+.1f ms/min)  over %d samples",
+                 audioSlope, audioSlope * 60_000, audioVsMic.count))
+    if let videoSlope = driftSlope(videoVsMic) {
+        print(String(format: "  video↔mic    drift: %+.6f s/s  (%+.1f ms/min)  over %d samples",
+                     videoSlope, videoSlope * 60_000, videoVsMic.count))
+    }
+    print("")
+    // Coherent host clocks tick at one rate ⇒ slope ≈ 0. Threshold 0.5 ms/s (30 ms/min) sits well
+    // above measurement jitter and well below the drift two unsynced clocks would show.
+    if abs(audioSlope) < 0.0005 {
+        print("  VERDICT: PASS — the two streams share a coherent host clock (no relative drift).")
+        print("  Route 2 is viable: a mic-only 2nd stream stays in sync with the recording stream,")
+        print("  so a dead mic can be rebuilt on reconnect without disturbing the replay buffer.")
+    } else {
+        print("  VERDICT: FAIL — the streams drift apart. Route 2 needs resync/resampling before it's")
+        print("  viable; a naive 2nd-stream mux would desync over a long capture.")
     }
     exit(0)
 }

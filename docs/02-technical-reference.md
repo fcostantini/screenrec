@@ -204,9 +204,11 @@ Consequences for anyone designing mic recovery:
      back to the AirPods) and needs a fixed-format/resampled mic input (48k into a 24k input).
   2. **Rebuild a mic-only second stream** — two `SCStream`s were verified to coexist and both
      deliver, so the recording stream never blinks. Handles fallback *and* reconnect (a
-     returning AirPod rebinds at the same 24 kHz → no resampling). Unverified assumption to
-     settle first: whether a second stream's mic PTS stays coherent with the main stream's
-     video (ADR-001's whole concern — use the §3.5 drift method).
+     returning AirPod rebinds at the same 24 kHz → no resampling). PTS coherence across the two
+     streams — ADR-001's whole concern — **verified 2026-07-20** (`mic-swap-spike --two-streams-pts`:
+     sysAudio↔mic drift +0.6 ms/min over 90 s, i.e. the same host clock with no relative drift;
+     the ~50 ms sysAudio−mic offset is constant capture latency, not drift). This is the preferred
+     recovery route (and the only one that handles reconnect without wiping the replay buffer).
 - **Format changes mid-stream** remain possible for the *same* device (e.g. an AirPods
   HFP/A2DP codec flip), so `MovieRecorder` compares each mic buffer's ASBD (sample rate /
   channels / format ID) against the input's and fail-stops on a diff (M3-T2). With a pinned

@@ -530,6 +530,19 @@ video (deterministic, reproducible).
 
 ## Field notes (append; things learned that docs don't cover yet)
 
+- 2026-07-20 (Route 2 coherence spike — PASSED, the M6-T4 mic-recovery gate is green): extended
+  `mic-swap-spike --two-streams-pts` — run recording stream A (video + system audio) and a mic-only
+  stream B concurrently, sample each output's host-clock PTS every 5 s, fit the drift of (A's PTS −
+  B's mic PTS) vs time. 90 s / 18 samples: **sysAudio↔mic slope +0.6 ms/min, video↔mic +4.3 ms/min**
+  — essentially zero (the ~50 ms constant sysAudio−mic offset is fixed capture latency, not drift).
+  So two SEPARATE `SCStream`s share a coherent host clock on macOS 15 (the docs/02 §5 "coherent by
+  construction" prior, now measured *across streams*), settling ADR-001's cross-stream concern.
+  **Route 2 is viable.** If built (a ~2-task M6-T4 feature): a fixed-format resampled mic input + a
+  reconnect watchdog that rebuilds stream B, mic muxed against the shared epoch. Route 2 preserves the
+  replay buffer — the reason Franco rejected the cheaper auto-re-arm alternative (proven live to wipe
+  the last minutes of video+audio; see the armed-replay note below). Phase B (an end-to-end two-stream
+  recording + a real A/V-sync scrub) is optional belt-and-suspenders, not run.
+
 - 2026-07-20 (armed-replay mic loss — MEASURED, informs M6-T4 mic recovery): Franco's worry
   confirmed live with clip evidence. Arm replay with the AirPods mic (Automatic → AirPods, 24 kHz),
   then case the AirPods: the mic ring stops filling (screen + system audio keep going), a "mic
