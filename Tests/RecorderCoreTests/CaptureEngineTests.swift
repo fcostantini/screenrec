@@ -9,7 +9,9 @@ import Testing
     // unit test — live TCC revocation would destroy this terminal's own grant, docs/02 §2).
 
     @Test func failsWhenScreenExplicitlyDenied() {
-        guard case .fail = CaptureEngine.startDecision(screenPermission: .denied, availableDisplays: 1) else {
+        guard case .fail = CaptureEngine.startDecision(
+            screenPermission: .denied, availableDisplays: 1,
+            content: .display(.main), runningBundleIDs: []) else {
             Issue.record("expected .fail when screen recording is denied")
             return
         }
@@ -22,26 +24,36 @@ import Testing
         // Both live preflight values must say so — `.notDetermined` especially, since that is
         // what a freshly-built CLI binary reports even when it captures fine (02 §10), and it
         // is the only cell the CLI can reach.
-        #expect(CaptureEngine.startDecision(screenPermission: .granted, availableDisplays: 0)
+        #expect(CaptureEngine.startDecision(
+            screenPermission: .granted, availableDisplays: 0,
+            content: .display(.main), runningBundleIDs: [])
             == .fail(CaptureEngine.noDisplaysGuidance))
-        #expect(CaptureEngine.startDecision(screenPermission: .notDetermined, availableDisplays: 0)
+        #expect(CaptureEngine.startDecision(
+            screenPermission: .notDetermined, availableDisplays: 0,
+            content: .display(.main), runningBundleIDs: [])
             == .fail(CaptureEngine.noDisplaysGuidance))
     }
 
     @Test func deniedBeatsDisplaysPresent() {
         // Displays present, but the grant is explicitly refused — permission still wins.
         // (Defensive: Permissions.screenRecordingState() cannot currently produce `.denied`.)
-        #expect(CaptureEngine.startDecision(screenPermission: .denied, availableDisplays: 2)
+        #expect(CaptureEngine.startDecision(
+            screenPermission: .denied, availableDisplays: 2,
+            content: .display(.main), runningBundleIDs: [])
             == .fail(CaptureEngine.permissionGuidance))
     }
 
     @Test func proceedsWhenGrantedWithDisplays() {
-        #expect(CaptureEngine.startDecision(screenPermission: .granted, availableDisplays: 2) == .proceed)
+        #expect(CaptureEngine.startDecision(
+            screenPermission: .granted, availableDisplays: 2,
+            content: .display(.main), runningBundleIDs: []) == .proceed)
     }
 
     @Test func proceedsWhenNotDeterminedButDisplaysPresent() {
         // CGPreflight is unreliable for CLI binaries; visible displays mean we can capture.
-        #expect(CaptureEngine.startDecision(screenPermission: .notDetermined, availableDisplays: 1) == .proceed)
+        #expect(CaptureEngine.startDecision(
+            screenPermission: .notDetermined, availableDisplays: 1,
+            content: .display(.main), runningBundleIDs: []) == .proceed)
     }
 
     // Start-error → user-facing message (the thrown-permission path, docs/02 §2/§10).
@@ -98,5 +110,34 @@ import Testing
     @Test func streamErrorPassesThroughNonSCKErrors() {
         let other = NSError(domain: "Foo", code: 7, userInfo: [NSLocalizedDescriptionKey: "kaboom"])
         #expect(CaptureEngine.endReason(forStreamError: other) == .streamError("kaboom"))
+    }
+
+    // MARK: per-app content (M7-T1)
+
+    @Test func appContentResolvesAgainstRunningApps() {
+        #expect(CaptureEngine.startDecision(
+            screenPermission: .granted, availableDisplays: 1,
+            content: .app(bundleID: "com.example.app"),
+            runningBundleIDs: ["com.other", "com.example.app"]) == .proceed)
+    }
+
+    @Test func missingAppFailsWithActionableCopy() {
+        let decision = CaptureEngine.startDecision(
+            screenPermission: .granted, availableDisplays: 1,
+            content: .app(bundleID: "com.example.gone"), runningBundleIDs: ["com.other"])
+        // Says what happened AND what to do (M6-T3 bar), and names the app.
+        guard case .fail(let message) = decision else {
+            Issue.record("expected .fail for an unlisted app")
+            return
+        }
+        #expect(message.contains("com.example.gone"))
+        #expect(message.contains("Open the app"))
+    }
+
+    @Test func stallWatchdogOnlyAttachesForDisplayContent() {
+        // Its "user active ⇒ frames expected" premise fails under an app filter (docs/02 §7).
+        #expect(CaptureEngine.attachesStallWatchdog(to: .display(.main)))
+        #expect(CaptureEngine.attachesStallWatchdog(to: .display(.id(7))))
+        #expect(!CaptureEngine.attachesStallWatchdog(to: .app(bundleID: "com.example.app")))
     }
 }

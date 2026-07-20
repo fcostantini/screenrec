@@ -65,6 +65,28 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   `SCStreamFrameInfo.status == .complete` via attachments; `.idle`/incomplete frames are
   skipped (but see tail-frame patch).
 
+## 1a. Per-app capture (`SCContentFilter(display:including:)`) — measured 2026-07-20, M7-T1
+
+- **Geometry:** an `including:` filter's `contentRect`/`pointPixelScale` are the *display's*
+  (2056×1285 pts @2× → 4112×2570 here), not the app's windows. Frames arrive display-sized
+  with the app's windows composited on black, so bitrate/timing math is content-independent.
+- **System audio IS scoped to the included app.** Measured with the same afplay stimulus:
+  whole-screen control peaked 0.29 (float sample) / −10.6 dB in the recorded track;
+  app-scoped peaked 0.0000 / −91 dB (digital silence).
+- **The included app quitting fires NO stream error** — the stream keeps running and
+  delivering frames of the now-empty filter, indefinitely. Ending the session takes process
+  watching: `AppTerminationWatch` (`DispatchSourceProcess`/`NOTE_EXIT`, no polling) →
+  `stop(reason: .appQuit)`. A source armed against an already-dead pid never signals, hence
+  the watch's before-and-after liveness probes.
+- **Zero windows (app alive) is likewise silent-healthy:** no error, stream keeps delivering.
+- **An app filter delivers frames continuously at ~the fps cap even when the content is
+  static** (measured 35 fps avg over a static TextEdit window) — unlike whole-display
+  capture's frame-on-change. Expect no VFR size savings for static app content.
+- `SCShareableContent.applications` lists only apps with on-screen windows, and a freshly
+  launched app can take a few seconds to appear — "running" (pgrep-alive) does not imply
+  resolvable yet. `CapturableApps`/`list-apps` read the same enumeration the engine resolves
+  against, so a listed app is always bindable.
+
 ## 2. TCC / permissions (both PoC field bugs lived here)
 
 - **Screen & System Audio Recording** (`kTCCServiceScreenCapture`): covers system audio

@@ -24,10 +24,14 @@ public actor CaptureEngine {
     private let microphoneWatchdog: MicrophoneWatchdog?
     private var microphoneWatchdogTask: Task<Void, Never>?
 
-    /// Logs a wedged capture — video silent while the user is active (docs/02 §7).
-    /// Diagnostic only: v1 never auto-restarts.
-    private let stallWatchdog: StallWatchdog
+    /// Logs a wedged capture — video silent while the user is active (docs/02 §7). Diagnostic
+    /// only: v1 never auto-restarts. Nil under an app filter (`attachesStallWatchdog`).
+    private let stallWatchdog: StallWatchdog?
     private var stallWatchdogTask: Task<Void, Never>?
+
+    /// App-scoped capture only: ends the session when the recorded app quits, since SCK keeps
+    /// the stream alive and silent instead of erroring (docs/02 §1a).
+    private var appTerminationWatch: AppTerminationWatch?
 
     private static let log = Logger(subsystem: "dev.fcostantini.screenrec", category: "capture")
 
@@ -56,28 +60,34 @@ public actor CaptureEngine {
         } else {
             microphoneWatchdog = nil
         }
-        stallWatchdog = StallWatchdog { seconds in
-            Self.log.warning(
-                """
-                Capture stalled: no video for \(Int(seconds), privacy: .public)s while the user \
-                was active. The stream is likely wedged (docs/02 §7). Not restarting — v1 policy.
-                """)
+        if Self.attachesStallWatchdog(to: configuration.content) {
+            stallWatchdog = StallWatchdog { seconds in
+                Self.log.warning(
+                    """
+                    Capture stalled: no video for \(Int(seconds), privacy: .public)s while the user \
+                    was active. The stream is likely wedged (docs/02 §7). Not restarting — v1 policy.
+                    """)
+            }
+        } else {
+            stallWatchdog = nil
         }
         router.attach(StartedDetector(continuation: continuation))
         if let microphoneWatchdog { router.attach(microphoneWatchdog) }
-        router.attach(stallWatchdog)
+        if let stallWatchdog { router.attach(stallWatchdog) }
     }
 
     public func start() async {
         guard state == .idle else { return }
         state = .starting
         do {
-            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            let content = try await SCShareableContent.forCapture()
             if let requestedStopReason { return terminate(requestedStopReason) }
 
             switch Self.startDecision(
                 screenPermission: Permissions.screenRecordingState(),
-                availableDisplays: content.displays.count
+                availableDisplays: content.displays.count,
+                content: configuration.content,
+                runningBundleIDs: content.applications.map(\.bundleIdentifier)
             ) {
             case .fail(let message):
                 return failToStart(message)
@@ -88,11 +98,18 @@ public actor CaptureEngine {
             guard let display = resolveDisplay(from: content) else {
                 return failToStart("No display matched the requested selection.")
             }
+            var includedApp: SCRunningApplication?
+            if case .app(let bundleID) = configuration.content {
+                guard let app = content.applications.first(where: { $0.bundleIdentifier == bundleID }) else {
+                    return failToStart(Self.appUnavailableMessage(bundleID: bundleID))
+                }
+                includedApp = app
+            }
 
             let handler = StreamHandler(router: router) { [weak self] error in
                 Task { await self?.terminate(Self.endReason(forStreamError: error)) }
             }
-            let (filter, streamConfig) = makeStreamConfiguration(for: display)
+            let (filter, streamConfig) = makeStreamConfiguration(for: display, including: includedApp)
             let stream = SCStream(filter: filter, configuration: streamConfig, delegate: handler)
             try stream.addStreamOutput(handler, type: .screen, sampleHandlerQueue: screenQueue)
             try stream.addStreamOutput(handler, type: .audio, sampleHandlerQueue: audioQueue)
@@ -116,6 +133,11 @@ public actor CaptureEngine {
             state = .running
             sleepGuard.begin(reason: "Recording the screen")
             startWatchdogs()
+            if let includedApp {
+                appTerminationWatch = AppTerminationWatch(processID: includedApp.processID) { [weak self] in
+                    Task { await self?.stop(reason: .appQuit) }
+                }
+            }
         } catch {
             failToStart(Self.startErrorMessage(error))
         }
@@ -173,8 +195,9 @@ public actor CaptureEngine {
                 microphoneWatchdog.check()
             }
         }
-        let stallWatchdog = self.stallWatchdog
-        stallWatchdogTask = pollingTask(every: StallWatchdog.checkInterval) { stallWatchdog.check() }
+        if let stallWatchdog {
+            stallWatchdogTask = pollingTask(every: StallWatchdog.checkInterval) { stallWatchdog.check() }
+        }
     }
 
     private func cancelWatchdogs() {
@@ -182,6 +205,8 @@ public actor CaptureEngine {
         microphoneWatchdogTask = nil
         stallWatchdogTask?.cancel()
         stallWatchdogTask = nil
+        appTerminationWatch?.cancel()
+        appTerminationWatch = nil
     }
 
     /// Dropping a `Task` reference does not cancel it: an engine released while running would
@@ -189,6 +214,7 @@ public actor CaptureEngine {
     deinit {
         microphoneWatchdogTask?.cancel()
         stallWatchdogTask?.cancel()
+        appTerminationWatch?.cancel()
     }
 
     private func terminate(_ reason: EndReason) {
@@ -202,8 +228,16 @@ public actor CaptureEngine {
         handler = nil
     }
 
+    /// An `.app` filter still needs a display to composite on; it takes the `.main` default.
+    private var displaySelection: DisplaySelection {
+        switch configuration.content {
+        case .display(let selection): selection
+        case .app: .main
+        }
+    }
+
     private func resolveDisplay(from content: SCShareableContent) -> SCDisplay? {
-        switch configuration.display {
+        switch displaySelection {
         case .main:
             return content.displays.first { $0.displayID == CGMainDisplayID() } ?? content.displays.first
         case .id(let id):
@@ -211,8 +245,15 @@ public actor CaptureEngine {
         }
     }
 
-    private func makeStreamConfiguration(for display: SCDisplay) -> (SCContentFilter, SCStreamConfiguration) {
-        let filter = SCContentFilter(display: display, excludingWindows: [])
+    private func makeStreamConfiguration(
+        for display: SCDisplay, including app: SCRunningApplication?
+    ) -> (SCContentFilter, SCStreamConfiguration) {
+        let filter: SCContentFilter
+        if let app {
+            filter = SCContentFilter(display: display, including: [app], exceptingWindows: [])
+        } else {
+            filter = SCContentFilter(display: display, excludingWindows: [])
+        }
         let (width, height) = CaptureConfiguration.pixelDimensions(
             pointSize: filter.contentRect.size,
             pointPixelScale: CGFloat(filter.pointPixelScale)
@@ -250,10 +291,33 @@ public actor CaptureEngine {
     /// Deliberately ignores `CGPreflightScreenCaptureAccess()` — it false-negatives for
     /// freshly-built CLI binaries that capture fine (docs/02 §10). `.denied` is handled
     /// defensively; `Permissions.screenRecordingState()` cannot currently return it.
-    static func startDecision(screenPermission: PermissionState, availableDisplays: Int) -> StartDecision {
+    static func startDecision(
+        screenPermission: PermissionState, availableDisplays: Int,
+        content: ContentSelection, runningBundleIDs: [String]
+    ) -> StartDecision {
         if screenPermission == .denied { return .fail(permissionGuidance) }
         guard availableDisplays > 0 else { return .fail(noDisplaysGuidance) }
+        if case .app(let bundleID) = content, !runningBundleIDs.contains(bundleID) {
+            return .fail(appUnavailableMessage(bundleID: bundleID))
+        }
         return .proceed
+    }
+
+    /// The shareable applications only list apps with on-screen content, so "not listed"
+    /// covers both not-running and nothing-visible. Surface-neutral copy (M6-T3).
+    static func appUnavailableMessage(bundleID: String) -> String {
+        "\"\(bundleID)\" isn't running or has nothing on screen to capture. "
+            + "Open the app, then try again."
+    }
+
+    /// The stall watchdog's premise — user active ⇒ frames expected — only holds for
+    /// whole-display capture: under an app filter the user can be active all day in an app
+    /// that isn't being recorded (docs/02 §7).
+    static func attachesStallWatchdog(to content: ContentSelection) -> Bool {
+        switch content {
+        case .display: true
+        case .app: false
+        }
     }
 
     /// Maps a start-time error to user-facing guidance. Ungranted permission arrives as a

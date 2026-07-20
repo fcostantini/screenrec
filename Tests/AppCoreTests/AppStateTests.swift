@@ -122,7 +122,7 @@ import RecorderCore
 
     @Test func defaultsMatchTheCaptureDefaults() {
         let state = makeState()
-        #expect(state.captureConfiguration.display == .main)
+        #expect(state.captureConfiguration.content == .display(.main))
         #expect(state.captureConfiguration.microphone == .none)
         #expect(state.captureConfiguration.quality == .balanced)
     }
@@ -133,7 +133,7 @@ import RecorderCore
         state.microphonePreference = .device(id: "mic-uid")
         state.quality = .high
 
-        #expect(state.captureConfiguration.display == .id(42))
+        #expect(state.captureConfiguration.content == .display(.id(42)))
         #expect(state.captureConfiguration.microphone == .device(id: "mic-uid"))
         #expect(state.captureConfiguration.quality == .high)
     }
@@ -198,7 +198,7 @@ import RecorderCore
         let state = makeState()
         state.refreshSources(displays: [])
         #expect(state.selectedDisplayID == nil)
-        #expect(state.captureConfiguration.display == .main)
+        #expect(state.captureConfiguration.content == .display(.main))
     }
 
     // MARK: - Session shape

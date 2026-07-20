@@ -32,7 +32,7 @@ import Testing
 
     @Test func defaultsAreMainDisplayNoMic60fpsBalanced() {
         let config = CaptureConfiguration()
-        #expect(config.display == .main)
+        #expect(config.content == .display(.main))
         #expect(config.microphone == .none)
         #expect(config.frameRateCap == 60)
         #expect(config.quality == .balanced)
@@ -40,11 +40,16 @@ import Testing
 
     @Test func storesExplicitSelections() {
         let config = CaptureConfiguration(
-            display: .id(7), microphone: .device(id: "MIC-1"), frameRateCap: 30, quality: .high)
-        #expect(config.display == .id(7))
+            content: .display(.id(7)), microphone: .device(id: "MIC-1"), frameRateCap: 30, quality: .high)
+        #expect(config.content == .display(.id(7)))
         #expect(config.microphone == .device(id: "MIC-1"))
         #expect(config.frameRateCap == 30)
         #expect(config.quality == .high)
+    }
+
+    @Test func storesAppContent() {
+        let config = CaptureConfiguration(content: .app(bundleID: "com.example.app"))
+        #expect(config.content == .app(bundleID: "com.example.app"))
     }
 
     // MARK: preset parsing (CLI/settings literals)

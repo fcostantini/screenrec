@@ -12,7 +12,7 @@ import RecorderCore
 
     /// Every reason a recording can end for, other than the user asking.
     private static let failStops: [EndReason] = [
-        .displayDisconnected, .microphoneChanged, .diskAlmostFull, .streamError("-3818"),
+        .displayDisconnected, .appQuit, .microphoneChanged, .diskAlmostFull, .streamError("-3818"),
     ]
 
     private func notification(_ event: EngineEvent, duration: TimeInterval = 754) -> RecordingNotification? {
@@ -60,6 +60,11 @@ import RecorderCore
         // A shared phrase would make the notification useless for the thing it exists to do.
         let bodies = Self.failStops.compactMap { finished($0)?.body }
         #expect(Set(bodies).count == Self.failStops.count)
+    }
+
+    @Test func appQuitNamesTheCausePlainly() {
+        // M7-T1: app-scoped capture ends when its app quits — approved copy (plan review).
+        #expect(finished(.appQuit)?.body == "Ended: the recorded app quit. File is playable.")
     }
 
     @Test func anUnclassifiedStreamErrorSaysWhatHappenedNotWhatSCKSaid() {

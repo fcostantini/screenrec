@@ -148,6 +148,7 @@ public enum RecordingNotifications {
     private static func cause(_ reason: EndReason) -> String {
         switch reason {
         case .displayDisconnected: "display disconnected"
+        case .appQuit: "the recorded app quit"
         case .microphoneChanged: "microphone changed"
         case .diskAlmostFull: "disk almost full — free up space before recording again"
         case .streamError: "screen capture stopped unexpectedly"

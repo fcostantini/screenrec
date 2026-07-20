@@ -11,6 +11,7 @@ func printUsage() {
     USAGE:
       screenrec-cli record [options] [path]   Record screen + audio to a .mov
       screenrec-cli list-mics          List audio input devices
+      screenrec-cli list-apps          List running apps capturable with record --app
       screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
       screenrec-cli probe-stream [--duration N] [--mic <id>] [--no-mic]
                                        Capture and report per-source buffers/formats/PTS
@@ -36,6 +37,8 @@ func printUsage() {
     record options:
       --duration <sec>   Stop after N seconds (else p/r/Return on a terminal, or stream end)
       --preset <name>    efficient | balanced | high   (default: balanced)
+      --app <bundle-id>  Record one app instead of the whole screen — its windows and
+                         its audio only (see list-apps)
       --mic <id>         Use a specific microphone (see list-mics)
       --no-mic           Record without a microphone
       --output <dir>     Output directory when no [path] is given (default: ~/Movies)
@@ -84,6 +87,7 @@ func describe(_ reason: EndReason) -> String {
     switch reason {
     case .userStopped: return "userStopped"
     case .displayDisconnected: return "displayDisconnected"
+    case .appQuit: return "appQuit"
     case .microphoneChanged: return "microphoneChanged"
     case .diskAlmostFull: return "diskAlmostFull"
     case .systemSleep: return "systemSleep"
@@ -166,6 +170,23 @@ func listMics() {
     }
 }
 
+func listApps() async {
+    let apps: [CapturableApp]
+    do {
+        apps = try await CapturableApps.available()
+    } catch {
+        die("Couldn't list apps: \(error.localizedDescription)", code: 1)
+    }
+    guard !apps.isEmpty else {
+        print("No capturable apps found.")
+        return
+    }
+    let idWidth = apps.map(\.bundleID.count).max() ?? 0
+    for app in apps {
+        print("\(app.bundleID.padding(toLength: idWidth, withPad: " ", startingAt: 0))  \(app.name)")
+    }
+}
+
 /// One step of a `--script` timeline (04 §4.1): record for N seconds, or pause for N seconds.
 enum ScriptStep {
     case record(Double)
@@ -175,6 +196,7 @@ enum ScriptStep {
 struct RecordOptions {
     var duration: Double?
     var preset: QualityPreset = .balanced
+    var appBundleID: String?
     var micID: String?
     var micEnabled = true
     var outputDir = OutputLocation.defaultDirectory()
@@ -214,6 +236,9 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
                 die("--preset must be one of: \(QualityPreset.allCases.map(\.rawValue).joined(separator: ", "))")
             }
             options.preset = parsed
+        case "--app":
+            guard let value = iterator.next() else { die("--app needs a bundle id (see list-apps)") }
+            options.appBundleID = value
         case "--mic":
             guard let value = iterator.next() else { die("--mic needs a device id") }
             options.micID = value
@@ -295,6 +320,7 @@ func printRecordDryRun(_ options: RecordOptions) {
     print("Recording configuration (dry-run — no capture):")
     print("  Screen recording permission: \(describe(Permissions.screenRecordingState()))")
     print("  Preset:   \(options.preset.rawValue)")
+    print("  Capture:  \(options.appBundleID.map { "app \($0)" } ?? "entire screen")")
     print("  FPS cap:  \(CaptureConfiguration().frameRateCap)")
     print("  Duration: \(options.duration.map { "\(Int($0))s" } ?? "until stopped")")
 
@@ -435,7 +461,9 @@ func performRecording(_ options: RecordOptions) async {
 
     let mic = resolveMicrophone(micEnabled: options.micEnabled, preferredID: options.micID)
     if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
-    let configuration = CaptureConfiguration(microphone: mic.selection, quality: options.preset)
+    let content: ContentSelection = options.appBundleID.map { .app(bundleID: $0) } ?? .display(.main)
+    let configuration = CaptureConfiguration(
+        content: content, microphone: mic.selection, quality: options.preset)
     let session: RecordingSession
     do {
         session = try RecordingSession(
@@ -457,6 +485,7 @@ func performRecording(_ options: RecordOptions) async {
         stopHint = interactive ? "p pause · r resume · Return stop" : "until the stream ends"
     }
     print("record: \(options.preset.rawValue) → \(outputURL.path)  (\(stopHint))")
+    if let bundleID = options.appBundleID { print("  capturing app: \(bundleID)") }
 
     await session.start()
     let ticker = Task { await runProgressTicker(session, outputURL: outputURL) }
@@ -521,6 +550,8 @@ case "record":
     }
 case "list-mics", "--list-mics":
     listMics()
+case "list-apps":
+    await listApps()
 case "engine-smoke":
     await runEngineSmoke(Array(arguments.dropFirst()))
 case "probe-stream":

@@ -16,6 +16,14 @@ public enum DisplaySelection: Sendable, Equatable {
     case id(CGDirectDisplayID)
 }
 
+/// What the stream captures. `.app` composites one app's windows (and scopes system audio to
+/// that app — measured, docs/02 §1a) on the main display; frames stay display-sized, so
+/// bitrate/timing math is content-independent.
+public enum ContentSelection: Sendable, Equatable {
+    case display(DisplaySelection)
+    case app(bundleID: String)
+}
+
 /// Which microphone to capture. `.device` carries an already-resolved explicit
 /// `uniqueID` (see `Permissions.resolveMicrophoneID`) — never a nil/default sentinel,
 /// which would fail capture with the opaque "invalid parameter" (docs/02 §1).
@@ -27,18 +35,18 @@ public enum MicrophoneSelection: Sendable, Equatable {
 /// A complete, value-type description of what to capture. Holds no live objects — the
 /// engine resolves it against `SCShareableContent` at start time.
 public struct CaptureConfiguration: Sendable, Equatable {
-    public var display: DisplaySelection
+    public var content: ContentSelection
     public var microphone: MicrophoneSelection
     public var frameRateCap: Int
     public var quality: QualityPreset
 
     public init(
-        display: DisplaySelection = .main,
+        content: ContentSelection = .display(.main),
         microphone: MicrophoneSelection = .none,
         frameRateCap: Int = 60,
         quality: QualityPreset = .balanced
     ) {
-        self.display = display
+        self.content = content
         self.microphone = microphone
         self.frameRateCap = frameRateCap
         self.quality = quality

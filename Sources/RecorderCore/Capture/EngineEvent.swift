@@ -5,6 +5,9 @@ import Foundation
 public enum EndReason: Sendable, Equatable {
     case userStopped
     case displayDisconnected
+    /// App-scoped capture only: the recorded app quit. SCK fires no stream error for this
+    /// (measured, docs/02 §1a) — `AppTerminationWatch` detects it.
+    case appQuit
     case microphoneChanged
     case diskAlmostFull
     case systemSleep

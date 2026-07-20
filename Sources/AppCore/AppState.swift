@@ -538,7 +538,7 @@ public final class AppState {
     /// without starting anything.
     public var captureConfiguration: CaptureConfiguration {
         CaptureConfiguration(
-            display: selectedDisplayID.map(DisplaySelection.id) ?? .main,
+            content: .display(selectedDisplayID.map(DisplaySelection.id) ?? .main),
             microphone: pickedMicrophoneID.map { MicrophoneSelection.device(id: $0) } ?? .none,
             frameRateCap: frameRateCap,
             quality: quality)

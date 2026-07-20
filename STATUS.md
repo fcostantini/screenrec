@@ -5,6 +5,32 @@
 
 ## Now
 
+- **M7-T1 DONE — per-app capture core + CLI (Franco picked M7 over M8, 2026-07-20; plan
+  artifact approved, `list-apps` included).** `CaptureConfiguration.display` → `content:
+  ContentSelection` (`.display(…)` / `.app(bundleID:)`); the engine builds
+  `SCContentFilter(display:including:)`, resolves the app against the same enumeration
+  `list-apps` prints, fail-stops as `finished(.appQuit)` when the recorded app quits — via the
+  new `AppTerminationWatch` (`DispatchSourceProcess`/`NOTE_EXIT`), because **SCK fires NO
+  stream error on app-quit** (measured; it keeps delivering frames of the empty filter) — and
+  does NOT attach the StallWatchdog under an app filter (its user-active ⇒ frames-expected
+  premise fails there; both rulings docs/03 assigned to T1 are made and coded). CLI:
+  `record --app <bundle-id>` + `list-apps` (backed by `CapturableApps`, reused by T2's menu
+  picker). **Verified LIVE:** app-scoped frames show ONLY TextEdit on black while a flashing
+  bystander window + the full desktop fill the whole-screen control frames; system audio
+  scoped — same afplay stimulus reads −91 dB (silence) app-scoped vs −10.6 dB max in the
+  control; TextEdit killed mid-recording → `finished (appQuit)`, playable 7.92 s file, tracks
+  ≤70 ms apart. 271 tests (+10). New platform facts in **02 §1a** (incl.: an app filter
+  delivers ~constant fps even for static content — no VFR savings). /simplify (4 agents) →
+  no bandaids found, layering endorsed; 5 cleanups presented → Franco approved batch → all
+  applied (app check folded into the one `startDecision` seam, shared
+  `SCShareableContent.forCapture()` so listed ⇒ bindable is structural, exhaustive switches,
+  queue drop) + live re-verified; 3 findings skipped with rationale (field note). Also fixed
+  (separate commit): `CoreInfo.version` had missed the 1.0.0 bump — the version-pin test
+  caught it.
+  VERSION unchanged; the MINOR bump (1.1.0) lands when M7 completes at T2. **Next: M7-T2
+  (menu source picker, persistence, sources-locked-while-recording, armed replay follows the
+  pick — plan artifact first).**
+
 - **🎉 v1.0.0 DECLARED (Franco, 2026-07-20).** Feature-complete (M0–M6); M6-T4's remaining items
   deferred — distribution/notarization → when Franco actually shares the app; mic recovery →
   graduated to milestone **M8** (Route 2, spike-verified). **Semantic versioning adopted (ADR-013):**
@@ -537,6 +563,33 @@ video (deterministic, reproducible).
 | G6   | ✅ **v1 declared 2026-07-20 (v1.0.0)** — M6 complete bar the deferred T4 bucket; G6 = the sum of the soak legs (below) + acceptance criteria, all green | §7 leg 1 ✅ 2026-07-17: 2 h battery, real usage + Zoom, replay armed, 3 mid-run replay saves; 19.5 GB / 7223.42 s, tracks ≤110 ms apart; battery 99→62%, CPU avg 12.9% / max 19.3%, RSS 98–485 MB trendless, zero thermal warnings; Franco: "smooth throughout, no desync" (claps at 0/1/2 h). §7 kill leg ✅ (amended to 1 h, Franco): kill -9 at 3540 s → playable 3539.53 s, **0.47 s lost** (≤10 s); app relaunched Ready. ⚠️ relaunch dropped the persisted armed state (transient pipeline failure → self-disarm; field note) — open follow-up, not a gate fail (§7 doesn't cover it). |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-20 (M7-T1 verification-rig traps — cost three false failures and one lingering window):
+  - **zsh backgrounding: `(A && B &)` runs A in the FOREGROUND and backgrounds only B.** Every
+    "app isn't running" failure in the M7-T1 quit-leg attempts was the detached
+    `(sleep N && pkill -x TextEdit &)` — sleep blocked, then pkill fired *right before* the
+    recording started. The engine was correct each time. Use `(A; B) &` to background a
+    sequence. Corollary of the standing lesson: assert the precondition (is the app running
+    *now*?) immediately before the measurement, not seconds before.
+  - **Interpreted tool scripts run as `swift-frontend -interpret <file>`** — `pkill -f "swift
+    foo.swift"` doesn't match; `pkill -f foo.swift` does. Franco had to point out the stimulus
+    window was still up.
+  - A freshly `open`ed app takes a few seconds to appear in `SCShareableContent.applications`
+    (02 §1a) — settle ~5 s before asserting listability.
+
+- 2026-07-20 (M7-T1 /simplify findings skipped, with rationale — future inputs, not debt to hide):
+  - **`ContentSelection` shape:** the altitude reviewer argued `.app` vs `.display` conflates
+    "what scope" with "which display" (an app filter is display-scoped; the `.app → main
+    display` rule lives in the engine). Kept as-is: it's docs/03's prescribed seam and matches
+    T2's single-axis picker (Entire Screen / apps in one list). Revisit only if multi-display
+    app capture or window-level capture ever becomes real — then `.app(bundleID:, on:)`.
+  - **StallWatchdog under app filters:** measured (02 §1a) that app filters deliver frames
+    continuously even when static — so silence there may be *stronger* stall evidence, and the
+    watchdog could arguably stay attached. Kept the approved don't-attach ruling (one 34 s
+    measurement isn't enough to bet the premise on; cost is only a diagnostic log line).
+  - **Test-latch consolidation:** five near-identical private `Flag`/latch helpers now exist
+    across test files; candidates for a shared RecorderCoreTests support file if one ever
+    appears.
 
 - 2026-07-20 (Route 2 coherence spike — PASSED, the M6-T4 mic-recovery gate is green): extended
   `mic-swap-spike --two-streams-pts` — run recording stream A (video + system audio) and a mic-only

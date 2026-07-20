@@ -650,7 +650,7 @@ shared-stream mode rides the recording's filter). **Window-level capture is expl
 this milestone** — independent-window streams and live resize are a different, harder
 feature; do not bundle.
 
-- [ ] M7-T1 Core: `CaptureConfiguration.content` (`.display(id)` / `.app(bundleID)`),
+- [x] M7-T1 Core: `CaptureConfiguration.content` (`.display(id)` / `.app(bundleID)`),
       filter construction, CLI `record --app <bundle-id>`. Rulings to make here: the
       end-reason for "target app quit mid-recording" (the display-gone precedent, 02 §7),
       and StallWatchdog scoping (user-active ⇒ frames-expected is false under an app
