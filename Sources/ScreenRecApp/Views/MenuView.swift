@@ -58,15 +58,18 @@ struct MenuView: View {
             }
         }
 
-        // Reads through `presentMicrophoneID`: the checkmark sits on None while the picked
-        // device is away, without the pick being forgotten. Writes are real user picks.
+        // Reads through `presentMicrophonePreference`: the checkmark sits on None while a picked
+        // device is away, without forgetting the pick. Writes are real user picks. Automatic
+        // (docs/06 item 6) follows the system default at capture start.
         Picker("Microphone", selection: Binding(
-            get: { state.presentMicrophoneID },
-            set: { state.selectedMicrophoneID = $0 }
+            get: { state.presentMicrophonePreference },
+            set: { state.microphonePreference = $0 }
         )) {
-            Text("None").tag(String?.none)
+            Text("None").tag(MicrophonePreference.none)
+            Text("Automatic (System Default)").tag(MicrophonePreference.automatic)
+            Divider()
             ForEach(state.microphones, id: \.uniqueID) { device in
-                Text(device.name).tag(String?.some(device.uniqueID))
+                Text(device.name).tag(MicrophonePreference.device(id: device.uniqueID))
             }
         }
 

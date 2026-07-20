@@ -624,7 +624,7 @@ while a manual recording runs; memory flat over 30 min).
       ~/Movies (no `.mov`, no `.partial`), recording ended, app back to Ready; Stop & Save
       unaffected.
 
-- [ ] M6-T13 Automatic (system default) microphone option (Franco, 2026-07-20, from M6-T11
+- [x] M6-T13 Automatic (system default) microphone option (Franco, 2026-07-20, from M6-T11
       dogfooding). Today the mic pick is a specific device or `None`; a connecting device never
       overrides an explicit pick (picked-device-or-nothing, `resolvedMicrophone()`) — pick built-in,
       connect AirPods, built-in stays. Add an **opt-in** `MicrophoneSelection.automatic` that

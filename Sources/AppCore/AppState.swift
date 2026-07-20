@@ -34,15 +34,22 @@ public final class AppState {
             if selectedDisplayID != oldValue, !isRehomingSources { replayConfigurationChanged() }
         }
     }
-    /// The last user-picked microphone; nil ⇒ record no microphone. Persisted, and it survives
-    /// the device's absence: resolution at every stream start uses the device if present and
-    /// records without a mic if not — "AirPods when they're in your ears", automatically.
-    public var selectedMicrophoneID: String? {
+    /// The user's microphone pick: a specific device, `.automatic` (follow the system default at
+    /// capture start, M6-T13), or `.none`. Persisted, and survives its device's absence — resolution
+    /// happens at every stream start (device-if-present, else no mic; the default for `.automatic`).
+    public var microphonePreference: MicrophonePreference {   // set once in init, then by the picker
         didSet {
-            guard selectedMicrophoneID != oldValue, !isRehomingSources else { return }
+            guard microphonePreference != oldValue, !isRehomingSources else { return }
             persist()
             replayConfigurationChanged()
         }
+    }
+
+    /// The specific device UID when one is picked; nil for `.none`/`.automatic` (both resolve at
+    /// start). Lets `captureConfiguration` stay a plain translation.
+    private var pickedMicrophoneID: String? {
+        if case .device(let id) = microphonePreference { return id }
+        return nil
     }
 
     /// True while `refreshSources` re-homes stale picks. Its writes are housekeeping, not user
@@ -164,7 +171,7 @@ public final class AppState {
         return Permissions.recordingReadiness(
             screen: Permissions.screenRecordingState(),
             microphone: Permissions.microphoneState(),
-            microphoneRequired: selectedMicrophoneID != nil)
+            microphoneRequired: microphonePreference != .none)
     }
 
     /// Whether screen recording was already granted when this process started.
@@ -222,7 +229,7 @@ public final class AppState {
             screen: Permissions.screenRecordingState(),
             hasAskedForScreen: hasAskedForScreenRecording,
             microphone: Permissions.microphoneState(),
-            microphoneRequired: selectedMicrophoneID != nil,
+            microphoneRequired: microphonePreference != .none,
             notifications: notificationState)
         if fresh != onboardingRows { onboardingRows = fresh }
     }
@@ -298,7 +305,7 @@ public final class AppState {
         outputLocation = OutputLocation(directory: settings.outputDirectory)
         quality = settings.quality
         frameRateCap = settings.frameRateCap
-        selectedMicrophoneID = settings.microphoneID
+        microphonePreference = settings.microphonePreference
         isReplayArmed = settings.replayArmed
         replaySeconds = settings.replaySeconds
         replayHotkey = settings.replayHotkey
@@ -328,7 +335,7 @@ public final class AppState {
         SettingsStore.save(
             Settings(
                 outputDirectory: outputDirectory, quality: quality, frameRateCap: frameRateCap,
-                microphoneID: selectedMicrophoneID,
+                microphonePreference: microphonePreference,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey),
             to: defaults)
@@ -427,13 +434,28 @@ public final class AppState {
     /// loop forever.
     private func replayCaptureConfiguration() -> CaptureConfiguration {
         var configuration = captureConfiguration
-        if let picked = selectedMicrophoneID {
-            switch Permissions.resolvedMicrophoneID(preferred: picked, fallingBackToDefault: false) {
-            case .explicit(let id): configuration.microphone = .device(id: id)
-            case .noDevice: configuration.microphone = .none
-            }
+        if microphonePreference != .none {          // else captureConfiguration already carries `.none`
+            configuration.microphone = micSelection(microphoneResolution())
         }
         return configuration
+    }
+
+    /// A resolution as a capture selection — a resolved device, or nothing.
+    private func micSelection(_ resolution: MicrophoneResolution) -> MicrophoneSelection {
+        if case .explicit(let id) = resolution { return .device(id: id) }
+        return .none
+    }
+
+    /// The concrete device for the current pick, shared by the recording and replay paths so they
+    /// can never bind different mics: `.automatic` follows the system default, a specific pick is
+    /// device-or-nothing. Callers special-case `.none` first (a chosen-no-mic isn't a miss). At
+    /// capture start only — SCK binds the mic once (02 §4).
+    private func microphoneResolution() -> MicrophoneResolution {
+        switch microphonePreference {
+        case .none: return .noDevice(reason: "no microphone chosen")
+        case .automatic: return Permissions.resolvedMicrophoneID(preferred: nil, fallingBackToDefault: true)
+        case .device(let id): return Permissions.resolvedMicrophoneID(preferred: id, fallingBackToDefault: false)
+        }
     }
 
     /// Registers the shortcut and tells the user if the system refused it (combo taken by
@@ -472,17 +494,21 @@ public final class AppState {
         }
         // The microphone pick deliberately survives its device's absence: clearing it here
         // would forget the user's choice every time the AirPods sat in their case at menu-open.
-        // The menu's picker binding shows None while the device is away (`presentMicrophoneID`),
-        // and stream starts resolve picked-device-or-nothing, so nothing lies.
+        // The menu's picker binding shows None while the device is away
+        // (`presentMicrophonePreference`), and stream starts resolve to the picked device or
+        // nothing (Automatic follows the system default), so nothing lies.
     }
 
-    /// What the menu's Microphone picker selects: the pick when its device is present, else nil
-    /// (checkmark on None) — the truthful display of a pick whose device is away, without
-    /// forgetting the pick.
-    public var presentMicrophoneID: String? {
-        guard let picked = selectedMicrophoneID,
-              microphones.contains(where: { $0.uniqueID == picked }) else { return nil }
-        return picked
+    /// What the menu's Microphone picker highlights: the pick, except a specific device that's
+    /// currently away shows as `.none` (checkmark on None) — the truthful display of a pick whose
+    /// device is in its case, without forgetting the pick. `.automatic` isn't a device, so it
+    /// always shows itself.
+    public var presentMicrophonePreference: MicrophonePreference {
+        if case .device(let id) = microphonePreference,
+           !microphones.contains(where: { $0.uniqueID == id }) {
+            return .none
+        }
+        return microphonePreference
     }
 
     public func refreshRecentRecordings() {
@@ -513,7 +539,7 @@ public final class AppState {
     public var captureConfiguration: CaptureConfiguration {
         CaptureConfiguration(
             display: selectedDisplayID.map(DisplaySelection.id) ?? .main,
-            microphone: selectedMicrophoneID.map { MicrophoneSelection.device(id: $0) } ?? .none,
+            microphone: pickedMicrophoneID.map { MicrophoneSelection.device(id: $0) } ?? .none,
             frameRateCap: frameRateCap,
             quality: quality)
     }
@@ -685,24 +711,25 @@ public final class AppState {
 
     // MARK: - Helpers
 
-    /// SCK needs an explicit device ID or capture fails with an opaque "invalid parameter"
-    /// (02 §1). Resolution is picked-device-or-nothing (no default fallback): the persisted
-    /// pick's device may be in its case, and binding a different mic than the menu shows
-    /// would make the menu lie.
+    /// Resolves the pick to a device (or none) for a recording, and names it for the menu — SCK
+    /// needs an explicit device ID or capture fails with an opaque "invalid parameter" (02 §1).
+    /// Shares `microphoneResolution()` with the replay path so the two never bind different mics.
     private func resolvedMicrophone() -> MicrophoneSelection {
-        guard let picked = selectedMicrophoneID else {
+        guard microphonePreference != .none else {
             activeMicrophoneName = nil
             return .none
         }
-        switch Permissions.resolvedMicrophoneID(preferred: picked, fallingBackToDefault: false) {
+        switch microphoneResolution() {
         case .explicit(let resolved):
             activeMicrophoneName = AudioInputs.available().first { $0.uniqueID == resolved }?.name
             return .device(id: resolved)
         case .noDevice:
-            // Record the screen anyway — losing a capture over a missing microphone is the
-            // worse outcome (ADR-012) — but never silently (ADR-007).
+            // Record the screen anyway — losing a capture over a missing microphone is the worse
+            // outcome (ADR-012) — but never silently (ADR-007).
             activeMicrophoneName = nil
-            lastFailure = "The selected microphone isn't connected — recording without it."
+            lastFailure = microphonePreference == .automatic
+                ? "No microphone connected — recording without one."
+                : "The selected microphone isn't connected — recording without it."
             return .none
         }
     }

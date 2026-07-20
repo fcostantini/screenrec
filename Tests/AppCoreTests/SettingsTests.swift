@@ -81,18 +81,35 @@ import RecorderCore
     @Test func microphonePickPersistsAndSurvivesItsDeviceBeingAway() {
         let defaults = makeDefaults().defaults
         var settings = makeSettings()
-        settings.microphoneID = "airpods-uuid-that-is-not-connected-right-now"
+        settings.microphonePreference = .device(id: "airpods-uuid-that-is-not-connected-right-now")
         SettingsStore.save(settings, to: defaults)
         // No presence validation at load: launching with the AirPods in their case must not
         // forget the pick. Resolution at stream start handles absence.
-        #expect(SettingsStore.load(from: defaults).microphoneID
-            == "airpods-uuid-that-is-not-connected-right-now")
+        #expect(SettingsStore.load(from: defaults).microphonePreference
+            == .device(id: "airpods-uuid-that-is-not-connected-right-now"))
 
-        // None round-trips as key-absent, not as an empty string.
-        settings.microphoneID = nil
+        // None round-trips as both keys absent, not as an empty string.
+        settings.microphonePreference = .none
         SettingsStore.save(settings, to: defaults)
         #expect(defaults.object(forKey: "microphoneID") == nil)
-        #expect(SettingsStore.load(from: defaults).microphoneID == nil)
+        #expect(defaults.object(forKey: "microphoneAutomatic") == nil)
+        #expect(SettingsStore.load(from: defaults).microphonePreference == .none)
+    }
+
+    @Test func automaticMicrophonePersistsAndWinsOverAStoredDevice() {
+        // M6-T13: Automatic is a distinct persisted value (a bool key), and it takes precedence
+        // over any device id left in the plist.
+        let defaults = makeDefaults().defaults
+        var settings = makeSettings()
+        settings.microphonePreference = .automatic
+        SettingsStore.save(settings, to: defaults)
+        #expect(defaults.bool(forKey: "microphoneAutomatic"))
+        #expect(defaults.object(forKey: "microphoneID") == nil)   // no stale device left behind
+        #expect(SettingsStore.load(from: defaults).microphonePreference == .automatic)
+
+        // A hand-edited plist with both set still resolves to Automatic.
+        defaults.set("some-device", forKey: "microphoneID")
+        #expect(SettingsStore.load(from: defaults).microphonePreference == .automatic)
     }
 
     @Test func hotkeyPersistsAsTheDocumentedDict() {

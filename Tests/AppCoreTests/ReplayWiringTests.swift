@@ -100,7 +100,7 @@ import RecorderCore
         state.isReplayArmed = true
         spy.calls = []
 
-        state.selectedMicrophoneID = "some-mic"
+        state.microphonePreference = .device(id: "some-mic")
         state.quality = .efficient
         state.frameRateCap = 30
         #expect(spy.calls == Array(repeating: .configurationChanged, count: 3))
@@ -130,12 +130,12 @@ import RecorderCore
         // survives its device's absence so AirPods work automatically when they return.
         let (state, spy, _) = makeState()
         state.isReplayArmed = true
-        state.selectedMicrophoneID = "vanished-mic"
+        state.microphonePreference = .device(id: "vanished-mic")
         spy.calls = []
 
         state.refreshSources(displays: [])   // picked mic absent from the fresh device list
-        #expect(state.selectedMicrophoneID == "vanished-mic")   // pick kept
-        #expect(state.presentMicrophoneID == nil)               // menu shows None, truthfully
+        #expect(state.microphonePreference == .device(id: "vanished-mic"))  // pick kept
+        #expect(state.presentMicrophonePreference == .none)                 // menu shows None, truthfully
         #expect(spy.calls.isEmpty)                              // buffer untouched
     }
 
@@ -219,7 +219,7 @@ import RecorderCore
     @Test func changesWhileDisarmedTouchNothing() {
         let (state, spy, _) = makeState()
         state.quality = .efficient
-        state.selectedMicrophoneID = "some-mic"
+        state.microphonePreference = .device(id: "some-mic")
         state.replaySeconds = 30
         #expect(spy.calls.isEmpty)
     }

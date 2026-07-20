@@ -39,12 +39,17 @@ Order and grouping (separators between groups):
 4. — separator —
 5. `Display ▸` submenu: one entry per `NSScreen`, checkmark on current. Disabled while
    recording.
-6. `Microphone ▸` submenu: input-device list + `None`. Checkmark on current. Disabled while
-   recording. Enumerated **live** via the CoreAudio HAL (`AudioInputs.available`), not
-   `AVCaptureDevice.DiscoverySession` — the latter caches and misses devices hot-plugged into a
-   long-running app (M6-T11). Each HAL device is then validated through `AVCaptureDevice`, so the
-   list holds exactly what the recorder can bind: resolvable virtual/aggregate devices included,
-   un-bindable ones filtered (Franco, 2026-07-20).
+6. `Microphone ▸` submenu: `None`, **`Automatic (System Default)`**, a divider, then the input-device
+   list. Checkmark on current. Disabled while recording. Devices enumerated **live** via the CoreAudio
+   HAL (`AudioInputs.available`), not `AVCaptureDevice.DiscoverySession` — the latter caches and misses
+   devices hot-plugged into a long-running app (M6-T11). Each HAL device is validated through
+   `AVCaptureDevice`, so the list holds exactly what the recorder can bind: resolvable virtual/aggregate
+   devices included, un-bindable ones filtered (Franco, 2026-07-20).
+   **Automatic (M6-T13):** an opt-in mode that follows the system default input — resolved at
+   record/arm start only (SCK binds the mic once, 02 §4), so a running capture never hot-switches to a
+   mid-session device (that's M6-T4). A specific device pick is never overridden by a connecting
+   device. The recording menu's active-mic line names the *resolved* device, so the menu doesn't lie.
+   (A `.menu` Picker honors a `Divider()`, though not text color — see "Menu text styling".)
 7. `Quality ▸` submenu: Efficient / Balanced / High (docs/02 §3 presets).
 8. — separator —
 9. `Open Recordings Folder — <~/path>` — reveals the output dir in Finder, and **shows the current
@@ -265,7 +270,8 @@ moved):
 | `outputDirectory` | String path | M4-T4 |
 | `qualityPreset` | `efficient`\|`balanced`\|`high` | M4-T4 |
 | `fpsCap` | Int 30\|60 | M4-T4 |
-| `microphoneID` | String uniqueID; absent ⇒ None. **Never cleared by device absence** — the pick survives the AirPods sitting in their case; every stream start resolves picked-device-or-nothing (no default-mic fallback, or the menu would lie), and the menu's checkmark sits on None while the device is away (Franco, 2026-07-16) | M5 follow-up |
+| `microphoneID` | String uniqueID; absent ⇒ None (or Automatic — see below). **Never cleared by device absence** — the pick survives the AirPods sitting in their case; the menu's checkmark sits on None while the device is away (Franco, 2026-07-16). A specific pick resolves device-or-nothing (no default fallback, or the menu would lie) | M5 follow-up |
+| `microphoneAutomatic` | Bool; true ⇒ **Automatic (System Default)**, and it wins over any `microphoneID` in the plist. Resolution follows the system default at capture start (M6-T13) | M6-T13 |
 | `replayArmed` | Bool | **M5** |
 | `replaySeconds` | Int 30\|60\|120 | **M5** |
 | `replayHotkey` | Dict: keyCode Int, modifiers Int | **M5** |

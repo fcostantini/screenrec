@@ -130,7 +130,7 @@ import RecorderCore
     @Test func pickedSourcesReachTheConfiguration() {
         let state = makeState()
         state.selectedDisplayID = 42
-        state.selectedMicrophoneID = "mic-uid"
+        state.microphonePreference = .device(id: "mic-uid")
         state.quality = .high
 
         #expect(state.captureConfiguration.display == .id(42))
@@ -142,7 +142,7 @@ import RecorderCore
         // `.none` has to survive as `.none`: SCK treats a nil/sentinel device ID as an error
         // (docs/02 §1), and "the user chose no mic" must not quietly become "some mic".
         let state = makeState()
-        state.selectedMicrophoneID = nil
+        state.microphonePreference = .none
         #expect(state.captureConfiguration.microphone == .none)
     }
 
@@ -184,14 +184,14 @@ import RecorderCore
 
     @Test func aVanishedMicrophonePickIsKeptButDisplaysAsNone() {
         // The pick survives its device's absence (persisted; AirPods return and just work) —
-        // the menu stays honest through `presentMicrophoneID`, and stream starts resolve
+        // the menu stays honest through `presentMicrophonePreference`, and stream starts resolve
         // picked-device-or-nothing rather than falling back to the system default, so the
         // menu and the file always agree.
         let state = makeState()
-        state.selectedMicrophoneID = "unplugged-device-uid"
+        state.microphonePreference = .device(id: "unplugged-device-uid")
         state.refreshSources(displays: [])
-        #expect(state.selectedMicrophoneID == "unplugged-device-uid")
-        #expect(state.presentMicrophoneID == nil)
+        #expect(state.microphonePreference == .device(id: "unplugged-device-uid"))
+        #expect(state.presentMicrophonePreference == .none)
     }
 
     @Test func noDisplaysAtAllLeavesTheConfigurationOnMain() {

@@ -5,6 +5,23 @@
 
 ## Now
 
+- **M6-T13 DONE — Automatic (system-default) microphone.** The mic pick is now a
+  `MicrophonePreference` enum (`none`/`automatic`/`device`) replacing `selectedMicrophoneID: String?`;
+  the Microphone picker gains an opt-in **Automatic (System Default)** row (above the device list,
+  separated by a divider). `.automatic` resolves the system default at **record/arm start** via the
+  resolver's existing `fallingBackToDefault` flag (SCK binds once, 02 §4 — no mid-session hot-switch,
+  that's M6-T4); a specific pick is never overridden. Persisted as a new `microphoneAutomatic` bool
+  (wins over a stored `microphoneID`). Resolution is shared by the record and replay paths
+  (`microphoneResolution()`) so they can't bind different mics. **Verified LIVE on Franco's AirPods,
+  conclusively by sample rate:** Automatic + AirPods → mic track **24 kHz** (AirPods = the default) and
+  the active-mic line named "AirPods Pro"; control — built-in picked while AirPods connected → **48 kHz**
+  (built-in), pick unmoved. 261 tests (+ automatic persistence round-trip; the pure resolver's
+  default-fallback was already covered). /code-review (high) → 2 cleanups, **no correctness bugs** (the
+  init-didSet concern verified safe), both applied: the shared resolver helper + a stale comment.
+  **Menu finding:** a `.menu` Picker honors `Divider()` (docs/06), unlike text color. **Next: the M6
+  tail is down to the T4 decision bucket** (Developer ID + notarization, mic recovery, H.264 compat) —
+  the last thing between here and G6/v1.
+
 - **M6-T12 DONE — discard an ongoing recording.** A subordinate, confirmed **Discard Recording…**
   row (red via an `NSColor` attributed title; placed low and set apart from Stop & Save; the alert's
   **safe** choice is the default) drops the take instead of finalizing it. Seam:
@@ -69,10 +86,9 @@ Shipped and gated: **M0–M5 complete, G0–G5 passed.** M6 (ship-quality) is mo
   loss), T3 (error-message audit), T5 (launch-at-login + README + docs), plus the dogfooding
   fixes T6 (replay resize) / T7 (recording-file safeguard) / T8 (arm-while-recording) /
   T9 (armed survives relaunch) / T10 (menu-highlight) / T11 (live mic list via CoreAudio HAL) /
-  T12 (discard recording).
-- **Open (Franco's call on order):** T4 decision bucket (Developer ID + notarization, mic
-  recovery, H.264 compat), T13 (opt-in Automatic/system-default mic — slotted from M6-T11's
-  dogfooding). Post-v1: **M7** (per-app capture).
+  T12 (discard recording) / T13 (Automatic/system-default mic).
+- **Open (Franco's call):** T4 decision bucket (Developer ID + notarization, mic recovery,
+  H.264 compat) — the last M6 task before G6/v1. Post-v1: **M7** (per-app capture).
 - **G6** = v1 done: not formally run; it's the sum of M6 + the acceptance criteria, most
   already green.
 

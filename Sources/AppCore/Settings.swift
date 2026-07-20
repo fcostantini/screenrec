@@ -18,6 +18,14 @@ public struct ReplayHotkey: Sendable, Equatable {
     public static let standard = ReplayHotkey(keyCode: 15, modifiers: 2048 | 256)
 }
 
+/// The user's microphone pick, before resolution to a concrete device (docs/06 item 6):
+/// a specific device, `automatic` (follow the system default at capture start, M6-T13), or none.
+public enum MicrophonePreference: Sendable, Equatable, Hashable {
+    case none
+    case automatic
+    case device(id: String)
+}
+
 /// The app's persisted preferences (docs/06 "Settings window").
 ///
 /// Launch-at-login (M6) arrives with the feature it configures.
@@ -26,10 +34,10 @@ public struct Settings: Sendable, Equatable {
     public var quality: QualityPreset
     /// docs/06 offers 30 or 60.
     public var frameRateCap: Int
-    /// The last user-picked microphone's uniqueID; nil ⇒ None. Deliberately NOT validated
-    /// against connected devices at load — the pick must survive the device sitting in its
-    /// case (resolution happens at every stream start, and falls back to no mic).
-    public var microphoneID: String?
+    /// The microphone pick. `.device`'s uniqueID and `.automatic` are deliberately NOT validated
+    /// against connected devices at load — a pick must survive its device sitting in its case;
+    /// resolution happens at every stream start (and falls back to no mic).
+    public var microphonePreference: MicrophonePreference
     public var replayArmed: Bool
     /// docs/06 offers 30, 60 or 120.
     public var replaySeconds: Int
@@ -43,7 +51,7 @@ public struct Settings: Sendable, Equatable {
             outputDirectory: OutputLocation.defaultDirectory(),
             quality: .balanced,
             frameRateCap: 60,
-            microphoneID: nil,
+            microphonePreference: .none,
             replayArmed: false,
             replaySeconds: 60,
             replayHotkey: .standard)
@@ -61,6 +69,8 @@ public enum SettingsStore {
         public static let qualityPreset = "qualityPreset"
         public static let fpsCap = "fpsCap"
         public static let microphoneID = "microphoneID"
+        /// True ⇒ Automatic (follow the system default); a specific device lives in `microphoneID`.
+        public static let microphoneAutomatic = "microphoneAutomatic"
         public static let replayArmed = "replayArmed"
         public static let replaySeconds = "replaySeconds"
         public static let replayHotkey = "replayHotkey"
@@ -103,9 +113,11 @@ public enum SettingsStore {
         }
 
         // No device-presence validation, on purpose: launching with the AirPods in their case
-        // must not forget the pick (see the field's comment).
-        if let microphoneID = defaults.string(forKey: Key.microphoneID), !microphoneID.isEmpty {
-            settings.microphoneID = microphoneID
+        // must not forget the pick (see the field's comment). Automatic wins over a stored device.
+        if defaults.bool(forKey: Key.microphoneAutomatic) {
+            settings.microphonePreference = .automatic
+        } else if let microphoneID = defaults.string(forKey: Key.microphoneID), !microphoneID.isEmpty {
+            settings.microphonePreference = .device(id: microphoneID)
         }
 
         settings.replayArmed = defaults.bool(forKey: Key.replayArmed)
@@ -135,10 +147,16 @@ public enum SettingsStore {
         defaults.set(settings.outputDirectory.path, forKey: Key.outputDirectory)
         defaults.set(settings.quality.rawValue, forKey: Key.qualityPreset)
         defaults.set(settings.frameRateCap, forKey: Key.fpsCap)
-        if let microphoneID = settings.microphoneID {
-            defaults.set(microphoneID, forKey: Key.microphoneID)
-        } else {
+        switch settings.microphonePreference {
+        case .none:
             defaults.removeObject(forKey: Key.microphoneID)
+            defaults.removeObject(forKey: Key.microphoneAutomatic)
+        case .automatic:
+            defaults.removeObject(forKey: Key.microphoneID)
+            defaults.set(true, forKey: Key.microphoneAutomatic)
+        case .device(let id):
+            defaults.set(id, forKey: Key.microphoneID)
+            defaults.removeObject(forKey: Key.microphoneAutomatic)
         }
         defaults.set(settings.replayArmed, forKey: Key.replayArmed)
         defaults.set(settings.replaySeconds, forKey: Key.replaySeconds)
