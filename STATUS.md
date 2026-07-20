@@ -530,6 +530,20 @@ video (deterministic, reproducible).
 
 ## Field notes (append; things learned that docs don't cover yet)
 
+- 2026-07-20 (armed-replay mic loss — MEASURED, informs M6-T4 mic recovery): Franco's worry
+  confirmed live with clip evidence. Arm replay with the AirPods mic (Automatic → AirPods, 24 kHz),
+  then case the AirPods: the mic ring stops filling (screen + system audio keep going), a "mic
+  disconnected while armed" notification fires, no menu-level indicator. **Reconnecting the AirPods
+  does NOT restore the mic** — same SCK rule as recording (bound once at arm, a died device is
+  unbindable to that stream; `ReplayController`'s `.microphoneLost` only notifies, never rebuilds).
+  Proof by three saved clips (30 s buffer): #1 armed+AirPods → mic track 24 kHz; #2 case → wait past
+  the buffer → reconnect → save → **no mic track at all**; #3 after re-arm → mic track 24 kHz back.
+  So the ONLY recovery today is **re-arm** (or any rebuild event: record start/stop, a settings
+  change). This bites harder for armed replay than for recording (armed runs all day; AirPods
+  case/reconnect constantly), which reframes the M6-T4 mic-recovery judgment toward "worth it" — and
+  specifically toward **Route 2** (rebuild a mic-only stream on reconnect, the only route that
+  handles reconnect). First step if built: the §3.5 PTS-coherence spike (the Route 2 gate).
+
 - 2026-07-20 (M6-T4 distribution, deferred): how a self-signed build runs elsewhere, worked out for
   Franco's "share it without a paid Developer account" question. The shipped app is
   `Authority=screenrec-dev` (self-signed, TeamIdentifier not set, **no entitlements embedded** — so no
