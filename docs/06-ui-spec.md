@@ -39,8 +39,12 @@ Order and grouping (separators between groups):
 4. — separator —
 5. `Display ▸` submenu: one entry per `NSScreen`, checkmark on current. Disabled while
    recording.
-6. `Microphone ▸` submenu: AVCaptureDevice list + `None`. Checkmark on current.
-   Disabled while recording.
+6. `Microphone ▸` submenu: input-device list + `None`. Checkmark on current. Disabled while
+   recording. Enumerated **live** via the CoreAudio HAL (`AudioInputs.available`), not
+   `AVCaptureDevice.DiscoverySession` — the latter caches and misses devices hot-plugged into a
+   long-running app (M6-T11). Each HAL device is then validated through `AVCaptureDevice`, so the
+   list holds exactly what the recorder can bind: resolvable virtual/aggregate devices included,
+   un-bindable ones filtered (Franco, 2026-07-20).
 7. `Quality ▸` submenu: Efficient / Balanced / High (docs/02 §3 presets).
 8. — separator —
 9. `Open Recordings Folder — <~/path>` — reveals the output dir in Finder, and **shows the current

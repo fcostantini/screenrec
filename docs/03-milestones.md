@@ -597,7 +597,7 @@ while a manual recording runs; memory flat over 30 min).
       measured, not eyeballed (M4-T1 rule); idle menu provably rebuild-free (no publish
       without change).
 
-- [ ] M6-T11 Mic list goes stale in a long-running app (Franco, 2026-07-17: AirPods
+- [x] M6-T11 Mic list goes stale in a long-running app (Franco, 2026-07-17: AirPods
       connected + actively captured by armed replay, yet absent from the Microphone picker
       across multiple fresh menu opens; checkmark on None). Measured: a fresh process's
       `AVCaptureDevice.DiscoverySession` lists them, the running app's doesn't — while the

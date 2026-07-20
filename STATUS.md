@@ -5,6 +5,26 @@
 
 ## Now
 
+- **M6-T11 DONE — the mic list is live.** Root cause: `AudioInputs.available()` enumerated via
+  `AVCaptureDevice.DiscoverySession`, which caches in a long-running process and misses devices
+  hot-plugged after launch (Franco's AirPods — captured by armed replay yet absent from the
+  picker, checkmark stuck on None). Fix: enumerate device UIDs **live via the CoreAudio HAL**
+  (`kAudioHardwarePropertyDevices` + input-stream check), then validate + name + mark-default
+  through `AVCaptureDevice` (live per device) so a listed device is always one the recorder can
+  bind. `AudioInputDevice` seam unchanged → menu picker, CLI `list-mics`, ReplayArm inherit it.
+  **Reproduced + fixed LIVE on Franco's AirPods:** staleprobe showed HAL tracking connect/disconnect
+  1→2→1 while DiscoverySession sat frozen at 1 the whole run; the installed app's Microphone
+  submenu (menudriver) then showed AirPods appear on connect + drop on disconnect, both directions.
+  /code-review (high, workflow) → 7 findings; the real one — pure-HAL "show all" could list devices
+  the AVCaptureDevice resolver then rejects (silent no-mic) — reopened the device-scope call; Franco
+  chose **"show all bindable"** → the AVCaptureDevice-validation design above (which also folds the
+  default-source, name-source, and wasted-read findings). 257 tests (+5: pure `select` seam,
+  resolvable/unresolvable fixture on each side). **Also answered Franco's "why did replay capture my
+  voice while the picker said None?":** the pick was never None — the stale list just couldn't
+  *show* it, while the live capture-side resolver bound it; this fix aligns display with capture.
+  **Slotted M6-T13** (opt-in Automatic/system-default mic) from his follow-up. **Next: the M6 tail
+  is Franco's pick — T12 (discard recording) or the T4 bucket.**
+
 - **M6-T5 DONE — launch at login + README + docs closeout.** Launch-at-login: a Settings
   toggle backed by `SMAppService.mainApp` (register/unregister; `.status` is the self-
   persisting truth, so **no `launchAtLogin` UserDefaults key** — docs/06 amended). **The
@@ -30,10 +50,10 @@ Shipped and gated: **M0–M5 complete, G0–G5 passed.** M6 (ship-quality) is mo
 - **Done:** T1 (acceptance run, C2 criterion amended), T2 (2-h soak — clean + kill-leg 0.47 s
   loss), T3 (error-message audit), T5 (launch-at-login + README + docs), plus the dogfooding
   fixes T6 (replay resize) / T7 (recording-file safeguard) / T8 (arm-while-recording) /
-  T9 (armed survives relaunch) / T10 (menu-highlight).
+  T9 (armed survives relaunch) / T10 (menu-highlight) / T11 (live mic list via CoreAudio HAL).
 - **Open (Franco's call on order):** T4 decision bucket (Developer ID + notarization, mic
-  recovery, H.264 compat), T11 (stale mic list), T12 (discard recording). Post-v1: **M7**
-  (per-app capture).
+  recovery, H.264 compat), T12 (discard recording), T13 (opt-in Automatic/system-default mic —
+  slotted from M6-T11's dogfooding). Post-v1: **M7** (per-app capture).
 - **G6** = v1 done: not formally run; it's the sum of M6 + the acceptance criteria, most
   already green.
 
@@ -470,6 +490,18 @@ video (deterministic, reproducible).
 | G6   | 🟡 soak legs passed (G6 = v1 done awaits the rest of M6) | §7 leg 1 ✅ 2026-07-17: 2 h battery, real usage + Zoom, replay armed, 3 mid-run replay saves; 19.5 GB / 7223.42 s, tracks ≤110 ms apart; battery 99→62%, CPU avg 12.9% / max 19.3%, RSS 98–485 MB trendless, zero thermal warnings; Franco: "smooth throughout, no desync" (claps at 0/1/2 h). §7 kill leg ✅ (amended to 1 h, Franco): kill -9 at 3540 s → playable 3539.53 s, **0.47 s lost** (≤10 s); app relaunched Ready. ⚠️ relaunch dropped the persisted armed state (transient pipeline failure → self-disarm; field note) — open follow-up, not a gate fail (§7 doesn't cover it). |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-20 (M6-T11 live mic list): the enumerator and the resolver were two AVFoundation layers
+  with *different* freshness. `AVCaptureDevice.DiscoverySession` caches its device list in a
+  long-running process (the stale picker), but `AVCaptureDevice(uniqueID:)` — the capture-side
+  existence check — is **live per device** (it bound Franco's hot-connected AirPods while the list
+  still didn't show them; that's why replay had his voice). The fix leans on exactly this split:
+  the CoreAudio HAL (`kAudioHardwarePropertyDevices`) is the live *enumerator*, `AVCaptureDevice`
+  the live per-UID *validator/namer*. HAL device UIDs are byte-identical to AVCaptureDevice's and
+  to what SCK binds (`BuiltInMicrophoneDevice`; AirPods `40-…:input` — both probe-verified). Lesson:
+  when a list looks stale but a direct lookup works, they're different APIs — don't assume one
+  framework keeps one cache. Also: a `.menu` MenuBarExtra re-reads sources on each open (M6-T10's
+  `RefreshOnMenuOpen`), so a live enumerator surfaces hot-plugged devices on the very next open.
 
 - 2026-07-16 (M6-T1 C3): two observations from the acceptance leg.
   - **The app has a live install at `/Users/Shared/ScreenRec.app`** (found running there;
