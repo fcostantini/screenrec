@@ -25,8 +25,18 @@
   (the ADR-012 floor holds). Stable-mic regression clean. 291 tests (+6). Sync evidence: the
   measured two-stream PTS coherence (±0.6 ms/min, field notes 2026-07-20) + every leg's tracks
   aligned ≤150 ms; a human scrub of the leg files is offered, not yet done. ADR-012 superseded
-  note written; 02 §4 rewritten; VERSION → **1.2.0**. **The roadmap is now empty — no planned
-  milestones remain. Next: Franco's call (dogfood, new milestones, or polish).**
+  note written; 02 §4 rewritten; VERSION → **1.2.0**. Review (2 agents; findings presented,
+  Franco approved batch): **one real gap fixed — a rescue-stream death with no HAL event never
+  retried** (now self-schedules a delayed re-attempt); locks narrowed off the enumeration path;
+  a dedicated sample queue (the listener queue must never carry live buffers); the rescue now
+  OWNS its watchdog (`WeakRescueHolder` deleted; `MicrophoneWatchdog.onLoss` became settable);
+  a mute latch closes the orphaned-stream teardown window; docs/01 amended with the
+  satellite-stream exception; audio-config contract unified (`applyAudioCapture`), HAL address
+  builder shared, CLI pick→policy folded into `resolveMicrophone`, the re-arm test moved beside
+  the watchdog suite. Skipped w/ comment: confirm-at-first-buffer (the flat 3 s wait only
+  delays the notification). Re-verified live post-refactor (Automatic leg: loss → recovery,
+  41.2 s mic track of 45 s). v1.2.0 deployed to /Users/Shared. **The roadmap is now empty — no
+  planned milestones remain. Next: Franco's call (dogfood, new milestones, or polish).**
 
 - **M8-T1 DONE — fixed-format resampled mic input (M8 mic recovery underway; plan approved).**
   New public seam `ResampledMicInput` (Support/): every mic buffer converts to **48 kHz mono
