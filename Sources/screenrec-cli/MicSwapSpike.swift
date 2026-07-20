@@ -172,7 +172,7 @@ private func retryRepoint(
 }
 
 /// Which experiment to run.
-private enum SpikeMode { case swap, reconnect, fallback, nilDevice, nilFollow, twoStreams, twoStreamsPTS }
+private enum SpikeMode { case swap, reconnect, fallback, nilDevice, nilFollow, twoStreams, twoStreamsPTS, twoStreamsRecord }
 
 func runMicSwapSpike(_ args: [String]) async {
     var seconds = 4.0
@@ -192,6 +192,8 @@ func runMicSwapSpike(_ args: [String]) async {
             mode = .twoStreams
         case "--two-streams-pts":
             mode = .twoStreamsPTS
+        case "--two-streams-record":
+            mode = .twoStreamsRecord
         case "--seconds":
             seconds = parsePositive(iterator.next(), flag: "--seconds")
         default:
@@ -206,6 +208,7 @@ func runMicSwapSpike(_ args: [String]) async {
     case .nilFollow: await runNilFollowSpike()
     case .twoStreams: await runTwoStreamSpike(seconds: seconds)
     case .twoStreamsPTS: await runTwoStreamPTSSpike(seconds: seconds)
+    case .twoStreamsRecord: await runTwoStreamRecordSpike(seconds: seconds)
     }
 }
 
@@ -494,6 +497,89 @@ private func runTwoStreamPTSSpike(seconds: Double) async {
     } else {
         print("  VERDICT: FAIL — the streams drift apart. Route 2 needs resync/resampling before it's")
         print("  viable; a naive 2nd-stream mux would desync over a long capture.")
+    }
+    exit(0)
+}
+
+/// Route 2 Phase B: routes SCK buffers from two streams into one `MovieRecorder`.
+private final class RecordingSink: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
+    private let recorder: MovieRecorder
+    init(recorder: MovieRecorder) { self.recorder = recorder }
+    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        let source: SourceType
+        switch type {
+        case .screen:
+            guard isCompleteSpikeVideoFrame(sampleBuffer) else { return }   // drop idle frames (02 §1)
+            source = .screen
+        case .audio: source = .systemAudio
+        case .microphone: source = .microphone
+        @unknown default: return
+        }
+        recorder.consume(sampleBuffer, type: source)
+    }
+    func stream(_ stream: SCStream, didStopWithError error: Error) {}
+}
+
+/// Mirrors `SampleRouter.isCompleteVideoFrame` (internal to RecorderCore): only `.complete` screen
+/// frames carry real pixels; idle ticks must not reach the writer.
+private func isCompleteSpikeVideoFrame(_ buffer: CMSampleBuffer) -> Bool {
+    guard let attachments = CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: false)
+            as? [[SCStreamFrameInfo: Any]],
+          let statusValue = attachments.first?[.status] as? Int,
+          let status = SCFrameStatus(rawValue: statusValue) else { return false }
+    return status == .complete
+}
+
+/// Route 2 Phase B: mux a real recording from stream A (video + system audio) and a mic-only stream
+/// B into one `.mov` — proving the end-to-end mux stays synced (Phase A settled the raw PTS
+/// coherence; this confirms `MovieRecorder`/`TimestampRebaser` don't break it). Scrub the file for
+/// A/V sync (run alongside `tools/beepflash.sh`: the flash lands in the video, the beep in the mic).
+private func runTwoStreamRecordSpike(seconds: Double) async {
+    let devices = AudioInputs.available()
+    guard let mic = devices.first(where: { $0.isDefault }) ?? devices.first else { die("no input devices", code: 74) }
+    let display = await firstSpikeDisplay()
+    let filter = SCContentFilter(display: display, excludingWindows: [])
+
+    let configA = SCStreamConfiguration()
+    configA.width = 640; configA.height = 360
+    configA.minimumFrameInterval = CMTime(value: 1, timescale: 30)
+    configA.queueDepth = 6
+    configA.capturesAudio = true
+    configA.sampleRate = 48_000; configA.channelCount = 2
+    configA.excludesCurrentProcessAudio = true
+
+    let movies = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first
+        ?? FileManager.default.temporaryDirectory
+    let url = movies.appendingPathComponent("TwoStreamSpike-\(String(UUID().uuidString.prefix(8))).mov")
+
+    let recorder: MovieRecorder
+    do {
+        recorder = try MovieRecorder(outputURL: url, frameRate: 30, preset: .balanced, includesMicrophone: true)
+    } catch { die("recorder init failed: \(error.localizedDescription)", code: 74) }
+
+    let sink = RecordingSink(recorder: recorder)
+    let streamA = SCStream(filter: filter, configuration: configA, delegate: sink)
+    let streamB = SCStream(filter: filter, configuration: spikeConfiguration(micID: mic.uniqueID), delegate: sink)
+
+    print("two-stream RECORD spike (Phase B): stream A video+sysaudio + stream B mic → one .mov")
+    print("  mic: \(mic.name)  ·  \(Int(seconds)) s  ·  \(url.lastPathComponent)")
+    do {
+        try streamA.addStreamOutput(sink, type: .screen, sampleHandlerQueue: DispatchQueue(label: "rec.a.screen"))
+        try streamA.addStreamOutput(sink, type: .audio, sampleHandlerQueue: DispatchQueue(label: "rec.a.audio"))
+        try await streamA.startCapture()
+        try streamB.addStreamOutput(sink, type: .microphone, sampleHandlerQueue: DispatchQueue(label: "rec.b.mic"))
+        try await streamB.startCapture()
+    } catch { die("startCapture failed: \(error.localizedDescription)", code: 74) }
+
+    try? await Task.sleep(for: .seconds(seconds))
+    try? await streamB.stopCapture()
+    try? await streamA.stopCapture()
+
+    do {
+        let finalURL = try await recorder.finish()
+        print("  saved: \(finalURL.path)")
+    } catch {
+        die("finish failed: \(error.localizedDescription)", code: 74)
     }
     exit(0)
 }

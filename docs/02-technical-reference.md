@@ -207,8 +207,10 @@ Consequences for anyone designing mic recovery:
      returning AirPod rebinds at the same 24 kHz → no resampling). PTS coherence across the two
      streams — ADR-001's whole concern — **verified 2026-07-20** (`mic-swap-spike --two-streams-pts`:
      sysAudio↔mic drift +0.6 ms/min over 90 s, i.e. the same host clock with no relative drift;
-     the ~50 ms sysAudio−mic offset is constant capture latency, not drift). This is the preferred
-     recovery route (and the only one that handles reconnect without wiping the replay buffer).
+     the ~50 ms sysAudio−mic offset is constant capture latency, not drift), and confirmed
+     end-to-end (`--two-streams-record` muxes both streams into one `.mov`: mic held a constant
+     ~16 ms offset to system audio, no drift over 62 s). This is the preferred recovery route (and
+     the only one that handles reconnect without wiping the replay buffer).
 - **Format changes mid-stream** remain possible for the *same* device (e.g. an AirPods
   HFP/A2DP codec flip), so `MovieRecorder` compares each mic buffer's ASBD (sample rate /
   channels / format ID) against the input's and fail-stops on a diff (M3-T2). With a pinned

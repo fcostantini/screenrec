@@ -540,8 +540,12 @@ video (deterministic, reproducible).
   **Route 2 is viable.** If built (a ~2-task M6-T4 feature): a fixed-format resampled mic input + a
   reconnect watchdog that rebuilds stream B, mic muxed against the shared epoch. Route 2 preserves the
   replay buffer — the reason Franco rejected the cheaper auto-re-arm alternative (proven live to wipe
-  the last minutes of video+audio; see the armed-replay note below). Phase B (an end-to-end two-stream
-  recording + a real A/V-sync scrub) is optional belt-and-suspenders, not run.
+  the last minutes of video+audio; see the armed-replay note below). **Phase B also PASSED
+  (2026-07-20):** `mic-swap-spike --two-streams-record` muxes both streams into one real `MovieRecorder`
+  `.mov`; recorded 70 s with beepflash, the mic (stream B) held a **constant ~16 ms offset** to system
+  audio (stream A) with no drift over 62 s (the 16 ms is the test's acoustic speaker→mic delay, absent
+  in the real feature). So both source coherence and the end-to-end mux are confirmed — Route 2 is
+  viable, gate fully green.
 
 - 2026-07-20 (armed-replay mic loss — MEASURED, informs M6-T4 mic recovery): Franco's worry
   confirmed live with clip evidence. Arm replay with the AirPods mic (Automatic → AirPods, 24 kHz),
