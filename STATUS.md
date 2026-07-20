@@ -87,8 +87,12 @@ Shipped and gated: **M0–M5 complete, G0–G5 passed.** M6 (ship-quality) is mo
   fixes T6 (replay resize) / T7 (recording-file safeguard) / T8 (arm-while-recording) /
   T9 (armed survives relaunch) / T10 (menu-highlight) / T11 (live mic list via CoreAudio HAL) /
   T12 (discard recording) / T13 (Automatic/system-default mic).
-- **Open (Franco's call):** T4 decision bucket (Developer ID + notarization, mic recovery,
-  H.264 compat) — the last M6 task before G6/v1. Post-v1: **M7** (per-app capture).
+- **Deferred (Franco, 2026-07-20):** T4 decision bucket (Developer ID + notarization, mic
+  recovery, H.264 compat, HDR). Distribution/notarization is revisited **when Franco actually
+  shares the app with someone** (he'd rather not pay for a Developer account until then); the
+  other items are demand-/usage-driven. **v1 is feature-complete** — M0–M5 done, M6 done bar this
+  deferred bucket; G6 is the only unrun gate and it's the sum of what's already green. Post-v1:
+  **M7** (per-app capture).
 - **G6** = v1 done: not formally run; it's the sum of M6 + the acceptance criteria, most
   already green.
 
@@ -525,6 +529,20 @@ video (deterministic, reproducible).
 | G6   | 🟡 soak legs passed (G6 = v1 done awaits the rest of M6) | §7 leg 1 ✅ 2026-07-17: 2 h battery, real usage + Zoom, replay armed, 3 mid-run replay saves; 19.5 GB / 7223.42 s, tracks ≤110 ms apart; battery 99→62%, CPU avg 12.9% / max 19.3%, RSS 98–485 MB trendless, zero thermal warnings; Franco: "smooth throughout, no desync" (claps at 0/1/2 h). §7 kill leg ✅ (amended to 1 h, Franco): kill -9 at 3540 s → playable 3539.53 s, **0.47 s lost** (≤10 s); app relaunched Ready. ⚠️ relaunch dropped the persisted armed state (transient pipeline failure → self-disarm; field note) — open follow-up, not a gate fail (§7 doesn't cover it). |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-20 (M6-T4 distribution, deferred): how a self-signed build runs elsewhere, worked out for
+  Franco's "share it without a paid Developer account" question. The shipped app is
+  `Authority=screenrec-dev` (self-signed, TeamIdentifier not set, **no entitlements embedded** — so no
+  AMFI launch block). On another Mac it is NOT double-click-runnable (Gatekeeper blocks an unidentified
+  developer), but it DOES run after a **one-time override**: System Settings → Privacy & Security →
+  "Open Anyway" (macOS 15/Sequoia dropped the old right-click→Open shortcut), or strip quarantine with
+  `xattr -dr com.apple.quarantine <app>`. After that, TCC grants (screen/mic) work normally — grants
+  attach to the stable designated requirement, which self-signed apps have. The "unverified developer"
+  warning is unavoidable without Developer ID + notarization ($99/yr). Building from source elsewhere
+  needs the recipient to create their own `screenrec-dev` cert first (devsign.sh stops otherwise) — a
+  ~15-min developer task, not a non-technical one. **Open question for when this is built:** is ad-hoc
+  signing (`codesign -s -`) more portable for a *downloaded* app than a cert the target doesn't trust?
+  Untested — only one Mac here. Revisit at M6-T4 when Franco actually shares.
 
 - 2026-07-20 (M6-T12 discard): two things worth keeping.
   - **Menu text styling in a `.menu` MenuBarExtra goes through AppKit, which keeps only the text.**

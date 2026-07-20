@@ -532,7 +532,8 @@ while a manual recording runs; memory flat over 30 min).
       installability work, not before it.
       **Verify:** toggle on → `SMAppService.mainApp.status == .enabled`; log out/in → the app is
       running **(human)**; toggle off → the login item is gone.
-- [ ] M6-T4 Optional (decide then): Developer ID + notarization for distribution
+- [ ] M6-T4 Optional (**DEFERRED 2026-07-20** — Franco: revisit when actually sharing the app;
+      see STATUS). Developer ID + notarization for distribution
       beyond this machine; `--h264-downscale` compat mode; HDR spike (ADR stretch);
       **mic recovery after device loss** — ADR-012 deferred it to here. Not a research
       question any more: M3-T7 verified both routes and 02 §4 costs them (~2 tasks; a
