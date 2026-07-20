@@ -664,9 +664,16 @@ feature; do not bundle.
       **Verify:** menudriver-driven app-scoped recording + mid-recording replay save, both
       probe clean and both contain only the target app.
 
+- [x] M7-T3 CLI parity (added post-G7, Franco 2026-07-20): `replay-arm --app <bundle-id>` —
+      the record precedent's flag on the replay harness; app-quit ends the armed stream (no
+      CLI auto-retry, deliberately — the retry loop is the GUI ReplayController's).
+      **Verify:** arm app-scoped → USR1 save → clip probes clean + frames contain only the
+      target; quit the app while armed → `stopped (appQuit)`; whole-screen regression run.
+
 **Gate G7**: an app-scoped recording and an app-scoped armed-replay save, each verified
 content-clean (no bystander app visible, no bystander audio), app-quit handled, plus a
-no-regression pass of G5 §6.4 (simultaneity) under an app filter.
+no-regression pass of G5 §6.4 (simultaneity) under an app filter. (T3 is post-gate parity
+polish; G7 closed on T1+T2.)
 
 ---
 

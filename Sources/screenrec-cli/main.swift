@@ -15,11 +15,13 @@ func printUsage() {
       screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
       screenrec-cli probe-stream [--duration N] [--mic <id>] [--no-mic]
                                        Capture and report per-source buffers/formats/PTS
-      screenrec-cli replay-arm [--seconds N] [--duration N] [--mic <id>] [--no-mic]
-                               [--output <dir>]
+      screenrec-cli replay-arm [--seconds N] [--duration N] [--app <bundle-id>]
+                               [--mic <id>] [--no-mic] [--output <dir>]
                                        Arm instant replay: screen + system audio + mic into
                                        rolling N-second rings (default 60). Prints occupancy
-                                       every 2 s.
+                                       every 2 s. --app scopes video + system audio to one
+                                       app (see list-apps); if that app quits, the armed
+                                       stream ends (no auto-retry — that's the GUI's job).
                                        Save the last N seconds anytime with 's'+Return or
                                        `kill -USR1 <pid>` → "Replay <date>.mov" in --output
                                        (default ~/Movies); any other line (or Return) stops.

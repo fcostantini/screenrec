@@ -5,6 +5,19 @@
 
 ## Now
 
+- **M7-T3 DONE — CLI parity: `replay-arm --app` (Franco's ask, post-G7).** The record
+  precedent's flag on the replay harness: one `ContentSelection` line + parsing + help; app-quit
+  while armed ends the stream as `stopped (appQuit)` — deliberately NO CLI auto-retry (that loop
+  is the GUI ReplayController's). Verified headless: app-scoped arm → USR1 save → 14.3 s clip,
+  probe clean, frame contains only TextEdit; quit-while-armed leg exits `appQuit`; whole-screen
+  regression clean; 281 tests. `probe-stream` stays display-only on purpose. No VERSION bump —
+  the CLI is the dev harness, not the shipped app (plan approved). Also this session (post-M7
+  QQ): **why app-scoped recordings look choppy when the target is backgrounded** — macOS/Chromium
+  throttle occluded apps' rendering; SCK can't capture frames never drawn. Discord recipe
+  (untested): relaunch with `--disable-backgrounding-occluded-windows --disable-renderer-backgrounding
+  --disable-background-timer-throttling` (+ `NSAppSleepDisabled`); measuring + docs deferred at
+  Franco's call. **Next: M8 (mic recovery) when Franco says go; dogfooding v1.1.0 meanwhile.**
+
 - **🎉 M7 COMPLETE — v1.1.0 (M7-T2 DONE, GATE G7 PASSED 2026-07-20).** The menu's `Display ▸`
   became **`Source ▸`**: Entire Screen (per-display when several) above a divider, running apps
   below — live via `CapturableApps` at menu open (async, publish-on-change), filtered to

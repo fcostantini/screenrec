@@ -5,6 +5,7 @@ import RecorderCore
 struct ReplayArmOptions {
     var seconds = 60.0
     var duration: Double?
+    var appBundleID: String?
     var micID: String?
     var micEnabled = true
     var outputDir = OutputLocation.defaultDirectory()
@@ -21,6 +22,9 @@ func parseReplayArmOptions(_ args: [String]) -> ReplayArmOptions {
             options.seconds = parsePositive(iterator.next(), flag: "--seconds", max: 600)
         case "--duration":
             options.duration = parsePositive(iterator.next(), flag: "--duration", max: 86_400)
+        case "--app":
+            guard let value = iterator.next() else { die("--app needs a bundle id (see list-apps)") }
+            options.appBundleID = value
         case "--mic":
             guard let value = iterator.next() else { die("--mic needs a device id") }
             options.micID = value
@@ -119,7 +123,8 @@ func runReplayArm(_ args: [String]) async {
 
     let mic = resolveMicrophone(micEnabled: options.micEnabled, preferredID: options.micID)
     if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
-    let configuration = CaptureConfiguration(microphone: mic.selection)
+    let content: ContentSelection = options.appBundleID.map { .app(bundleID: $0) } ?? .display(.main)
+    let configuration = CaptureConfiguration(content: content, microphone: mic.selection)
     let engine = CaptureEngine(configuration: configuration)
     // Route encoder failure through the engine's stop seam so the event loop prints it and the
     // process exits once from the main flow — never exit() from a VT/capture thread. `weak`
@@ -176,6 +181,7 @@ func runReplayArm(_ args: [String]) async {
     if interactive { stopHints.append("s+Return saves · Return stops") }
     if stopHints.isEmpty { stopHints.append("until the stream ends") }
     print("replay-arm: balanced HEVC → \(Int(options.seconds)) s ring  (\(stopHints.joined(separator: " · ")))")
+    if let bundleID = options.appBundleID { print("  capturing app: \(bundleID)") }
     let pid = ProcessInfo.processInfo.processIdentifier
     print("  pid \(pid) — save from another shell:  kill -USR1 \(pid)")
 
