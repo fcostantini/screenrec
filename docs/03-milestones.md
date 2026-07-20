@@ -624,6 +624,21 @@ while a manual recording runs; memory flat over 30 min).
       ~/Movies (no `.mov`, no `.partial`), recording ended, app back to Ready; Stop & Save
       unaffected.
 
+- [ ] M6-T13 Automatic (system default) microphone option (Franco, 2026-07-20, from M6-T11
+      dogfooding). Today the mic pick is a specific device or `None`; a connecting device never
+      overrides an explicit pick (picked-device-or-nothing, `resolvedMicrophone()`) — pick built-in,
+      connect AirPods, built-in stays. Add an **opt-in** `MicrophoneSelection.automatic` that
+      resolves the current system-default input at record/arm start (flip on the resolver's existing
+      `fallingBackToDefault`, which `Permissions.resolvedMicrophoneID` already supports). Picker
+      gains an "Automatic (System Default)" row above the device list; persist as a distinct value
+      (not a device ID); the recording menu's active-mic line already names the resolved device so
+      the menu still doesn't lie. **Scope: resolved AT START only** — SCK binds the mic once (02 §4),
+      so a live armed/recording stream does NOT hot-switch to a device connected mid-session; that
+      live takeover is the M6-T4 mic-recovery rebuild, not this task. **Verify:** unit (automatic →
+      resolves default; → None when no default) + live: pick Automatic, connect AirPods, start
+      recording → mic track is AirPods; with a specific device picked, connecting AirPods does not
+      change the pick.
+
 **Gate G6** = v1 done.
 
 ---
