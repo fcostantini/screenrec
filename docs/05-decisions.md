@@ -94,3 +94,12 @@ not a research question.
 Every capability lands in `screenrec-cli` before the app (M1–M3, M5 core). Agents can
 run/verify CLI headlessly under the terminal's existing TCC grants; GUI verification
 needs a human. The CLI ships in the repo forever as the debugging surface.
+
+## ADR-013 ✅ Semantic versioning (Franco, 2026-07-20)
+Adopted at v1. The `VERSION` file is the single source (ADR from M4-T6's stamping). Read semver for
+an **end-user app**, not a library: "breaking" is user-facing. MAJOR = a settings/recording-format
+migration, dropped OS support, or a UX overhaul; MINOR = a new backward-compatible feature (M7, M8);
+PATCH = fixes with no new feature. `1.0.0` = v1 (M0–M6). Bump `VERSION` in the commit that warrants
+it and tag the release. Chosen over date-based or build-number-only schemes because the milestone
+structure already maps cleanly onto MINOR bumps, and a human-readable `defaults read`/Finder version
+was the point of M4-T6's stamping.

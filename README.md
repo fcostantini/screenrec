@@ -5,8 +5,8 @@ microphone (separate track)**, tuned HEVC encoding, crash-safe long recordings,
 pause/resume, and ShadowPlay-style **instant replay** via a global hotkey.
 Zero external dependencies — Apple frameworks only, no Xcode required.
 
-**Status:** feature-complete through M6 (ship-quality pass). See `STATUS.md` for the
-live gate table and what's left before v1.
+**Status:** **v1.0.0** — feature-complete (M0–M6, ship-quality pass). See `STATUS.md` for the
+gate table; post-v1 work (M7 per-app capture, M8 mic recovery) is planned in `docs/03`.
 
 ## Build & run
 
@@ -65,6 +65,21 @@ runs on **this machine only** — copied elsewhere it hits Gatekeeper as an unid
 developer. To try it on another Mac, **share the repo and build there** (the steps above
 are self-contained). Distributing the built `.app` needs Developer ID signing + Apple
 notarization — tracked as M6-T4.
+
+## Versioning
+
+The single source of truth is the `VERSION` file (`bundle.sh` stamps it into both
+`CFBundleShortVersionString` and `CFBundleVersion`, and refuses to build without it). Releases
+follow **semantic versioning**, read for an end-user app (so "breaking" means user-facing, not API —
+ADR-013):
+
+- **MAJOR** (`2.0.0`) — a breaking user-facing change: a settings/recording-format migration,
+  dropping macOS 15 support, a fundamental UX overhaul.
+- **MINOR** (`1.1.0`) — a new backward-compatible feature (e.g. per-app capture, mic recovery).
+- **PATCH** (`1.0.1`) — bug/dogfooding fixes; no new user-facing feature.
+
+Bump `VERSION` in the same commit as the change that warrants it, and tag the release (`git tag
+v1.0.0`). `1.0.0` is v1 (feature-complete M0–M6).
 
 ## Repository map
 

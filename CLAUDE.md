@@ -104,6 +104,10 @@ the task ID: `M0-T2: devsign.sh finds stable identity`. Doc-only changes: prefix
 `docs:`. Push to origin at session end. Never force-push main. The git history is the
 per-task audit trail — one task, one commit.
 
+**Versioning (semver, ADR-013):** bump the `VERSION` file in the same commit as the change that
+warrants it — MINOR for a new user-facing feature (a milestone like M7/M8), PATCH for fixes with no
+new feature, MAJOR for a breaking user-facing change. Tag releases (`git tag v1.2.0`). `1.0.0` = v1.
+
 ## Session-end checklist (do this before your final message, every session)
 
 1. Tick completed task checkboxes in `docs/03-milestones.md` (never tick a task whose
