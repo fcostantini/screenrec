@@ -92,6 +92,11 @@ choice rather than a limitation. Keeping notify-and-continue for v1 anyway:
 Scheduled as an explicit decision point in **M6-T4**, not left to memory — both routes are
 verified and costed in 02 §4, so that call is a product judgement (does it bite in real use?),
 not a research question.
+**Superseded by M8 (2026-07-20): recovery is BUILT.** It bit in real use (armed replay +
+AirPods, measured), so Route 2 shipped: M8-T1's fixed-format input + M8-T2's
+`MicrophoneRescue` (HAL return listener → mic-only stream → splice; policy honors the pick,
+02 §4). Notify-and-continue remains the floor when the device never returns; the loss and
+recovery notifications carry the state either way.
 
 ## ADR-011 ✅ CLI-first development
 Every capability lands in `screenrec-cli` before the app (M1–M3, M5 core). Agents can

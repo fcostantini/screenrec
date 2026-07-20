@@ -711,7 +711,7 @@ hence T1 is a hard prerequisite for T2.
       both emerge as the fixed target with correct sample counts/durations and monotonic PTS (fixture
       on each side of the rate); live — a mid-stream device change keeps the mic track valid/playable.
 
-- [ ] M8-T2 **Reconnect watchdog + mic-only stream rebuild.** When the picked mic (or, under
+- [x] M8-T2 **Reconnect watchdog + mic-only stream rebuild.** When the picked mic (or, under
       Automatic, the current system default) returns after a loss, build a fresh mic-only `SCStream`
       and splice its buffers through T1's fixed-format input against the shared epoch, so the mic
       track / replay ring resumes (a silent gap over the loss→reconnect window is expected). Wire into

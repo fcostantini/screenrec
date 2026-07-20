@@ -85,6 +85,11 @@ is the seam that makes this trivial.
 ## Concurrency model
 
 - `CaptureEngine` is an **actor** owning stream lifecycle (start/stop/reconfigure).
+  **One exception (M8-T2):** `MicrophoneRescue`, a lock-based satellite owned by the engine,
+  runs a second, mic-only `SCStream` after a mic loss and splices its (fixed-format) buffers
+  into the same `SampleRouter`. Its lifecycle is callback-driven (HAL device events, SCK
+  delegate) rather than actor-hosted; the engine creates it per session and cancels it in
+  `terminate()`. "One stream per session" elsewhere in this doc means the *primary* stream.
 - Sample delivery happens on **dedicated serial `DispatchQueue`s** passed to
   `addStreamOutput` (one per output type). Handlers must be allocation-light: no async
   hops, no lock contention; append to writer / push to ring and return. SCK's IOSurface

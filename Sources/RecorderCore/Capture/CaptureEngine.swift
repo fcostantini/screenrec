@@ -23,6 +23,8 @@ public actor CaptureEngine {
     /// when no mic was selected.
     private let microphoneWatchdog: MicrophoneWatchdog?
     private var microphoneWatchdogTask: Task<Void, Never>?
+    /// Splices a returned mic back in via a mic-only stream (M8-T2); nil when no mic.
+    private let microphoneRescue: MicrophoneRescue?
 
     /// Logs a wedged capture — video silent while the user is active (docs/02 §7). Diagnostic
     /// only: v1 never auto-restarts. Nil under an app filter (`attachesStallWatchdog`).
@@ -54,11 +56,17 @@ public actor CaptureEngine {
         self.configuration = configuration
         (self.events, self.continuation) = AsyncStream.makeStream(of: EngineEvent.self)
         self.router = SampleRouter()
-        if case .device = configuration.microphone {
+        if case .device(let deviceID) = configuration.microphone {
             let continuation = self.continuation
-            microphoneWatchdog = MicrophoneWatchdog { continuation.yield(.microphoneLost) }
+            let rescue = MicrophoneRescue(
+                policy: configuration.microphoneRecovery, pickedDeviceID: deviceID, router: router,
+                onLoss: { continuation.yield(.microphoneLost) },
+                onSpliced: { continuation.yield(.microphoneRecovered) })
+            microphoneRescue = rescue
+            microphoneWatchdog = rescue.watchdog
         } else {
             microphoneWatchdog = nil
+            microphoneRescue = nil
         }
         if Self.attachesStallWatchdog(to: configuration.content) {
             stallWatchdog = StallWatchdog { seconds in
@@ -207,6 +215,7 @@ public actor CaptureEngine {
         stallWatchdogTask = nil
         appTerminationWatch?.cancel()
         appTerminationWatch = nil
+        microphoneRescue?.cancel()
     }
 
     /// Dropping a `Task` reference does not cancel it: an engine released while running would
@@ -215,6 +224,7 @@ public actor CaptureEngine {
         microphoneWatchdogTask?.cancel()
         stallWatchdogTask?.cancel()
         appTerminationWatch?.cancel()
+        microphoneRescue?.cancel()
     }
 
     private func terminate(_ reason: EndReason) {
@@ -267,14 +277,9 @@ public actor CaptureEngine {
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
         config.queueDepth = 5
         config.showsCursor = true
-        config.capturesAudio = true
-        config.sampleRate = 48_000
-        config.channelCount = 2
-        config.excludesCurrentProcessAudio = true
-        if case .device(let id) = configuration.microphone {
-            config.captureMicrophone = true
-            config.microphoneCaptureDeviceID = id
-        }
+        var microphoneID: String?
+        if case .device(let id) = configuration.microphone { microphoneID = id }
+        config.applyAudioCapture(microphoneID: microphoneID)
         return (filter, config)
     }
 

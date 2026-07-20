@@ -104,6 +104,7 @@ func describe(_ event: EngineEvent) -> String {
     case .paused: return "paused"
     case .resumed: return "resumed"
     case .microphoneLost: return "microphoneLost"
+    case .microphoneRecovered: return "microphoneRecovered"
     case .recordingFileRestored: return "recordingFileRestored"
     case .fileProgress(let seconds, let bytes):
         return "fileProgress(\(seconds.isFinite ? Int(seconds) : 0)s, \(bytes) bytes)"
@@ -309,13 +310,18 @@ func reserveOutputURL(_ options: RecordOptions) throws -> URL {
     }
 }
 
-/// Microphone selection, plus the reason when a mic was requested but none is usable.
-/// Shared by record (dry-run and real capture) and replay-arm so they can't disagree.
-func resolveMicrophone(micEnabled: Bool, preferredID: String?) -> (selection: MicrophoneSelection, unavailable: String?) {
-    guard micEnabled else { return (.none, nil) }
+/// Microphone selection + recovery policy, plus the reason when a mic was requested but none
+/// is usable. Shared by record (dry-run and real capture) and replay-arm so they can't
+/// disagree. Policy (M8-T2): an explicit --mic recovers only onto itself; a resolved default
+/// follows whatever is default at return time.
+func resolveMicrophone(
+    micEnabled: Bool, preferredID: String?
+) -> (selection: MicrophoneSelection, recovery: MicrophoneRecovery, unavailable: String?) {
+    let recovery: MicrophoneRecovery = preferredID != nil ? .sameDevice : .systemDefault
+    guard micEnabled else { return (.none, recovery, nil) }
     switch Permissions.resolvedMicrophoneID(preferred: preferredID) {
-    case .explicit(let id): return (.device(id: id), nil)
-    case .noDevice(let reason): return (.none, reason)
+    case .explicit(let id): return (.device(id: id), recovery, nil)
+    case .noDevice(let reason): return (.none, recovery, reason)
     }
 }
 
@@ -466,7 +472,8 @@ func performRecording(_ options: RecordOptions) async {
     if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
     let content: ContentSelection = options.appBundleID.map { .app(bundleID: $0) } ?? .display(.main)
     let configuration = CaptureConfiguration(
-        content: content, microphone: mic.selection, quality: options.preset)
+        content: content, microphone: mic.selection,
+        microphoneRecovery: mic.recovery, quality: options.preset)
     let session: RecordingSession
     do {
         session = try RecordingSession(
@@ -514,8 +521,11 @@ func performRecording(_ options: RecordOptions) async {
         case .resumed:
             print("\n  ▶  resumed")
         case .microphoneLost:
-            // Not a stop: screen + system audio keep recording, the mic track ends here (ADR-012).
+            // Not a stop: screen + system audio keep recording (ADR-012); the rescue may
+            // resume the mic track (M8-T2).
             print("\n  ⚠️  microphone disconnected — still recording (screen + system audio)")
+        case .microphoneRecovered:
+            print("\n  🎤 microphone reconnected — mic track resumed")
         case .recordingFileRestored:
             print("\n  ⚠️  recording file was moved — moved it back (recording continues)")
         case .finished(let url, let reason, let dropped):

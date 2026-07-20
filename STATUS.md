@@ -5,6 +5,29 @@
 
 ## Now
 
+- **🎉 M8 COMPLETE — v1.2.0 (M8-T2 DONE, GATE G8 PASSED 2026-07-20). The AirPods come back.**
+  New `MicrophoneRescue` (Capture/) lives INSIDE `CaptureEngine`, so recording, idle-armed
+  replay and shared-stream mode all inherit recovery from one implementation: on
+  `.microphoneLost`, a HAL device-list listener (`kAudioHardwarePropertyDevices`, event-driven)
+  waits for the rebind target — `.sameDevice` for a specific pick, `.systemDefault` for
+  Automatic (`MicrophoneRecovery`, set by AppState/CLI) — then builds the spike-proven mic-only
+  `SCStream` and splices through its own `ResampledMicInput` into the same router; first-buffer
+  confirmation guards dead-but-listed devices; `MicrophoneWatchdog.rearm()` restarts the loss
+  cycle so all-day case/uncase works. New `.microphoneRecovered` event → notifications
+  ("Still recording · microphone reconnected" / "Replay still armed · microphone reconnected",
+  docs/06 rows) and the loss copy de-lied ("…until it reconnects"). **Verified LIVE with Franco
+  casing/uncasing on voice cues (`say`):** (1) recording + sameDevice — loss → AirPods return →
+  mic track resumed, 72.35 s of 90 s (the gap = the case window); (2) **armed replay** (the
+  priority scenario) — loss → return → ring refilled → 60.2 s clip saved mid-armed, mic track
+  spanning the FULL window, video/system audio uninterrupted, post-recovery signal −8.8 dB;
+  (3) Automatic — AirPods cased and left cased → recovered onto the BUILT-IN mic (the policy);
+  (4) never-returns — no substitution under sameDevice, mic track ends at 19.7 s, clean file
+  (the ADR-012 floor holds). Stable-mic regression clean. 291 tests (+6). Sync evidence: the
+  measured two-stream PTS coherence (±0.6 ms/min, field notes 2026-07-20) + every leg's tracks
+  aligned ≤150 ms; a human scrub of the leg files is offered, not yet done. ADR-012 superseded
+  note written; 02 §4 rewritten; VERSION → **1.2.0**. **The roadmap is now empty — no planned
+  milestones remain. Next: Franco's call (dogfood, new milestones, or polish).**
+
 - **M8-T1 DONE — fixed-format resampled mic input (M8 mic recovery underway; plan approved).**
   New public seam `ResampledMicInput` (Support/): every mic buffer converts to **48 kHz mono
   Float32** via a primeless `AVAudioConverter` (output PTS = input PTS, converter state carries
@@ -629,10 +652,24 @@ video (deterministic, reproducible).
 | G3   | ✅ **PASSED 2026-07-15** | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears ✅ PASSED 2026-07-15 (Franco, post-M3-T6, per the ADR-012 definition): AirPods cased at ~22s of a 60s run → CLI printed `⚠️ microphone disconnected — still recording` at ~25s (≈3.2s latency = 3s timeout + ≤1s poll), recording ran to the end, `finished (userStopped)`, file playable, mic track 21.82s vs video 59.83s. First run (pre-M3-T6) disproved the gate's premise — no takeover, buffers just stop → docs/02 §4 corrected, ADR-012 written. Also proved: a reconnected device NEVER resumes (mic gone for the session). §4.4 disk-guard ✅ PASSED: `--test-disk-floor 500000` (GB) vs 676 GiB free → `finished (diskAlmostFull)`, file playable (2.25s); negative verified on a real non-boot volume (4 GB HFS+ image, importantUsage reads 0 → records the full 8s, `userStopped`) after /code-review caught that the recommended capacity key reads 0 on every external volume. §4.1 cross-seam clap-sync ✅ (Franco — sync holds across the seam). §4.3 ✅ both ways in: display sleep (headless via `pmset`) → playable 3.3s, and lid-close/system sleep (Franco) → `finished (displayDisconnected)` + playable 11.2s file finalized on wake, confirming lid-close is the same -3815 and that `.systemSleep` is genuinely unreachable. §4.3 monitor-unplug N/A — built-in display only. |
 | G4   | ✅ **PASSED 2026-07-16** (§5.4 fresh-account rerun waived by Franco) | §5.2 ✅ headless: DR byte-identical across A→B rebuild + `--verify --strict` + rebuilt app `Ready` → menu-driven 19.43 s playable file, no re-grant. §5.3 ✅ headless (delivery) + ✅ live (Franco: banner renders + click reveals). §5.1 ✅ live (Franco: auto-relaunch on grant transition, forced the ungranted state). §5.4 ❌→**FIXED + verified** (unit + headless forced-failure integration: no wedge, clean "Couldn't write…"; preflight probes the real AVAssetWriter API → Desktop rejected at selection); the fresh-account end-to-end rerun was **discarded by Franco 2026-07-16** — the waiver, not a pass, is the record. |
 | G5   | ✅ **PASSED 2026-07-16** | §6.1 ✅ burst: 4.5 min busyscene max load → CPU 7.2% avg (cumulative), RSS flat 201–202 MB (+1 MB), occupancy pinned (T2 evidence). §6.2 ✅ save <1 s (0.08 s signal→file external, T4) + probe hvc1+2aac 60.56 s keyframe-aligned + content genuinely the last minute (Franco). §6.3 ✅ two rapid triggers → one coalesced clean file (T4 live + OS-level signal merge). §6.4 ✅ recording (35.99 s) + mid-recording replay (32.29 s) off one shared stream, both probe-clean (T5). §6.5 ✅ 30.2 min armed real usage: RSS drift min5→end +7 MB (no leak), CPU 4.7% avg, min-30 save 0.17 s write / ≈0.6 s end-to-end (rig overhead subtracted; raw 1.53 s incl. 0.87 s menudriver). |
+| G8   | ✅ **PASSED 2026-07-20 (v1.2.0)** | (1) Armed replay: case → armed held → in-ear return → ring refilled unaided → 60.2 s clip, mic track spans the full window (gap included), video+system audio uninterrupted, post-recovery −8.8 dB. (2) Recording: case → return → `finished(userStopped)`, mic track 72.35 s of 90 s, resumed across the gap. (3) No regression: stable-mic 12 s run 3-track clean; never-returns leg = today's ADR-012 outcome (no substitution, playable file). Sync: measured cross-stream PTS coherence (±0.6 ms/min) + per-leg track alignment ≤150 ms; human scrub offered. Automatic-policy bonus leg: recovery onto the built-in while the pick's device stayed away. |
 | G7   | ✅ **PASSED 2026-07-20 (v1.1.0)** | App-scoped recording (32.25 s, hvc1 + 2×AAC, menu-driven) + app-scoped **mid-recording** replay save (14.76 s, same shared stream — G5 §6.4 simultaneity under an app filter): both probe clean, both **content-clean** (a flashing bystander window on screen throughout appears in NO checked frame of either file). Bystander *audio* scoping: measured same-day at the engine level (M7-T1: −91 dB app-scoped vs −10.6 dB whole-screen control through the identical filter-construction path; SCK-level spike 0.0000 vs 0.2931) — not re-measured through the menu path, which diverges only above the filter. App-quit handled: CLI `finished(appQuit)` (T1) + armed-stream quit → held armed → auto re-arm on relaunch → clean clip (T2). |
 | G6   | ✅ **v1 declared 2026-07-20 (v1.0.0)** — M6 complete bar the deferred T4 bucket; G6 = the sum of the soak legs (below) + acceptance criteria, all green | §7 leg 1 ✅ 2026-07-17: 2 h battery, real usage + Zoom, replay armed, 3 mid-run replay saves; 19.5 GB / 7223.42 s, tracks ≤110 ms apart; battery 99→62%, CPU avg 12.9% / max 19.3%, RSS 98–485 MB trendless, zero thermal warnings; Franco: "smooth throughout, no desync" (claps at 0/1/2 h). §7 kill leg ✅ (amended to 1 h, Franco): kill -9 at 3540 s → playable 3539.53 s, **0.47 s lost** (≤10 s); app relaunched Ready. ⚠️ relaunch dropped the persisted armed state (transient pipeline failure → self-disarm; field note) — open follow-up, not a gate fail (§7 doesn't cover it). |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-20 (M8-T2 live-rig lessons):
+  - **"Open the case" does NOT reconnect AirPods to a Mac as an input device — in-ear does.**
+    The first leg-1 attempt cued lid-open and the device never rejoined the HAL during the
+    window (the run looked like a rescue failure; it was a rig failure — the machinery passed
+    untouched on the retry with an in-ear cue). Any future mic-reconnect leg: cue "put them in
+    your ears", and poll `list-mics` before starting a leg that needs them bound.
+  - **Voice cues via `say` beat clock-watching for human-in-the-loop legs**: schedule
+    `(sleep N; say "…") &` beside the capture; the human just reacts. Bonus: the cue audio
+    lands in the system-audio track as a timeline marker. (Also handy: `say` re-prompts +
+    a `list-mics` poll loop to detect the human completing a step.)
+  - `log show` hides `os.Logger` `.info` lines without `--info` — absence of rescue log lines
+    proves nothing at default level.
 
 - 2026-07-20 (M7-T2): four rig/platform finds.
   - **🔴 menudriver's `dismiss` posted a GLOBAL Escape (CGEvent)** — whenever the menu wasn't

@@ -4,9 +4,10 @@ import Foundation
 /// Detects a microphone that was delivering buffers and then stopped. A lost mic does not
 /// hand over to another device — its buffers simply stop (docs/02 §4) — so starvation is the
 /// only available signal. Firing is a notification, not a termination: recording continues
-/// and the mic track ends at the disconnect (ADR-012). One-shot: SCK never re-attaches a
-/// pinned `microphoneCaptureDeviceID` once the device goes away, so there is nothing to
-/// re-arm for. Pausing never stops the `SCStream`, so heartbeats continue while paused.
+/// (ADR-012). One-shot per loss: SCK never re-attaches a pinned device to the SAME stream —
+/// `rearm()` restarts the cycle once a rescue stream splices (M8-T2), so repeated
+/// case/uncase cycles each fire. Pausing never stops the `SCStream`, so heartbeats continue
+/// while paused.
 ///
 /// `consume` runs on the mic capture queue: state is lock-guarded (docs/01) and `onLoss`
 /// fires outside the lock.
@@ -20,9 +21,9 @@ final class MicrophoneWatchdog: SampleConsumer, @unchecked Sendable {
 
     private let timeout: TimeInterval
     private let now: @Sendable () -> TimeInterval
-    private let onLoss: @Sendable () -> Void
 
     private let lock = NSLock()
+    private var onLoss: @Sendable () -> Void
     private var lastBufferAt: TimeInterval?
     private var hasFired = false
 
@@ -46,18 +47,33 @@ final class MicrophoneWatchdog: SampleConsumer, @unchecked Sendable {
         lastBufferAt = now()
     }
 
+    /// Replaces the loss handler — `MicrophoneRescue` chains itself behind the engine's event
+    /// yield after both exist (neither can capture the other during its own init).
+    func setOnLoss(_ handler: @escaping @Sendable () -> Void) {
+        lock.lock()
+        onLoss = handler
+        lock.unlock()
+    }
+
+    /// Restart the loss cycle after a rescue splices (M8-T2). Clearing `lastBufferAt` keeps the
+    /// re-armed watchdog silent until the rescue stream's first heartbeat actually lands.
+    func rearm() {
+        lock.lock()
+        hasFired = false
+        lastBufferAt = nil
+        lock.unlock()
+    }
+
     /// Fire `onLoss` once if the mic has been quiet past `timeout`. Stays silent until at least
     /// one heartbeat lands: a mic that never delivered is covered by MovieRecorder's startup grace.
     func check() {
         lock.lock()
-        let lost: Bool
+        var fire: (@Sendable () -> Void)?
         if !hasFired, let last = lastBufferAt, now() - last >= timeout {
             hasFired = true
-            lost = true
-        } else {
-            lost = false
+            fire = onLoss
         }
         lock.unlock()
-        if lost { onLoss() }  // outside the lock — it is non-reentrant
+        fire?()  // outside the lock — it is non-reentrant
     }
 }

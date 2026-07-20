@@ -124,7 +124,8 @@ func runReplayArm(_ args: [String]) async {
     let mic = resolveMicrophone(micEnabled: options.micEnabled, preferredID: options.micID)
     if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
     let content: ContentSelection = options.appBundleID.map { .app(bundleID: $0) } ?? .display(.main)
-    let configuration = CaptureConfiguration(content: content, microphone: mic.selection)
+    let configuration = CaptureConfiguration(
+        content: content, microphone: mic.selection, microphoneRecovery: mic.recovery)
     let engine = CaptureEngine(configuration: configuration)
     // Route encoder failure through the engine's stop seam so the event loop prints it and the
     // process exits once from the main flow — never exit() from a VT/capture thread. `weak`
@@ -221,6 +222,8 @@ func runReplayArm(_ args: [String]) async {
             // Same warning record prints (ADR-012): screen + system audio keep buffering; the
             // mic ring just stops filling — without this line its frozen column looks healthy.
             print("  ⚠️  microphone disconnected — replay continues (screen + system audio)")
+        case .microphoneRecovered:
+            print("  🎤 microphone reconnected — the mic ring is filling again")
         case .stopped(let reason):
             print("replay-arm: stopped (\(describe(reason))) — ring discarded")
             if reason != .userStopped { exitCode = 1 }

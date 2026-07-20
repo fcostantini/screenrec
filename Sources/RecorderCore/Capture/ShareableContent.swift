@@ -8,3 +8,19 @@ extension SCShareableContent {
         try await excludingDesktopWindows(false, onScreenWindowsOnly: true)
     }
 }
+
+extension SCStreamConfiguration {
+    /// The one home of the audio-capture contract (docs/02 §1): 48 kHz stereo system audio,
+    /// own audio excluded, and — when given — an explicit mic device (a nil/default sentinel
+    /// pins silently, docs/02 §1). Shared by the engine's primary stream and the mic rescue.
+    func applyAudioCapture(microphoneID: String?) {
+        capturesAudio = true
+        sampleRate = 48_000
+        channelCount = 2
+        excludesCurrentProcessAudio = true
+        if let microphoneID {
+            captureMicrophone = true
+            microphoneCaptureDeviceID = microphoneID
+        }
+    }
+}

@@ -17,6 +17,44 @@ import Testing
 
     private static let timeout: TimeInterval = 3
 
+    @Test func rearmedWatchdogFiresAgainAfterAFreshStarvation() {
+        // M8-T2: the loss cycle must repeat across rescues (all-day case/uncase).
+        let clock = TestClock()
+        let losses = LossCounter()
+        let watchdog = MicrophoneWatchdog(
+            timeout: Self.timeout, now: { clock.now }, onLoss: { losses.increment() })
+
+        watchdog.consume(makeMarkerBuffer(), type: .microphone)
+        clock.advance(Self.timeout + 1)
+        watchdog.check()
+        #expect(losses.value == 1)
+
+        // Latched: more starvation must not re-fire before a rescue splices.
+        clock.advance(Self.timeout + 1)
+        watchdog.check()
+        #expect(losses.value == 1)
+
+        // Rescue spliced: silent until the rescue stream's first heartbeat…
+        watchdog.rearm()
+        clock.advance(Self.timeout + 1)
+        watchdog.check()
+        #expect(losses.value == 1)
+
+        // …then a second loss fires a second time.
+        watchdog.consume(makeMarkerBuffer(), type: .microphone)
+        clock.advance(Self.timeout + 1)
+        watchdog.check()
+        #expect(losses.value == 2)
+    }
+
+    /// Mid-flight count assertions need a readable tally, which `confirmation` doesn't offer.
+    private final class LossCounter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+        var value: Int { lock.lock(); defer { lock.unlock() }; return count }
+        func increment() { lock.lock(); count += 1; lock.unlock() }
+    }
+
     @Test func firesOnceWhenMicrophoneStopsDelivering() async {
         let clock = TestClock()
         // Exactly one event: a disconnect is permanent (verified — a reconnected device never

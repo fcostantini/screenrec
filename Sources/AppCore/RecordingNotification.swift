@@ -39,11 +39,19 @@ public enum RecordingNotifications {
                 fileURL: url)
 
         case .microphoneLost:
-            // The one notification that isn't about an ending: recording continues (ADR-012).
-            // Leads with that because the question it answers is "did my capture just die?".
+            // Not an ending: recording continues (ADR-012). Leads with that because the
+            // question it answers is "did my capture just die?".
             return RecordingNotification(
                 title: "Still recording · microphone disconnected",
-                body: "The rest of the recording has no microphone track.",
+                body: "The recording has no microphone until it reconnects.",
+                fileURL: nil)
+
+        case .microphoneRecovered:
+            // The rescue spliced the mic back in (M8-T2) — silence here would leave the user
+            // believing the loss notice above still holds.
+            return RecordingNotification(
+                title: "Still recording · microphone reconnected",
+                body: "The microphone track resumed.",
                 fileURL: nil)
 
         case .recordingFileRestored:
@@ -120,7 +128,16 @@ public enum RecordingNotifications {
     public static func replayMicrophoneLost() -> RecordingNotification {
         RecordingNotification(
             title: "Replay still armed · microphone disconnected",
-            body: "Replays saved from now on have no microphone. Re-arm to reconnect it.",
+            body: "Replays saved while it's away have no microphone.",
+            fileURL: nil)
+    }
+
+    /// The armed pipeline's mic came back via the rescue stream (M8-T2) — counterpart to the
+    /// loss notice above.
+    public static func replayMicrophoneReconnected() -> RecordingNotification {
+        RecordingNotification(
+            title: "Replay still armed · microphone reconnected",
+            body: "Replays saved from now on include the microphone again.",
             fileURL: nil)
     }
 

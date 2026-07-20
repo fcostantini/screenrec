@@ -24,6 +24,14 @@ public enum ContentSelection: Sendable, Equatable {
     case app(bundleID: String)
 }
 
+/// Which device a lost microphone recovers onto (docs/03 M8-T2: honor the pick).
+public enum MicrophoneRecovery: Sendable, Equatable {
+    /// A specific pick rebinds only itself — never silently substitutes another device.
+    case sameDevice
+    /// Automatic (M6-T13) follows the CURRENT system default at return time.
+    case systemDefault
+}
+
 /// Which microphone to capture. `.device` carries an already-resolved explicit
 /// `uniqueID` (see `Permissions.resolveMicrophoneID`) — never a nil/default sentinel,
 /// which would fail capture with the opaque "invalid parameter" (docs/02 §1).
@@ -37,17 +45,20 @@ public enum MicrophoneSelection: Sendable, Equatable {
 public struct CaptureConfiguration: Sendable, Equatable {
     public var content: ContentSelection
     public var microphone: MicrophoneSelection
+    public var microphoneRecovery: MicrophoneRecovery
     public var frameRateCap: Int
     public var quality: QualityPreset
 
     public init(
         content: ContentSelection = .display(.main),
         microphone: MicrophoneSelection = .none,
+        microphoneRecovery: MicrophoneRecovery = .sameDevice,
         frameRateCap: Int = 60,
         quality: QualityPreset = .balanced
     ) {
         self.content = content
         self.microphone = microphone
+        self.microphoneRecovery = microphoneRecovery
         self.frameRateCap = frameRateCap
         self.quality = quality
     }

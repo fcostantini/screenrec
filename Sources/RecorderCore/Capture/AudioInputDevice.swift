@@ -80,7 +80,7 @@ public enum AudioInputs {
         return value.takeRetainedValue() as String   // HAL returns a +1 CFString
     }
 
-    private static func globalAddress(
+    static func globalAddress(
         _ selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
         AudioObjectPropertyAddress(
             mSelector: selector,

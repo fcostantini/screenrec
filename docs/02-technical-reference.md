@@ -191,11 +191,15 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   section claimed "AirPods die → built-in mic takes over" — that is **FALSE**; do not design
   against it. Detecting mic loss therefore needs a **starvation watchdog** (was delivering,
   then stopped), not a format comparison — M3-T6, policy in ADR-012.
-- ⚠️ **A lost mic never comes back — reconnecting the device does NOT resume delivery.**
-  Verified 2026-07-15: AirPods cased mid-recording and then reconnected ~20 s later produced
-  no further mic buffers at all (mic track ended at 21.8 s of a 59.8 s file; the recording ran
-  to the end). Mic loss is therefore one-shot per session — nothing to re-arm or recover, which
-  is why `MicrophoneWatchdog` fires once.
+- ⚠️ **A lost mic never comes back *to the stream that lost it*** — reconnecting the device
+  does NOT resume delivery on the original `SCStream` (verified 2026-07-15: mic track ended at
+  21.8 s of a 59.8 s file despite a reconnect). **Since M8-T2 recovery IS built**: on loss,
+  `MicrophoneRescue` waits for the rebind target via a HAL device-list listener
+  (`kAudioHardwarePropertyDevices`), then splices a fresh mic-only `SCStream` into the same
+  router through its own `ResampledMicInput` — the track/ring resumes after a silent gap;
+  `MicrophoneWatchdog.rearm()` restarts the loss cycle so repeated case/uncase works. Policy
+  honors the pick (`MicrophoneRecovery`): `.sameDevice` for a specific pick, `.systemDefault`
+  for Automatic (which may recover onto a *different* device — the current default).
 
 ### The one rule behind all mic-device behavior (M3-T7 spike, 2026-07-15)
 

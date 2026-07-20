@@ -142,6 +142,16 @@ import RecorderCore
         #expect(state.captureConfiguration.quality == .high)
     }
 
+    @Test func recoveryPolicyHonorsThePick() {
+        // M8-T2: Automatic follows the system default on recovery; a specific pick (and None,
+        // vacuously) recovers only onto itself.
+        let state = makeState()
+        state.microphonePreference = .device(id: "mic-uid")
+        #expect(state.captureConfiguration.microphoneRecovery == .sameDevice)
+        state.microphonePreference = .automatic
+        #expect(state.captureConfiguration.microphoneRecovery == .systemDefault)
+    }
+
     @Test func noMicrophoneMeansNoneNotADefaultDevice() {
         // `.none` has to survive as `.none`: SCK treats a nil/sentinel device ID as an error
         // (docs/02 §1), and "the user chose no mic" must not quietly become "some mic".

@@ -140,13 +140,16 @@ form). Never the word "error" for a fail-stop.
 |---|---|---|---|
 | Manual stop | `Recording saved · 00:12:34` | `Recording 2026-07-14 at 10.12.mov` | reveal |
 | Fail-stop (any cause) | `Recording saved · 00:12:34` | `Ended: <cause>. File is playable.` | reveal |
-| Microphone lost mid-recording | `Still recording · microphone disconnected` | `The rest of the recording has no microphone track.` | — |
+| Microphone lost mid-recording | `Still recording · microphone disconnected` | `The recording has no microphone until it reconnects.` | — |
+| Microphone recovered mid-recording — **M8-T2** | `Still recording · microphone reconnected` | `The microphone track resumed.` | — |
 | Never started | `Couldn't start recording` | the engine's own message, e.g. `No displays available — the screen may be asleep or locked.` | — |
 | Replay saved — **M5** | `Replay saved` | `Replay … .mov — last 60 s. Click to reveal.` | reveal |
 | Replay save failed — **M5** | `Couldn't save replay` | one-line cause + what to do | — |
 | Recording file moved — **M6-T7** | `Still recording · file moved back` | `The recording file was moved while recording, so it was moved back.` | — |
 | Recording file deleted — **M6-T7** | via `failed`: | `The recording file was deleted while recording, so the video couldn't be saved.` | — |
 | Recovered interrupted recording — **M6-T7** | `Recovered an interrupted recording` | `Recording … .mov is ready to play.` | reveal |
+| Replay mic lost while armed — **M5, amended M8-T2** | `Replay still armed · microphone disconnected` | `Replays saved while it's away have no microphone.` | — |
+| Replay mic recovered while armed — **M8-T2** | `Replay still armed · microphone reconnected` | `Replays saved from now on include the microphone again.` | — |
 
 Fail-stop causes, one per reachable `EndReason`:
 `display disconnected` · `microphone changed` · `disk almost full` ·

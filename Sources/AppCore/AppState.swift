@@ -341,6 +341,9 @@ public final class AppState {
         replay.onMicrophoneLost = { [weak self] in
             self?.notifier?(RecordingNotifications.replayMicrophoneLost())
         }
+        replay.onMicrophoneRecovered = { [weak self] in
+            self?.notifier?(RecordingNotifications.replayMicrophoneReconnected())
+        }
         replay.onPipelineFailure = { [weak self] message in
             guard let self else { return }
             // Mirror the controller's self-disarm in the persisted state. The didSet runs
@@ -616,6 +619,9 @@ public final class AppState {
             content: selectedAppBundleID.map { ContentSelection.app(bundleID: $0) }
                 ?? .display(selectedDisplayID.map(DisplaySelection.id) ?? .main),
             microphone: pickedMicrophoneID.map { MicrophoneSelection.device(id: $0) } ?? .none,
+            // Honor the pick (M8-T2): a specific device recovers only onto itself; Automatic
+            // follows the current system default at return time.
+            microphoneRecovery: microphonePreference == .automatic ? .systemDefault : .sameDevice,
             frameRateCap: frameRateCap,
             quality: quality)
     }
@@ -760,9 +766,12 @@ public final class AppState {
             statusIcon = .idle
             lastFailure = message
         case .microphoneLost:
-            // The one mid-recording problem that does not end the session (ADR-012): the mic
-            // track ends, the recording continues, and the icon must keep saying so.
+            // The one mid-recording problem that does not end the session (ADR-012): the
+            // recording continues, and the icon must keep saying so. The rescue may clear it.
             lastFailure = "Microphone disconnected — still recording."
+        case .microphoneRecovered:
+            // The rescue spliced the mic back (M8-T2); the loss notice would now be a lie.
+            lastFailure = nil
         case .recordingFileRestored:
             break   // recording unaffected; the notification carries the news
         case .fileProgress:

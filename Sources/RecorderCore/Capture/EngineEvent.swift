@@ -22,9 +22,12 @@ public enum EngineEvent: Sendable, Equatable {
     case paused
     case resumed
     /// A selected mic stopped delivering — the device went away (docs/02 §4). The one
-    /// mid-recording problem that does not end the session: recording continues and the mic
-    /// track ends here (ADR-012).
+    /// mid-recording problem that does not end the session: recording continues (ADR-012);
+    /// the rescue stream may resume the track (M8-T2, `.microphoneRecovered`).
     case microphoneLost
+    /// The rescue stream spliced the mic back in (M8-T2): the track/ring resumes after a
+    /// silent gap over the loss window.
+    case microphoneRecovered
     /// The in-progress file was moved (Trash included) and the sentinel renamed it back;
     /// recording continues. Deletion is not an event — it fails the session.
     case recordingFileRestored
