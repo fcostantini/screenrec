@@ -21,7 +21,7 @@ import RecorderCore
     /// Every way a session can end. All of them are `finished` — the fail-stops are ADR-007
     /// successes, not errors — so all of them must land on the same icon.
     private static let endReasons: [EndReason] = [
-        .userStopped, .displayDisconnected, .microphoneChanged,
+        .userStopped, .displayDisconnected, .appQuit, .microphoneChanged,
         .diskAlmostFull, .systemSleep, .streamError("-3815"),
     ]
 
@@ -30,9 +30,13 @@ import RecorderCore
     /// Never `AppState()` here: settings persist on `didSet` since M4-T4, so a bare AppState in
     /// a test writes to the real `UserDefaults.standard` — leaking one test's assignment into
     /// another's launch, and onto disk between runs. (That is exactly how this was found.)
-    private func makeState() -> AppState {
+    private func makeDefaults() -> UserDefaults {
         // Invariant: a fresh UUID suite name is always a valid, unused domain.
-        AppState(defaults: UserDefaults(suiteName: "appstate-tests-\(UUID().uuidString)")!)
+        UserDefaults(suiteName: "appstate-tests-\(UUID().uuidString)")!
+    }
+
+    private func makeState() -> AppState {
+        AppState(defaults: makeDefaults())
     }
 
     /// An AppState that has been through `started`, i.e. the first complete video frame landed.
@@ -199,6 +203,70 @@ import RecorderCore
         state.refreshSources(displays: [])
         #expect(state.selectedDisplayID == nil)
         #expect(state.captureConfiguration.content == .display(.main))
+    }
+
+    // MARK: - Source picker: app capture (docs/06 item 5, M7-T2)
+
+    @Test func aPickedAppReachesTheConfiguration() {
+        let state = makeState()
+        state.selectedAppBundleID = "com.example.app"
+        #expect(state.captureConfiguration.content == .app(bundleID: "com.example.app"))
+    }
+
+    @Test func sourceChoiceRoundTripsAndRemembersTheDisplay() {
+        let state = makeState()
+        state.selectedDisplayID = 42
+        state.sourceChoice = .app(bundleID: "com.example.app")
+        #expect(state.sourceChoice == .app(bundleID: "com.example.app"))
+
+        state.sourceChoice = .display(42)
+        // Returning from an app detour lands on the remembered display, not back on main.
+        #expect(state.selectedAppBundleID == nil)
+        #expect(state.captureConfiguration.content == .display(.id(42)))
+    }
+
+    @Test func anAbsentPickedAppIsKeptAndShownAsNotRunning() {
+        // The mic rule (docs/06): a pick survives absence — never re-homed to Entire Screen.
+        // The menu shows it through `missingPickedApp`; a start while absent fails loud (M7-T1).
+        let state = makeState()
+        state.selectedAppBundleID = "com.example.gone"
+        state.refreshApps([CapturableApp(bundleID: "com.other", name: "Other")], excluding: nil)
+        #expect(state.selectedAppBundleID == "com.example.gone")
+        #expect(state.missingPickedApp
+            == CapturableApp(bundleID: "com.example.gone", name: "com.example.gone"))
+    }
+
+    @Test func missingPickedAppUsesTheInjectedNameResolver() {
+        let state = makeState()
+        state.appDisplayName = { $0 == "com.example.gone" ? "Gone" : nil }
+        state.selectedAppBundleID = "com.example.gone"
+        #expect(state.missingPickedApp?.name == "Gone")
+    }
+
+    @Test func aRunningPickedAppIsNotMissing() {
+        let state = makeState()
+        state.selectedAppBundleID = "com.example.app"
+        state.refreshApps([CapturableApp(bundleID: "com.example.app", name: "App")], excluding: nil)
+        #expect(state.missingPickedApp == nil)
+    }
+
+    @Test func refreshAppsExcludesTheAppItself() {
+        let state = makeState()
+        state.refreshApps(
+            [CapturableApp(bundleID: "dev.fcostantini.screenrec.app", name: "ScreenRec"),
+             CapturableApp(bundleID: "com.other", name: "Other")],
+            excluding: "dev.fcostantini.screenrec.app")
+        #expect(state.capturableApps == [CapturableApp(bundleID: "com.other", name: "Other")])
+    }
+
+    @Test func theAppPickPersistsAcrossLaunches() {
+        let defaults = makeDefaults()
+        let first = AppState(defaults: defaults)
+        first.selectedAppBundleID = "com.example.app"
+
+        let second = AppState(defaults: defaults)
+        #expect(second.selectedAppBundleID == "com.example.app")
+        #expect(second.captureConfiguration.content == .app(bundleID: "com.example.app"))
     }
 
     // MARK: - Session shape

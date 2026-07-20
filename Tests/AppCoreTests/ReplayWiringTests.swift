@@ -109,6 +109,23 @@ import RecorderCore
         #expect(spy.lastSeconds == 60)
     }
 
+    @Test func aSourceSwitchRestartsTheArmedStreamExactlyOnce() {
+        // App → different display writes TWO backing properties; unbatched, each didSet would
+        // rebuild the armed stream (wiping the buffer, the first against a config that exists
+        // for a microsecond). The `sourceChoice` setter batches them into one restart (M7-T2).
+        let (state, spy, _) = makeState()
+        state.selectedDisplayID = 1
+        state.isReplayArmed = true
+        spy.calls = []
+
+        state.sourceChoice = .app(bundleID: "com.example.app")
+        #expect(spy.calls == [.configurationChanged])
+
+        spy.calls = []
+        state.sourceChoice = .display(2)
+        #expect(spy.calls == [.configurationChanged])
+    }
+
     @Test func windowChangesResizeInPlaceInsteadOfRestarting() {
         // A length change must never take the rebuild path — that wipes the buffer.
         let (state, spy, _) = makeState()

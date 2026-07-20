@@ -658,7 +658,7 @@ feature; do not bundle.
       **Verify:** CLI capture of one app while another app animates on screen → the other
       app appears in NO frame; system audio contains only the target's audio; app-quit
       mid-run → clean `finished(reason:)`, playable file.
-- [ ] M7-T2 App: source picker in the menu (Entire Screen / running apps — dynamic list,
+- [x] M7-T2 App: source picker in the menu (Entire Screen / running apps — dynamic list,
       refreshed on open; the M5-T5 `refreshSources` re-home suppression applies), settings
       persistence, sources-locked-while-recording behavior, armed replay follows the pick.
       **Verify:** menudriver-driven app-scoped recording + mid-recording replay save, both

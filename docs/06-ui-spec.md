@@ -37,8 +37,18 @@ Order and grouping (separators between groups):
 3. **Instant Replay armed** — checkmark toggle; right hint `⌥⌘R saves`. Persisted.
    **M5** (Franco, 2026-07-15): a toggle that arms nothing is a lie for a whole milestone.
 4. — separator —
-5. `Display ▸` submenu: one entry per `NSScreen`, checkmark on current. Disabled while
-   recording.
+5. `Source ▸` submenu (M7-T2; was `Display ▸`): what gets captured. **Entire Screen** (one row
+   per `NSScreen` when several — "Entire Screen (<name>)"), a divider, then the **running apps**
+   (name-sorted; ScreenRec excludes itself; filtered to `activationPolicy == .regular` so system
+   chrome — Dock, Control Center — never lists). Checkmark on current. Apps enumerate via
+   `CapturableApps` — the same `SCShareableContent` read the engine binds against, so a listed
+   app is always bindable; fetched async at menu open (the rows can land a beat late on the
+   first open, like the recents). **A picked app that isn't running stays listed** as
+   `<name> (not running)` with the checkmark — the pick survives absence (the mic rule), Start
+   then fails loud (never a silent whole-screen fallback), and an armed replay retries until the
+   app returns (measured: quit → relaunch re-arms unaided). ⚠️ `.disabled(true)` on a Picker row
+   does not survive the `.menu` bridge (measured M7-T2) — the not-running row renders undimmed;
+   accepted. Hidden while recording (see recording item 7).
 6. `Microphone ▸` submenu: `None`, **`Automatic (System Default)`**, a divider, then the input-device
    list. Checkmark on current. Disabled while recording. Devices enumerated **live** via the CoreAudio
    HAL (`AudioInputs.available`), not `AVCaptureDevice.DiscoverySession` — the latter caches and misses
@@ -80,7 +90,8 @@ Order and grouping (separators between groups):
 2. **Pause** / **Resume** (swaps by state).
 3. **Stop & Save** — primary.
 4. — separator —
-5. Dimmed info row: active mic + `separate track`. Then the **Arm Instant Replay toggle
+5. Dimmed info rows: when app-scoped, `Recording <app> only` (M7-T2 — the recording menu names
+   its subject); active mic + `separate track`. Then the **Arm Instant Replay toggle
    — live mid-recording** (amended 2026-07-17, M6-T8: arming attaches replay to the live
    stream, disarming detaches; the recording is unaffected either way) and, when armed,
    **Save Replay Now** with the shortcut column carrying the combo (this replaces the old
@@ -272,6 +283,7 @@ moved):
 | `fpsCap` | Int 30\|60 | M4-T4 |
 | `microphoneID` | String uniqueID; absent ⇒ None (or Automatic — see below). **Never cleared by device absence** — the pick survives the AirPods sitting in their case; the menu's checkmark sits on None while the device is away (Franco, 2026-07-16). A specific pick resolves device-or-nothing (no default fallback, or the menu would lie) | M5 follow-up |
 | `microphoneAutomatic` | Bool; true ⇒ **Automatic (System Default)**, and it wins over any `microphoneID` in the plist. Resolution follows the system default at capture start (M6-T13) | M6-T13 |
+| `captureAppBundleID` | String bundle ID; absent ⇒ entire screen. **Never cleared by the app not running** — the pick survives (mic rule); a start while it's away fails loud, armed replay retries until it returns | M7-T2 |
 | `replayArmed` | Bool | **M5** |
 | `replaySeconds` | Int 30\|60\|120 | **M5** |
 | `replayHotkey` | Dict: keyCode Int, modifiers Int | **M5** |

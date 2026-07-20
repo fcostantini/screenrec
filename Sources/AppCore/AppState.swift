@@ -4,6 +4,14 @@ import Observation
 import RecorderCore
 import os
 
+/// One Hashable tag for the Source picker's two kinds of row (docs/06 item 5, M7-T2).
+/// RecorderCore's `ContentSelection` carries non-Hashable siblings; `captureConfiguration`
+/// translates.
+public enum SourceChoice: Hashable, Sendable {
+    case display(CGDirectDisplayID?)
+    case app(bundleID: String)
+}
+
 /// The menu-bar app's view state.
 ///
 /// Drives a `RecordingSession` and consumes its `EngineEvent` stream, RecorderCore's single
@@ -25,6 +33,9 @@ public final class AppState {
 
     public private(set) var displays: [DisplayOption] = []
     public private(set) var microphones: [AudioInputDevice] = []
+    /// Running apps for the Source picker (docs/06 item 5, M7-T2). Fetched async by the view at
+    /// menu open — `SCShareableContent` takes ~a second — through `refreshApps`.
+    public private(set) var capturableApps: [CapturableApp] = []
 
     /// The user's picks, as the plain identifiers the menu selects by: RecorderCore's
     /// `DisplaySelection`/`MicrophoneSelection` carry associated values and aren't `Hashable`,
@@ -32,6 +43,16 @@ public final class AppState {
     public var selectedDisplayID: CGDirectDisplayID? {    // nil ⇒ whatever is the main display
         didSet {
             if selectedDisplayID != oldValue, !isRehomingSources { replayConfigurationChanged() }
+        }
+    }
+    /// The Source pick when it's an app (docs/06 item 5, M7-T2); nil ⇒ entire screen. Persisted,
+    /// and — like the mic pick — it survives the app not running: never re-homed by absence, and
+    /// a start while the app is away fails loud (never a silent whole-screen fallback).
+    public var selectedAppBundleID: String? {
+        didSet {
+            guard selectedAppBundleID != oldValue, !isRehomingSources else { return }
+            persist()
+            replayConfigurationChanged()
         }
     }
     /// The user's microphone pick: a specific device, `.automatic` (follow the system default at
@@ -52,10 +73,10 @@ public final class AppState {
         return nil
     }
 
-    /// True while `refreshSources` re-homes stale picks. Its writes are housekeeping, not user
-    /// intent — every menu open runs it, and restarting the armed stream there would wipe the
-    /// replay buffer on the first open after launch, or right after a mic vanished (the exact
-    /// moment someone opens the menu to save).
+    /// True while `refreshSources` re-homes stale picks (housekeeping, not user intent) and
+    /// while `sourceChoice` batches its two backing writes — either way, the suppressed didSets
+    /// must not restart the armed stream: a rebuild wipes the replay buffer, and the batched
+    /// case would otherwise rebuild twice, once against a config that exists for a microsecond.
     private var isRehomingSources = false
 
     // Persisted (docs/06). The display and microphone picks deliberately are not: they name
@@ -190,6 +211,9 @@ public final class AppState {
     /// a vanished device falls back to the system default. SCK binds the mic once at
     /// `startCapture` and never re-resolves (02 §4), so this is fixed for the session.
     public private(set) var activeMicrophoneName: String?
+    /// The app being recorded, for the recording menu's "Recording <app> only" line (docs/06,
+    /// M7-T2); nil for whole-screen. Named at start — the pick is locked for the session.
+    public private(set) var activeAppName: String?
     /// Set when a recording didn't survive its own start, or degraded on the way. ADR-007
     /// forbids the silent version of either.
     public private(set) var lastFailure: String?
@@ -306,6 +330,7 @@ public final class AppState {
         quality = settings.quality
         frameRateCap = settings.frameRateCap
         microphonePreference = settings.microphonePreference
+        selectedAppBundleID = settings.captureAppBundleID
         isReplayArmed = settings.replayArmed
         replaySeconds = settings.replaySeconds
         replayHotkey = settings.replayHotkey
@@ -336,6 +361,7 @@ public final class AppState {
             Settings(
                 outputDirectory: outputDirectory, quality: quality, frameRateCap: frameRateCap,
                 microphonePreference: microphonePreference,
+                captureAppBundleID: selectedAppBundleID,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey),
             to: defaults)
@@ -499,6 +525,55 @@ public final class AppState {
         // nothing (Automatic follows the system default), so nothing lies.
     }
 
+    /// Fetches and publishes the Source picker's app list; the view calls this at menu open.
+    /// In-flight-guarded (a quick reopen must not stack ~1 s shareable-content fetches); a
+    /// fetch failure keeps the last-known list rather than blanking an open picker.
+    public func refreshCapturableApps() async {
+        guard !isRefreshingApps else { return }
+        isRefreshingApps = true
+        defer { isRefreshingApps = false }
+        guard let apps = try? await CapturableApps.available() else { return }
+        refreshApps(apps)
+    }
+    private var isRefreshingApps = false
+
+    /// Membership + publish, assign-on-change only (M6-T10). ScreenRec never lists itself —
+    /// recording the recorder is noise; `recordableAppsFilter` applies the app layer's policy.
+    /// `excluding` is injected so tests don't depend on the test runner's bundle identity.
+    func refreshApps(
+        _ apps: [CapturableApp], excluding ownBundleID: String? = Bundle.main.bundleIdentifier
+    ) {
+        var apps = apps.filter { $0.bundleID != ownBundleID }
+        apps = recordableAppsFilter?(apps) ?? apps
+        if capturableApps != apps { capturableApps = apps }
+    }
+
+    /// Which running apps belong in the Source picker, beyond self-exclusion. Injected by the
+    /// app (the activation-policy read needs NSRunningApplication — AppKit); takes the whole
+    /// list so the implementation can snapshot the process table once. Nil ⇒ no extra filter.
+    public var recordableAppsFilter: (([CapturableApp]) -> [CapturableApp])?
+
+    /// The picked app while it isn't in the live list: the menu shows it as a checkmarked
+    /// "(not running)" row, so the pick stays visible without lying (the mic pattern's truth
+    /// discipline, M7-T2).
+    public var missingPickedApp: CapturableApp? {
+        guard let bundleID = selectedAppBundleID,
+              !capturableApps.contains(where: { $0.bundleID == bundleID }) else { return nil }
+        return CapturableApp(bundleID: bundleID, name: appName(for: bundleID))
+    }
+
+    /// Resolves an installed app's display name from its bundle ID (works while it isn't
+    /// running). Injected by the app — NSWorkspace is AppKit, banned here. Nil in tests.
+    public var appDisplayName: ((String) -> String?)?
+
+    /// Bundle ID → display name: the live list, then the installed-app resolver, then the ID
+    /// itself — the one fallback chain, and it never returns an empty string.
+    private func appName(for bundleID: String) -> String {
+        capturableApps.first { $0.bundleID == bundleID }?.name
+            ?? appDisplayName?(bundleID)
+            ?? bundleID
+    }
+
     /// What the menu's Microphone picker highlights: the pick, except a specific device that's
     /// currently away shows as `.none` (checkmark on None) — the truthful display of a pick whose
     /// device is in its case, without forgetting the pick. `.automatic` isn't a device, so it
@@ -538,10 +613,32 @@ public final class AppState {
     /// without starting anything.
     public var captureConfiguration: CaptureConfiguration {
         CaptureConfiguration(
-            content: .display(selectedDisplayID.map(DisplaySelection.id) ?? .main),
+            content: selectedAppBundleID.map { ContentSelection.app(bundleID: $0) }
+                ?? .display(selectedDisplayID.map(DisplaySelection.id) ?? .main),
             microphone: pickedMicrophoneID.map { MicrophoneSelection.device(id: $0) } ?? .none,
             frameRateCap: frameRateCap,
             quality: quality)
+    }
+
+    /// The Source picker's one Hashable selection over both row kinds (docs/06 item 5, M7-T2).
+    /// Writing `.display` clears the app pick; the remembered display survives an app detour.
+    /// The two backing writes are batched (`isRehomingSources`) into ONE persist + rebuild.
+    public var sourceChoice: SourceChoice {
+        get { selectedAppBundleID.map { .app(bundleID: $0) } ?? .display(selectedDisplayID) }
+        set {
+            guard newValue != sourceChoice else { return }
+            isRehomingSources = true
+            switch newValue {
+            case .display(let id):
+                selectedAppBundleID = nil
+                selectedDisplayID = id
+            case .app(let bundleID):
+                selectedAppBundleID = bundleID
+            }
+            isRehomingSources = false
+            persist()
+            replayConfigurationChanged()
+        }
     }
 
     // MARK: - Actions (docs/06 "Menu — idle/recording state", items 2–3)
@@ -556,6 +653,7 @@ public final class AppState {
 
         var configuration = captureConfiguration
         configuration.microphone = resolvedMicrophone()
+        activeAppName = selectedAppBundleID.map(appName(for:))
 
         let outputURL: URL
         do {
@@ -699,6 +797,7 @@ public final class AppState {
                 outputDirectory: outputDirectory)
         }
         activeMicrophoneName = nil
+        activeAppName = nil
         elapsedSeconds = 0
         recordedBytes = 0
         // `lastFailure` belongs to the session that raised it: left set, a transient notice would

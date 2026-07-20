@@ -22,6 +22,27 @@ struct ScreenRecApp: App {
         state.hotkeyRegistrar = { [weak hotkeys] in hotkeys?.setHotkey($0) ?? false }
         // SMAppService is a system service, not UI, but the seam keeps AppState testable.
         state.loginItem = SMLoginItem()
+        // Names a picked-but-closed app for the Source picker's "(not running)" row (M7-T2).
+        // NSWorkspace is AppKit, so the resolver is injected rather than living in AppCore.
+        // Cached: the row re-renders per menu publish, and each miss is a LaunchServices DB
+        // query plus disk metadata; an installed app's name can't change mid-run.
+        var appNameCache: [String: String] = [:]
+        state.appDisplayName = { bundleID in
+            if let cached = appNameCache[bundleID] { return cached }
+            let name = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+                .map { FileManager.default.displayName(atPath: $0.path) }
+            if let name { appNameCache[bundleID] = name }
+            return name
+        }
+        // Keeps the Source picker to apps a user would record: SCShareableContent also lists
+        // windowed system chrome (Dock, Control Center…). Whole-list shape so one process-table
+        // snapshot serves every app; the CLI's `list-apps` deliberately stays unfiltered.
+        state.recordableAppsFilter = { apps in
+            let regular = Set(NSWorkspace.shared.runningApplications
+                .filter { $0.activationPolicy == .regular }
+                .compactMap(\.bundleIdentifier))
+            return apps.filter { regular.contains($0.bundleID) }
+        }
         let state = state
         hotkeys.onHotkey = { state.saveReplay() }
     }

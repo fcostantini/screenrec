@@ -52,9 +52,23 @@ struct MenuView: View {
 
         // A `Picker` in menu content renders as docs/06 items 5–7 ask: a submenu with a
         // checkmark on the current entry. An explicit `Menu` forced `.inline` adds separators.
-        Picker("Display", selection: $state.selectedDisplayID) {
+        //
+        // Source (docs/06 item 5, M7-T2): screens above the divider, running apps below — the
+        // Microphone submenu's shape. A picked app that isn't running stays listed, dimmed and
+        // checkmarked, so the pick is visible without lying (its Start fails loud instead).
+        Picker("Source", selection: $state.sourceChoice) {
             ForEach(state.displays) { screen in
-                Text(screen.name).tag(CGDirectDisplayID?.some(screen.id))
+                Text(state.displays.count == 1 ? "Entire Screen" : "Entire Screen (\(screen.name))")
+                    .tag(SourceChoice.display(screen.id))
+            }
+            Divider()
+            ForEach(state.capturableApps, id: \.bundleID) { app in
+                Text(app.name).tag(SourceChoice.app(bundleID: app.bundleID))
+            }
+            if let missing = state.missingPickedApp {
+                Text("\(missing.name) (not running)")
+                    .tag(SourceChoice.app(bundleID: missing.bundleID))
+                    .disabled(true)
             }
         }
 
@@ -114,8 +128,14 @@ struct MenuView: View {
 
         if let failure = state.lastFailure {
             Text(failure)
-        } else if let microphone = state.activeMicrophoneName {
-            Text("\(microphone) · separate track")
+        } else {
+            // docs/06 recording item 5 (M7-T2): an app-scoped recording names its subject.
+            if let app = state.activeAppName {
+                Text("Recording \(app) only")
+            }
+            if let microphone = state.activeMicrophoneName {
+                Text("\(microphone) · separate track")
+            }
         }
 
         replayControls
@@ -185,6 +205,9 @@ struct MenuView: View {
         state.refreshRecentRecordings()
         if !state.isSessionActive {
             state.refreshSources(displays: DisplayOption.liveScreens())
+            // Async because SCShareableContent takes ~a second; on the first open the app rows
+            // land a beat late, like the recents. Publishes only on a real change.
+            Task { await state.refreshCapturableApps() }
         }
         state.refreshProgress()
     }

@@ -5,6 +5,33 @@
 
 ## Now
 
+- **🎉 M7 COMPLETE — v1.1.0 (M7-T2 DONE, GATE G7 PASSED 2026-07-20).** The menu's `Display ▸`
+  became **`Source ▸`**: Entire Screen (per-display when several) above a divider, running apps
+  below — live via `CapturableApps` at menu open (async, publish-on-change), filtered to
+  `activationPolicy == .regular` (the raw list included Dock/Control Center/SystemUIServer —
+  caught live) and excluding ScreenRec itself. New contractual key `captureAppBundleID`
+  (docs/06 table). **The absence ruling (approved via plan artifact):** the pick survives the
+  app not running — shown as a checkmarked `<name> (not running)` row (`.disabled` does NOT
+  survive the `.menu` bridge; renders undimmed, accepted) — Start fails loud with T1's copy,
+  and **armed replay retries until the app returns** (M6-T9's stream-death patience, measured
+  live: quit → armed held → relaunch → re-armed unaided → clean 18.2 s clip). Recording menu
+  gains `Recording <app> only`. **Verified LIVE, all menudriver-driven:** pick TextEdit →
+  key persisted → survives app relaunch; app-scoped 32 s recording + **mid-recording 14.8 s
+  replay save off the shared stream, BOTH content-clean** (flashing bystander window absent
+  from every checked frame of both files); recording menu shows subject + lock row, no
+  pickers. 281 tests (+9; +2 settings). VERSION 1.0.0 → **1.1.0** + tag (ADR-013, first
+  post-v1 MINOR). /simplify (4 agents) → 1 real find + polish, findings presented, Franco
+  approved batch: **the `sourceChoice` setter batched to ONE armed-stream rebuild** (was two —
+  the second wiping the replay buffer against a microsecond-lived config; regression test on
+  the ReplaySpy), app-list fetch/membership policy consolidated into
+  `AppState.refreshCapturableApps()` + an injected whole-list `recordableAppsFilter` (one
+  process-table snapshot), one `appName(for:)` chain, LaunchServices name lookups cached in
+  the app-layer resolver. Skipped w/ rationale: `SourceChoice.display` non-optional (low
+  stakes, mirrors stored state). All re-verified live post-refactor on the deployed 1.1.0. Verification-rig find: **menudriver's `dismiss` posted a GLOBAL Escape** —
+  when the menu wasn't tracking it landed in the focused app (the driving terminal!) and
+  interrupted the agent session mid-run; now AXCancel on the menu element (field note).
+  **Next: M8 (mic recovery) is the only planned milestone left — Franco's call on when.**
+
 - **M7-T1 DONE — per-app capture core + CLI (Franco picked M7 over M8, 2026-07-20; plan
   artifact approved, `list-apps` included).** `CaptureConfiguration.display` → `content:
   ContentSelection` (`.display(…)` / `.app(bundleID:)`); the engine builds
@@ -560,9 +587,32 @@ video (deterministic, reproducible).
 | G3   | ✅ **PASSED 2026-07-15** | §4.1 pause-math: scripted `rec10,pause5,rec10` (--no-mic). Calm box → 4 runs 19.86–19.98s, all ∈ [19.8,20.2], tracks match ≤40ms. Loaded box (post code-review workflow, load ~2.6) → mean 20.05s over 8 runs (25s wall→20s file ⇒ 5s pause exactly removed), 5/8 strictly in-window; the 3 outliers are load jitter (audio starvation stretches the video tail; a load-delayed resume frame), NOT pause-math error. All runs probe monotonic-clean. §4.2 mic-disappears ✅ PASSED 2026-07-15 (Franco, post-M3-T6, per the ADR-012 definition): AirPods cased at ~22s of a 60s run → CLI printed `⚠️ microphone disconnected — still recording` at ~25s (≈3.2s latency = 3s timeout + ≤1s poll), recording ran to the end, `finished (userStopped)`, file playable, mic track 21.82s vs video 59.83s. First run (pre-M3-T6) disproved the gate's premise — no takeover, buffers just stop → docs/02 §4 corrected, ADR-012 written. Also proved: a reconnected device NEVER resumes (mic gone for the session). §4.4 disk-guard ✅ PASSED: `--test-disk-floor 500000` (GB) vs 676 GiB free → `finished (diskAlmostFull)`, file playable (2.25s); negative verified on a real non-boot volume (4 GB HFS+ image, importantUsage reads 0 → records the full 8s, `userStopped`) after /code-review caught that the recommended capacity key reads 0 on every external volume. §4.1 cross-seam clap-sync ✅ (Franco — sync holds across the seam). §4.3 ✅ both ways in: display sleep (headless via `pmset`) → playable 3.3s, and lid-close/system sleep (Franco) → `finished (displayDisconnected)` + playable 11.2s file finalized on wake, confirming lid-close is the same -3815 and that `.systemSleep` is genuinely unreachable. §4.3 monitor-unplug N/A — built-in display only. |
 | G4   | ✅ **PASSED 2026-07-16** (§5.4 fresh-account rerun waived by Franco) | §5.2 ✅ headless: DR byte-identical across A→B rebuild + `--verify --strict` + rebuilt app `Ready` → menu-driven 19.43 s playable file, no re-grant. §5.3 ✅ headless (delivery) + ✅ live (Franco: banner renders + click reveals). §5.1 ✅ live (Franco: auto-relaunch on grant transition, forced the ungranted state). §5.4 ❌→**FIXED + verified** (unit + headless forced-failure integration: no wedge, clean "Couldn't write…"; preflight probes the real AVAssetWriter API → Desktop rejected at selection); the fresh-account end-to-end rerun was **discarded by Franco 2026-07-16** — the waiver, not a pass, is the record. |
 | G5   | ✅ **PASSED 2026-07-16** | §6.1 ✅ burst: 4.5 min busyscene max load → CPU 7.2% avg (cumulative), RSS flat 201–202 MB (+1 MB), occupancy pinned (T2 evidence). §6.2 ✅ save <1 s (0.08 s signal→file external, T4) + probe hvc1+2aac 60.56 s keyframe-aligned + content genuinely the last minute (Franco). §6.3 ✅ two rapid triggers → one coalesced clean file (T4 live + OS-level signal merge). §6.4 ✅ recording (35.99 s) + mid-recording replay (32.29 s) off one shared stream, both probe-clean (T5). §6.5 ✅ 30.2 min armed real usage: RSS drift min5→end +7 MB (no leak), CPU 4.7% avg, min-30 save 0.17 s write / ≈0.6 s end-to-end (rig overhead subtracted; raw 1.53 s incl. 0.87 s menudriver). |
+| G7   | ✅ **PASSED 2026-07-20 (v1.1.0)** | App-scoped recording (32.25 s, hvc1 + 2×AAC, menu-driven) + app-scoped **mid-recording** replay save (14.76 s, same shared stream — G5 §6.4 simultaneity under an app filter): both probe clean, both **content-clean** (a flashing bystander window on screen throughout appears in NO checked frame of either file). Bystander *audio* scoping: measured same-day at the engine level (M7-T1: −91 dB app-scoped vs −10.6 dB whole-screen control through the identical filter-construction path; SCK-level spike 0.0000 vs 0.2931) — not re-measured through the menu path, which diverges only above the filter. App-quit handled: CLI `finished(appQuit)` (T1) + armed-stream quit → held armed → auto re-arm on relaunch → clean clip (T2). |
 | G6   | ✅ **v1 declared 2026-07-20 (v1.0.0)** — M6 complete bar the deferred T4 bucket; G6 = the sum of the soak legs (below) + acceptance criteria, all green | §7 leg 1 ✅ 2026-07-17: 2 h battery, real usage + Zoom, replay armed, 3 mid-run replay saves; 19.5 GB / 7223.42 s, tracks ≤110 ms apart; battery 99→62%, CPU avg 12.9% / max 19.3%, RSS 98–485 MB trendless, zero thermal warnings; Franco: "smooth throughout, no desync" (claps at 0/1/2 h). §7 kill leg ✅ (amended to 1 h, Franco): kill -9 at 3540 s → playable 3539.53 s, **0.47 s lost** (≤10 s); app relaunched Ready. ⚠️ relaunch dropped the persisted armed state (transient pipeline failure → self-disarm; field note) — open follow-up, not a gate fail (§7 doesn't cover it). |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-20 (M7-T2): four rig/platform finds.
+  - **🔴 menudriver's `dismiss` posted a GLOBAL Escape (CGEvent)** — whenever the menu wasn't
+    actually tracking, that Esc went to the *focused* app. With Franco using the machine, focus
+    was often the driving terminal — and Esc there **interrupts the agent session**, which looked
+    exactly like Franco cancelling tool calls (he wasn't; he caught it: "something is
+    interrupting you and it's not me"). Fixed: `dismiss` now performs **AXCancel on the menu
+    element** — targeted, no-op when nothing's open, can never hit a bystander app. Lesson for
+    every AX tool here: never post global key/mouse events when a targeted AX action exists.
+  - **The harness auto-rejects a verbatim retry of a command the user declined.** After Franco's
+    deliberate "stop for a moment" rejection, resending the identical command string bounced
+    twice with the same "user doesn't want to proceed" — reworded/split commands went through.
+    Adjust the command after any rejection; never resend it byte-identical.
+  - **`grep -cE "error|warning"` in a `&&` chain is a trap**: zero matches ⇒ exit 1 ⇒ the rest
+    of the chain (bundle.sh, the deploy) silently skips — I "deployed" a stale dist twice while
+    the release build had the fix. Pipe to `grep` for display only, never as a chain link.
+  - **`.disabled(true)` on a Picker row doesn't survive the `.menu` MenuBarExtra bridge**
+    (measured via AX: the not-running row reads enabled, renders undimmed) — same family as
+    text color / destructive role (docs/06 "Menu text styling"). And `SCShareableContent`'s app
+    list includes windowed system chrome (Dock, Control Center, SystemUIServer, Stats) — a
+    picker over it needs the `activationPolicy == .regular` filter (view layer;
+    NSRunningApplication is AppKit).
 
 - 2026-07-20 (M7-T1 verification-rig traps — cost three false failures and one lingering window):
   - **zsh backgrounding: `(A && B &)` runs A in the FOREGROUND and backgrounds only B.** Every

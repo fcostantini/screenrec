@@ -82,11 +82,11 @@ func openMenu() {
     usleep(250_000)                      // let the menu finish opening before anyone reads it
 }
 
+/// AXCancel on the menu element, never a posted keystroke — a global Escape lands in the
+/// focused app whenever the menu isn't tracking. No open menu ⇒ no-op.
 func dismissMenu() {
-    let source = CGEventSource(stateID: .hidSystemState)
-    CGEvent(keyboardEventSource: source, virtualKey: 53, keyDown: true)?  // Escape
-        .post(tap: .cghidEventTap)
-    CGEvent(keyboardEventSource: source, virtualKey: 53, keyDown: false)?.post(tap: .cghidEventTap)
+    guard let menu = children(statusItem()).first, !children(menu).isEmpty else { return }
+    AXUIElementPerformAction(menu, kAXCancelAction as CFString)
     usleep(150_000)
 }
 

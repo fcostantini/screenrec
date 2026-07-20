@@ -38,6 +38,10 @@ public struct Settings: Sendable, Equatable {
     /// against connected devices at load — a pick must survive its device sitting in its case;
     /// resolution happens at every stream start (and falls back to no mic).
     public var microphonePreference: MicrophonePreference
+    /// The Source pick (docs/06 item 5, M7-T2): capture one app instead of the whole screen.
+    /// Nil ⇒ entire screen. Not validated against running apps at load — the pick survives the
+    /// app being closed; a start while it's away fails loud (never a silent whole-screen fallback).
+    public var captureAppBundleID: String?
     public var replayArmed: Bool
     /// docs/06 offers 30, 60 or 120.
     public var replaySeconds: Int
@@ -52,6 +56,7 @@ public struct Settings: Sendable, Equatable {
             quality: .balanced,
             frameRateCap: 60,
             microphonePreference: .none,
+            captureAppBundleID: nil,
             replayArmed: false,
             replaySeconds: 60,
             replayHotkey: .standard)
@@ -71,6 +76,8 @@ public enum SettingsStore {
         public static let microphoneID = "microphoneID"
         /// True ⇒ Automatic (follow the system default); a specific device lives in `microphoneID`.
         public static let microphoneAutomatic = "microphoneAutomatic"
+        /// Absent ⇒ entire screen (M7-T2).
+        public static let captureAppBundleID = "captureAppBundleID"
         public static let replayArmed = "replayArmed"
         public static let replaySeconds = "replaySeconds"
         public static let replayHotkey = "replayHotkey"
@@ -120,6 +127,11 @@ public enum SettingsStore {
             settings.microphonePreference = .device(id: microphoneID)
         }
 
+        // Like the mic: no running-app validation — the pick survives the app being closed.
+        if let bundleID = defaults.string(forKey: Key.captureAppBundleID), !bundleID.isEmpty {
+            settings.captureAppBundleID = bundleID
+        }
+
         settings.replayArmed = defaults.bool(forKey: Key.replayArmed)
 
         // Same shape as fps: only the documented values, or a ring gets sized by garbage.
@@ -158,6 +170,8 @@ public enum SettingsStore {
             defaults.set(id, forKey: Key.microphoneID)
             defaults.removeObject(forKey: Key.microphoneAutomatic)
         }
+        // `set(_:Any?)` removes the key for nil — absent ⇒ entire screen, per the table.
+        defaults.set(settings.captureAppBundleID, forKey: Key.captureAppBundleID)
         defaults.set(settings.replayArmed, forKey: Key.replayArmed)
         defaults.set(settings.replaySeconds, forKey: Key.replaySeconds)
         defaults.set(

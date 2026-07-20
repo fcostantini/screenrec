@@ -42,6 +42,7 @@ import RecorderCore
         #expect(SettingsStore.Key.qualityPreset == "qualityPreset")
         #expect(SettingsStore.Key.fpsCap == "fpsCap")
         #expect(SettingsStore.Key.microphoneID == "microphoneID")
+        #expect(SettingsStore.Key.captureAppBundleID == "captureAppBundleID")
         #expect(SettingsStore.Key.replayArmed == "replayArmed")
         #expect(SettingsStore.Key.replaySeconds == "replaySeconds")
         #expect(SettingsStore.Key.replayHotkey == "replayHotkey")
@@ -94,6 +95,30 @@ import RecorderCore
         #expect(defaults.object(forKey: "microphoneID") == nil)
         #expect(defaults.object(forKey: "microphoneAutomatic") == nil)
         #expect(SettingsStore.load(from: defaults).microphonePreference == .none)
+    }
+
+    @Test func appPickPersistsAndSurvivesTheAppBeingClosed() {
+        // M7-T2: like the mic — no running-app validation at load; the pick outlives the app's
+        // process. Entire-screen round-trips as the key being absent, not an empty string.
+        let defaults = makeDefaults().defaults
+        var settings = makeSettings()
+        settings.captureAppBundleID = "com.example.notrunning"
+        SettingsStore.save(settings, to: defaults)
+        #expect(defaults.string(forKey: "captureAppBundleID") == "com.example.notrunning")
+        #expect(SettingsStore.load(from: defaults).captureAppBundleID == "com.example.notrunning")
+
+        settings.captureAppBundleID = nil
+        SettingsStore.save(settings, to: defaults)
+        #expect(defaults.object(forKey: "captureAppBundleID") == nil)
+        #expect(SettingsStore.load(from: defaults).captureAppBundleID == nil)
+    }
+
+    @Test func anEmptyAppBundleIDLoadsAsEntireScreen() {
+        // One `defaults write` away: an empty string must not become an app filter that can
+        // never resolve.
+        let defaults = makeDefaults().defaults
+        defaults.set("", forKey: SettingsStore.Key.captureAppBundleID)
+        #expect(SettingsStore.load(from: defaults).captureAppBundleID == nil)
     }
 
     @Test func automaticMicrophonePersistsAndWinsOverAStoredDevice() {
