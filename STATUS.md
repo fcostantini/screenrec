@@ -5,7 +5,12 @@
 
 ## Now
 
-- **🎉 M9 COMPLETE — M9-T8 DONE (replay-length slider). VERSION bump to 1.3.0 owed (Franco to cut).**
+- **🎉 M9 COMPLETE + v1.3.0 CUT — tagged `v1.3.0`, pushed to origin, deployed to /Users/Shared (2026-07-21).**
+  VERSION + `CoreInfo.version` → 1.3.0 (pin test green); the MINOR earns from T3 menu-bar clock + T4
+  global hotkey + T8 slider. All 15 M9 commits + the tag are on origin (0 unpushed). Installed build
+  reports 1.3.0. Owed live-checks (Franco, at leisure): global hotkey (⌥⌘S from another app) + slider
+  end-to-end (set 3:20, arm, save → ≈3:20 clip). **Next: M10 (share export & basic editing) on Franco's
+  go.** M9-T8 detail below.
   The Settings Picker (30/60/120 s) is now a **Slider, 5 s → 15 min, seconds granularity**, live `M:SS`
   value, **applied on release** (a draft `@State` committed to `replaySeconds` on
   `onEditingChanged(false)`, so a drag while armed resizes the ring **once** via M6-T6's `windowChanged`,
