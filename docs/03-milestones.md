@@ -848,7 +848,7 @@ its read side. Order matters: T1 builds the `AVAssetReader` read/transcode side 
 milestone is the trim/format side only, held deliberately (ADR-015). Capture default is never changed
 (still HEVC `.mov`, ADR-004); everything here is export/derive.
 
-- [ ] M10-T1 **Transcode-to-MP4 core + CLI.** A messaging/web-friendly export: read an existing
+- [x] M10-T1 **Transcode-to-MP4 core + CLI.** A messaging/web-friendly export: read an existing
       `.mov` and write H.264 High + AAC `.mp4`, `yuv420p`, `+faststart` — motivated by the manual
       ffmpeg-to-WhatsApp step done today (ADR-016; ADR-004 already named H.264 export demand-driven).
       **Seams:** a new `Exporter` (Export/ or Recording/) over `AVAssetReader`/writer (or

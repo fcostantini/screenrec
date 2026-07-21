@@ -10,6 +10,10 @@ func printUsage() {
 
     USAGE:
       screenrec-cli record [options] [path]   Record screen + audio to a .mov
+      screenrec-cli export --to-mp4 <in> [<out>]  Transcode a recording to a shareable
+                                       H.264 + AAC .mp4 (yuv420p, faststart): downscaled to
+                                       1920 wide, the two audio tracks mixed to one. Default
+                                       <out> is the input's .mp4 sibling. The source is read-only.
       screenrec-cli list-mics          List audio input devices
       screenrec-cli list-apps          List running apps capturable with record --app
       screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
@@ -561,6 +565,8 @@ case "probe-stream":
     await runProbeStream(Array(arguments.dropFirst()))
 case "replay-arm":
     await runReplayArm(Array(arguments.dropFirst()))
+case "export":
+    await runExport(Array(arguments.dropFirst()))
 case "-h", "--help":
     printUsage()
 default:

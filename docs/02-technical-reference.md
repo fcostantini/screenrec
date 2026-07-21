@@ -153,7 +153,8 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
 
 - **HEVC (`hvc1`) is the default codec.** Hard constraint: AVAssetWriter's H.264 path
   caps at 4096×2304 — the dev display (4112×2570) already exceeds it. Offer H.264 only
-  with a downscale, or not at all in v1.
+  with a downscale, or not at all in v1. (M10-T1's share export takes the downscale route:
+  `Exporter` re-encodes to H.264 High/AAC `.mp4` fitted to ≤1920 wide, so the cap is never hit.)
 - Bitrate model (`BitrateModel`): `bits = width × height × fps × BPP`, with H.264-class
   BPP ≈ 0.05 and an HEVC discount ≈ 0.6. Presets (CLI literals: `efficient` |
   `balanced` | `high`, lowercase):

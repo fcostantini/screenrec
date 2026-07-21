@@ -5,6 +5,32 @@
 
 ## Now
 
+- **M10-T1 DONE — transcode-to-MP4 share export (core + CLI).** New `Exporter` (RecorderCore/Export/)
+  over `AVAssetReader → re-encode → AVAssetWriter`: HEVC `.mov` → **H.264 High + AAC `.mp4`, yuv420p,
+  `+faststart`**, downscaled to **≤1920 wide** (Franco's recipe value, and forced anyway — 02 §3's
+  4096×2304 H.264 cap, which capture's 4112×2570 exceeds), the **two audio tracks mixed to one** stereo
+  AAC (`AVAssetReaderAudioMixOutput`, the recipe's `amix`). **No B-frames** (monotonic, most compatible;
+  bitrate-capped so they barely help size). CLI **`export --to-mp4 <in> [<out>]`**; default `<out>` is
+  the `.mp4` sibling, collision-resolved (` 2`), source read-only. Reuses `AudioEncodingSettings.aac` +
+  the ReplayMuxer write/drain idiom. **Capture default unchanged** (still HEVC `.mov`, ADR-004) — this is
+  a derived share copy (ADR-016). **326 tests (+8** ExporterTests: fittedSize downscale/no-upscale/even/
+  height-cap, mp4Sibling, availableURL collision, reject output==input, reject symlink-alias, one
+  integration — 2400×1500 3-track HEVC → 1920×1200 h264 + single mixed aac, playable, faststart moov<mdat,
+  audio spans the clip). Full dev loop green. **Verified LIVE headless:** a real 4112×2570 recording →
+  `export` → ffprobe **h264 High / yuv420p / 1920×1200 / aac 2ch single track / moov before mdat**;
+  re-export wrote `… 2.mp4`, original untouched. **Review (code-review agent; findings presented → Franco
+  approved batch):** ① collision guard is now **file-identity** (`fileResourceIdentifier` after resolving
+  symlinks) not string-equality — a string compare let an aliased `<out>` (symlink, `/tmp` alias, APFS
+  case) pass and the pre-write delete destroy the *input recording*; the alias test I added caught that
+  `resourceValues` reports the symlink's OWN identity (needs resolve-first). ② audio `canAdd` failure now
+  **throws** (was silent video-only + an undrained-output retention hazard). ③ duration = `assetDuration −
+  sessionStart`. ④ `removeItem` moved into `run()` beside `startWriting` (a construction failure leaves an
+  existing `<out>` intact). ⑤ reader/writer **cancelled on error paths** (frees the HW encoder). Deferred
+  ⑦ (field note). **No VERSION bump** — the CLI is the dev harness, not the shipped app (M7-T3 precedent);
+  the MINOR (1.4.0) lands with **M10-T2** (app wiring) or when Franco cuts. **M9 live-checks (global hotkey
+  ⌥⌘S, replay slider) CONFIRMED DONE by Franco (2026-07-21).** **Next: M10-T2 (Share… / Export as MP4 menu
+  action + progress/completion reusing M9-T2's confirmation) — plan artifact first.**
+
 - **🎉 M9 COMPLETE + v1.3.0 CUT — tagged `v1.3.0`, pushed to origin, deployed to /Users/Shared (2026-07-21).**
   VERSION + `CoreInfo.version` → 1.3.0 (pin test green); the MINOR earns from T3 menu-bar clock + T4
   global hotkey + T8 slider. All 15 M9 commits + the tag are on origin (0 unpushed). Installed build
@@ -808,6 +834,24 @@ video (deterministic, reproducible).
 | G6   | ✅ **v1 declared 2026-07-20 (v1.0.0)** — M6 complete bar the deferred T4 bucket; G6 = the sum of the soak legs (below) + acceptance criteria, all green | §7 leg 1 ✅ 2026-07-17: 2 h battery, real usage + Zoom, replay armed, 3 mid-run replay saves; 19.5 GB / 7223.42 s, tracks ≤110 ms apart; battery 99→62%, CPU avg 12.9% / max 19.3%, RSS 98–485 MB trendless, zero thermal warnings; Franco: "smooth throughout, no desync" (claps at 0/1/2 h). §7 kill leg ✅ (amended to 1 h, Franco): kill -9 at 3540 s → playable 3539.53 s, **0.47 s lost** (≤10 s); app relaunched Ready. ⚠️ relaunch dropped the persisted armed state (transient pipeline failure → self-disarm; field note) — open follow-up, not a gate fail (§7 doesn't cover it). |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-21 (M10-T1 debt): **`Exporter.FailureBox` + the `drain` loop duplicate
+  `ReplayMuxer.AppendFailure` + `append`** — the first-error box is line-for-line equal; the drain loops
+  differ only in source (pull-from-`AVAssetReaderOutput` vs replay from an in-memory array). A shared
+  `Support/FirstError` (and maybe a shared drain skeleton) would DRY both, but the extraction touches
+  `ReplayMuxer`, so it was **deferred from M10-T1** as out-of-scope (code-review finding ⑦, Franco
+  approved deferring). Slot into a debt task.
+
+- 2026-07-21 (M10-T1 test infra): **VT hardware-encoder oversubscription makes encoder-heavy tests
+  flaky.** swift-testing parallelizes across suites, so several tests each holding a
+  `VTCompressionSession` run at once; Apple Silicon allows only a handful concurrently. Two
+  hardware-encode-heavy integration tests (each: build an HEVC fixture *then* re-encode) pushed it over
+  → the shared 4 s readiness precondition in `SyntheticBuffers` failed ("encoder session never became
+  ready") and the export tests hung ~120 s. Fix applied: **one integration test per new encoder-heavy
+  suite** (merged the 640 + 2400 cases into a single 2400×1500 test that proves codecs, the 2→1 audio
+  mix, faststart, *and* the downscale). Also: **killing `swift test` mid-encode (SIGTERM) degrades the
+  HW encoder for the *next* run** — don't loop-run tests in a killable wrapper; a lone `swift test` is
+  ~1.3 s.
 
 - 2026-07-21 (M9-T5): **retired `MicSwapSpike.swift`** (822 LOC, 8 modes) — completed research
   scaffolding. Its findings are recorded (02 §4 / M3-T7, ADR-012 / M6-T4) and the recovery it explored
