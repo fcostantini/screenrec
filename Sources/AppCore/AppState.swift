@@ -695,6 +695,13 @@ public final class AppState {
         elapsedSeconds = 0
         recordedBytes = 0
 
+        // `activeMicrophoneName` is what `resolvedMicrophone()` above just resolved to; posting
+        // here, after the session commits, keeps a failed start from claiming it began.
+        if let notice = RecordingNotifications.recordingStart(
+            microphonePreference: microphonePreference, resolvedMicName: activeMicrophoneName) {
+            notifier?(notice)
+        }
+
         // Armed replay rides the recording's stream from here (docs/01's key property; the
         // buffer restarts — a new stream is a new pts epoch).
         if isReplayArmed {

@@ -77,6 +77,21 @@ public enum RecordingNotifications {
         }
     }
 
+    /// A recording that wanted a microphone but resolved to none records screen-only (ADR-012);
+    /// this says so at start, in the outcome-first voice, so a take set up and walked away from
+    /// isn't silently mic-less — the mid-recording loss (`microphoneLost`) already notifies. Nil
+    /// when the user chose None (an intentional no-mic) or a device did resolve.
+    public static func recordingStart(
+        microphonePreference: MicrophonePreference, resolvedMicName: String?
+    ) -> RecordingNotification? {
+        guard microphonePreference != .none, resolvedMicName == nil else { return nil }
+        let body = microphonePreference == .automatic
+            ? "No microphone is connected — recording screen only."
+            : "The selected microphone isn't connected — recording screen only."
+        return RecordingNotification(
+            title: "Recording started · no microphone", body: body, fileURL: nil)
+    }
+
     // MARK: - Replay (docs/06 notifications table, M5 rows)
 
     /// docs/06: `Replay saved` / `Replay … .mov — last 60 s. Click to reveal.` The count is the

@@ -742,7 +742,7 @@ feedback fixes and debt are PATCH/`refactor:` — Franco's call per commit. One 
 
 ### Quality-of-life
 
-- [ ] M9-T1 **Notify when a recording starts without its mic.** `AppState.resolvedMicrophone()`
+- [x] M9-T1 **Notify when a recording starts without its mic.** `AppState.resolvedMicrophone()`
       records screen-only and sets `lastFailure` when the picked device is absent (or Automatic
       resolves to nothing) but never posts — so a mic'd take set up and walked away from goes
       silently mic-less, while a *mid*-recording loss does notify (`.microphoneLost`). Post an

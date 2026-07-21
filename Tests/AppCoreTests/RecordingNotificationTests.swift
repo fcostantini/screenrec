@@ -112,6 +112,38 @@ import RecorderCore
         #expect(start?.title != finalize?.title)
     }
 
+    // MARK: - Recording started without a microphone (M9-T1)
+
+    @Test func aSpecificMicThatIsAwayIsAnnouncedAtStart() {
+        // The gap the mid-recording loss already notifies for, closed at start: outcome first
+        // (it IS recording), the cause named, nothing to reveal.
+        let n = RecordingNotifications.recordingStart(
+            microphonePreference: .device(id: "uid"), resolvedMicName: nil)
+        #expect(n?.title == "Recording started · no microphone")
+        #expect(n?.body == "The selected microphone isn't connected — recording screen only.")
+        #expect(n?.fileURL == nil)
+    }
+
+    @Test func automaticWithNothingConnectedSaysNoneIsConnected() {
+        let n = RecordingNotifications.recordingStart(
+            microphonePreference: .automatic, resolvedMicName: nil)
+        #expect(n?.title == "Recording started · no microphone")
+        #expect(n?.body == "No microphone is connected — recording screen only.")
+    }
+
+    @Test func choosingNoneIsSilent() {
+        // A deliberate no-mic is not a miss.
+        #expect(RecordingNotifications.recordingStart(
+            microphonePreference: .none, resolvedMicName: nil) == nil)
+    }
+
+    @Test func aResolvedMicrophoneSaysNothingAtStart() {
+        #expect(RecordingNotifications.recordingStart(
+            microphonePreference: .device(id: "uid"), resolvedMicName: "AirPods Pro") == nil)
+        #expect(RecordingNotifications.recordingStart(
+            microphonePreference: .automatic, resolvedMicName: "MacBook Pro Microphone") == nil)
+    }
+
     // MARK: - M6-T3: every failure message says what happened AND what to do
 
     @Test func diskAlmostFullNamesTheRemedy() {

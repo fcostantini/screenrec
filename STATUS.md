@@ -5,6 +5,19 @@
 
 ## Now
 
+- **M9-T1 DONE — mic-less-start notification.** A recording that wanted a mic but resolved to none
+  now posts `Recording started · no microphone` at start (pure `RecordingNotifications.recordingStart`,
+  fired from `AppState.start()` after the session commits), closing the gap where only a
+  *mid*-recording loss notified while a walked-away take went silently mic-less (ADR-007/ADR-012).
+  Silent for a deliberate None; body splits specific-pick ("The selected microphone isn't connected")
+  vs Automatic ("No microphone is connected") — plan-approved copy, device left unnamed. Capture
+  behavior unchanged (still records screen-only); the menu `lastFailure` row is untouched. **295
+  tests (+4** on the pure mapper: both variants + None-silent + resolved-silent). Full dev loop green
+  (build/test/release/bundle-sign). Quality pass done manually — 54-line pure-fn diff, multi-agent
+  review disproportionate; call-site comment trimmed of duplication with the factory doc. **No VERSION
+  bump** — PATCH-worthy but batched (the M9 note leaves per-commit bumps to Franco; M7-T1 precedent).
+  **Next: M9-T2 (in-app replay confirmation, banner-independent) — plan artifact first.**
+
 - **📋 Product/code review done + roadmap reopened (2026-07-21).** A full review (artifact: product +
   code, three parallel deep-dives — architecture, UX, competitive) ran against v1.2.0. **Two product
   forks resolved by Franco and recorded as ADRs so no future agent re-litigates:**
