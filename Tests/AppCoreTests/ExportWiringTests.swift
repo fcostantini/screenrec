@@ -1,0 +1,93 @@
+import Foundation
+import Testing
+
+@testable import AppCore
+import RecorderCore
+
+/// AppState → Exporter wiring, with the transcode injected — the real `Exporter` runs the
+/// hardware encoder (that's `ExporterTests`' job), so the wiring is tested on a fake.
+@MainActor
+@Suite struct ExportWiringTests {
+
+    private func makeState() -> AppState {
+        AppState(defaults: UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!)
+    }
+
+    @Test func exportSetsInProgressSynchronouslyThenReceiptAndNotifies() async {
+        let state = makeState()
+        var posted: [RecordingNotification] = []
+        state.notifier = { posted.append($0) }
+        let written = URL(fileURLWithPath: "/tmp/Clip.mp4")
+        state.exportFunction = { _, _ in written }
+
+        state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
+        #expect(state.exportInProgress == "Clip.mov")   // set before the background task runs
+        #expect(state.lastExport == nil)
+
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(state.lastExport?.url == written)
+        #expect(state.lastExport?.menuTitle == "Exported to MP4 · Clip.mp4")
+        #expect(posted.count == 1)
+        #expect(posted.first?.title == "Exported to MP4")
+        #expect(posted.first?.fileURL == written)
+    }
+
+    @Test func exportFailureNotifiesAndLeavesNoReceipt() async {
+        let state = makeState()
+        var posted: [RecordingNotification] = []
+        state.notifier = { posted.append($0) }
+        state.exportFunction = { _, _ in throw ExportError.writerFailed("nope") }
+
+        state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(state.lastExport == nil)
+        #expect(posted.count == 1)
+        #expect(posted.first?.title == "Couldn't export to MP4")
+        #expect(posted.first?.fileURL == nil)
+    }
+
+    @Test func aFailedReExportKeepsThePriorReceipt() async {
+        let state = makeState()
+        state.notifier = { _ in }
+        let firstURL = URL(fileURLWithPath: "/tmp/A.mp4")
+        state.exportFunction = { _, _ in firstURL }
+
+        state.exportToMP4(URL(fileURLWithPath: "/tmp/A.mov"))
+        while state.exportInProgress != nil { await Task.yield() }
+        #expect(state.lastExport?.url == firstURL)
+
+        state.exportFunction = { _, _ in throw ExportError.writerFailed("nope") }
+        state.exportToMP4(URL(fileURLWithPath: "/tmp/B.mov"))
+        while state.exportInProgress != nil { await Task.yield() }
+        #expect(state.lastExport?.url == firstURL)   // A's pointer isn't erased by B's failure
+    }
+
+    @Test func secondExportWhileOneRunsIsIgnored() async {
+        let state = makeState()
+        var posted: [RecordingNotification] = []
+        state.notifier = { posted.append($0) }
+        state.exportFunction = { _, output in output }
+
+        // No suspension point between the two calls, so the first export's task hasn't run yet —
+        // the guard sees `exportInProgress` set and drops the second.
+        state.exportToMP4(URL(fileURLWithPath: "/tmp/A.mov"))
+        state.exportToMP4(URL(fileURLWithPath: "/tmp/B.mov"))
+        #expect(state.exportInProgress == "A.mov")
+
+        while state.exportInProgress != nil { await Task.yield() }
+        #expect(posted.count == 1)   // exactly one export completed
+    }
+
+    @Test func exportNotificationCopy() {
+        let ok = RecordingNotifications.exported(url: URL(fileURLWithPath: "/tmp/Clip.mp4"))
+        #expect(ok.title == "Exported to MP4")
+        #expect(ok.body == "Clip.mp4 — ready to share. Click to reveal.")
+        #expect(ok.fileURL == URL(fileURLWithPath: "/tmp/Clip.mp4"))
+
+        let failed = RecordingNotifications.exportFailed()
+        #expect(failed.title == "Couldn't export to MP4")
+        #expect(failed.fileURL == nil)
+    }
+}

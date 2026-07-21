@@ -68,8 +68,13 @@ Order and grouping (separators between groups):
    item 10).
 10. Recent recordings: up to 5 most-recent files from the output dir, **indented one level**
     under `Open Recordings Folder` so they read as its contents rather than as more commands
-    (Franco, 2026-07-15 — inline rows, not a submenu, settling this against 03's wording);
-    click reveals in Finder. ⚠️ Implementation notes from M4-T2: a SwiftUI `.menu`
+    (Franco, 2026-07-15). **M10-T2 made each a submenu** — `<name> ▸ { Reveal in Finder · Export
+    as MP4 }` — so the export action has a home; the old direct click-to-reveal moved into the
+    submenu. An export shows a top-of-menu `Exporting <name>…` row while it runs (stamped at open,
+    not ticking — the M6-T10 constraint) and an `Exported to MP4 · <name>` receipt that reveals the
+    `.mp4` on click (the recents list is `.mov`-only, so this is the export's in-menu pointer). The
+    saved-replay receipt (M9-T2) gained the same `{ Reveal · Export as MP4 }` submenu. ⚠️
+    Implementation notes from M4-T2: a SwiftUI `.menu`
     `MenuBarExtra` exposes neither `NSMenuItem.indentationLevel` (the indent is leading
     whitespace in the title, with an explicit accessibility label so VoiceOver reads the
     filename) nor a dimmed-but-clickable style — "dimmed style" is **not** currently met and
@@ -148,6 +153,8 @@ form). Never the word "error" for a fail-stop.
 | Never started | `Couldn't start recording` | the engine's own message, e.g. `No displays available — the screen may be asleep or locked.` | — |
 | Replay saved — **M5** | `Replay saved` | `Replay … .mov — last 60 s. Click to reveal.` | reveal |
 | Replay save failed — **M5** | `Couldn't save replay` | one-line cause + what to do | — |
+| Exported to MP4 — **M10-T2** | `Exported to MP4` | `<name>.mp4 — ready to share. Click to reveal.` | reveal |
+| Export failed — **M10-T2** | `Couldn't export to MP4` | `The original recording is untouched. Try again, or check the output folder is writable.` | — |
 | Recording file moved — **M6-T7** | `Still recording · file moved back` | `The recording file was moved while recording, so it was moved back.` | — |
 | Recording file deleted — **M6-T7** | via `failed`: | `The recording file was deleted while recording, so the video couldn't be saved.` | — |
 | Recovered interrupted recording — **M6-T7** | `Recovered an interrupted recording` | `Recording … .mov is ready to play.` | reveal |

@@ -112,6 +112,27 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
+    // MARK: - Export (M10-T2, docs/06 notifications table)
+
+    /// The share export finished — reveal it to send it on. Export runs from an idle menu (no
+    /// active screen-share), so unlike the replay banner this isn't suppressed: it's the primary
+    /// completion signal.
+    public static func exported(url: URL) -> RecordingNotification {
+        RecordingNotification(
+            title: "Exported to MP4",
+            body: "\(url.lastPathComponent) — ready to share. Click to reveal.",
+            fileURL: url)
+    }
+
+    /// The transcode failed. The original recording is only read, so it's untouched; the raw
+    /// error goes to the log and the user gets the one thing to check.
+    public static func exportFailed() -> RecordingNotification {
+        RecordingNotification(
+            title: "Couldn't export to MP4",
+            body: "The original recording is untouched. Try again, or check the output folder is writable.",
+            fileURL: nil)
+    }
+
     /// The armed stream's mic died (docs/02 §4: it can never rebind to this stream). Amends
     /// docs/06's table, which predates armed replay. Mirrors the recording row's outcome-first
     /// shape: replay is still working, and the one remedy is named.

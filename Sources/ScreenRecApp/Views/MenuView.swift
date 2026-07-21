@@ -43,6 +43,7 @@ struct MenuView: View {
 
         Divider()
 
+        exportStatusRow
         lastReplayRow
 
         Button("Start Recording") { Task { await state.start() } }
@@ -101,9 +102,10 @@ struct MenuView: View {
             Finder.open(state.outputDirectory)
         }
         // Indented under the folder above. The indent is in the title because a SwiftUI menu
-        // gives no access to `NSMenuItem.indentationLevel` — hence the accessibility label.
+        // gives no access to `NSMenuItem.indentationLevel` — hence the accessibility label. Each
+        // row is a submenu (M10-T2): reveal, or export a shareable MP4.
         ForEach(state.recentRecordings, id: \.self) { url in
-            Button("    \(url.lastPathComponent)") { Finder.reveal(url) }
+            Menu("    \(url.lastPathComponent)") { fileActions(url) }
                 .accessibilityLabel(url.lastPathComponent)
         }
     }
@@ -119,6 +121,7 @@ struct MenuView: View {
 
         Divider()
 
+        exportStatusRow
         lastReplayRow
 
         if state.isPaused {
@@ -164,9 +167,31 @@ struct MenuView: View {
     /// armed session; cleared on disarm.
     @ViewBuilder private var lastReplayRow: some View {
         if let last = state.lastReplay {
+            Menu(last.menuTitle) { fileActions(last.url) }
+            Divider()
+        }
+    }
+
+    /// The MP4 export's in-menu signal (M10-T2), shared by both menus: an "Exporting…" row while
+    /// one runs (stamped at open — nothing may tick into an open menu, M6-T10), then a receipt
+    /// that reveals the `.mp4`. The `.mov`-only recents list never shows the export, so this is
+    /// its pointer.
+    @ViewBuilder private var exportStatusRow: some View {
+        if let name = state.exportInProgress {
+            Text("Exporting \(name)…")
+            Divider()
+        } else if let last = state.lastExport {
             Button(last.menuTitle) { Finder.reveal(last.url) }
             Divider()
         }
+    }
+
+    /// The per-file submenu shared by recents and the replay receipt: reveal in Finder, or export
+    /// a shareable MP4 (blocked while one export already runs — one at a time).
+    @ViewBuilder private func fileActions(_ url: URL) -> some View {
+        Button("Reveal in Finder") { Finder.reveal(url) }
+        Button("Export as MP4") { state.exportToMP4(url) }
+            .disabled(state.exportInProgress != nil)
     }
 
     /// Arm toggle + save row, shared by both menus (docs/06 idle item 3 / recording item 5:

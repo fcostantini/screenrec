@@ -857,7 +857,7 @@ milestone is the trim/format side only, held deliberately (ADR-015). Capture def
       downmix to one audio track for `.mp4` (messaging apps expect it) — flag it. **Verify:** CLI
       export of a 3-track test `.mov` → `probe` shows h264 + aac in `.mp4`, plays; WhatsApp
       constraints hold (yuv420p, faststart).
-- [ ] M10-T2 **Export app wiring.** A **Share… / Export as MP4** action on a recent recording and a
+- [x] M10-T2 **Export app wiring.** A **Share… / Export as MP4** action on a recent recording and a
       saved replay (menu row and/or the replay-saved confirmation), off the main path, with a
       progress + completion signal reusing M9-T2's in-app confirmation pattern; reveal on done.
       **Verify:** menudriver — export a recent file → the `.mp4` appears in the output folder, probes

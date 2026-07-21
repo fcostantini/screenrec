@@ -5,6 +5,37 @@
 
 ## Now
 
+- **M10-T2 DONE — Export as MP4 wired into the app (LIVE-VERIFIED).** Each recent-recording row and
+  the saved-replay receipt is now a **submenu** — `<name> ▸ { Reveal in Finder · Export as MP4 }` —
+  over a thin `AppState.exportToMP4(_:)` on M10-T1's `Exporter`. Runs **off the main path** (an
+  unstructured MainActor-inheriting `Task` that `await`s the injectable `exportFunction`; blocking
+  transcode runs off-main on the Exporter's queue), **one at a time** (synchronous guard on
+  `exportInProgress`), output = the `.mp4` sibling (collision-resolved), source read-only. Completion
+  signal reuses M9-T2: a top-of-menu **`Exported to MP4 · <name>` receipt** (new `LastExport`, reveals
+  on click; stamped at open, M6-T10) + an **`Exported to MP4` notification** (new
+  `RecordingNotifications.exported`/`exportFailed`, docs/06 table). An `Exporting <name>…` row shows
+  while it runs. `exportFunction` is injected so tests skip the hardware encoder. **331 tests (+6:**
+  5 `ExportWiringTests` — in-progress→receipt+notify, failure clears + no receipt, a failed re-export
+  keeps the prior receipt, one-at-a-time, copy; +1 net after gating, see below). **LIVE-VERIFIED
+  (deployed to /Users/Shared, PID-swapped):** menudriver → the newest recording's submenu → Export as
+  MP4 → **`Recording ….mp4` appeared in ~1 s**, ffprobe **h264 High / yuv420p / 1920×1200 / aac 2ch /
+  moov-before-mdat**, and the menu showed the **`Exported to MP4 · …` receipt row**. Full dev loop
+  green. **Review (code-review agent; 8.5/10, no correctness bugs; findings presented → Franco approved
+  batch):** ④ dropped `lastExport = nil` at start so a failed re-export keeps the prior receipt (the
+  in-progress row shadows it anyway); ⑥ tightened the test gate to `== "1"`. Deferred: ① a pre-existing
+  misplaced doc comment in RecordingNotification.swift (separate `docs:` commit), ② quit-mid-export can
+  leave a partial `.mp4` (low-stakes — derived copy, source untouched; field note), ③ export during
+  record+replay is best-effort (can fault VT, fails cleanly; field note). **No VERSION bump** — the
+  accumulated M10 features (T1 CLI, T2 app export) owe a MINOR **1.4.0** whenever Franco cuts.
+  **Owed:** a live export failure path (unit-covered; not driven live — would need `~/Movies`
+  unwritable). Left a test `.mp4` in `~/Movies` (Franco's real recording, exported) — his to keep or
+  delete. **⚠️ VT-encoder test flakiness (see field note):** the Exporter's one hardware-encode
+  integration test oversubscribes the VideoToolbox pool under the parallel suite (~half the runs fault
+  with -12912), so it's **gated behind `SCREENREC_HW_ENCODE_TESTS=1`** and run in isolation
+  (`swift test --filter ExporterTests` with that env); the default `swift test` skips it and is stable.
+  The real transcode is CLI-verified (ADR-011) and `fittedSize` covers the downscale math. **Next:
+  M10-T3 (GIF export from a clip) — plan artifact first.**
+
 - **M10-T1 DONE — transcode-to-MP4 share export (core + CLI).** New `Exporter` (RecorderCore/Export/)
   over `AVAssetReader → re-encode → AVAssetWriter`: HEVC `.mov` → **H.264 High + AAC `.mp4`, yuv420p,
   `+faststart`**, downscaled to **≤1920 wide** (Franco's recipe value, and forced anyway — 02 §3's
@@ -834,6 +865,25 @@ video (deterministic, reproducible).
 | G6   | ✅ **v1 declared 2026-07-20 (v1.0.0)** — M6 complete bar the deferred T4 bucket; G6 = the sum of the soak legs (below) + acceptance criteria, all green | §7 leg 1 ✅ 2026-07-17: 2 h battery, real usage + Zoom, replay armed, 3 mid-run replay saves; 19.5 GB / 7223.42 s, tracks ≤110 ms apart; battery 99→62%, CPU avg 12.9% / max 19.3%, RSS 98–485 MB trendless, zero thermal warnings; Franco: "smooth throughout, no desync" (claps at 0/1/2 h). §7 kill leg ✅ (amended to 1 h, Franco): kill -9 at 3540 s → playable 3539.53 s, **0.47 s lost** (≤10 s); app relaunched Ready. ⚠️ relaunch dropped the persisted armed state (transient pipeline failure → self-disarm; field note) — open follow-up, not a gate fail (§7 doesn't cover it). |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-21 (M10-T2 review deferrals, Franco-approved): three low-severity edges left out of the
+  T2 commit. **① Pre-existing doc bug:** in `RecordingNotification.swift` the "The armed stream's
+  mic died…" comment is stranded above `loginItemFailed()` (whose real comment is the next two
+  lines), and `replayMicrophoneLost()` has none — predates M10, fix in a separate `docs:` commit.
+  **② Quit mid-export can leave a partial `.mp4`:** the export `Task` isn't awaited on `⌘Q` (unlike
+  recordings' `stopAndWaitForFinalize`); the partial is a *derived* share copy (source untouched,
+  re-doable), so accepted, not fixed. **③ Export during record+replay is best-effort:** reachable
+  via the replay-receipt submenu while capturing; it adds encode/decode load onto the live encoders
+  and can fault VT (-12912), but fails cleanly (notification + `exportInProgress` cleared, no wedge).
+
+- 2026-07-21 (M10-T2, extends the M10-T1 VT note below): **the fix for the encoder-oversubscription
+  flakiness is to GATE the one hardware-encode integration test out of the default parallel run.**
+  Shrinking it (small source, few frames, tiny target) did NOT fix it — ANY added live encode layered
+  onto the other encoder suites faults VideoToolbox (-12912) ~half the time; confirmed by
+  bisection (suite is 3/3 green without the test, majority-fail with it). It runs reliably in
+  isolation (`--filter`), so it's `@Test(.enabled(if: env["SCREENREC_HW_ENCODE_TESTS"] == "1"))` and
+  exercised via `SCREENREC_HW_ENCODE_TESTS=1 swift test --filter ExporterTests`. The default
+  `swift test` skips it and stays stable. Real transcode coverage = the CLI verify (ADR-011).
 
 - 2026-07-21 (M10-T1 debt): **`Exporter.FailureBox` + the `drain` loop duplicate
   `ReplayMuxer.AppendFailure` + `append`** — the first-error box is line-for-line equal; the drain loops
