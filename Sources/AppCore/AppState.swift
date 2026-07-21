@@ -95,6 +95,12 @@ public final class AppState {
         }
     }
 
+    /// Whether the menu-bar label shows the live elapsed clock while recording (M9-T3). A pure
+    /// display pref — it touches nothing but the label — persisted, opt-out.
+    public var showsMenuBarTimer: Bool {
+        didSet { if showsMenuBarTimer != oldValue { persist() } }
+    }
+
     // MARK: - Instant replay (docs/06 idle item 3, Settings "Instant Replay")
 
     /// Arming starts the rolling buffer (its own capture stream while idle; a recording's
@@ -175,6 +181,10 @@ public final class AppState {
     public private(set) var elapsedSeconds: TimeInterval = 0
     public private(set) var recordedBytes: Int64 = 0
 
+    /// The live menu-bar clock's basis (M9-T3): nil when idle, set on `.started`, frozen on
+    /// `.paused`, cleared on any ending. The label computes the ticking value from it locally.
+    public private(set) var recordingClock: RecordingClock?
+
     /// Whether a recording could start right now (docs/06 item 1's header status, and what
     /// enables Start).
     ///
@@ -224,6 +234,12 @@ public final class AppState {
     /// (M9-T2): the "Replay saved" notification is suppressed while armed (docs/06). Cleared on
     /// disarm; updated on each save.
     public private(set) var lastReplay: LastReplay?
+
+    /// A brief menu-bar confirmation the label shows on a save (M9-T3): visible without opening
+    /// the menu, unlike `lastReplay`'s row. Set on save success, auto-cleared after `flashDuration`.
+    public private(set) var replaySavedFlash = false
+    private var flashTask: Task<Void, Never>?
+    private static let flashDuration: Duration = .seconds(2)
 
     // MARK: - Onboarding (docs/06 "Onboarding window")
 
@@ -339,6 +355,7 @@ public final class AppState {
         isReplayArmed = settings.replayArmed
         replaySeconds = settings.replaySeconds
         replayHotkey = settings.replayHotkey
+        showsMenuBarTimer = settings.showsMenuBarTimer
         replay = replayController ?? ReplayController()
         screenWasGrantedAtLaunch = Permissions.screenRecordingState() == .granted
         refreshOnboarding()          // populated before the first render, or the window flickers
@@ -371,7 +388,7 @@ public final class AppState {
                 microphonePreference: microphonePreference,
                 captureAppBundleID: selectedAppBundleID,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
-                replayHotkey: replayHotkey),
+                replayHotkey: replayHotkey, showsMenuBarTimer: showsMenuBarTimer),
             to: defaults)
     }
 
@@ -419,6 +436,7 @@ public final class AppState {
                     // The in-app receipt (M9-T2): the notification below is banner-suppressed while
                     // armed, so the menu row is what actually reaches the user.
                     lastReplay = LastReplay(url: saved.url, seconds: Int(saved.duration.rounded()))
+                    flashReplaySaved()             // and a signal without opening the menu (M9-T3)
                     notifier?(RecordingNotifications.replaySaved(url: saved.url, duration: saved.duration))
                     refreshRecentRecordings()      // the new clip belongs at the top
                 case .failure(let error):
@@ -426,6 +444,18 @@ public final class AppState {
                     notifier?(RecordingNotifications.replaySaveFailed())
                 }
             }
+        }
+    }
+
+    /// Shows the menu-bar save confirmation, then clears it after `flashDuration` (M9-T3). A new
+    /// save restarts the window rather than stacking.
+    private func flashReplaySaved() {
+        replaySavedFlash = true
+        flashTask?.cancel()
+        flashTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.flashDuration)
+            guard !Task.isCancelled else { return }
+            self?.replaySavedFlash = false
         }
     }
 
@@ -770,15 +800,22 @@ public final class AppState {
     func apply(_ event: EngineEvent) {
         notify(about: event)
         switch event {
-        case .started, .resumed:
+        case .started:
+            recordingClock = RecordingClock(accumulated: 0, runningSince: Date())
+            statusIcon = .recording
+        case .resumed:
+            recordingClock?.runningSince = Date()   // resume the span; keep what was banked
             statusIcon = .recording
         case .paused:
+            recordingClock?.bankAndFreeze(now: Date())
             statusIcon = .paused
         case .stopped, .finished, .discarded:
             // Every ending is the same to the icon, including fail-stops (ADR-007 successes with
             // a cause) and discards. The cause, if any, reaches the user as a notification.
+            recordingClock = nil
             statusIcon = .idle
         case .failed(let message):
+            recordingClock = nil
             statusIcon = .idle
             lastFailure = message
         case .microphoneLost:

@@ -98,7 +98,12 @@ private struct StatusIconLabel: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        StatusIconView(icon: state.statusIcon, isReplayArmed: state.isReplayArmed)
+        StatusIconView(
+            icon: state.statusIcon,
+            isReplayArmed: state.isReplayArmed,
+            recordingClock: state.recordingClock,
+            showsTimer: state.showsMenuBarTimer,
+            replaySavedFlash: state.replaySavedFlash)
             .task {
                 // A persisted armed state resumes at launch; `init` never arms (tests
                 // construct AppState freely and must not spin capture).

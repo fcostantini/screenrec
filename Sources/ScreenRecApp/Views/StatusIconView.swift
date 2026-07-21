@@ -115,22 +115,66 @@ enum StatusIconImage {
     }
 }
 
-/// The status item's label. Pulses while recording, unless the user asked for less motion.
+/// The status item's label: the icon (pulsing while recording unless Reduce Motion is on), plus a
+/// live elapsed clock (M9-T3) and a brief save confirmation. The clock and flash live here, not in
+/// the menu, because the label isn't subject to the `.menu` bridge that freezes the in-menu clock
+/// (M6-T10).
 struct StatusIconView: View {
     let icon: StatusIcon
     var isReplayArmed = false
+    var recordingClock: RecordingClock? = nil
+    var showsTimer = true
+    var replaySavedFlash = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        HStack(spacing: 4) {
+            iconImage
+            if showsTimer, let recordingClock {
+                MenuBarTimer(clock: recordingClock)
+            }
+            if replaySavedFlash {
+                Image(systemName: "checkmark.circle.fill")
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    @ViewBuilder private var iconImage: some View {
         if icon == .recording && !reduceMotion {
             PulsingRecordingIcon(
                 label: StatusIconImage.label(for: icon, isReplayArmed: isReplayArmed),
                 isReplayArmed: isReplayArmed)
         } else {
             Image(nsImage: StatusIconImage.image(for: icon, isReplayArmed: isReplayArmed))
-                .accessibilityLabel(StatusIconImage.label(for: icon, isReplayArmed: isReplayArmed))
         }
+    }
+
+    /// The whole item as one VoiceOver element: the icon state, plus elapsed time and a
+    /// just-saved note when shown.
+    private var accessibilityLabel: String {
+        var label = StatusIconImage.label(for: icon, isReplayArmed: isReplayArmed)
+        if showsTimer, let recordingClock {
+            label += ", " + MenuHeader.elapsed(recordingClock.elapsed(now: Date()))
+        }
+        if replaySavedFlash { label += ", replay saved" }
+        return label
+    }
+}
+
+/// The live elapsed clock in the status-item label (M9-T3). Redraws once a second off its own
+/// timer; a paused clock (`runningSince == nil`) yields a constant value, so it simply freezes.
+private struct MenuBarTimer: View {
+    let clock: RecordingClock
+    @State private var now = Date()
+    private let ticker = Timer.publish(every: 1, tolerance: 0.1, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        Text(MenuHeader.elapsed(clock.elapsed(now: now)))
+            .monospacedDigit()
+            .onReceive(ticker) { now = $0 }
     }
 }
 

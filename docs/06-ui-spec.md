@@ -86,7 +86,10 @@ Order and grouping (separators between groups):
    (M6-T10, measured): any state publish rebuilds the OPEN menu's AppKit rows and garbles
    hover/highlight — a per-second tick corrupted rows under the cursor — and
    `Text(timerInterval:)` doesn't animate through the menu bridge, so a live clock in a
-   `.menu` MenuBarExtra is not implementable without the corruption.*
+   `.menu` MenuBarExtra is not implementable without the corruption.* **M9-T3:** the *menu-bar
+   label* (the status item itself, not the menu) DOES show a live ticking `HH:MM:SS` — it isn't
+   subject to the bridge (it already redraws for the pulse), so the always-visible clock lives
+   there; the in-menu header stays stamped-at-open. Opt-out via `showsMenuBarTimer`.
 2. **Pause** / **Resume** (swaps by state).
 3. **Stop & Save** — primary.
 4. — separator —
@@ -255,6 +258,8 @@ the old line is simply false above three green ticks.
 
 - Output folder (choose → `opendir` preflight immediately, friendly error per 02 §2)
 - Quality preset · Frame-rate cap (30/60)
+- **Show recording time in the menu bar** (M9-T3) — top-level toggle, on by default; off ⇒ the
+  status item shows the icon only. Backed by `showsMenuBarTimer`.
 - Instant replay: buffer length 30 s / 60 s / 2 min · hotkey recorder (default ⌥⌘R) — **M5**
   - Changing the length while armed resizes the buffer **in place** (M6-T6): grow keeps
     everything and fills to the new length; shrink drops the excess immediately. Quality/
@@ -290,6 +295,7 @@ moved):
 | `replayArmed` | Bool | **M5** |
 | `replaySeconds` | Int 30\|60\|120 | **M5** |
 | `replayHotkey` | Dict: keyCode Int, modifiers Int | **M5** |
+| `showsMenuBarTimer` | Bool; **absent ⇒ on** (opt-out). The status-item label's live elapsed clock while recording (M9-T3) | M9-T3 |
 
 ⚠️ **`launchAtLogin` is NOT a UserDefaults key (amended M6-T5).** The spec originally listed
 one, but `SMAppService` persists the login-item registration itself, so a stored bool would be

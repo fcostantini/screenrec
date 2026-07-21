@@ -62,6 +62,34 @@ import RecorderCore
         #expect(state.statusIcon == .recording)
     }
 
+    // MARK: - Recording clock for the menu-bar label (M9-T3)
+
+    @Test func startBeginsARunningClockAtZero() {
+        let state = recordingState()
+        #expect(state.recordingClock?.accumulated == 0)
+        #expect(state.recordingClock?.runningSince != nil)   // running
+    }
+
+    @Test func pauseFreezesTheClockAndResumeRunsItAgain() {
+        let state = recordingState()
+        state.apply(.paused)
+        #expect(state.recordingClock?.runningSince == nil)   // frozen
+        state.apply(.resumed)
+        #expect(state.recordingClock?.runningSince != nil)   // running again
+    }
+
+    @Test(arguments: endReasons) func everyEndingClearsTheClock(reason: EndReason) {
+        let state = recordingState()
+        state.apply(.finished(url: Self.outputURL, reason: reason, droppedFrames: 0))
+        #expect(state.recordingClock == nil)
+    }
+
+    @Test func aStartFailureLeavesNoClock() {
+        let state = makeState()
+        state.apply(.failed(message: "no displays"))
+        #expect(state.recordingClock == nil)
+    }
+
     @Test(arguments: endReasons) func everyEndingReturnsToIdle(reason: EndReason) {
         let state = recordingState()
         state.apply(.finished(url: Self.outputURL, reason: reason, droppedFrames: 0))

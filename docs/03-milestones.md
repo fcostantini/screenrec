@@ -763,7 +763,7 @@ feedback fixes and debt are PATCH/`refactor:` — Franco's call per commit. One 
       label flash (label is outside the `.menu` bridge — see M9-T3). Keep the existing notification
       too. **Verify:** menudriver — arm → save → the menu shows the last-replay row with name +
       duration; disarm clears it. Unit — the summary formats name + rounded seconds.
-- [ ] M9-T3 **Live elapsed clock in the menu-bar label.** The in-menu clock is frozen-at-open by the
+- [x] M9-T3 **Live elapsed clock in the menu-bar label.** The in-menu clock is frozen-at-open by the
       `.menu` bridge (M6-T10, correct). The `MenuBarExtra` *label* is NOT bridged — it already
       redraws frame-by-frame to animate the pulse (`PulsingRecordingIcon`, StatusIconView). Render a
       monospaced `HH:MM:SS` next to the icon while recording, off the same timer, so elapsed time is

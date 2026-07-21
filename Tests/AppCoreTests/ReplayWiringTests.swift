@@ -307,6 +307,20 @@ import RecorderCore
         #expect(state.lastReplay?.menuTitle == "Replay saved · 60 s")
     }
 
+    @Test func saveSuccessFlashesTheMenuBar() async {
+        // M9-T3: a signal visible without opening the menu (the receipt row needs the menu open).
+        let (state, spy, _) = makeState()
+        state.isReplayArmed = true
+        spy.saveResult = .success(ReplayMuxer.SavedReplay(
+            url: URL(fileURLWithPath: "/tmp/r.mov"), duration: 30))
+        state.notifier = { _ in }
+
+        state.saveReplay()
+        await Task.yield()
+
+        #expect(state.replaySavedFlash)
+    }
+
     @Test func disarmingClearsTheLastReplayReceipt() async {
         // The receipt belongs to the armed session that produced it.
         let (state, spy, _) = makeState()

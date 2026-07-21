@@ -46,6 +46,8 @@ public struct Settings: Sendable, Equatable {
     /// docs/06 offers 30, 60 or 120.
     public var replaySeconds: Int
     public var replayHotkey: ReplayHotkey
+    /// Whether the menu-bar label shows the live elapsed clock while recording (M9-T3). Default on.
+    public var showsMenuBarTimer: Bool
 
     public static let allowedFrameRateCaps = [30, 60]
     public static let allowedReplaySeconds = [30, 60, 120]
@@ -59,7 +61,8 @@ public struct Settings: Sendable, Equatable {
             captureAppBundleID: nil,
             replayArmed: false,
             replaySeconds: 60,
-            replayHotkey: .standard)
+            replayHotkey: .standard,
+            showsMenuBarTimer: true)
     }
 }
 
@@ -84,6 +87,8 @@ public enum SettingsStore {
         /// `replayHotkey` is a Dict (docs/06): these are its inner keys.
         public static let hotkeyKeyCode = "keyCode"
         public static let hotkeyModifiers = "modifiers"
+        /// Absent ⇒ on (M9-T3): the menu-bar clock is opt-out, not opt-in.
+        public static let showsMenuBarTimer = "showsMenuBarTimer"
     }
 
     /// Reads settings, replacing anything unusable with the default.
@@ -150,6 +155,12 @@ public enum SettingsStore {
             settings.replayHotkey = ReplayHotkey(keyCode: keyCode, modifiers: modifiers)
         }
 
+        // Opt-out, so absent means on (the `.standard` default holds); only an explicit stored
+        // value overrides it.
+        if defaults.object(forKey: Key.showsMenuBarTimer) != nil {
+            settings.showsMenuBarTimer = defaults.bool(forKey: Key.showsMenuBarTimer)
+        }
+
         return settings
     }
 
@@ -178,5 +189,6 @@ public enum SettingsStore {
             [Key.hotkeyKeyCode: settings.replayHotkey.keyCode,
              Key.hotkeyModifiers: settings.replayHotkey.modifiers],
             forKey: Key.replayHotkey)
+        defaults.set(settings.showsMenuBarTimer, forKey: Key.showsMenuBarTimer)
     }
 }

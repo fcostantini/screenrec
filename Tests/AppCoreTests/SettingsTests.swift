@@ -48,6 +48,7 @@ import RecorderCore
         #expect(SettingsStore.Key.replayHotkey == "replayHotkey")
         #expect(SettingsStore.Key.hotkeyKeyCode == "keyCode")
         #expect(SettingsStore.Key.hotkeyModifiers == "modifiers")
+        #expect(SettingsStore.Key.showsMenuBarTimer == "showsMenuBarTimer")
     }
 
     @Test func savesUnderExactlyThoseKeysAndNoOthers() {
@@ -58,7 +59,7 @@ import RecorderCore
         let written = defaults.persistentDomain(forName: suite) ?? [:]
         #expect(Set(written.keys) == [
             "outputDirectory", "qualityPreset", "fpsCap",
-            "replayArmed", "replaySeconds", "replayHotkey",
+            "replayArmed", "replaySeconds", "replayHotkey", "showsMenuBarTimer",
         ])
     }
 
@@ -174,6 +175,17 @@ import RecorderCore
         #expect(!loaded.replayArmed)
         #expect(loaded.replaySeconds == 60)
         #expect(loaded.replayHotkey == .standard)
+        #expect(loaded.showsMenuBarTimer)               // absent ⇒ on (M9-T3, opt-out)
+    }
+
+    @Test func theMenuBarTimerIsOptOutAndRoundTrips() {
+        let defaults = makeDefaults().defaults
+        // Absent stays on; an explicit false is the only thing that turns it off.
+        #expect(SettingsStore.load(from: defaults).showsMenuBarTimer)
+        var settings = makeSettings()
+        settings.showsMenuBarTimer = false
+        SettingsStore.save(settings, to: defaults)
+        #expect(!SettingsStore.load(from: defaults).showsMenuBarTimer)
     }
 
     // MARK: - The values a plist can actually contain

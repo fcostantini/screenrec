@@ -5,6 +5,27 @@
 
 ## Now
 
+- **M9-T3 DONE — live menu-bar clock + replay-saved flash + hide toggle.** The status-item *label*
+  (not the menu — it isn't bridged, unlike the frozen in-menu clock, M6-T10) now shows a live
+  monospaced `HH:MM:SS` while recording, ticking off its own 1 s timer like the pulse; frozen with the
+  amber icon when paused; icon-only when idle or when the new **Show recording time in the menu bar**
+  Settings toggle is off (`showsMenuBarTimer`, opt-out — absent ⇒ on). A pure, pause-correct
+  `RecordingClock` value type is the basis (updated only on start/pause/resume/end — nothing published
+  per second, so no menu churn; the label computes the ticking value locally). The M9-T2-deferred
+  **replay-saved flash** landed here: a ~2 s `checkmark.circle.fill` appended to the label on ⌥⌘R save,
+  visible without opening the menu. **307 tests (+10:** RecordingClock math incl. pause/resume banking;
+  the apply-fold clock transitions; `showsMenuBarTimer` opt-out round-trip + key pin/set; the flash
+  flag). Full dev loop green (build/test/release/bundle-sign). docs/06 amended (status-item live-clock
+  note + Settings toggle bullet + the contractual key row). Quality pass: `recordingClock` defaulted to
+  nil so `StatusIconView(icon:)` stays constructible. **NOT yet run — needs Franco (drives the
+  desktop):** the live *measured* check (screenshot the label across ≥3 ticks, assert it advances —
+  M4-T1 rule) + flash appears/clears + Settings-off ⇒ icon-only. No VERSION bump (batched).
+  **Next: M9-T4 (global start/stop hotkey), then debt T5–T7.**
+  **Backlog (Franco, 2026-07-21):** replay buffer length as a slider 0–15 min w/ seconds granularity
+  (today it's a 30/60/120 Picker) — real design Qs: ring memory at 15 min (video ring alone ~GBs at
+  Balanced ≈19 Mbps; see M5-T3/M5-T6 RSS notes), a sensible non-zero floor, `allowedReplaySeconds`
+  becoming a range. Unslotted — Franco to place (its own small milestone/task).
+
 - **M9-T2 DONE — in-app replay confirmation + banner-suppression discoverability.** A saved replay now
   shows a top-of-menu **`Replay saved · N s`** row (idle + recording), set from a new `AppState.lastReplay`
   (new `LastReplay` value type) in `saveReplay`'s success branch, cleared on disarm, click-reveals the

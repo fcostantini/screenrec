@@ -45,6 +45,8 @@ struct SettingsView: View {
 
             Toggle("Launch at login", isOn: $state.launchAtLogin)
 
+            Toggle("Show recording time in the menu bar", isOn: $state.showsMenuBarTimer)
+
             Section("Instant Replay") {
                 Picker("Replay buffer", selection: $state.replaySeconds) {
                     ForEach(Settings.allowedReplaySeconds, id: \.self) { seconds in
