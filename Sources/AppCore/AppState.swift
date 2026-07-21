@@ -203,38 +203,25 @@ public final class AppState {
     /// `.paused`, cleared on any ending. The label computes the ticking value from it locally.
     public private(set) var recordingClock: RecordingClock?
 
-    /// Whether a recording could start right now (docs/06 item 1's header status, and what
-    /// enables Start).
-    ///
-    /// Computed, not stored: SwiftUI builds menu rows before any `.task` on them runs, so a
-    /// refreshed copy would always be one open behind. Both TCC queries are cheap.
+    /// Permissions/onboarding, split out (M9-T7): AppState owns this sub-model and forwards to it.
+    /// It needs one input, `microphoneRequired`, supplied from the mic pick; observation propagates
+    /// through the nested `@Observable`, so views read `state.readiness`/`state.onboardingRows`/…
+    /// unchanged.
+    private let permissions = PermissionsModel()
+
+    /// The one input the model needs: whether a mic is required (i.e. one is picked).
+    private var microphoneRequired: Bool { microphonePreference != .none }
+
+    /// Whether a recording could start right now (docs/06 item 1's header status, and what enables
+    /// Start). Computed, not stored: SwiftUI builds menu rows before any `.task` runs, so a stored
+    /// copy would lag one open (both TCC queries are cheap).
     public var readiness: RecordingReadiness {
-        // A grant this process hasn't restarted into is not readiness:
-        // `CGPreflightScreenCaptureAccess()` flips true the moment the System Settings switch
-        // lands, but the process keeps its launch-time TCC decision until a full restart
-        // (02 §2). Only the launch snapshot can tell the difference.
-        if needsRelaunchForScreenGrant {
-            return .blocked(reason: "ScreenRec needs to reopen to finish turning on screen "
-                + "recording. It will do that on its own in a moment.")
-        }
-        return Permissions.recordingReadiness(
-            screen: Permissions.screenRecordingState(),
-            microphone: Permissions.microphoneState(),
-            microphoneRequired: microphonePreference != .none)
+        permissions.readiness(microphoneRequired: microphoneRequired)
     }
 
-    /// Whether screen recording was already granted when this process started.
-    ///
-    /// The relaunch decision keys on the transition (ungranted at launch → granted now), not on
-    /// whether our button was pressed: a grant flipped directly in System Settings needs the
-    /// same restart. Keying on the snapshot also avoids a relaunch loop when the app launched
-    /// already-granted.
-    public let screenWasGrantedAtLaunch: Bool
+    public var screenWasGrantedAtLaunch: Bool { permissions.screenWasGrantedAtLaunch }
+    public var needsRelaunchForScreenGrant: Bool { permissions.needsRelaunchForScreenGrant }
 
-    /// The grant has landed but this process can't use it yet.
-    public var needsRelaunchForScreenGrant: Bool {
-        !screenWasGrantedAtLaunch && Permissions.screenRecordingState() == .granted
-    }
     /// The microphone actually bound for this recording — not necessarily the one picked, since
     /// a vanished device falls back to the system default. SCK binds the mic once at
     /// `startCapture` and never re-resolves (02 §4), so this is fixed for the session.
@@ -259,63 +246,30 @@ public final class AppState {
     private var flashTask: Task<Void, Never>?
     private static let flashDuration: Duration = .seconds(2)
 
-    // MARK: - Onboarding (docs/06 "Onboarding window")
+    // MARK: - Onboarding (docs/06 "Onboarding window") — delegated to PermissionsModel (M9-T7)
 
     /// Whether the setup window has anything to say: first launch or any missing permission,
     /// never once satisfied (docs/06).
     public var needsOnboarding: Bool { readiness != .ready }
+    public var hasAskedForScreenRecording: Bool { permissions.hasAskedForScreenRecording }
+    public var notificationState: PermissionState { permissions.notificationState }
+    public var onboardingRows: [OnboardingRow] { permissions.onboardingRows }
 
-    /// Whether the screen-recording prompt has been fired this launch.
-    ///
-    /// This — not "were we denied" — flips the row to the System Settings route: preflight reads
-    /// false for "never asked" and "declined" alike (02 §2), and after asking the remedy is the
-    /// same either way. Latched for the launch; reverting to `Grant…` would restore a button
-    /// that can no longer prompt.
-    public private(set) var hasAskedForScreenRecording = false
-
-    /// Notification authorization. Held rather than queried because, unlike TCC, reading it is
-    /// async — and the live call needs a real bundle, so the app supplies it (see
-    /// `setNotificationState`) and tests inject it.
-    public private(set) var notificationState: PermissionState = .notDetermined
-
-    /// The checklist. Stored and refreshed, unlike the computed `readiness`, because the window
-    /// stays open while the user crosses to System Settings: TCC changes outside the process, so
-    /// `@Observable` has nothing to observe and a computed value would never redraw. The window
-    /// polls, and the poll writes here.
-    public private(set) var onboardingRows: [OnboardingRow] = []
-
-    /// Re-reads the permission states. Assigns only on a real change: `@Observable` publishes on
-    /// every set, not every change, so an unconditional write would redraw the window once a
-    /// second.
     public func refreshOnboarding() {
-        let fresh = OnboardingModel.rows(
-            screen: Permissions.screenRecordingState(),
-            hasAskedForScreen: hasAskedForScreenRecording,
-            microphone: Permissions.microphoneState(),
-            microphoneRequired: microphonePreference != .none,
-            notifications: notificationState)
-        if fresh != onboardingRows { onboardingRows = fresh }
+        permissions.refreshOnboarding(microphoneRequired: microphoneRequired)
     }
 
-    /// Fires the screen-recording prompt and latches that it has been asked. Returns whether the
-    /// grant landed — it essentially never does on the spot: macOS makes the user cross to
-    /// System Settings and restart the app (02 §2). The window polls for it instead.
     @discardableResult
     public func requestScreenRecording() -> Bool {
-        hasAskedForScreenRecording = true
-        let granted = Permissions.requestScreenRecording()
-        refreshOnboarding()          // the row must switch to the System Settings route now
-        return granted
+        permissions.requestScreenRecording(microphoneRequired: microphoneRequired)
     }
 
     public func requestMicrophoneAccess() async {
-        _ = await Permissions.requestMicrophoneAccess()
-        refreshOnboarding()
+        await permissions.requestMicrophoneAccess(microphoneRequired: microphoneRequired)
     }
 
     public func setNotificationState(_ state: PermissionState) {
-        notificationState = state
-        refreshOnboarding()
+        permissions.setNotificationState(state, microphoneRequired: microphoneRequired)
     }
 
     // MARK: - Session
@@ -376,8 +330,9 @@ public final class AppState {
         recordHotkey = settings.recordHotkey
         showsMenuBarTimer = settings.showsMenuBarTimer
         replay = replayController ?? ReplayController()
-        screenWasGrantedAtLaunch = Permissions.screenRecordingState() == .granted
-        refreshOnboarding()          // populated before the first render, or the window flickers
+        // `screenWasGrantedAtLaunch` is captured by PermissionsModel's own init. Populate the rows
+        // before the first render, or the window flickers.
+        refreshOnboarding()
 
         replay.onMicrophoneLost = { [weak self] in
             self?.notifier?(RecordingNotifications.replayMicrophoneLost())
