@@ -43,6 +43,8 @@ struct MenuView: View {
 
         Divider()
 
+        lastReplayRow
+
         Button("Start Recording") { Task { await state.start() } }
             .disabled(state.readiness != .ready)
 
@@ -117,6 +119,8 @@ struct MenuView: View {
 
         Divider()
 
+        lastReplayRow
+
         if state.isPaused {
             Button("Resume") { Task { await state.resume() } }
         } else {
@@ -151,6 +155,17 @@ struct MenuView: View {
         // MenuBarExtra bridge (it keeps only the text) — an attributed title does (docs/06).
         Button(role: .destructive) { discardRecording() } label: {
             Text(Self.discardTitle)
+        }
+    }
+
+    /// A banner-independent "Replay saved" confirmation (M9-T2, docs/06 §Notifications): while
+    /// armed the screen is captured, so macOS suppresses the notification — this row is the
+    /// receipt, revealing the clip on click. Renders nothing (and no divider) until a save this
+    /// armed session; cleared on disarm.
+    @ViewBuilder private var lastReplayRow: some View {
+        if let last = state.lastReplay {
+            Button(last.menuTitle) { Finder.reveal(last.url) }
+            Divider()
         }
     }
 

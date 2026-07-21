@@ -64,6 +64,18 @@ struct SettingsView: View {
                         ? " Changing the buffer or sources restarts replay from empty." : ""))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                // Banner suppression (docs/06 §Notifications): while armed, the screen is captured,
+                // so macOS hides banners — ours and other apps'. Name the fix, not the API.
+                Text("While replay is armed, macOS hides notification banners — ScreenRec's and other "
+                    + "apps'. To keep seeing them, turn on \"Allow notifications when mirroring or "
+                    + "sharing the display\" in System Settings › Notifications.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open Notification Settings…") { openNotificationSettings() }
+                    .buttonStyle(.link)
+                    .font(.caption)
             }
         }
         .formStyle(.grouped)
@@ -102,6 +114,14 @@ struct SettingsView: View {
         case .inaccessible(let reason):
             // Keep the old folder; accepting an unwritable one defers the failure to record time.
             folderProblem = reason
+        }
+    }
+
+    /// Best effort: deep-links to the Notifications pane; degrades to opening System Settings if
+    /// the pane identifier shifts.
+    private func openNotificationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
+            NSWorkspace.shared.open(url)
         }
     }
 }

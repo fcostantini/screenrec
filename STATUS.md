@@ -5,6 +5,20 @@
 
 ## Now
 
+- **M9-T2 DONE — in-app replay confirmation + banner-suppression discoverability.** A saved replay now
+  shows a top-of-menu **`Replay saved · N s`** row (idle + recording), set from a new `AppState.lastReplay`
+  (new `LastReplay` value type) in `saveReplay`'s success branch, cleared on disarm, click-reveals the
+  clip — so the confirmation reaches the user even though the `Replay saved` banner is suppressed while
+  armed (docs/06 §Notifications). Settings' Instant Replay section gains a caption naming the real fix
+  (the "Allow notifications when mirroring or sharing the display" toggle) + an `Open Notification
+  Settings…` deep-link. **297 tests (+2:** save sets the receipt with rounded seconds + `menuTitle`;
+  disarm clears it). Full dev loop green (build/test/release/bundle). Quality pass: caption quotes/`›`
+  matched to codebase style (straight quotes, literal `›`). **Deferred to M9-T3 (approved):** the
+  menu-bar label "flash" (a save signal visible *without* opening the menu) — it folds into M9-T3's
+  label rebuild, so the label is touched once. Live menudriver render-check offered, not yet run (needs
+  Franco — drives the desktop). No VERSION bump (batched). **Next: M9-T3 (live menu-bar clock + the
+  deferred replay-saved label flash) — plan artifact first.**
+
 - **M9-T1 DONE — mic-less-start notification.** A recording that wanted a mic but resolved to none
   now posts `Recording started · no microphone` at start (pure `RecordingNotifications.recordingStart`,
   fired from `AppState.start()` after the session commits), closing the gap where only a

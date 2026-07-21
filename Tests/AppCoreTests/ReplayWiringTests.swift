@@ -291,6 +291,37 @@ import RecorderCore
         #expect(posted.first?.fileURL == url)
     }
 
+    @Test func saveSuccessRecordsTheLastReplayForTheMenu() async {
+        // M9-T2: the in-app receipt the banner-suppressed "Replay saved" can't be.
+        let (state, spy, _) = makeState()
+        state.isReplayArmed = true
+        let url = URL(fileURLWithPath: "/tmp/Replay 2026-07-16 at 14.02.11.mov")
+        spy.saveResult = .success(ReplayMuxer.SavedReplay(url: url, duration: 60.4))
+        state.notifier = { _ in }
+
+        state.saveReplay()
+        await Task.yield()
+
+        #expect(state.lastReplay?.url == url)
+        #expect(state.lastReplay?.seconds == 60)                       // rounded from 60.4
+        #expect(state.lastReplay?.menuTitle == "Replay saved · 60 s")
+    }
+
+    @Test func disarmingClearsTheLastReplayReceipt() async {
+        // The receipt belongs to the armed session that produced it.
+        let (state, spy, _) = makeState()
+        state.isReplayArmed = true
+        spy.saveResult = .success(ReplayMuxer.SavedReplay(
+            url: URL(fileURLWithPath: "/tmp/r.mov"), duration: 30))
+        state.notifier = { _ in }
+        state.saveReplay()
+        await Task.yield()
+        #expect(state.lastReplay != nil)
+
+        state.isReplayArmed = false
+        #expect(state.lastReplay == nil)
+    }
+
     @Test func saveFailureNotifiesCouldnt() async {
         let (state, spy, _) = makeState()
         state.isReplayArmed = true

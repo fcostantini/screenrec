@@ -220,6 +220,11 @@ public final class AppState {
 
     public private(set) var recentRecordings: [URL] = []
 
+    /// The last replay saved this armed session, for the menu's banner-independent confirmation
+    /// (M9-T2): the "Replay saved" notification is suppressed while armed (docs/06). Cleared on
+    /// disarm; updated on each save.
+    public private(set) var lastReplay: LastReplay?
+
     // MARK: - Onboarding (docs/06 "Onboarding window")
 
     /// Whether the setup window has anything to say: first launch or any missing permission,
@@ -411,6 +416,9 @@ public final class AppState {
                 guard let self else { return }
                 switch result {
                 case .success(let saved):
+                    // The in-app receipt (M9-T2): the notification below is banner-suppressed while
+                    // armed, so the menu row is what actually reaches the user.
+                    lastReplay = LastReplay(url: saved.url, seconds: Int(saved.duration.rounded()))
                     notifier?(RecordingNotifications.replaySaved(url: saved.url, duration: saved.duration))
                     refreshRecentRecordings()      // the new clip belongs at the top
                 case .failure(let error):
@@ -437,6 +445,7 @@ public final class AppState {
             registerReplayHotkey()
         } else {
             replay.disarm()
+            lastReplay = nil          // the receipt belongs to the armed session that made it
             _ = hotkeyRegistrar?(nil)
         }
     }

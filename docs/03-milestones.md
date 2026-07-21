@@ -752,7 +752,7 @@ feedback fixes and debt are PATCH/`refactor:` — Franco's call per commit. One 
       after `resolvedMicrophone()` returns `.noDevice`; distinguish specific-pick vs Automatic
       wording as `lastFailure` already does. **Verify:** unit — the factory's copy for both cases;
       the fold — a start with an absent pick posts exactly one notification (fake notifier).
-- [ ] M9-T2 **In-app confirmation for a saved replay (banner-independent).** macOS suppresses
+- [x] M9-T2 **In-app confirmation for a saved replay (banner-independent).** macOS suppresses
       banners whenever the display is captured — i.e. whenever replay is armed — so "Replay saved",
       the headline confirmation, renders only in Notification Center's list, never as a banner
       (docs/06 §Notifications, measured). Give the save a signal that doesn't route through
