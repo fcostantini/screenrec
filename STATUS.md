@@ -17,10 +17,11 @@
   the apply-fold clock transitions; `showsMenuBarTimer` opt-out round-trip + key pin/set; the flash
   flag). Full dev loop green (build/test/release/bundle-sign). docs/06 amended (status-item live-clock
   note + Settings toggle bullet + the contractual key row). Quality pass: `recordingClock` defaulted to
-  nil so `StatusIconView(icon:)` stays constructible. **NOT yet run — needs Franco (drives the
-  desktop):** the live *measured* check (screenshot the label across ≥3 ticks, assert it advances —
-  M4-T1 rule) + flash appears/clears + Settings-off ⇒ icon-only. No VERSION bump (batched).
-  **Next: M9-T4 (global start/stop hotkey), then debt T5–T7.**
+  nil so `StatusIconView(icon:)` stays constructible. **LIVE-VERIFIED 2026-07-21:** deployed to
+  /Users/Shared (PID-swap confirmed) and **Franco visually confirmed the ticking menu-bar clock** on a
+  menudriver-started recording (which he then discarded — no stray file). The finer sub-checks (flash
+  appears/clears, Settings-off ⇒ icon-only, pause-freeze) are unit-covered + spot-checkable. No VERSION
+  bump (batched). **Next: M9-T4 (global start/stop hotkey), then debt T5–T7, then T8 (slider).**
   **Slotted as M9-T8 (Franco, 2026-07-21):** replay buffer length as a slider (small floor → 15 min,
   seconds granularity), replacing the 30/60/120 Picker. **RAM/disk cost accepted — no cap** (his call);
   floor over zero. `allowedReplaySeconds` list → a `5...900` range with clamp-on-load; Slider applies on
