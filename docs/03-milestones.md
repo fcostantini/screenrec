@@ -799,16 +799,20 @@ feedback fixes and debt are PATCH/`refactor:` — Franco's call per commit. One 
       `[any SampleConsumer]` snapshot rebuilt only on `attach`/`detach` (rare); `route` reads the
       reference under the lock and delivers outside it, no per-buffer allocation. **Verify:**
       `SampleRouterTests` green; add a concurrent attach/detach-during-routing test; TSan clean.
-- [ ] M9-T7 **Split `AppState` (856 LOC).** Extract two self-contained clusters into `@Observable`
-      sub-models `AppState` owns and delegates to, views reading them directly: (a)
-      permissions/onboarding (`onboardingRows`, `refreshOnboarding`, the request/relaunch/readiness
-      surface, `notificationState`, `hasAskedForScreenRecording`, `screenWasGrantedAtLaunch`), (b)
-      the source picker (displays/mics/apps, `sourceChoice`, `refreshSources`/`refreshCapturableApps`,
-      `missingPickedApp`, `presentMicrophonePreference`, `captureConfiguration`). Behavior-preserving;
-      the 34 `AppStateTests` are the net. **Optional pairing:** add `RecordingSessionTests` around
-      the ADR-007 fate-branch selection by seaming its finalize step (the highest-consequence
-      untested code). **Verify:** full suite green, no behavior change; each sub-model independently
-      testable.
+- [x] M9-T7 **Split `AppState` — extracted `PermissionsModel`.** The permission/onboarding cluster
+      (`onboardingRows`, `refreshOnboarding`, the request/relaunch/readiness surface, `notificationState`,
+      `hasAskedForScreenRecording`, `screenWasGrantedAtLaunch`) moved to a `@Observable`
+      `PermissionsModel` that AppState owns and forwards to; it needs one input, `microphoneRequired`,
+      supplied from the mic pick. Behavior-preserving (315 tests, +2 `PermissionsModelTests`; forwarders
+      keep the view/CLI surface, so no existing test changed). AppState 962 → 917.
+      **The source-picker split was deliberately NOT done (Franco, 2026-07-21) — and is not deferred.**
+      On close reading the picks (`selectedDisplayID`/`selectedAppBundleID`/`microphonePreference` +
+      `quality`/`frameRateCap`) are *intrinsically* coupled to `persist()` and
+      `replayConfigurationChanged()` via non-uniform `didSet`s (display reconfigures replay but doesn't
+      persist; the others do; `isRehomingSources` batches). They ARE the capture config that drives
+      persistence and replay — extracting them adds a callback layer over intrinsic coupling rather than
+      separating a concern, for negative clarity value. Left in AppState on purpose. Do not re-attempt
+      without a genuinely better seam. (The optional `RecordingSessionTests` pairing also dropped.)
 
 ### Feature (Franco's ask, 2026-07-21)
 

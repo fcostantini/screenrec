@@ -5,6 +5,20 @@
 
 ## Now
 
+- **M9-T7 DONE — split `AppState`: extracted `PermissionsModel`.** The permission/onboarding cluster
+  (onboarding rows, `refreshOnboarding`, the request/relaunch/readiness surface, `notificationState`,
+  `hasAskedForScreenRecording`, `screenWasGrantedAtLaunch`) is now a `@Observable` `PermissionsModel`
+  AppState owns and forwards to; its one input is `microphoneRequired` (from the mic pick), and
+  observation propagates through the nested `@Observable` so the view/CLI surface is unchanged.
+  **315 tests (+2 `PermissionsModelTests`;** no existing test needed changing — the forwarders keep the
+  surface). AppState **962 → 917 LOC**. Full dev loop green. **The source-picker split was deliberately
+  DROPPED — not deferred (Franco, 2026-07-21):** the picks + quality/fps are *intrinsically* coupled to
+  `persist()` + `replayConfigurationChanged()` via non-uniform didSets (display reconfigures replay but
+  doesn't persist; others do; `isRehomingSources` batches) — they ARE the capture config that drives
+  persistence/replay, so extracting them adds a callback layer over intrinsic coupling for negative
+  clarity. Left in AppState on purpose; docs/03 M9-T7 says don't re-attempt. No T7b. No VERSION bump
+  (internal). **Next: M9-T8 (replay-length slider) — the last M9 item; plan artifact first.**
+
 - **M9-T6 DONE — allocation-free `SampleRouter.route`.** The per-buffer `Array(consumers.values)` on
   the SCK capture queue (~140×/s, against docs/01's allocation-light rule) is gone: a pre-built
   immutable `consumerList` snapshot, rebuilt only on attach/detach (rare), is what `route` reads under
