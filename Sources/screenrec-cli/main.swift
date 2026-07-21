@@ -25,17 +25,7 @@ func printUsage() {
                                        Save the last N seconds anytime with 's'+Return or
                                        `kill -USR1 <pid>` → "Replay <date>.mov" in --output
                                        (default ~/Movies); any other line (or Return) stops.
-      screenrec-cli mic-swap-spike [mode]  How SCK binds mic devices (M3-T7 evidence, 02 §4)
       screenrec-cli --help
-
-    mic-swap-spike modes:
-      (default)      Re-point between two live devices mid-capture
-      --reconnect    Re-bind a device that died and came back        (human: case/uncase)
-      --fallback     Re-point to a never-died device after mic loss  (human: case)
-      --nil-device   Is a nil microphoneCaptureDeviceID accepted?
-      --nil-follow   Does nil follow the system default as it changes? (human: case)
-      --two-streams  Can a mic-only stream coexist with the recording stream?
-      --record-repoint  M8-T1 live verify: a recording rides a mic re-point (needs 2 mics)
 
     record options:
       --duration <sec>   Stop after N seconds (else p/r/Return on a terminal, or stream end)
@@ -571,8 +561,6 @@ case "probe-stream":
     await runProbeStream(Array(arguments.dropFirst()))
 case "replay-arm":
     await runReplayArm(Array(arguments.dropFirst()))
-case "mic-swap-spike":
-    await runMicSwapSpike(Array(arguments.dropFirst()))
 case "-h", "--help":
     printUsage()
 default:

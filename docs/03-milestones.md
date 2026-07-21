@@ -786,7 +786,7 @@ feedback fixes and debt are PATCH/`refactor:` — Franco's call per commit. One 
 
 ### Debt
 
-- [ ] M9-T5 **Retire `MicSwapSpike.swift` (822 LOC).** Every leg's purpose is recorded (M3-T7 in
+- [x] M9-T5 **Retire `MicSwapSpike.swift` (822 LOC).** Every leg's purpose is recorded (M3-T7 in
       02 §4, the M6-T4 decision in ADR-012, M8 shipped). It ships in the CLI binary, duplicates
       RecorderCore internals it can't reach (`isCompleteSpikeVideoFrame`, the audio-capture
       contract), and has two undocumented modes. **Decision:** delete outright (the M8 G8 live gates

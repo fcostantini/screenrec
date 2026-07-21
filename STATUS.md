@@ -5,6 +5,15 @@
 
 ## Now
 
+- **M9-T5 DONE — retired `MicSwapSpike.swift` (822 LOC, 8 modes).** Completed research scaffolding
+  removed: the file + the `mic-swap-spike` CLI dispatch + the printUsage modes block. Purpose served
+  and recorded (02 §4, ADR-012, shipped M8); M8 G8 live gates are the standing regression (field note).
+  Verified: build + **313 tests** unchanged, release + bundle green; `--help` no longer lists it and
+  `mic-swap-spike` now errors "Unknown command"; the 6 real subcommands
+  (record/list-mics/list-apps/engine-smoke/probe-stream/replay-arm) intact. No VERSION bump (internal
+  cleanup). **Next: M9-T6 (allocation-free `SampleRouter.route`), then T7 (split AppState), then T8
+  (slider).**
+
 - **M9-T4 DONE — global start/stop recording shortcut (+ `ReplayHotkey`→`Hotkey` rename, Franco's ask).**
   An **opt-in** global Start/Stop shortcut: off by default (an always-live combo the user didn't choose
   can clash, unlike replay's ⌥⌘R which only fires while armed); a Settings toggle enables it, seeding
@@ -754,6 +763,13 @@ video (deterministic, reproducible).
 | G6   | ✅ **v1 declared 2026-07-20 (v1.0.0)** — M6 complete bar the deferred T4 bucket; G6 = the sum of the soak legs (below) + acceptance criteria, all green | §7 leg 1 ✅ 2026-07-17: 2 h battery, real usage + Zoom, replay armed, 3 mid-run replay saves; 19.5 GB / 7223.42 s, tracks ≤110 ms apart; battery 99→62%, CPU avg 12.9% / max 19.3%, RSS 98–485 MB trendless, zero thermal warnings; Franco: "smooth throughout, no desync" (claps at 0/1/2 h). §7 kill leg ✅ (amended to 1 h, Franco): kill -9 at 3540 s → playable 3539.53 s, **0.47 s lost** (≤10 s); app relaunched Ready. ⚠️ relaunch dropped the persisted armed state (transient pipeline failure → self-disarm; field note) — open follow-up, not a gate fail (§7 doesn't cover it). |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-21 (M9-T5): **retired `MicSwapSpike.swift`** (822 LOC, 8 modes) — completed research
+  scaffolding. Its findings are recorded (02 §4 / M3-T7, ADR-012 / M6-T4) and the recovery it explored
+  is shipped (M8-T1/T2); the **M8 G8 live gates are the standing regression** — mic recovery is
+  re-verified live against the app if ever needed, not via a CLI spike. Removed the file, the
+  `mic-swap-spike` dispatch, and the printUsage modes block. Recoverable from git (parent of the M9-T5
+  commit) if a two-stream harness is ever wanted again.
 
 - 2026-07-21 (deploy gotcha): **`killall ScreenRec` did NOT terminate the running menu-bar
   instance** (PID unchanged after `killall -w`), so the subsequent `open dist/.../ScreenRec.app`
