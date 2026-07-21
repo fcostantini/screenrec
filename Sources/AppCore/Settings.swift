@@ -57,12 +57,32 @@ public struct Settings: Sendable, Equatable {
     public var showsMenuBarTimer: Bool
 
     public static let allowedFrameRateCaps = [30, 60]
-    /// The replay buffer length range (M9-T8): 5 s floor → 15 min, seconds granularity.
+    /// The replay buffer length range (M9-T8): 5 s floor → 15 min. Seconds granularity via typed
+    /// input; the slider snaps to `replaySliderStep`.
     public static let replaySecondsRange = 5...900
+    /// The slider lands on 15-second increments (M9-T8); finer values come from the typed field.
+    public static let replaySliderStep = 15
 
-    /// The replay length as `M:SS` for the Settings slider (M9-T8): 200 → "3:20", 5 → "0:05".
+    /// The replay length as `M:SS` (M9-T8): 200 → "3:20", 5 → "0:05".
     public static func replayBufferLabel(_ seconds: Int) -> String {
         String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+
+    /// Parses the typed replay length — `"M:SS"` or a plain seconds count — clamped into range;
+    /// nil if it isn't a number (the field then reverts). `"3:20"` → 200, `"200"` → 200, `"0:03"` → 5.
+    public static func parseReplayBuffer(_ text: String) -> Int? {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        let seconds: Int
+        if trimmed.contains(":") {
+            let parts = trimmed.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2, let minutes = Int(parts[0]),
+                  let secs = Int(parts[1]), (0..<60).contains(secs) else { return nil }
+            seconds = minutes * 60 + secs
+        } else {
+            guard let secs = Int(trimmed) else { return nil }
+            seconds = secs
+        }
+        return min(max(seconds, replaySecondsRange.lowerBound), replaySecondsRange.upperBound)
     }
 
     public static var standard: Settings {

@@ -264,8 +264,9 @@ the old line is simply false above three green ticks.
   user didn't choose can clash); enabling seeds ⌥⌘S and shows the recorder pill. Fires
   `AppState.toggleRecording` (active session ⇒ Stop & Save; idle+ready ⇒ Start; blocked ⇒ notify).
   Backed by `recordHotkey`.
-- Instant replay: buffer length — **a slider, 5 s to 15 min, seconds granularity (M9-T8;** applied on
-  release, shown as `M:SS`; was a 30 s / 60 s / 2 min picker) · hotkey recorder (default ⌥⌘R) — **M5**
+- Instant replay: buffer length — **a slider that snaps to 15 s (5 s–15 min), plus a typed `M:SS`
+  field for exact values (M9-T8;** slider is continuous/tick-free, applied on release; was a 30 s /
+  60 s / 2 min picker) · hotkey recorder (default ⌥⌘R) — **M5**
   - Changing the length while armed resizes the buffer **in place** (M6-T6): grow keeps
     everything and fills to the new length; shrink drops the excess immediately. Quality/
     fps/source changes still restart the armed stream (SCK binds sources per stream, 02 §4).

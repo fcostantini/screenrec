@@ -13,7 +13,11 @@
   **clamps** a positive value into range (1000→900, 3→5), absent/≤0 → 60. New pure
   `Settings.replayBufferLabel` (M:SS). **317 tests (+2:** clamp-high/low, in-range survives incl. odd
   137, non-positive→60, the label formatter; the windowChanges test now uses 137). Full dev loop green;
-  docs/06 amended (key range + settings line). **Live-verify owed (deploy + Franco):** set 3:20, arm,
+  docs/06 amended (key range + settings line). **Reworked after Franco's look (approved):** the `step:1`
+  slider's dense tick marks were ugly — now a **continuous, tick-free slider that snaps to 15 s** (a
+  rounding binding) beside an **editable `M:SS` field** for exact/finer values
+  (`Settings.parseReplayBuffer` accepts `M:SS` or plain seconds, clamps 5–900, reverts garbage). 318
+  tests. **Live-verify owed (deploy + Franco):** set 3:20, arm,
   save → clip ≈ that length. **M9 (T1–T8) is done.** The accumulated MINOR features (T3 menu-bar clock,
   T4 global hotkey, T8 slider) owe **v1.3.0** — Franco's call to cut (VERSION + `CoreInfo.version` + tag).
   **Next: cut 1.3.0, then M10 (share export & basic editing) when Franco says go.**

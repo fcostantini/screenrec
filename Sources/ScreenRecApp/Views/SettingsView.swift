@@ -12,9 +12,12 @@ struct SettingsView: View {
     /// selection, not as an opaque "invalid parameter" at record time (02 §2).
     @State private var folderProblem: String?
 
-    /// The replay-length slider's in-progress value (M9-T8): committed to `state.replaySeconds` only
-    /// on release, so a drag doesn't resize the armed ring on every tick. Seeded from the model.
+    /// The replay-length slider's in-progress value (M9-T8): snapped to 15 s while dragging and
+    /// committed to `state.replaySeconds` only on release, so a drag doesn't resize the armed ring on
+    /// every tick. Seeded from the model.
     @State private var draftReplaySeconds: Double = 60
+    /// The editable `M:SS` value beside the slider — finer than the 15 s slider steps, typed.
+    @State private var replayText = ""
 
     var body: some View {
         Form {
@@ -79,15 +82,18 @@ struct SettingsView: View {
             Section("Instant Replay") {
                 LabeledContent("Replay buffer") {
                     HStack(spacing: 10) {
-                        Slider(value: $draftReplaySeconds, in: Self.replayRange, step: 1) { editing in
-                            // Apply on release, not per tick — a drag while armed resizes the ring
-                            // once (via `windowChanged`) instead of rebuilding it hundreds of times.
+                        // Continuous slider (no `step:`, so no tick marks), snapped to 15 s in the
+                        // binding; committed on release so a drag while armed resizes the ring once
+                        // (via `windowChanged`), not hundreds of times.
+                        Slider(value: snappedReplayBinding, in: Self.replayRange) { editing in
                             if !editing { state.replaySeconds = Int(draftReplaySeconds) }
                         }
-                        Text(Settings.replayBufferLabel(Int(draftReplaySeconds)))
+                        TextField("", text: $replayText)
+                            .labelsHidden()
+                            .multilineTextAlignment(.trailing)
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                            .frame(width: 46, alignment: .trailing)
+                            .frame(width: 54)
+                            .onSubmit(commitTypedReplayBuffer)
                     }
                 }
                 LabeledContent("Save replay shortcut") {
@@ -123,14 +129,42 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 420)
         .fixedSize()
-        .onAppear { draftReplaySeconds = Double(state.replaySeconds) }
-        .onChange(of: state.replaySeconds) { draftReplaySeconds = Double(state.replaySeconds) }
+        .onAppear { syncReplayControls() }
+        .onChange(of: state.replaySeconds) { syncReplayControls() }
     }
 
     /// The replay slider's range as `Double`s (M9-T8), kept off the view body so the type-checker
     /// isn't asked to prove the whole expression at once.
     private static let replayRange =
         Double(Settings.replaySecondsRange.lowerBound)...Double(Settings.replaySecondsRange.upperBound)
+
+    /// Snaps the slider to 15 s (M9-T8) without tick marks: the binding rounds every set, so the
+    /// thumb lands on 15 s multiples while the slider itself stays continuous (no `step:`).
+    private var snappedReplayBinding: Binding<Double> {
+        Binding(
+            get: { draftReplaySeconds },
+            set: { newValue in
+                let step = Double(Settings.replaySliderStep)
+                let snapped = (newValue / step).rounded() * step
+                draftReplaySeconds = min(max(snapped, Self.replayRange.lowerBound),
+                                         Self.replayRange.upperBound)
+            })
+    }
+
+    /// Keeps the slider draft and the typed `M:SS` field in step with the model.
+    private func syncReplayControls() {
+        draftReplaySeconds = Double(state.replaySeconds)
+        replayText = Settings.replayBufferLabel(state.replaySeconds)
+    }
+
+    /// Commits a typed value (`M:SS` or seconds); unparseable input reverts the field.
+    private func commitTypedReplayBuffer() {
+        if let seconds = Settings.parseReplayBuffer(replayText) {
+            state.replaySeconds = seconds       // onChange re-syncs the slider and normalizes the text
+        } else {
+            replayText = Settings.replayBufferLabel(state.replaySeconds)
+        }
+    }
 
     private var abbreviatedOutputPath: String {
         (state.outputDirectory.path as NSString).abbreviatingWithTildeInPath

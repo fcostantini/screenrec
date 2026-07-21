@@ -272,6 +272,18 @@ import RecorderCore
         #expect(Settings.replayBufferLabel(900) == "15:00")
     }
 
+    @Test func parseReplayBufferHandlesBothFormsClampsAndRejectsGarbage() {
+        #expect(Settings.parseReplayBuffer("3:20") == 200)     // M:SS
+        #expect(Settings.parseReplayBuffer("200") == 200)      // plain seconds
+        #expect(Settings.parseReplayBuffer("15:00") == 900)
+        #expect(Settings.parseReplayBuffer(" 1:30 ") == 90)    // trims whitespace
+        #expect(Settings.parseReplayBuffer("0:03") == 5)       // clamps up to the floor
+        #expect(Settings.parseReplayBuffer("99:00") == 900)    // clamps to the max
+        #expect(Settings.parseReplayBuffer("abc") == nil)      // unparseable ⇒ revert
+        #expect(Settings.parseReplayBuffer("3:75") == nil)     // seconds field must be < 60
+        #expect(Settings.parseReplayBuffer("") == nil)
+    }
+
     @Test func aMalformedHotkeyFallsBackWhole() {
         // Half a shortcut is not a shortcut, and zero modifiers would fire on plain typing.
         let defaults = makeDefaults().defaults
