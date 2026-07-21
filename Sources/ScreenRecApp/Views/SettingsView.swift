@@ -12,6 +12,10 @@ struct SettingsView: View {
     /// selection, not as an opaque "invalid parameter" at record time (02 §2).
     @State private var folderProblem: String?
 
+    /// The replay-length slider's in-progress value (M9-T8): committed to `state.replaySeconds` only
+    /// on release, so a drag doesn't resize the armed ring on every tick. Seeded from the model.
+    @State private var draftReplaySeconds: Double = 60
+
     var body: some View {
         Form {
             LabeledContent("Output folder") {
@@ -73,9 +77,17 @@ struct SettingsView: View {
             }
 
             Section("Instant Replay") {
-                Picker("Replay buffer", selection: $state.replaySeconds) {
-                    ForEach(Settings.allowedReplaySeconds, id: \.self) { seconds in
-                        Text(Self.bufferTitle(seconds)).tag(seconds)
+                LabeledContent("Replay buffer") {
+                    HStack(spacing: 10) {
+                        Slider(value: $draftReplaySeconds, in: Self.replayRange, step: 1) { editing in
+                            // Apply on release, not per tick — a drag while armed resizes the ring
+                            // once (via `windowChanged`) instead of rebuilding it hundreds of times.
+                            if !editing { state.replaySeconds = Int(draftReplaySeconds) }
+                        }
+                        Text(Settings.replayBufferLabel(Int(draftReplaySeconds)))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: 46, alignment: .trailing)
                     }
                 }
                 LabeledContent("Save replay shortcut") {
@@ -111,12 +123,14 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 420)
         .fixedSize()
+        .onAppear { draftReplaySeconds = Double(state.replaySeconds) }
+        .onChange(of: state.replaySeconds) { draftReplaySeconds = Double(state.replaySeconds) }
     }
 
-    /// docs/06's values, spelled the way a human says them.
-    private static func bufferTitle(_ seconds: Int) -> String {
-        seconds == 120 ? "2 minutes" : "\(seconds) seconds"
-    }
+    /// The replay slider's range as `Double`s (M9-T8), kept off the view body so the type-checker
+    /// isn't asked to prove the whole expression at once.
+    private static let replayRange =
+        Double(Settings.replaySecondsRange.lowerBound)...Double(Settings.replaySecondsRange.upperBound)
 
     private var abbreviatedOutputPath: String {
         (state.outputDirectory.path as NSString).abbreviatingWithTildeInPath

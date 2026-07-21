@@ -57,7 +57,13 @@ public struct Settings: Sendable, Equatable {
     public var showsMenuBarTimer: Bool
 
     public static let allowedFrameRateCaps = [30, 60]
-    public static let allowedReplaySeconds = [30, 60, 120]
+    /// The replay buffer length range (M9-T8): 5 s floor → 15 min, seconds granularity.
+    public static let replaySecondsRange = 5...900
+
+    /// The replay length as `M:SS` for the Settings slider (M9-T8): 200 → "3:20", 5 → "0:05".
+    public static func replayBufferLabel(_ seconds: Int) -> String {
+        String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
 
     public static var standard: Settings {
         Settings(
@@ -149,10 +155,13 @@ public enum SettingsStore {
 
         settings.replayArmed = defaults.bool(forKey: Key.replayArmed)
 
-        // Same shape as fps: only the documented values, or a ring gets sized by garbage.
-        let replaySeconds = defaults.integer(forKey: Key.replaySeconds)
-        if Settings.allowedReplaySeconds.contains(replaySeconds) {
-            settings.replaySeconds = replaySeconds
+        // A positive value clamps into the range (M9-T8); absent or garbage (`integer(forKey:)` is 0
+        // for both) keeps the default 60 — never a 0-length ring.
+        let rawReplaySeconds = defaults.integer(forKey: Key.replaySeconds)
+        if rawReplaySeconds > 0 {
+            settings.replaySeconds = min(
+                max(rawReplaySeconds, Settings.replaySecondsRange.lowerBound),
+                Settings.replaySecondsRange.upperBound)
         }
 
         // A malformed hotkey falls back whole — half a shortcut is not a shortcut. `hotkey(from:)`

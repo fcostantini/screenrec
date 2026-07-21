@@ -133,12 +133,12 @@ import RecorderCore
         state.isReplayArmed = true
         spy.calls = []
 
-        state.replaySeconds = 120
+        state.replaySeconds = 137          // M9-T8: an arbitrary length, not just 30/60/120
         #expect(spy.calls == [.windowChanged])
-        #expect(spy.lastSeconds == 120)
+        #expect(spy.lastSeconds == 137)
 
         // Same value again ⇒ no churn.
-        state.replaySeconds = 120
+        state.replaySeconds = 137
         #expect(spy.calls.count == 1)
     }
 

@@ -240,20 +240,36 @@ import RecorderCore
         #expect(SettingsStore.load(from: defaults).frameRateCap == fps)
     }
 
-    @Test(arguments: [0, -1, 15, 45, 90, 600])
-    func onlyTheThreeDocumentedReplayLengthsAreAccepted(seconds: Int) {
-        // A garbage window would size the replay rings — same shape as the fps rule: fall
-        // back, never clamp to a value nobody chose.
+    @Test(arguments: [0, -1])
+    func nonPositiveReplaySecondsFallBackTo60(seconds: Int) {
+        // `integer(forKey:)` is 0 for absent and garbage alike; never a 0-length ring (M9-T8).
         let defaults = makeDefaults().defaults
         defaults.set(seconds, forKey: "replaySeconds")
         #expect(SettingsStore.load(from: defaults).replaySeconds == 60)
     }
 
-    @Test(arguments: [30, 60, 120])
-    func theThreeDocumentedReplayLengthsSurvive(seconds: Int) {
+    @Test(arguments: [5, 30, 60, 120, 137, 900])
+    func anInRangeReplayLengthSurvives(seconds: Int) {
+        // M9-T8: any second-value in 5…900 is now valid, not just the old three.
         let defaults = makeDefaults().defaults
         defaults.set(seconds, forKey: "replaySeconds")
         #expect(SettingsStore.load(from: defaults).replaySeconds == seconds)
+    }
+
+    @Test func aPositiveOutOfRangeReplayLengthClampsToTheNearestBound() {
+        // A hand-edited plist, or a value from a future build: clamp rather than discard the intent.
+        let defaults = makeDefaults().defaults
+        defaults.set(1000, forKey: "replaySeconds")
+        #expect(SettingsStore.load(from: defaults).replaySeconds == 900)   // to the max
+        defaults.set(3, forKey: "replaySeconds")
+        #expect(SettingsStore.load(from: defaults).replaySeconds == 5)     // to the floor
+    }
+
+    @Test func replayBufferLabelFormatsAsMinutesSeconds() {
+        #expect(Settings.replayBufferLabel(5) == "0:05")
+        #expect(Settings.replayBufferLabel(90) == "1:30")
+        #expect(Settings.replayBufferLabel(200) == "3:20")
+        #expect(Settings.replayBufferLabel(900) == "15:00")
     }
 
     @Test func aMalformedHotkeyFallsBackWhole() {

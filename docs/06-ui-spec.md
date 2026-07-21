@@ -264,7 +264,8 @@ the old line is simply false above three green ticks.
   user didn't choose can clash); enabling seeds ⌥⌘S and shows the recorder pill. Fires
   `AppState.toggleRecording` (active session ⇒ Stop & Save; idle+ready ⇒ Start; blocked ⇒ notify).
   Backed by `recordHotkey`.
-- Instant replay: buffer length 30 s / 60 s / 2 min · hotkey recorder (default ⌥⌘R) — **M5**
+- Instant replay: buffer length — **a slider, 5 s to 15 min, seconds granularity (M9-T8;** applied on
+  release, shown as `M:SS`; was a 30 s / 60 s / 2 min picker) · hotkey recorder (default ⌥⌘R) — **M5**
   - Changing the length while armed resizes the buffer **in place** (M6-T6): grow keeps
     everything and fills to the new length; shrink drops the excess immediately. Quality/
     fps/source changes still restart the armed stream (SCK binds sources per stream, 02 §4).
@@ -297,7 +298,7 @@ moved):
 | `microphoneAutomatic` | Bool; true ⇒ **Automatic (System Default)**, and it wins over any `microphoneID` in the plist. Resolution follows the system default at capture start (M6-T13) | M6-T13 |
 | `captureAppBundleID` | String bundle ID; absent ⇒ entire screen. **Never cleared by the app not running** — the pick survives (mic rule); a start while it's away fails loud, armed replay retries until it returns | M7-T2 |
 | `replayArmed` | Bool | **M5** |
-| `replaySeconds` | Int 30\|60\|120 | **M5** |
+| `replaySeconds` | Int seconds; **M9-T8 slider range 5–900** (clamped on load — a positive out-of-range value snaps to the nearest bound, absent/≤0 ⇒ 60). Was 30\|60\|120 | **M5** |
 | `replayHotkey` | Dict: keyCode Int, modifiers Int | **M5** |
 | `recordHotkey` | Dict: keyCode Int, modifiers Int; **absent ⇒ off** (M9-T4, opt-in global start/stop) | M9-T4 |
 | `showsMenuBarTimer` | Bool; **absent ⇒ on** (opt-out). The status-item label's live elapsed clock while recording (M9-T3) | M9-T3 |

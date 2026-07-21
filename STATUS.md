@@ -5,6 +5,19 @@
 
 ## Now
 
+- **🎉 M9 COMPLETE — M9-T8 DONE (replay-length slider). VERSION bump to 1.3.0 owed (Franco to cut).**
+  The Settings Picker (30/60/120 s) is now a **Slider, 5 s → 15 min, seconds granularity**, live `M:SS`
+  value, **applied on release** (a draft `@State` committed to `replaySeconds` on
+  `onEditingChanged(false)`, so a drag while armed resizes the ring **once** via M6-T6's `windowChanged`,
+  not per tick). `Settings.allowedReplaySeconds [30,60,120]` → `replaySecondsRange 5...900`; load
+  **clamps** a positive value into range (1000→900, 3→5), absent/≤0 → 60. New pure
+  `Settings.replayBufferLabel` (M:SS). **317 tests (+2:** clamp-high/low, in-range survives incl. odd
+  137, non-positive→60, the label formatter; the windowChanges test now uses 137). Full dev loop green;
+  docs/06 amended (key range + settings line). **Live-verify owed (deploy + Franco):** set 3:20, arm,
+  save → clip ≈ that length. **M9 (T1–T8) is done.** The accumulated MINOR features (T3 menu-bar clock,
+  T4 global hotkey, T8 slider) owe **v1.3.0** — Franco's call to cut (VERSION + `CoreInfo.version` + tag).
+  **Next: cut 1.3.0, then M10 (share export & basic editing) when Franco says go.**
+
 - **M9-T7 DONE — split `AppState`: extracted `PermissionsModel`.** The permission/onboarding cluster
   (onboarding rows, `refreshOnboarding`, the request/relaunch/readiness surface, `notificationState`,
   `hasAskedForScreenRecording`, `screenWasGrantedAtLaunch`) is now a `@Observable` `PermissionsModel`

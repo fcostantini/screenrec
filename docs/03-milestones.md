@@ -816,7 +816,7 @@ feedback fixes and debt are PATCH/`refactor:` — Franco's call per commit. One 
 
 ### Feature (Franco's ask, 2026-07-21)
 
-- [ ] M9-T8 **Replay buffer length as a slider (small floor → 15 min, seconds granularity).** Replace
+- [x] M9-T8 **Replay buffer length as a slider (small floor → 15 min, seconds granularity).** Replace
       the Settings Picker (30 / 60 / 120 s) with a slider from a small non-zero floor (~5 s) to 15 min,
       seconds granularity. **RAM/disk cost explicitly accepted (Franco) — no memory cap**; the ring is a
       live in-RAM buffer that scales with the window (≈2.6 GB resident at 15 min / Balanced), and that's
