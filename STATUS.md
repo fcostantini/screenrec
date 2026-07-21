@@ -713,6 +713,16 @@ video (deterministic, reproducible).
 
 ## Field notes (append; things learned that docs don't cover yet)
 
+- 2026-07-21 (deploy gotcha): **`killall ScreenRec` did NOT terminate the running menu-bar
+  instance** (PID unchanged after `killall -w`), so the subsequent `open dist/.../ScreenRec.app`
+  merely re-focused the stale instance — you end up with the new files on disk but the OLD binary
+  running (and the change appears "missing"). Reliable redeploy: read the PID
+  (`ps -Ao pid,comm | grep MacOS/ScreenRec`), `kill -9 <pid>`, confirm it's gone, replace the
+  bundle (`rm -rf /Users/Shared/ScreenRec.app && ditto dist/ScreenRec.app /Users/Shared/ScreenRec.app`),
+  `open`, then **verify the PID changed**. Sanity-check a change is really in the deployed binary
+  with `strings <bundle>/Contents/MacOS/ScreenRec | grep '<a copy string from the change>'`. TCC
+  grants persist across the swap (same DR + same path).
+
 - 2026-07-20 (M8-T2 live-rig lessons):
   - **"Open the case" does NOT reconnect AirPods to a Mac as an input device — in-ear does.**
     The first leg-1 attempt cued lid-open and the device never rejoined the HAL during the
