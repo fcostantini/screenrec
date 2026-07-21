@@ -5,6 +5,15 @@
 
 ## Now
 
+- **M9-T6 DONE — allocation-free `SampleRouter.route`.** The per-buffer `Array(consumers.values)` on
+  the SCK capture queue (~140×/s, against docs/01's allocation-light rule) is gone: a pre-built
+  immutable `consumerList` snapshot, rebuilt only on attach/detach (rare), is what `route` reads under
+  the lock (a COW retain, not a heap allocation) then delivers outside it. Thread-safe because the list
+  is always *replaced*, never mutated in place — so an in-flight route snapshot stays a stable view.
+  Behavior unchanged (the dict stays the identity-keyed source of truth). Verified: build + **313
+  tests**, **TSan clean** on the concurrent route/attach/detach suite, release + bundle green. 12-line
+  diff. No VERSION bump (internal perf). **Next: M9-T7 (split AppState), then T8 (slider).**
+
 - **M9-T5 DONE — retired `MicSwapSpike.swift` (822 LOC, 8 modes).** Completed research scaffolding
   removed: the file + the `mic-swap-spike` CLI dispatch + the printUsage modes block. Purpose served
   and recorded (02 §4, ADR-012, shipped M8); M8 G8 live gates are the standing regression (field note).

@@ -794,7 +794,7 @@ feedback fixes and debt are PATCH/`refactor:` — Franco's call per commit. One 
       harness — recommendation: delete, rationale to STATUS field notes not a code comment.
       **Verify:** build/test green; CLI help no longer advertises removed modes; other subcommands
       unaffected.
-- [ ] M9-T6 **Allocation-free `SampleRouter.route`.** `Array(consumers.values)` runs on the SCK
+- [x] M9-T6 **Allocation-free `SampleRouter.route`.** `Array(consumers.values)` runs on the SCK
       capture queue ~140×/s, against docs/01's "handlers allocation-light" rule. Hold an immutable
       `[any SampleConsumer]` snapshot rebuilt only on `attach`/`detach` (rare); `route` reads the
       reference under the lock and delivers outside it, no per-buffer allocation. **Verify:**
