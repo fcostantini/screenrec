@@ -810,10 +810,29 @@ feedback fixes and debt are PATCH/`refactor:` — Franco's call per commit. One 
       untested code). **Verify:** full suite green, no behavior change; each sub-model independently
       testable.
 
+### Feature (Franco's ask, 2026-07-21)
+
+- [ ] M9-T8 **Replay buffer length as a slider (small floor → 15 min, seconds granularity).** Replace
+      the Settings Picker (30 / 60 / 120 s) with a slider from a small non-zero floor (~5 s) to 15 min,
+      seconds granularity. **RAM/disk cost explicitly accepted (Franco) — no memory cap**; the ring is a
+      live in-RAM buffer that scales with the window (≈2.6 GB resident at 15 min / Balanced), and that's
+      fine. **Seams:** `Settings.allowedReplaySeconds` (the fixed list) → a `replaySecondsRange`
+      (`5...900`); load **clamps** into the range instead of list-membership (garbage still falls back to
+      60); `SettingsView` Picker → `Slider` with a live `M:SS` value label; `windowChanged` already
+      resizes the armed ring in place (M6-T6), so a live drag grows/shrinks the buffer — **apply on
+      drag-end** (a `Slider(onEditingChanged:)`), not per-tick, or every intermediate value rebuilds.
+      **Rulings:** the floor value; the value-label format (`M:SS`); commit-on-release vs live. docs/06
+      updated (`replaySeconds` key type is now a range; the Instant Replay settings line); the
+      SettingsTests pinning 30/60/120 rewritten to the clamp/fallback rules. **Verify:** unit — load
+      clamps an out-of-range value into `[floor, 900]`, round-trips an arbitrary in-range value (e.g.
+      137 s), garbage falls back to 60; the value-label formats; a change while armed fires
+      `windowChanged`. Live — set an odd length (e.g. 3:20), arm, save → clip ≈ that length. MINOR bump.
+
 **Gate G9**: the four QoL verifies pass (mic-less start posts once; a saved replay shows an in-app
 confirmation while armed; the menu-bar clock advances live, measured; the global shortcut starts and
 stops from another app), and after the debt tasks build + full test + release build + `bundle.sh` +
-TSan are all green with a menudriver smoke (start → stop → arm → save) showing no regression.
+TSan are all green with a menudriver smoke (start → stop → arm → save) showing no regression. T8 (the
+replay slider) is an additional feature with its own verify above — not a G9 blocker.
 
 ---
 

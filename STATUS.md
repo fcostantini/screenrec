@@ -21,10 +21,10 @@
   desktop):** the live *measured* check (screenshot the label across ≥3 ticks, assert it advances —
   M4-T1 rule) + flash appears/clears + Settings-off ⇒ icon-only. No VERSION bump (batched).
   **Next: M9-T4 (global start/stop hotkey), then debt T5–T7.**
-  **Backlog (Franco, 2026-07-21):** replay buffer length as a slider 0–15 min w/ seconds granularity
-  (today it's a 30/60/120 Picker) — real design Qs: ring memory at 15 min (video ring alone ~GBs at
-  Balanced ≈19 Mbps; see M5-T3/M5-T6 RSS notes), a sensible non-zero floor, `allowedReplaySeconds`
-  becoming a range. Unslotted — Franco to place (its own small milestone/task).
+  **Slotted as M9-T8 (Franco, 2026-07-21):** replay buffer length as a slider (small floor → 15 min,
+  seconds granularity), replacing the 30/60/120 Picker. **RAM/disk cost accepted — no cap** (his call);
+  floor over zero. `allowedReplaySeconds` list → a `5...900` range with clamp-on-load; Slider applies on
+  drag-end via the existing `windowChanged` in-place resize (M6-T6). See docs/03 M9-T8.
 
 - **M9-T2 DONE — in-app replay confirmation + banner-suppression discoverability.** A saved replay now
   shows a top-of-menu **`Replay saved · N s`** row (idle + recording), set from a new `AppState.lastReplay`
