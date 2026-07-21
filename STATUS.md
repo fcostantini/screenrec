@@ -5,6 +5,24 @@
 
 ## Now
 
+- **📋 Product/code review done + roadmap reopened (2026-07-21).** A full review (artifact: product +
+  code, three parallel deep-dives — architecture, UX, competitive) ran against v1.2.0. **Two product
+  forks resolved by Franco and recorded as ADRs so no future agent re-litigates:**
+  (1) **Distribution — ADR-014:** personal tool, limited private sharing only, **no
+  notarization** (self-signed + one-time "Open Anyway"; grants persist via the stable DR). M6-T4's
+  notarization item is closed "won't do". README "Sharing this build" rewritten.
+  (2) **Direction — ADR-015:** stays a recorder; **basic editing (lossless trim + shareable-format
+  export) is now in-scope** as a future, but the Metal render/compositing "studio" stage (auto-zoom,
+  backgrounds) stays parked. Brief non-goal amended to point here.
+  **New roadmap in docs/03 (two milestones, Franco chose 2 over 4):**
+  **M9 — post-review polish & debt** (T1 mic-less-start notification · T2 in-app replay confirmation
+  [banner suppression] · T3 live menu-bar clock · T4 global start/stop hotkey · T5 retire
+  MicSwapSpike · T6 allocation-free SampleRouter.route · T7 split AppState), then
+  **M10 — share export & basic editing** (T1 MP4 export core+CLI [ADR-016, the WhatsApp step] · T2
+  export app wiring · T3 GIF-from-replay · T4 lossless trim). Independent of each other; build only on
+  shipped milestones. **NEXT TASK: M9-T1 — plan artifact first (mandatory), then implement.** Nothing
+  from M9/M10 is started; all boxes unticked.
+
 - **🎉 M8 COMPLETE — v1.2.0 (M8-T2 DONE, GATE G8 PASSED 2026-07-20). The AirPods come back.**
   New `MicrophoneRescue` (Capture/) lives INSIDE `CaptureEngine`, so recording, idle-armed
   replay and shared-stream mode all inherit recovery from one implementation: on

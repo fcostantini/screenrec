@@ -111,3 +111,42 @@ PATCH = fixes with no new feature. `1.0.0` = v1 (M0–M6). Bump `VERSION` in the
 it and tag the release. Chosen over date-based or build-number-only schemes because the milestone
 structure already maps cleanly onto MINOR bumps, and a human-readable `defaults read`/Finder version
 was the point of M4-T6's stamping.
+
+## ADR-014 ✅ Distribution: self-signed, privately shared, no notarization (Franco, 2026-07-21)
+Resolves the review's "personal tool or product?" fork. screenrec is a **personal tool Franco may
+hand to a small number of people directly — never public, never commercial.** So the Apple Developer
+Program ($99/yr) and `notarytool` are **not** worth it; M6-T4's notarization item is closed as "won't
+do" (not merely deferred). The sharing path uses the existing self-signed `screenrec-dev` build:
+- **On any Mac that can build**, clone and build (README's four commands) — zero caveats.
+- **Others** get the signed `.app` and clear Gatekeeper once via **System Settings → Privacy &
+  Security → Open Anyway** (macOS 15 removed the old right-click→Open shortcut for this).
+- TCC grants (Screen Recording, Microphone) then **persist across every future build** Franco sends,
+  because the stable designated requirement (M0-T3) keys the grant to the reused cert, not to
+  Apple's trust chain — the same property G4 §5.2 proved for local rebuilds.
+Refines ADR-006 (no sandbox; direct distribution "if ever") with the concrete decision. If the
+audience ever widens beyond a handful of direct recipients, revisit — Developer ID + notarization is the only
+part missing, and it's purely a Gatekeeper-friction removal, not a capability.
+
+## ADR-015 ✅ Product direction: a recorder that may gain *basic* editing, not a demo studio (Franco, 2026-07-21)
+Resolves the review's "recorder or studio?" fork, and supersedes the brief's blanket non-goal
+"Editing of any kind." The identity stays **a dependable, native, private capture tool.** Two
+consequences:
+- **Basic editing is now in-scope as a future** — specifically the *cheap* kind that reuses existing
+  machinery: **lossless trim** (passthrough via `ReplayMuxer`'s keyframe logic) and **format export**
+  (transcode to a shareable `.mp4`/GIF). These are format/trim operations, not a timeline editor.
+  Scheduled as M10.
+- **The frame render/compositing stage stays OUT.** Screen-Studio-style *polish-at-export* — automatic
+  click-zoom, cursor smoothing, padded backgrounds — needs a Metal/CoreImage render stage screenrec
+  deliberately does not have (video goes SCK → encoder untouched). That XL path is **parked**, and
+  crossing into it is a separate, explicit future decision, not something to drift into one
+  convenience feature at a time. ADR-008's cursor-as-data sidecar remains parked with it.
+The line: **trim and transcode = yes (M10); render/composite/animate = no, pending a deliberate
+future ADR.** The brief's non-goals list is amended to point here.
+
+## ADR-016 ✅ H.264/MP4 "share" export (demand-driven, realizes ADR-004's parked note)
+ADR-004 kept HEVC + `.mov` the capture default and named H.264 export "a post-v1 transcode feature if
+ever needed." The need is real and measured: clips are re-encoded by hand today (an ffmpeg recipe) to
+be WhatsApp/web-compatible. So M10-T1 adds a **"Share…" export** to H.264 High + AAC `.mp4`
+(`yuv420p`, `+faststart`), zero-dep (AVFoundation, ADR-010). It is an **export path, not a default
+change** — recordings are still captured HEVC `.mov`; the `.mp4` is derived on demand for sharing.
+GIF export (M10-T3) rides the same read side.

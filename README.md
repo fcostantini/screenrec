@@ -60,11 +60,21 @@ Everything is in the menu-bar menu:
 
 ## Sharing this build
 
-The build is signed with a **local** identity, so the assembled `dist/ScreenRec.app`
-runs on **this machine only** — copied elsewhere it hits Gatekeeper as an unidentified
-developer. To try it on another Mac, **share the repo and build there** (the steps above
-are self-contained). Distributing the built `.app` needs Developer ID signing + Apple
-notarization — tracked as M6-T4.
+The build is signed with a **local** identity. screenrec is a personal tool for you and a
+small number of people you hand it to directly — not public distribution (ADR-014) — so it
+deliberately skips Apple notarization. Two ways to share it:
+
+- **On a Mac that can build**, clone the repo and run the four commands above — self-contained,
+  no caveats.
+- **Otherwise**, copy the assembled `dist/ScreenRec.app` over and clear Gatekeeper **once**: on
+  first launch it's blocked as an unidentified developer, so open **System Settings → Privacy &
+  Security** and click **Open Anyway** (macOS 15 removed the old right-click → Open shortcut). After
+  that it launches normally. Screen-recording and microphone grants then **persist across every
+  future build**, because the stable code-signing identity keys the grant to the app, not to Apple's
+  trust chain.
+
+Frictionless double-click distribution (no "Open Anyway") would need Developer ID signing + Apple
+notarization ($99/yr) — out of scope at this audience size (ADR-014).
 
 ## Versioning
 

@@ -49,7 +49,10 @@ demos, bug reports, and meetings" — not streamers, not video editors.
 ## Non-goals (v1)
 
 - Editing of any kind (trim, zoom, cursor effects). Cursor-as-data recording is designed
-  for but not implemented (see ADR-008).
+  for but not implemented (see ADR-008). **Amended post-v1 (ADR-015, 2026-07-21):** *basic*
+  editing — lossless trim and shareable-format export (`.mp4`/GIF) — is now in-scope as a future
+  (M10), reusing existing passthrough/transcode machinery. The render/compositing stage (auto-zoom,
+  backgrounds) stays a non-goal pending a deliberate future decision.
 - Webcam capture/overlay. (Architecture leaves room: it would be a 4th source.)
 - Streaming, sharing, cloud anything.
 - App Store distribution / sandboxing (see ADR-006). Windows. macOS < 15 (see ADR-001).

@@ -733,6 +733,133 @@ buffer (saved clip's mic resumes, no re-arm), video+system-audio buffer uninterr
 (§3.5); (2) recording — mic dies mid-recording → reconnect → mic track resumes, file playable, sync
 holds; (3) no regression — a stable-mic recording/replay is unaffected and G2 §3.5 drift still passes.
 
+## M9 — Post-review polish & debt (post-v1; from the 2026-07-21 product review)
+
+Two buckets from the review, done first because they clear the deck before M10 adds new code.
+**Quality-of-life** (T1–T4): four small, independent, daily-use fixes — none touch the sample path.
+**Debt** (T5–T7): the concentrated maintainability items. Feature tasks bump MINOR (ADR-013); the
+feedback fixes and debt are PATCH/`refactor:` — Franco's call per commit. One task at a time.
+
+### Quality-of-life
+
+- [ ] M9-T1 **Notify when a recording starts without its mic.** `AppState.resolvedMicrophone()`
+      records screen-only and sets `lastFailure` when the picked device is absent (or Automatic
+      resolves to nothing) but never posts — so a mic'd take set up and walked away from goes
+      silently mic-less, while a *mid*-recording loss does notify (`.microphoneLost`). Post an
+      outcome-first notice at start (ADR-007). **Seams:** a new pure
+      `RecordingNotifications.recordingStartedWithoutMicrophone(...)` factory (keeps copy
+      unit-testable, like every sibling); `AppState.start()` fires it via the injected `notifier`
+      after `resolvedMicrophone()` returns `.noDevice`; distinguish specific-pick vs Automatic
+      wording as `lastFailure` already does. **Verify:** unit — the factory's copy for both cases;
+      the fold — a start with an absent pick posts exactly one notification (fake notifier).
+- [ ] M9-T2 **In-app confirmation for a saved replay (banner-independent).** macOS suppresses
+      banners whenever the display is captured — i.e. whenever replay is armed — so "Replay saved",
+      the headline confirmation, renders only in Notification Center's list, never as a banner
+      (docs/06 §Notifications, measured). Give the save a signal that doesn't route through
+      UserNotifications: a **"Last replay: `<name>` · `N`s" row at the top of the menu** (idle and
+      recording), from a new `AppState.lastReplay` summary set in `saveReplay`'s success branch.
+      Add one line of discoverability near the Arm control (a Settings caption naming the System
+      Settings toggle — copy only, "name the fix not the API"). Optional stretch: a brief menu-bar
+      label flash (label is outside the `.menu` bridge — see M9-T3). Keep the existing notification
+      too. **Verify:** menudriver — arm → save → the menu shows the last-replay row with name +
+      duration; disarm clears it. Unit — the summary formats name + rounded seconds.
+- [ ] M9-T3 **Live elapsed clock in the menu-bar label.** The in-menu clock is frozen-at-open by the
+      `.menu` bridge (M6-T10, correct). The `MenuBarExtra` *label* is NOT bridged — it already
+      redraws frame-by-frame to animate the pulse (`PulsingRecordingIcon`, StatusIconView). Render a
+      monospaced `HH:MM:SS` next to the icon while recording, off the same timer, so elapsed time is
+      always visible without opening the menu. **Seams:** a recording-start `Date` exposed by
+      `AppState` (`.started` fold), read by the label; extend `PulsingRecordingIcon`/`StatusIconView`
+      to draw the string; a Settings toggle to hide it (menu-bar width / on-screen-share privacy);
+      paused freezes it amber. Reduce Motion stills the pulse but the clock still advances.
+      **Verify:** screenshot the label across ≥3 one-second ticks and assert the string advances —
+      MEASURE, don't eyeball (M4-T1 rule); Settings-off shows no string.
+- [ ] M9-T4 **Global start/stop recording shortcut.** Only replay-save has a global hotkey today;
+      start/stop needs the menu-bar icon, unreachable in a full-screen app or presentation. Add an
+      optional global Start/Stop shortcut. **Seams:** `HotkeyCenter` is hardcoded to one hotkey
+      (`id: 1`, single `hotKeyRef`) — generalize to N hotkeys keyed by id; a new `recordHotkey`
+      setting + `HotkeyRecorderButton` in Settings; the handler toggles `start()`/`stop()` gated on
+      `readiness`. **Rulings:** behavior in the `isSessionActive`-but-not-yet-recording window; a
+      blocked start fires the readiness notification (never a silent no-op); default combo or ship
+      unset. **Verify:** unit — the generalized `HotkeyCenter` registers/unregisters two independent
+      hotkeys without clobbering; the toggle picks start vs stop off session state. Live (human) —
+      the combo starts and stops from another frontmost app.
+
+### Debt
+
+- [ ] M9-T5 **Retire `MicSwapSpike.swift` (822 LOC).** Every leg's purpose is recorded (M3-T7 in
+      02 §4, the M6-T4 decision in ADR-012, M8 shipped). It ships in the CLI binary, duplicates
+      RecorderCore internals it can't reach (`isCompleteSpikeVideoFrame`, the audio-capture
+      contract), and has two undocumented modes. **Decision:** delete outright (the M8 G8 live gates
+      are the standing regression), or trim to the one `--record-repoint` leg as a documented
+      harness — recommendation: delete, rationale to STATUS field notes not a code comment.
+      **Verify:** build/test green; CLI help no longer advertises removed modes; other subcommands
+      unaffected.
+- [ ] M9-T6 **Allocation-free `SampleRouter.route`.** `Array(consumers.values)` runs on the SCK
+      capture queue ~140×/s, against docs/01's "handlers allocation-light" rule. Hold an immutable
+      `[any SampleConsumer]` snapshot rebuilt only on `attach`/`detach` (rare); `route` reads the
+      reference under the lock and delivers outside it, no per-buffer allocation. **Verify:**
+      `SampleRouterTests` green; add a concurrent attach/detach-during-routing test; TSan clean.
+- [ ] M9-T7 **Split `AppState` (856 LOC).** Extract two self-contained clusters into `@Observable`
+      sub-models `AppState` owns and delegates to, views reading them directly: (a)
+      permissions/onboarding (`onboardingRows`, `refreshOnboarding`, the request/relaunch/readiness
+      surface, `notificationState`, `hasAskedForScreenRecording`, `screenWasGrantedAtLaunch`), (b)
+      the source picker (displays/mics/apps, `sourceChoice`, `refreshSources`/`refreshCapturableApps`,
+      `missingPickedApp`, `presentMicrophonePreference`, `captureConfiguration`). Behavior-preserving;
+      the 34 `AppStateTests` are the net. **Optional pairing:** add `RecordingSessionTests` around
+      the ADR-007 fate-branch selection by seaming its finalize step (the highest-consequence
+      untested code). **Verify:** full suite green, no behavior change; each sub-model independently
+      testable.
+
+**Gate G9**: the four QoL verifies pass (mic-less start posts once; a saved replay shows an in-app
+confirmation while armed; the menu-bar clock advances live, measured; the global shortcut starts and
+stops from another app), and after the debt tasks build + full test + release build + `bundle.sh` +
+TSan are all green with a menudriver smoke (start → stop → arm → save) showing no regression.
+
+---
+
+## M10 — Share export & basic editing (post-v1; from the 2026-07-21 review)
+
+The first **export stage** in the codebase, then the two cheapest "basic-editing" features that reuse
+its read side. Order matters: T1 builds the `AVAssetReader` read/transcode side that T3 (GIF) and T4
+(trim) both lean on. The XL Metal "studio" render stage (auto-zoom, backgrounds) stays parked — this
+milestone is the trim/format side only, held deliberately (ADR-015). Capture default is never changed
+(still HEVC `.mov`, ADR-004); everything here is export/derive.
+
+- [ ] M10-T1 **Transcode-to-MP4 core + CLI.** A messaging/web-friendly export: read an existing
+      `.mov` and write H.264 High + AAC `.mp4`, `yuv420p`, `+faststart` — motivated by the manual
+      ffmpeg-to-WhatsApp step done today (ADR-016; ADR-004 already named H.264 export demand-driven).
+      **Seams:** a new `Exporter` (Export/ or Recording/) over `AVAssetReader`/writer (or
+      `AVAssetExportSession`), zero-dep (ADR-010); CLI `export --to-mp4 <in> [<out>]` as the headless
+      verify surface (ADR-011). **Decisions:** "share" quality + a size ceiling (not archival);
+      downmix to one audio track for `.mp4` (messaging apps expect it) — flag it. **Verify:** CLI
+      export of a 3-track test `.mov` → `probe` shows h264 + aac in `.mp4`, plays; WhatsApp
+      constraints hold (yuv420p, faststart).
+- [ ] M10-T2 **Export app wiring.** A **Share… / Export as MP4** action on a recent recording and a
+      saved replay (menu row and/or the replay-saved confirmation), off the main path, with a
+      progress + completion signal reusing M9-T2's in-app confirmation pattern; reveal on done.
+      **Verify:** menudriver — export a recent file → the `.mp4` appears in the output folder, probes
+      clean; a failure surfaces per the copy rules.
+- [ ] M10-T3 **GIF export from a clip (esp. the replay ring).** A replay clip → animated GIF straight
+      into a bug-report thread — the framing no competitor has. **Seams:** the M10-T1 frame read →
+      `ImageIO` animated-GIF destination (`kUTTypeGIF`) with palette reduction and an fps/scale cap;
+      zero-dep (ImageIO is system, ADR-010). Offer on a saved replay and a recent recording (a "Save
+      as GIF" action). **Verify:** a looping GIF from a test clip, size bounded by the caps, opens in
+      Preview/browser.
+- [ ] M10-T4 **Lossless trim (in/out, passthrough).** Trim a `.mov` to `[in, out]` without
+      re-encoding, reusing `ReplayMuxer`'s snapshot→keyframe-trim→passthrough approach, so "clip the
+      useful 20 s before sharing" costs no quality. **Seams:** generalize the muxer's trim or a
+      sibling `Trimmer` sharing the keyframe logic; a spare in/out UI (first editing surface — docs/06
+      amendment). **Rulings:** the in-point snaps to a keyframe (passthrough can only cut there — snap
+      and state it); keep the original, write a new file. Softens the brief's "no editing" non-goal
+      deliberately, on the trim/format side, not auto-zoom/render (ADR-015). **Verify:** `probe` shows
+      no re-encode (same codec/params), correct trimmed duration ±1 keyframe, playable; original
+      untouched.
+
+**Gate G10**: an `.mp4`, a GIF, and a losslessly-trimmed clip all produced from a real
+recording/replay via the app, each playable and correct (h264/aac/faststart; GIF loops within caps;
+trim is passthrough, duration correct, original intact); the capture default is unchanged and the
+"no render stage / no studio" line (ADR-015) is documented and held.
+
 ## Dependency graph
 
 ```
