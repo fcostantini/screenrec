@@ -7,7 +7,9 @@ import SwiftUI
 /// ⌥ or ⌃ — plain-⌘ combos are the system's and other apps' vocabulary (⌘C, ⌘Tab, ⌘Space…),
 /// and a Carbon hotkey would hijack them globally while replay is armed.
 struct HotkeyRecorderButton: View {
-    @Binding var hotkey: ReplayHotkey
+    @Binding var hotkey: Hotkey
+    /// Names this shortcut for VoiceOver (there are two now — replay and record, M9-T4).
+    var accessibilityName = "Shortcut"
     /// The registered hotkey intercepts its own combo before any local monitor sees it, so the
     /// owner must suspend it while the recorder listens and restore it after.
     var suspendGlobalHotkey: () -> Void = {}
@@ -20,7 +22,7 @@ struct HotkeyRecorderButton: View {
         Button(isRecording ? "Type shortcut…" : HotkeyDisplay.string(for: hotkey)) {
             isRecording ? stopRecording() : startRecording()
         }
-        .accessibilityLabel("Save replay shortcut: \(HotkeyDisplay.string(for: hotkey))")
+        .accessibilityLabel("\(accessibilityName): \(HotkeyDisplay.string(for: hotkey))")
         .onDisappear { stopRecording() }
     }
 
@@ -32,7 +34,7 @@ struct HotkeyRecorderButton: View {
             guard event.keyCode != kVK_Escape else { return nil }   // cancel, keep the old combo
             let modifiers = carbonModifiers(from: event.modifierFlags)
             guard modifiers & (optionKey | controlKey) != 0 else { return nil }
-            hotkey = ReplayHotkey(keyCode: Int(event.keyCode), modifiers: modifiers)
+            hotkey = Hotkey(keyCode: Int(event.keyCode), modifiers: modifiers)
             return nil          // consumed — the combo must not also type into the window
         }
     }

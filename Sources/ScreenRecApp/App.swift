@@ -17,9 +17,6 @@ struct ScreenRecApp: App {
         let notifier = ScreenRecApp.notifier
         // Posting is the app's job; AppCore may not import UserNotifications (docs/01).
         state.notifier = { [weak notifier] in notifier?.post($0) }
-        // Same split for the hotkey: Carbon lives here, AppCore stays framework-free.
-        let hotkeys = ScreenRecApp.hotkeys
-        state.hotkeyRegistrar = { [weak hotkeys] in hotkeys?.setHotkey($0) ?? false }
         // SMAppService is a system service, not UI, but the seam keeps AppState testable.
         state.loginItem = SMLoginItem()
         // Names a picked-but-closed app for the Source picker's "(not running)" row (M7-T2).
@@ -43,8 +40,22 @@ struct ScreenRecApp: App {
                 .compactMap(\.bundleIdentifier))
             return apps.filter { regular.contains($0.bundleID) }
         }
+        // Global shortcuts (M9-T4): map each intent to a Carbon hotkey id + the action it fires.
+        // Carbon lives here; AppCore stays framework-free. Weak captures — the closure is stored on
+        // `state`, which owns it.
+        let hotkeys = ScreenRecApp.hotkeys
         let state = state
-        hotkeys.onHotkey = { state.saveReplay() }
+        state.hotkeyRegistrar = { [weak hotkeys, weak state] hotkey, which in
+            guard let hotkeys, let state else { return false }
+            switch which {
+            case .saveReplay:
+                return hotkeys.setHotkey(hotkey, id: 1) { [weak state] in state?.saveReplay() }
+            case .toggleRecording:
+                return hotkeys.setHotkey(hotkey, id: 2) { [weak state] in
+                    Task { await state?.toggleRecording() }
+                }
+            }
+        }
     }
 
     /// Shared with the delegate, which installs it before launch completes.
@@ -108,6 +119,8 @@ private struct StatusIconLabel: View {
                 // A persisted armed state resumes at launch; `init` never arms (tests
                 // construct AppState freely and must not spin capture).
                 state.activateReplayIfArmed()
+                // The start/stop shortcut isn't tied to arming, so it registers on its own (M9-T4).
+                state.activateRecordHotkey()
                 state.syncLaunchAtLogin()
                 // Before any recording can start, so a live partial is never mistaken
                 // for a crash orphan.

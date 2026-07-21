@@ -90,6 +90,16 @@ import RecorderCore
         #expect(state.recordingClock == nil)
     }
 
+    // MARK: - Global start/stop shortcut (M9-T4)
+
+    @Test func theStartStopToggleReadsOffSessionAndReadiness() {
+        // Pure, so the three branches are testable without live capture (which start/stop need).
+        #expect(AppState.recordToggleAction(isSessionActive: false, isReady: true) == .start)
+        #expect(AppState.recordToggleAction(isSessionActive: true, isReady: true) == .stop)
+        #expect(AppState.recordToggleAction(isSessionActive: true, isReady: false) == .stop)  // active wins
+        #expect(AppState.recordToggleAction(isSessionActive: false, isReady: false) == .blockedNotify)
+    }
+
     @Test(arguments: endReasons) func everyEndingReturnsToIdle(reason: EndReason) {
         let state = recordingState()
         state.apply(.finished(url: Self.outputURL, reason: reason, droppedFrames: 0))

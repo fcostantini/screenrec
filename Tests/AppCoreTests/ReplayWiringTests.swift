@@ -256,13 +256,17 @@ import RecorderCore
     @Test func hotkeyRegistrationFollowsArmingAndRebinding() {
         let (state, spy, _) = makeState()
         _ = spy
-        var registered: [ReplayHotkey?] = []
-        state.hotkeyRegistrar = { registered.append($0); return true }
+        // Only the replay shortcut here; the record shortcut is nil (off), so it never registers.
+        var registered: [Hotkey?] = []
+        state.hotkeyRegistrar = { hotkey, kind in
+            if kind == .saveReplay { registered.append(hotkey) }
+            return true
+        }
 
         state.isReplayArmed = true
         #expect(registered == [.standard])
 
-        let custom = ReplayHotkey(keyCode: 1, modifiers: 256)
+        let custom = Hotkey(keyCode: 1, modifiers: 256)
         state.replayHotkey = custom
         #expect(registered == [.standard, custom])
 
@@ -272,6 +276,25 @@ import RecorderCore
         // Rebinding while disarmed must not register a hotkey for a feature that's off.
         state.replayHotkey = .standard
         #expect(registered == [.standard, custom, nil])
+    }
+
+    @Test func recordHotkeyRegistersWhenSetAndUnregistersWhenCleared() {
+        // M9-T4: the start/stop shortcut isn't tied to arming — set it, it registers; clear it, it
+        // unregisters — and it persists either way.
+        let (state, _, defaults) = makeState()
+        var records: [Hotkey?] = []
+        state.hotkeyRegistrar = { hotkey, kind in
+            if kind == .toggleRecording { records.append(hotkey) }
+            return true
+        }
+
+        state.recordHotkey = .recordDefault
+        #expect(records == [.recordDefault])
+        #expect(defaults.dictionary(forKey: "recordHotkey") != nil)
+
+        state.recordHotkey = nil
+        #expect(records == [.recordDefault, nil])            // unregistered
+        #expect(defaults.object(forKey: "recordHotkey") == nil)
     }
 
     @Test func saveSuccessNotifiesWithTheReplayCopy() async {

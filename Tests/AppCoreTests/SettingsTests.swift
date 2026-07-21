@@ -46,6 +46,7 @@ import RecorderCore
         #expect(SettingsStore.Key.replayArmed == "replayArmed")
         #expect(SettingsStore.Key.replaySeconds == "replaySeconds")
         #expect(SettingsStore.Key.replayHotkey == "replayHotkey")
+        #expect(SettingsStore.Key.recordHotkey == "recordHotkey")
         #expect(SettingsStore.Key.hotkeyKeyCode == "keyCode")
         #expect(SettingsStore.Key.hotkeyModifiers == "modifiers")
         #expect(SettingsStore.Key.showsMenuBarTimer == "showsMenuBarTimer")
@@ -156,7 +157,7 @@ import RecorderCore
             quality: .efficient, frameRateCap: 30)
         saved.replayArmed = true
         saved.replaySeconds = 120
-        saved.replayHotkey = ReplayHotkey(keyCode: 1, modifiers: 256)
+        saved.replayHotkey = Hotkey(keyCode: 1, modifiers: 256)
         SettingsStore.save(saved, to: defaults)
         let loaded = SettingsStore.load(from: defaults)
         #expect(loaded.quality == .efficient)
@@ -164,7 +165,7 @@ import RecorderCore
         #expect(loaded.outputDirectory.path == saved.outputDirectory.path)
         #expect(loaded.replayArmed)
         #expect(loaded.replaySeconds == 120)
-        #expect(loaded.replayHotkey == ReplayHotkey(keyCode: 1, modifiers: 256))
+        #expect(loaded.replayHotkey == Hotkey(keyCode: 1, modifiers: 256))
     }
 
     @Test func emptyDefaultsYieldTheDefaults() {
@@ -176,6 +177,30 @@ import RecorderCore
         #expect(loaded.replaySeconds == 60)
         #expect(loaded.replayHotkey == .standard)
         #expect(loaded.showsMenuBarTimer)               // absent ⇒ on (M9-T3, opt-out)
+    }
+
+    @Test func theRecordHotkeyIsOptInAndRoundTrips() {
+        // M9-T4: absent ⇒ off; a set combo persists as the documented dict and clears to key-absent.
+        let defaults = makeDefaults().defaults
+        #expect(SettingsStore.load(from: defaults).recordHotkey == nil)
+
+        var settings = makeSettings()
+        settings.recordHotkey = Hotkey(keyCode: 1, modifiers: 2048 | 256)
+        SettingsStore.save(settings, to: defaults)
+        #expect(defaults.dictionary(forKey: "recordHotkey")?["keyCode"] as? Int == 1)
+        #expect(SettingsStore.load(from: defaults).recordHotkey == Hotkey(keyCode: 1, modifiers: 2048 | 256))
+
+        settings.recordHotkey = nil
+        SettingsStore.save(settings, to: defaults)
+        #expect(defaults.object(forKey: "recordHotkey") == nil)         // cleared ⇒ key removed
+        #expect(SettingsStore.load(from: defaults).recordHotkey == nil)
+    }
+
+    @Test func aMalformedRecordHotkeyLoadsAsOff() {
+        // Like the replay key, but nil (off) rather than a fallback combo.
+        let defaults = makeDefaults().defaults
+        defaults.set(["keyCode": 1], forKey: "recordHotkey")            // no modifiers
+        #expect(SettingsStore.load(from: defaults).recordHotkey == nil)
     }
 
     @Test func theMenuBarTimerIsOptOutAndRoundTrips() {

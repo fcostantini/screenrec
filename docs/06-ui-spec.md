@@ -260,6 +260,10 @@ the old line is simply false above three green ticks.
 - Quality preset · Frame-rate cap (30/60)
 - **Show recording time in the menu bar** (M9-T3) — top-level toggle, on by default; off ⇒ the
   status item shows the icon only. Backed by `showsMenuBarTimer`.
+- **Global start/stop shortcut** (M9-T4) — opt-in toggle (off by default — an always-live combo the
+  user didn't choose can clash); enabling seeds ⌥⌘S and shows the recorder pill. Fires
+  `AppState.toggleRecording` (active session ⇒ Stop & Save; idle+ready ⇒ Start; blocked ⇒ notify).
+  Backed by `recordHotkey`.
 - Instant replay: buffer length 30 s / 60 s / 2 min · hotkey recorder (default ⌥⌘R) — **M5**
   - Changing the length while armed resizes the buffer **in place** (M6-T6): grow keeps
     everything and fills to the new length; shrink drops the excess immediately. Quality/
@@ -295,6 +299,7 @@ moved):
 | `replayArmed` | Bool | **M5** |
 | `replaySeconds` | Int 30\|60\|120 | **M5** |
 | `replayHotkey` | Dict: keyCode Int, modifiers Int | **M5** |
+| `recordHotkey` | Dict: keyCode Int, modifiers Int; **absent ⇒ off** (M9-T4, opt-in global start/stop) | M9-T4 |
 | `showsMenuBarTimer` | Bool; **absent ⇒ on** (opt-out). The status-item label's live elapsed clock while recording (M9-T3) | M9-T3 |
 
 ⚠️ **`launchAtLogin` is NOT a UserDefaults key (amended M6-T5).** The spec originally listed

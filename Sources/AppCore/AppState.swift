@@ -12,6 +12,13 @@ public enum SourceChoice: Hashable, Sendable {
     case app(bundleID: String)
 }
 
+/// Which global shortcut a registration is for (M9-T4). The app maps each to a Carbon hotkey id and
+/// the action it fires; AppState only names the intent.
+public enum GlobalShortcut: Sendable, Equatable {
+    case saveReplay
+    case toggleRecording
+}
+
 /// The menu-bar app's view state.
 ///
 /// Drives a `RecordingSession` and consumes its `EngineEvent` stream, RecorderCore's single
@@ -125,16 +132,27 @@ public final class AppState {
         }
     }
 
-    public var replayHotkey: ReplayHotkey {
+    public var replayHotkey: Hotkey {
         didSet {
             persist()
             if isReplayArmed { registerReplayHotkey() }
         }
     }
 
-    /// Registers/unregisters the global save shortcut, reporting whether the system accepted
-    /// it. Injected by the app (Carbon lives there, not in AppCore); nil means unregister.
-    public var hotkeyRegistrar: (@MainActor (ReplayHotkey?) -> Bool)?
+    /// The optional global start/stop recording shortcut (M9-T4). Nil ⇒ off. Registered whenever
+    /// set — not gated on arming, unlike the replay shortcut — and the handler checks readiness when
+    /// it fires.
+    public var recordHotkey: Hotkey? {
+        didSet {
+            guard recordHotkey != oldValue else { return }
+            persist()
+            registerRecordHotkey()
+        }
+    }
+
+    /// Registers/unregisters a global shortcut, reporting whether the system accepted it. Injected by
+    /// the app (Carbon lives there, not in AppCore); a nil hotkey unregisters that shortcut.
+    public var hotkeyRegistrar: (@MainActor (Hotkey?, GlobalShortcut) -> Bool)?
 
     /// Launch-at-login backing (docs/06). Injected by the app; nil in tests that don't exercise it.
     /// Set before `syncLaunchAtLogin()`.
@@ -355,6 +373,7 @@ public final class AppState {
         isReplayArmed = settings.replayArmed
         replaySeconds = settings.replaySeconds
         replayHotkey = settings.replayHotkey
+        recordHotkey = settings.recordHotkey
         showsMenuBarTimer = settings.showsMenuBarTimer
         replay = replayController ?? ReplayController()
         screenWasGrantedAtLaunch = Permissions.screenRecordingState() == .granted
@@ -388,7 +407,8 @@ public final class AppState {
                 microphonePreference: microphonePreference,
                 captureAppBundleID: selectedAppBundleID,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
-                replayHotkey: replayHotkey, showsMenuBarTimer: showsMenuBarTimer),
+                replayHotkey: replayHotkey, recordHotkey: recordHotkey,
+                showsMenuBarTimer: showsMenuBarTimer),
             to: defaults)
     }
 
@@ -476,7 +496,7 @@ public final class AppState {
         } else {
             replay.disarm()
             lastReplay = nil          // the receipt belongs to the armed session that made it
-            _ = hotkeyRegistrar?(nil)
+            _ = hotkeyRegistrar?(nil, .saveReplay)
         }
     }
 
@@ -526,13 +546,27 @@ public final class AppState {
         }
     }
 
-    /// Registers the shortcut and tells the user if the system refused it (combo taken by
-    /// another app) — every UI surface advertises the combo, so a silent failure means a
-    /// keypress that saves nothing.
+    /// Registers a shortcut and tells the user if the system refused it (combo taken by another
+    /// app) — every UI surface advertises the combo, so a silent failure means a keypress that does
+    /// nothing.
     private func registerReplayHotkey() {
         guard let hotkeyRegistrar else { return }
-        if !hotkeyRegistrar(replayHotkey) {
+        if !hotkeyRegistrar(replayHotkey, .saveReplay) {
             notifier?(RecordingNotifications.replayHotkeyUnavailable())
+        }
+    }
+
+    /// The app calls this once at launch — the start/stop shortcut isn't tied to arming, so it must
+    /// register even before anything is armed; the didSet calls it on change.
+    public func activateRecordHotkey() {
+        registerRecordHotkey()
+    }
+
+    private func registerRecordHotkey() {
+        guard let hotkeyRegistrar else { return }
+        let accepted = hotkeyRegistrar(recordHotkey, .toggleRecording)   // nil ⇒ unregister ⇒ true
+        if recordHotkey != nil, !accepted {
+            notifier?(RecordingNotifications.recordHotkeyUnavailable())
         }
     }
 
@@ -776,6 +810,25 @@ public final class AppState {
 
     public func resume() async {
         await session?.resume()
+    }
+
+    /// What the global start/stop shortcut does (M9-T4): a session in flight — recording or paused —
+    /// stops and saves; otherwise a ready app starts, and a blocked one says why. Never a silent
+    /// no-op — the shortcut advertised an action.
+    public func toggleRecording() async {
+        switch Self.recordToggleAction(isSessionActive: isSessionActive, isReady: readiness == .ready) {
+        case .start: await start()
+        case .stop: await stop()
+        case .blockedNotify: notifier?(RecordingNotifications.recordingHotkeyBlocked())
+        }
+    }
+
+    enum RecordToggleAction: Equatable { case start, stop, blockedNotify }
+
+    /// Pure so the three branches are unit-tested without live capture (which `start`/`stop` need).
+    static func recordToggleAction(isSessionActive: Bool, isReady: Bool) -> RecordToggleAction {
+        if isSessionActive { return .stop }   // a paused session is still active — stop wins
+        return isReady ? .start : .blockedNotify
     }
 
     /// Stops a recording and waits for the file to finalize. The app calls this before

@@ -3,34 +3,38 @@ import Carbon.HIToolbox
 import Foundation
 import SwiftUI
 
-/// Registers the global save-replay shortcut via Carbon `RegisterEventHotKey` — the one global
-/// hotkey API that needs no Accessibility/Input-Monitoring grant (02 §9). One shortcut at a
-/// time; registered only while replay is armed.
+/// Registers global shortcuts via Carbon `RegisterEventHotKey` — the one global hotkey API that
+/// needs no Accessibility/Input-Monitoring grant (02 §9). Holds several at once, keyed by id
+/// (M9-T4: save-replay and start/stop record), each with its own action; the shared handler
+/// dispatches by the fired hotkey's id.
 final class HotkeyCenter {
-    var onHotkey: (@MainActor () -> Void)?
-
-    private var hotKeyRef: EventHotKeyRef?
+    private var refs: [UInt32: EventHotKeyRef] = [:]
+    private var actions: [UInt32: @MainActor () -> Void] = [:]
     private var handlerRef: EventHandlerRef?
     private static let signature: OSType = 0x5352_5259  // 'SRRY'
 
-    /// Registers `hotkey`, replacing any previous one; nil unregisters (and returns true).
-    /// False means the system refused the combo (taken by another app) — the caller must tell
-    /// the user, because every UI surface advertises the shortcut as live.
+    /// Registers `hotkey` under `id`, replacing any previous one for that id; `action` fires on the
+    /// main actor when the combo is pressed. A nil hotkey unregisters `id` (and returns true).
+    /// False means the system refused the combo (taken by another app) — the caller must tell the
+    /// user, because every UI surface advertises the shortcut as live.
     @discardableResult
-    func setHotkey(_ hotkey: ReplayHotkey?) -> Bool {
-        if let hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
-            self.hotKeyRef = nil
+    func setHotkey(_ hotkey: Hotkey?, id: UInt32, action: @escaping @MainActor () -> Void = {}) -> Bool {
+        if let existing = refs[id] {
+            UnregisterEventHotKey(existing)
+            refs[id] = nil
         }
+        actions[id] = nil
         guard let hotkey else { return true }
         installHandlerIfNeeded()
         var ref: EventHotKeyRef?
-        let id = EventHotKeyID(signature: Self.signature, id: 1)
+        let hotKeyID = EventHotKeyID(signature: Self.signature, id: id)
         let status = RegisterEventHotKey(
-            UInt32(hotkey.keyCode), UInt32(hotkey.modifiers), id,
+            UInt32(hotkey.keyCode), UInt32(hotkey.modifiers), hotKeyID,
             GetApplicationEventTarget(), 0, &ref)
-        hotKeyRef = ref
-        return status == noErr && ref != nil
+        guard status == noErr, let ref else { return false }
+        refs[id] = ref
+        actions[id] = action
+        return true
     }
 
     private func installHandlerIfNeeded() {
@@ -40,27 +44,32 @@ final class HotkeyCenter {
         let selfPointer = Unmanaged.passUnretained(self).toOpaque()
         InstallEventHandler(
             GetApplicationEventTarget(),
-            { _, _, userData in
-                guard let userData else { return noErr }
+            { _, event, userData in
+                guard let userData, let event else { return noErr }
+                var fired = EventHotKeyID()
+                GetEventParameter(
+                    event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                    nil, MemoryLayout<EventHotKeyID>.size, nil, &fired)
                 let center = Unmanaged<HotkeyCenter>.fromOpaque(userData).takeUnretainedValue()
-                Task { @MainActor in center.onHotkey?() }
+                let id = fired.id
+                Task { @MainActor in center.actions[id]?() }
                 return noErr
             },
             1, &eventType, selfPointer, &handlerRef)
     }
 }
 
-/// Human-readable form of a `ReplayHotkey` (the settings pill, the menu hint) and its SwiftUI
+/// Human-readable form of a `Hotkey` (the settings pill, the menu hint) and its SwiftUI
 /// key equivalent. Key codes are Carbon kVK_* constants; the map covers the keys a shortcut
 /// plausibly uses, with a stated fallback rather than a silent blank.
 enum HotkeyDisplay {
-    static func string(for hotkey: ReplayHotkey) -> String {
+    static func string(for hotkey: Hotkey) -> String {
         modifierSymbols(for: hotkey.modifiers) + (keyNames[hotkey.keyCode] ?? "key \(hotkey.keyCode)")
     }
 
     /// The key as a SwiftUI equivalent for menu display; nil for keys SwiftUI can't represent.
     /// Special keys map to their semantic constants — a literal "↩" character is not Return.
-    static func keyEquivalent(for hotkey: ReplayHotkey) -> KeyEquivalent? {
+    static func keyEquivalent(for hotkey: Hotkey) -> KeyEquivalent? {
         switch hotkey.keyCode {
         case kVK_Return: return .return
         case kVK_Tab: return .tab
@@ -77,7 +86,7 @@ enum HotkeyDisplay {
     }
 
     /// The Carbon modifier mask as SwiftUI modifiers — one decoder, shared by every view.
-    static func eventModifiers(for hotkey: ReplayHotkey) -> SwiftUI.EventModifiers {
+    static func eventModifiers(for hotkey: Hotkey) -> SwiftUI.EventModifiers {
         var modifiers: SwiftUI.EventModifiers = []
         if hotkey.modifiers & cmdKey != 0 { modifiers.insert(.command) }
         if hotkey.modifiers & optionKey != 0 { modifiers.insert(.option) }

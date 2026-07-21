@@ -47,6 +47,31 @@ struct SettingsView: View {
 
             Toggle("Show recording time in the menu bar", isOn: $state.showsMenuBarTimer)
 
+            // M9-T4: opt-in, because a start/stop combo is always live (unlike replay's, which fires
+            // only while armed). Enabling seeds ⌥⌘S; the recorder pill changes it.
+            Toggle("Global start/stop shortcut", isOn: Binding(
+                get: { state.recordHotkey != nil },
+                set: { state.recordHotkey = $0 ? (state.recordHotkey ?? .recordDefault) : nil }))
+            if state.recordHotkey != nil {
+                LabeledContent("Start/stop shortcut") {
+                    HotkeyRecorderButton(
+                        hotkey: Binding(
+                            get: { state.recordHotkey ?? .recordDefault },
+                            set: { state.recordHotkey = $0 }),
+                        accessibilityName: "Start/stop recording shortcut",
+                        suspendGlobalHotkey: { _ = state.hotkeyRegistrar?(nil, .toggleRecording) },
+                        restoreGlobalHotkey: {
+                            if let hk = state.recordHotkey {
+                                _ = state.hotkeyRegistrar?(hk, .toggleRecording)
+                            }
+                        })
+                }
+                Text("Starts recording, or stops and saves the current one, from any app. "
+                    + "Must include ⌥ or ⌃.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Instant Replay") {
                 Picker("Replay buffer", selection: $state.replaySeconds) {
                     ForEach(Settings.allowedReplaySeconds, id: \.self) { seconds in
@@ -56,9 +81,12 @@ struct SettingsView: View {
                 LabeledContent("Save replay shortcut") {
                     HotkeyRecorderButton(
                         hotkey: $state.replayHotkey,
-                        suspendGlobalHotkey: { _ = state.hotkeyRegistrar?(nil) },
+                        accessibilityName: "Save replay shortcut",
+                        suspendGlobalHotkey: { _ = state.hotkeyRegistrar?(nil, .saveReplay) },
                         restoreGlobalHotkey: {
-                            if state.isReplayArmed { _ = state.hotkeyRegistrar?(state.replayHotkey) }
+                            if state.isReplayArmed {
+                                _ = state.hotkeyRegistrar?(state.replayHotkey, .saveReplay)
+                            }
                         })
                 }
                 Text("Shortcuts must include ⌥ or ⌃."

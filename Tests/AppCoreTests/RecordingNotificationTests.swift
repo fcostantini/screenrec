@@ -144,6 +144,20 @@ import RecorderCore
             microphonePreference: .automatic, resolvedMicName: "MacBook Pro Microphone") == nil)
     }
 
+    // MARK: - Global start/stop shortcut (M9-T4)
+
+    @Test func aBlockedStartShortcutSaysWhatAndOffersNoFile() {
+        let n = RecordingNotifications.recordingHotkeyBlocked()
+        #expect(n.title == "Can't start recording")
+        #expect(n.fileURL == nil)
+    }
+
+    @Test func aRefusedStartStopShortcutPointsToSettings() {
+        let n = RecordingNotifications.recordHotkeyUnavailable()
+        #expect(n.title == "Start/stop shortcut unavailable")
+        #expect(n.body.contains("Settings"))
+    }
+
     // MARK: - M6-T3: every failure message says what happened AND what to do
 
     @Test func diskAlmostFullNamesTheRemedy() {

@@ -5,6 +5,26 @@
 
 ## Now
 
+- **M9-T4 DONE — global start/stop recording shortcut (+ `ReplayHotkey`→`Hotkey` rename, Franco's ask).**
+  An **opt-in** global Start/Stop shortcut: off by default (an always-live combo the user didn't choose
+  can clash, unlike replay's ⌥⌘R which only fires while armed); a Settings toggle enables it, seeding
+  **⌥⌘S** (`Hotkey.recordDefault`), with the recorder pill to change it. `HotkeyCenter` generalized from
+  one hotkey to **N keyed by id** (replay=1, record=2; the Carbon handler reads the fired
+  `EventHotKeyID` and dispatches) — replaced the single `onHotkey`. New persisted `recordHotkey: Hotkey?`
+  (nil ⇒ off), registered at launch (`activateRecordHotkey`) + on change, not gated on arming.
+  `AppState.toggleRecording()` over a pure `recordToggleAction`: **active session (recording OR paused)
+  → Stop & Save; idle+ready → Start; blocked → notify** (never a silent no-op). The registrar seam is
+  now `(Hotkey?, GlobalShortcut) -> Bool`; App.swift maps each kind → Carbon id + action (weak captures,
+  no cycle). **Rename** `ReplayHotkey` → `Hotkey` (generic combo type; persisted key `replayHotkey`
+  unchanged) across 6 files via sed. Pause/resume + discard stay menu-only (out of scope). **313 tests
+  (+6:** `recordToggleAction` 3-way; `recordHotkey` opt-in round-trip + malformed-loads-off; register
+  on-set/unregister-on-clear; blocked + refused notification copy). Full dev loop green
+  (build/test/release/bundle-sign); the `hotkey(from:)` parse helper now DRYs replay+record load.
+  docs/06 amended (key row + Settings line). **Live-verify needs Franco (can't synthesize a global
+  key-press headlessly):** enable the shortcut, switch to another app, press ⌥⌘S → starts; press → stops
+  & saves. Not deployed yet. No VERSION bump (batched — M9's features (T3 clock, T4 shortcut) owe a MINOR
+  1.3.0 whenever Franco cuts it). **M9 QoL (T1–T4) COMPLETE. Next: debt T5–T7, then slider T8.**
+
 - **M9-T3 DONE — live menu-bar clock + replay-saved flash + hide toggle.** The status-item *label*
   (not the menu — it isn't bridged, unlike the frozen in-menu clock, M6-T10) now shows a live
   monospaced `HH:MM:SS` while recording, ticking off its own 1 s timer like the pulse; frozen with the

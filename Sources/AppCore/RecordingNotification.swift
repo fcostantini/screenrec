@@ -175,6 +175,24 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
+    /// The system refused the start/stop shortcut (M9-T4). Starting from the menu still works.
+    public static func recordHotkeyUnavailable() -> RecordingNotification {
+        RecordingNotification(
+            title: "Start/stop shortcut unavailable",
+            body: "Another app may be using that shortcut. Choose a different one in "
+                + "ScreenRec Settings. Starting from the menu still works.",
+            fileURL: nil)
+    }
+
+    /// The start/stop shortcut fired while the app can't record yet (M9-T4) — say so, never a
+    /// silent no-op; the setup window names the missing permission.
+    public static func recordingHotkeyBlocked() -> RecordingNotification {
+        RecordingNotification(
+            title: "Can't start recording",
+            body: "ScreenRec needs permission first — open it to finish setup.",
+            fileURL: nil)
+    }
+
     /// One phrase per reachable `EndReason` (docs/06). Never the raw SCK string, never the word
     /// "error" — the user can't act on either.
     private static func cause(_ reason: EndReason) -> String {

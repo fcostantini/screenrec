@@ -773,7 +773,7 @@ feedback fixes and debt are PATCH/`refactor:` — Franco's call per commit. One 
       paused freezes it amber. Reduce Motion stills the pulse but the clock still advances.
       **Verify:** screenshot the label across ≥3 one-second ticks and assert the string advances —
       MEASURE, don't eyeball (M4-T1 rule); Settings-off shows no string.
-- [ ] M9-T4 **Global start/stop recording shortcut.** Only replay-save has a global hotkey today;
+- [x] M9-T4 **Global start/stop recording shortcut.** Only replay-save has a global hotkey today;
       start/stop needs the menu-bar icon, unreachable in a full-screen app or presentation. Add an
       optional global Start/Stop shortcut. **Seams:** `HotkeyCenter` is hardcoded to one hotkey
       (`id: 1`, single `hotKeyRef`) — generalize to N hotkeys keyed by id; a new `recordHotkey`

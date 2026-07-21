@@ -1,11 +1,11 @@
 import Foundation
 import RecorderCore
 
-/// The global shortcut that saves a replay. Raw Carbon values — `keyCode` is a virtual key
-/// code (kVK_*) and `modifiers` a Carbon modifier mask (cmdKey/optionKey/…), because that's
-/// what `RegisterEventHotKey` takes; the app layer owns the Carbon import and the display
-/// formatting.
-public struct ReplayHotkey: Sendable, Equatable {
+/// A global shortcut combo (save-replay, or start/stop recording — M9-T4). Raw Carbon values —
+/// `keyCode` is a virtual key code (kVK_*) and `modifiers` a Carbon modifier mask
+/// (cmdKey/optionKey/…), because that's what `RegisterEventHotKey` takes; the app layer owns the
+/// Carbon import and the display formatting.
+public struct Hotkey: Sendable, Equatable {
     public var keyCode: Int
     public var modifiers: Int
 
@@ -14,8 +14,12 @@ public struct ReplayHotkey: Sendable, Equatable {
         self.modifiers = modifiers
     }
 
-    /// ⌥⌘R (docs/06): kVK_ANSI_R with optionKey | cmdKey.
-    public static let standard = ReplayHotkey(keyCode: 15, modifiers: 2048 | 256)
+    /// ⌥⌘R (docs/06): the default save-replay shortcut. kVK_ANSI_R with optionKey | cmdKey.
+    public static let standard = Hotkey(keyCode: 15, modifiers: 2048 | 256)
+
+    /// ⌥⌘S: the combo seeded when the user first enables the start/stop shortcut (M9-T4).
+    /// kVK_ANSI_S with optionKey | cmdKey.
+    public static let recordDefault = Hotkey(keyCode: 1, modifiers: 2048 | 256)
 }
 
 /// The user's microphone pick, before resolution to a concrete device (docs/06 item 6):
@@ -45,7 +49,10 @@ public struct Settings: Sendable, Equatable {
     public var replayArmed: Bool
     /// docs/06 offers 30, 60 or 120.
     public var replaySeconds: Int
-    public var replayHotkey: ReplayHotkey
+    public var replayHotkey: Hotkey
+    /// The optional global start/stop recording shortcut (M9-T4). Nil ⇒ off — an always-live combo
+    /// the user didn't choose could silently clash, so this is opt-in.
+    public var recordHotkey: Hotkey?
     /// Whether the menu-bar label shows the live elapsed clock while recording (M9-T3). Default on.
     public var showsMenuBarTimer: Bool
 
@@ -62,6 +69,7 @@ public struct Settings: Sendable, Equatable {
             replayArmed: false,
             replaySeconds: 60,
             replayHotkey: .standard,
+            recordHotkey: nil,
             showsMenuBarTimer: true)
     }
 }
@@ -84,7 +92,9 @@ public enum SettingsStore {
         public static let replayArmed = "replayArmed"
         public static let replaySeconds = "replaySeconds"
         public static let replayHotkey = "replayHotkey"
-        /// `replayHotkey` is a Dict (docs/06): these are its inner keys.
+        /// Absent ⇒ the start/stop shortcut is off (M9-T4). Same Dict shape as `replayHotkey`.
+        public static let recordHotkey = "recordHotkey"
+        /// `replayHotkey`/`recordHotkey` are Dicts (docs/06): these are their inner keys.
         public static let hotkeyKeyCode = "keyCode"
         public static let hotkeyModifiers = "modifiers"
         /// Absent ⇒ on (M9-T3): the menu-bar clock is opt-out, not opt-in.
@@ -145,15 +155,14 @@ public enum SettingsStore {
             settings.replaySeconds = replaySeconds
         }
 
-        // A malformed hotkey falls back whole — half a shortcut is not a shortcut. Zero
-        // modifiers is rejected (a bare key would fire on ordinary typing), and both values
-        // are bounded: they feed trapping UInt32 conversions at registration, so an oversized
-        // plist value would otherwise crash every launch.
-        if let dict = defaults.dictionary(forKey: Key.replayHotkey),
-           let keyCode = dict[Key.hotkeyKeyCode] as? Int, (0...0xFFFF).contains(keyCode),
-           let modifiers = dict[Key.hotkeyModifiers] as? Int, (1...0xFFFF).contains(modifiers) {
-            settings.replayHotkey = ReplayHotkey(keyCode: keyCode, modifiers: modifiers)
+        // A malformed hotkey falls back whole — half a shortcut is not a shortcut. `hotkey(from:)`
+        // rejects zero modifiers (a bare key would fire on ordinary typing) and bounds both values
+        // (they feed trapping UInt32 conversions at registration).
+        if let hk = hotkey(from: defaults.dictionary(forKey: Key.replayHotkey)) {
+            settings.replayHotkey = hk
         }
+        // Absent or malformed ⇒ the start/stop shortcut stays off (M9-T4).
+        settings.recordHotkey = hotkey(from: defaults.dictionary(forKey: Key.recordHotkey))
 
         // Opt-out, so absent means on (the `.standard` default holds); only an explicit stored
         // value overrides it.
@@ -162,6 +171,16 @@ public enum SettingsStore {
         }
 
         return settings
+    }
+
+    /// Validates a persisted hotkey dict: both inner keys present, zero modifiers rejected, and both
+    /// values bounded to fit the trapping UInt32 conversions at registration. Nil ⇒ absent/malformed.
+    private static func hotkey(from dict: [String: Any]?) -> Hotkey? {
+        guard let dict,
+              let keyCode = dict[Key.hotkeyKeyCode] as? Int, (0...0xFFFF).contains(keyCode),
+              let modifiers = dict[Key.hotkeyModifiers] as? Int, (1...0xFFFF).contains(modifiers)
+        else { return nil }
+        return Hotkey(keyCode: keyCode, modifiers: modifiers)
     }
 
     public static func save(_ settings: Settings, to defaults: UserDefaults) {
@@ -189,6 +208,14 @@ public enum SettingsStore {
             [Key.hotkeyKeyCode: settings.replayHotkey.keyCode,
              Key.hotkeyModifiers: settings.replayHotkey.modifiers],
             forKey: Key.replayHotkey)
+        // Nil removes the key, per the table — absent ⇒ off (M9-T4).
+        if let recordHotkey = settings.recordHotkey {
+            defaults.set(
+                [Key.hotkeyKeyCode: recordHotkey.keyCode, Key.hotkeyModifiers: recordHotkey.modifiers],
+                forKey: Key.recordHotkey)
+        } else {
+            defaults.removeObject(forKey: Key.recordHotkey)
+        }
         defaults.set(settings.showsMenuBarTimer, forKey: Key.showsMenuBarTimer)
     }
 }
