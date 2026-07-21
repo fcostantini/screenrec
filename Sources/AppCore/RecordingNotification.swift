@@ -133,9 +133,6 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
-    /// The armed stream's mic died (docs/02 §4: it can never rebind to this stream). Amends
-    /// docs/06's table, which predates armed replay. Mirrors the recording row's outcome-first
-    /// shape: replay is still working, and the one remedy is named.
     /// Launch-at-login registration threw (M6-T5) — the toggle reverted, so point the user at
     /// where they can change it directly.
     public static func loginItemFailed() -> RecordingNotification {
@@ -161,6 +158,9 @@ public enum RecordingNotifications {
             fileURL: url)
     }
 
+    /// The armed stream's mic died (docs/02 §4: it can never rebind to this stream). Amends
+    /// docs/06's table, which predates armed replay. Mirrors the recording row's outcome-first
+    /// shape: replay is still working, and the one remedy is named.
     public static func replayMicrophoneLost() -> RecordingNotification {
         RecordingNotification(
             title: "Replay still armed · microphone disconnected",
