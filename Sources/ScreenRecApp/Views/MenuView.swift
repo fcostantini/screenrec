@@ -186,11 +186,13 @@ struct MenuView: View {
         }
     }
 
-    /// The per-file submenu shared by recents and the replay receipt: reveal in Finder, or export
-    /// a shareable MP4 (blocked while one export already runs — one at a time).
+    /// The per-file submenu shared by recents and the replay receipt: reveal in Finder, or derive
+    /// a shareable MP4 / looping GIF (blocked while one export already runs — one at a time).
     @ViewBuilder private func fileActions(_ url: URL) -> some View {
         Button("Reveal in Finder") { Finder.reveal(url) }
         Button("Export as MP4") { state.exportToMP4(url) }
+            .disabled(state.exportInProgress != nil)
+        Button("Save as GIF") { state.exportToGIF(url) }
             .disabled(state.exportInProgress != nil)
     }
 

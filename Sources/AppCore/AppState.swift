@@ -246,15 +246,19 @@ public final class AppState {
     private var flashTask: Task<Void, Never>?
     private static let flashDuration: Duration = .seconds(2)
 
-    /// The source filename of the MP4 export in flight (M10-T2), or nil when idle: the menu shows
-    /// an "Exporting…" row and blocks a second export. One at a time.
+    /// The source filename of the export in flight (M10-T2, MP4 or GIF), or nil when idle: the
+    /// menu shows an "Exporting…" row and blocks a second export. One at a time, either format.
     public private(set) var exportInProgress: String?
-    /// The most recent export, for the menu receipt (reveals the `.mp4`). Replaced by the next.
+    /// The most recent export, for the menu receipt (reveals the file). Replaced by the next.
     public private(set) var lastExport: LastExport?
-    /// The transcode, injected so tests exercise the wiring without the hardware encoder. Returns
-    /// where it wrote. Defaults to the production `Exporter` (M10-T1).
+    /// The transcode and the GIF encode, injected so tests exercise the wiring without the
+    /// hardware codecs. Each returns where it wrote. Default to the production `Exporter` (M10-T1)
+    /// and `GifExporter` (M10-T3).
     public var exportFunction: @Sendable (_ source: URL, _ output: URL) async throws -> URL = {
         try await Exporter.exportToMP4(from: $0, to: $1).url
+    }
+    public var gifExportFunction: @Sendable (_ source: URL, _ output: URL) async throws -> URL = {
+        try await GifExporter.exportGIF(from: $0, to: $1).url
     }
 
     // MARK: - Onboarding (docs/06 "Onboarding window") — delegated to PermissionsModel (M9-T7)
@@ -445,27 +449,49 @@ public final class AppState {
         }
     }
 
-    /// Transcodes a recording or saved clip to a shareable `.mp4` (M10-T2), off the main path —
-    /// the menu row and the notification carry the outcome. One export at a time; the source is
-    /// only read, so a running export never touches a live recording.
+    /// Transcodes a recording or saved clip to a shareable `.mp4` (M10-T2).
     public func exportToMP4(_ source: URL) {
+        performExport(
+            source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source)),
+            using: exportFunction,
+            success: { RecordingNotifications.exported(url: $0) },
+            failure: RecordingNotifications.exportFailed)
+    }
+
+    /// Saves a recording or clip as a looping GIF (M10-T3), the same off-main, one-at-a-time path.
+    public func exportToGIF(_ source: URL) {
+        performExport(
+            source, to: Exporter.availableURL(basedOn: GifExporter.gifSibling(of: source)),
+            using: gifExportFunction,
+            success: { RecordingNotifications.savedAsGIF(url: $0) },
+            failure: RecordingNotifications.gifExportFailed)
+    }
+
+    /// Runs an export off the main path — the menu row and the notification carry the outcome. One
+    /// export at a time; the source is only read, so it never touches a live recording. Only a
+    /// success sets `lastExport`; the "Exporting…" row shadows any prior receipt while this runs,
+    /// so a failed re-export leaves the previous export's pointer intact.
+    private func performExport(
+        _ source: URL,
+        to output: URL,
+        using export: @escaping @Sendable (URL, URL) async throws -> URL,
+        success: @escaping (URL) -> RecordingNotification,
+        failure: @escaping () -> RecordingNotification
+    ) {
         guard exportInProgress == nil else { return }
-        let output = Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source))
-        // Only a success sets `lastExport`; the "Exporting…" row shadows any prior receipt while
-        // this runs, so a failed re-export leaves the previous export's pointer intact.
         exportInProgress = source.lastPathComponent
-        Task { [weak self, exportFunction] in
+        Task { [weak self, export] in
             do {
-                let url = try await exportFunction(source, output)
+                let url = try await export(source, output)
                 guard let self else { return }
                 exportInProgress = nil
                 lastExport = LastExport(url: url)
-                notifier?(RecordingNotifications.exported(url: url))
+                notifier?(success(url))
             } catch {
                 guard let self else { return }
                 exportInProgress = nil
                 Self.log.error("export failed: \(error.localizedDescription, privacy: .public)")
-                notifier?(RecordingNotifications.exportFailed())
+                notifier?(failure())
             }
         }
     }

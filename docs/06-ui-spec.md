@@ -68,9 +68,9 @@ Order and grouping (separators between groups):
    item 10).
 10. Recent recordings: up to 5 most-recent files from the output dir, **indented one level**
     under `Open Recordings Folder` so they read as its contents rather than as more commands
-    (Franco, 2026-07-15). **M10-T2 made each a submenu** — `<name> ▸ { Reveal in Finder · Export
-    as MP4 }` — so the export action has a home; the old direct click-to-reveal moved into the
-    submenu. An export shows a top-of-menu `Exporting <name>…` row while it runs (stamped at open,
+    (Franco, 2026-07-15). **M10-T2/T3 made each a submenu** — `<name> ▸ { Reveal in Finder · Export
+    as MP4 · Save as GIF }` — so the export/share actions have a home; the old direct
+    click-to-reveal moved into the submenu. An export shows a top-of-menu `Exporting <name>…` row while it runs (stamped at open,
     not ticking — the M6-T10 constraint) and an `Exported to MP4 · <name>` receipt that reveals the
     `.mp4` on click (the recents list is `.mov`-only, so this is the export's in-menu pointer). The
     saved-replay receipt (M9-T2) gained the same `{ Reveal · Export as MP4 }` submenu. ⚠️
@@ -155,6 +155,8 @@ form). Never the word "error" for a fail-stop.
 | Replay save failed — **M5** | `Couldn't save replay` | one-line cause + what to do | — |
 | Exported to MP4 — **M10-T2** | `Exported to MP4` | `<name>.mp4 — ready to share. Click to reveal.` | reveal |
 | Export failed — **M10-T2** | `Couldn't export to MP4` | `The original recording is untouched. Try again, or check the output folder is writable.` | — |
+| Saved as GIF — **M10-T3** | `Saved as GIF` | `<name>.gif — ready to share. Click to reveal.` | reveal |
+| GIF failed — **M10-T3** | `Couldn't save GIF` | `The original recording is untouched. Try again, or check the output folder is writable.` | — |
 | Recording file moved — **M6-T7** | `Still recording · file moved back` | `The recording file was moved while recording, so it was moved back.` | — |
 | Recording file deleted — **M6-T7** | via `failed`: | `The recording file was deleted while recording, so the video couldn't be saved.` | — |
 | Recovered interrupted recording — **M6-T7** | `Recovered an interrupted recording` | `Recording … .mov is ready to play.` | reveal |

@@ -5,6 +5,33 @@
 
 ## Now
 
+- **M10-T3 DONE — GIF export from a clip (core + CLI + app action), LIVE-VERIFIED.** A recording or
+  saved replay → a **looping animated GIF** via ImageIO (zero-dep). New `GifExporter` + `VideoFrameReader`
+  (RecorderCore/Export/): the frame reader is the M10-T1 `AVAssetReader` read side adapted to **CFR** —
+  an `AVMutableVideoComposition` `renderSize` scales, and a **PTS subsample in `readFrames` caps the
+  fps** (the composition output emits one frame per *source* frame and ignores `frameDuration` for the
+  output rate — the reason a naive frameDuration=1/15 rendered 30 fps; **field note**). Streams frames
+  one-at-a-time into a `CGImageDestination` (256-color, **loops forever**), never the whole clip in
+  memory. **Caps: 480 wide · 15 fps · first 30 s** (`GifConfiguration`; fps bumped from the planned 12
+  at Franco's ask). CLI **`export --to-gif <in> [<out>]`** (the export verb now takes exactly one of
+  `--to-mp4`/`--to-gif`); app **`Save as GIF`** in the same fileActions submenu, reusing T2's
+  `exportInProgress`/`lastExport`/one-at-a-time via a shared `performExport` (MP4 refactored onto it,
+  behavior-preserving). New `RecordingNotifications.savedAsGIF`/`gifExportFailed`; `LastExport.menuTitle`
+  now picks the verb by extension (a GIF receipt no longer reads "Exported to MP4"). **338 tests (+8:**
+  4 `GifExporterTests` — gifSibling, GIF fittedSize, output==input, + a **gated** integration proving a
+  480×270 15 fps looping GIF from a 30 fps fixture; 4 `ExportWiringTests` — GIF receipt+notify with the
+  right title, cross-format one-at-a-time, GIF copy). The GIF hardware integration test is **gated**
+  (`SCREENREC_HW_ENCODE_TESTS=1`, same VT-oversubscription reason as MP4). Full dev loop green.
+  **LIVE-VERIFIED:** CLI on a **real 4112×2570 recording** → ImageIO reports `com.compuserve.gif · 60
+  frames · 480×300 · loopCount 0`, valid + looping; **Franco visually confirmed** a sent demo GIF; the
+  deployed build (PID-swapped, kill-9) shows **`Save as GIF`** in the submenu (menudriver). **Review
+  (code-review agent; 8/10, one real bug found + fixed; findings presented → Franco approved batch):**
+  ① the mislabeled GIF receipt (fixed), ② `expectedFrames` crash-guard on non-finite duration, ③
+  `VideoFrameReader` made internal, ④ all `make` loads mapped to `ReaderError`, ⑤ fps cadence advances
+  only on an emitted frame, ⑥ reader cancelled on `readFrames` throw, ⑦ GIF-receipt test assertion.
+  **No VERSION bump** — T3 is a new feature since 1.4.0 and owes the next MINOR (**1.5.0**) whenever
+  Franco cuts. **Next: M10-T4 (lossless trim) — the last M10 item; plan artifact first.**
+
 - **v1.4.0 CUT (2026-07-21) — the MP4 share export (M10-T1 CLI + M10-T2 app) earns the MINOR.**
   `VERSION` + `CoreInfo.version` → 1.4.0 (pin test green), tagged `v1.4.0`, pushed. M10-T3 (GIF) and
   T4 (trim) remain; they'll fold into a later bump. **Next: M10-T3 (GIF export) — plan artifact first.**
@@ -869,6 +896,15 @@ video (deterministic, reproducible).
 | G6   | ✅ **v1 declared 2026-07-20 (v1.0.0)** — M6 complete bar the deferred T4 bucket; G6 = the sum of the soak legs (below) + acceptance criteria, all green | §7 leg 1 ✅ 2026-07-17: 2 h battery, real usage + Zoom, replay armed, 3 mid-run replay saves; 19.5 GB / 7223.42 s, tracks ≤110 ms apart; battery 99→62%, CPU avg 12.9% / max 19.3%, RSS 98–485 MB trendless, zero thermal warnings; Franco: "smooth throughout, no desync" (claps at 0/1/2 h). §7 kill leg ✅ (amended to 1 h, Franco): kill -9 at 3540 s → playable 3539.53 s, **0.47 s lost** (≤10 s); app relaunched Ready. ⚠️ relaunch dropped the persisted armed state (transient pipeline failure → self-disarm; field note) — open follow-up, not a gate fail (§7 doesn't cover it). |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-21 (M10-T3): **`AVAssetReaderVideoCompositionOutput` ignores the composition's
+  `frameDuration` for the OUTPUT rate** — it emits one frame per SOURCE frame. Setting
+  `composition.frameDuration = 1/15` on a 30 fps source still yields 30 output frames (measured:
+  srcFrames=34 → gifFrames=30). `renderSize` DOES scale. So GIF fps capping is a **PTS subsample in
+  the reader** (keep a frame only once ≥ 1/fps has passed since the last kept), not a composition
+  setting. Also: a synthetic MovieRecorder fixture fed in an instant burst loses ~2/3 of frames to
+  HEVC encoder warmup (30 fed → 11 kept) — pace the feed (`usleep`) so the fixture is dense enough to
+  exercise the subsample (30 fed → 34 kept → 15 GIF frames).
 
 - 2026-07-21 (M10-T2 review deferrals, Franco-approved): three low-severity edges left out of the
   T2 commit. **① Pre-existing doc bug:** in `RecordingNotification.swift` the "The armed stream's

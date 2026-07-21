@@ -80,6 +80,50 @@ import RecorderCore
         #expect(posted.count == 1)   // exactly one export completed
     }
 
+    @Test func gifExportSetsReceiptAndNotifies() async {
+        let state = makeState()
+        var posted: [RecordingNotification] = []
+        state.notifier = { posted.append($0) }
+        let written = URL(fileURLWithPath: "/tmp/Clip.gif")
+        state.gifExportFunction = { _, _ in written }
+
+        state.exportToGIF(URL(fileURLWithPath: "/tmp/Clip.mov"))
+        #expect(state.exportInProgress == "Clip.mov")
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(state.lastExport?.url == written)
+        #expect(state.lastExport?.menuTitle == "Saved as GIF · Clip.gif")
+        #expect(posted.first?.title == "Saved as GIF")
+        #expect(posted.first?.fileURL == written)
+    }
+
+    @Test func oneExportAtATimeAcrossFormats() async {
+        let state = makeState()
+        state.notifier = { _ in }
+        state.exportFunction = { _, output in output }
+        state.gifExportFunction = { _, output in output }
+
+        // An MP4 in flight blocks a GIF (they share one guard); no await between, so the MP4
+        // task hasn't run yet.
+        state.exportToMP4(URL(fileURLWithPath: "/tmp/A.mov"))
+        state.exportToGIF(URL(fileURLWithPath: "/tmp/A.mov"))
+        #expect(state.exportInProgress == "A.mov")
+        while state.exportInProgress != nil { await Task.yield() }
+        // The receipt is the MP4 sibling, not the GIF — the GIF call was dropped.
+        #expect(state.lastExport?.url.pathExtension == "mp4")
+    }
+
+    @Test func gifNotificationCopy() {
+        let ok = RecordingNotifications.savedAsGIF(url: URL(fileURLWithPath: "/tmp/Clip.gif"))
+        #expect(ok.title == "Saved as GIF")
+        #expect(ok.body == "Clip.gif — ready to share. Click to reveal.")
+        #expect(ok.fileURL == URL(fileURLWithPath: "/tmp/Clip.gif"))
+
+        let failed = RecordingNotifications.gifExportFailed()
+        #expect(failed.title == "Couldn't save GIF")
+        #expect(failed.fileURL == nil)
+    }
+
     @Test func exportNotificationCopy() {
         let ok = RecordingNotifications.exported(url: URL(fileURLWithPath: "/tmp/Clip.mp4"))
         #expect(ok.title == "Exported to MP4")

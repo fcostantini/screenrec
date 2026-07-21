@@ -133,6 +133,21 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
+    /// The GIF (M10-T3) finished — reveal it to drop into a thread.
+    public static func savedAsGIF(url: URL) -> RecordingNotification {
+        RecordingNotification(
+            title: "Saved as GIF",
+            body: "\(url.lastPathComponent) — ready to share. Click to reveal.",
+            fileURL: url)
+    }
+
+    public static func gifExportFailed() -> RecordingNotification {
+        RecordingNotification(
+            title: "Couldn't save GIF",
+            body: "The original recording is untouched. Try again, or check the output folder is writable.",
+            fileURL: nil)
+    }
+
     /// Launch-at-login registration threw (M6-T5) — the toggle reverted, so point the user at
     /// where they can change it directly.
     public static func loginItemFailed() -> RecordingNotification {

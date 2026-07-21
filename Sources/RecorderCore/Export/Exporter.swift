@@ -74,19 +74,24 @@ public enum Exporter {
         }
     }
 
-    /// The output pixel size for a `width × height` source under `configuration`: scaled to fit
-    /// the ceilings, aspect preserved, never upscaled, both dimensions rounded to even (H.264
-    /// requires even dimensions). Pure.
+    /// The output pixel size for a `width × height` source fitted within `maxWidth × maxHeight`:
+    /// aspect preserved, never upscaled, both dimensions rounded to even (H.264 requires even; GIF
+    /// tolerates it). Pure — shared by the MP4 and GIF (M10-T3) paths.
+    static func fittedSize(
+        width: Int, height: Int, maxWidth: Int, maxHeight: Int
+    ) -> (width: Int, height: Int) {
+        guard width > 0, height > 0 else { return (0, 0) }
+        let scale = min(1.0, Double(maxWidth) / Double(width), Double(maxHeight) / Double(height))
+        func even(_ value: Double) -> Int { max(2, Int((value / 2).rounded()) * 2) }
+        return (even(Double(width) * scale), even(Double(height) * scale))
+    }
+
     static func fittedSize(
         width: Int, height: Int, configuration: ExportConfiguration
     ) -> (width: Int, height: Int) {
-        guard width > 0, height > 0 else { return (0, 0) }
-        let scale = min(
-            1.0,
-            Double(configuration.maxWidth) / Double(width),
-            Double(configuration.maxHeight) / Double(height))
-        func even(_ value: Double) -> Int { max(2, Int((value / 2).rounded()) * 2) }
-        return (even(Double(width) * scale), even(Double(height) * scale))
+        fittedSize(
+            width: width, height: height,
+            maxWidth: configuration.maxWidth, maxHeight: configuration.maxHeight)
     }
 
     /// Transcodes `input` to `output`. `progress` (0…1, on a background queue) tracks the video
@@ -152,8 +157,9 @@ public enum Exporter {
     }
 
     /// True when both URLs resolve to the same file on disk (not merely the same string). Resolve
-    /// symlinks first: `resourceValues` reports a symlink's own identity, not its target's.
-    private static func sameFile(_ lhs: URL, _ rhs: URL) -> Bool {
+    /// symlinks first: `resourceValues` reports a symlink's own identity, not its target's. Shared
+    /// with the GIF path (M10-T3) as the delete-source guard.
+    static func sameFile(_ lhs: URL, _ rhs: URL) -> Bool {
         let left = lhs.resolvingSymlinksInPath()
         let right = rhs.resolvingSymlinksInPath()
         let key: Set<URLResourceKey> = [.fileResourceIdentifierKey]

@@ -862,7 +862,7 @@ milestone is the trim/format side only, held deliberately (ADR-015). Capture def
       progress + completion signal reusing M9-T2's in-app confirmation pattern; reveal on done.
       **Verify:** menudriver — export a recent file → the `.mp4` appears in the output folder, probes
       clean; a failure surfaces per the copy rules.
-- [ ] M10-T3 **GIF export from a clip (esp. the replay ring).** A replay clip → animated GIF straight
+- [x] M10-T3 **GIF export from a clip (esp. the replay ring).** A replay clip → animated GIF straight
       into a bug-report thread — the framing no competitor has. **Seams:** the M10-T1 frame read →
       `ImageIO` animated-GIF destination (`kUTTypeGIF`) with palette reduction and an fps/scale cap;
       zero-dep (ImageIO is system, ADR-010). Offer on a saved replay and a recent recording (a "Save

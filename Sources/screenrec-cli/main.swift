@@ -14,6 +14,9 @@ func printUsage() {
                                        H.264 + AAC .mp4 (yuv420p, faststart): downscaled to
                                        1920 wide, the two audio tracks mixed to one. Default
                                        <out> is the input's .mp4 sibling. The source is read-only.
+      screenrec-cli export --to-gif <in> [<out>]  Save a clip as a looping animated .gif
+                                       (480 wide, 15 fps, first 30 s). Default <out> is the
+                                       input's .gif sibling. The source is read-only.
       screenrec-cli list-mics          List audio input devices
       screenrec-cli list-apps          List running apps capturable with record --app
       screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
