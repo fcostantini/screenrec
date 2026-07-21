@@ -5,6 +5,10 @@
 
 ## Now
 
+- **v1.4.0 CUT (2026-07-21) — the MP4 share export (M10-T1 CLI + M10-T2 app) earns the MINOR.**
+  `VERSION` + `CoreInfo.version` → 1.4.0 (pin test green), tagged `v1.4.0`, pushed. M10-T3 (GIF) and
+  T4 (trim) remain; they'll fold into a later bump. **Next: M10-T3 (GIF export) — plan artifact first.**
+
 - **M10-T2 DONE — Export as MP4 wired into the app (LIVE-VERIFIED).** Each recent-recording row and
   the saved-replay receipt is now a **submenu** — `<name> ▸ { Reveal in Finder · Export as MP4 }` —
   over a thin `AppState.exportToMP4(_:)` on M10-T1's `Exporter`. Runs **off the main path** (an
