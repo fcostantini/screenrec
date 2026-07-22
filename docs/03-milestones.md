@@ -1038,7 +1038,7 @@ run before or after M12 — independent.
       silent mic-less take. (2) **Guard the region `.main` display resolution** so a multi-monitor
       `displays.first` fallback can't silently crop a region against the wrong display — fail loud
       instead. **Verify:** unit tests for both; the mic-grace copy is reviewed against the M6-T3 bar.
-- [ ] M13-T5 **`release.sh` + `smoke.sh` + doc refresh.** `Scripts/release.sh` (assert clean tree, read
+- [x] M13-T5 **`release.sh` + `smoke.sh` + doc refresh.** `Scripts/release.sh` (assert clean tree, read
       `VERSION`, run the 4-step loop, `git tag v$VERSION`, a README-vs-`VERSION` consistency check,
       remind to push); `Scripts/smoke.sh` (`screenrec-cli record --duration 3` + `probe` asserting 3
       tracks / ~3 s) for the dev box, which holds TCC — the only cheap catch for live-pipeline

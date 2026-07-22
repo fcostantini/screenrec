@@ -5,6 +5,25 @@
 
 ## Now
 
+- **🎉 M13-T5 DONE — release.sh + smoke.sh + doc refresh; M13 (Hardening) COMPLETE; GATE G13 PASSED
+  (2026-07-22).** **`Scripts/release.sh`** codifies the release cut (it does NOT bump the version —
+  that's the semver call, ADR-013): asserts clean tree · `CoreInfo.version == VERSION` · tag-not-exists,
+  runs the **full gate incl. `bundle.sh` signability** (stricter than the pre-push hook), tags `vX.Y.Z`,
+  and **prompt-then-pushes** main + tag in one invocation. **`Scripts/smoke.sh`** records `--duration 3`
+  via the CLI + probes → asserts video + ≥1 audio + ~3 s (the live-pipeline catch `swift test` can't do;
+  needs the dev box's TCC). **Docs un-staled:** README status → **version-agnostic** (M0–M13; points at
+  VERSION/tags, so it can't drift again) + Use section (source picker, region, export MP4/GIF, trim,
+  global hotkey) + repo map M0–M14; docs/01 **file tree** refreshed (was mislocating `Hotkey`, predating
+  the AppCore model split + `Export/`). **VERIFIED:** release.sh guards all correct (clean-tree refusal
+  live; CoreInfo-match/mismatch + tag-exists/free logic); **smoke.sh green live** (3 s → 1 video + 2
+  audio + 2.99 s, cleaned up). Scripts + docs only, no Swift. **G13 = all M13 legs green:** T1 pre-push
+  gate fails a deliberate regression · T2 OS-quit finalizes cleanly · T3 finalize branches unit-covered ·
+  T4 mic-grace + region notices · T5 release/smoke exist + pass + docs current. **M13 has NO new
+  user-facing feature (reliability/process/tests), so it's PATCH-worthy — owes 1.6.1, Franco's call to
+  cut** (and cutting it via the new `release.sh` would also end-to-end-verify its happy path, which the
+  existing v1.6.0 tag blocks). **Next: Franco's pick — cut 1.6.1, or M12 (Share & Surface) / M14
+  (Cleanup).**
+
 - **🛡 M13-T4 DONE — two reliability notices (2026-07-22).** **(1) Mic-grace silent-drop notice:** if a
   selected mic resolves to a device but never delivers its first buffer within `MovieRecorder`'s 0.75 s
   grace, the recorder started mic-less **silently** — M9-T1 only covered a mic that didn't *resolve*. Now

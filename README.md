@@ -5,8 +5,9 @@ microphone (separate track)**, tuned HEVC encoding, crash-safe long recordings,
 pause/resume, and ShadowPlay-style **instant replay** via a global hotkey.
 Zero external dependencies — Apple frameworks only, no Xcode required.
 
-**Status:** **v1.0.0** — feature-complete (M0–M6, ship-quality pass). See `STATUS.md` for the
-gate table; post-v1 work (M7 per-app capture, M8 mic recovery) is planned in `docs/03`.
+**Status:** feature-complete and hardened — **M0–M13 shipped** (capture, instant replay, per-app &
+region capture, microphone recovery, share export, basic editing, and reliability/CI hardening). See
+the `VERSION` file and git tags for the current release, and `STATUS.md` for the living state.
 
 ## Build & run
 
@@ -51,12 +52,18 @@ tells you if a folder isn't writable before you record.
 
 Everything is in the menu-bar menu:
 
-- **Start Recording / Stop & Save** — full-screen capture to a `.mov` in your output folder.
-- **Pause / Resume** — mid-recording, with the timeline kept in sync.
-- **Arm Instant Replay** + **⌥⌘R** — keeps the last 30 s / 60 s / 2 min buffered; the
-  hotkey saves it to disk in under a second, whether or not you're also recording.
-- **Settings (⌘,)** — output folder, quality (Efficient / Balanced / High), frame-rate
-  cap, replay buffer length and shortcut, and **Launch at login**.
+- **Start Recording / Stop & Save** — capture to a `.mov` in your output folder. An optional
+  **global start/stop shortcut** works from any app.
+- **Source ▸** — the whole screen, a **chosen app** (its windows + its audio only), or a
+  **drag-selected region** of the screen (`Select Region…`).
+- **Pause / Resume · Discard** — mid-recording, with the timeline kept in sync.
+- **Arm Instant Replay** + **⌥⌘R** — keeps a rolling buffer (5 s → 15 min); the hotkey saves the
+  last N seconds to disk in under a second, whether or not you're also recording.
+- **Recent recordings** — from each, **export a shareable MP4 or GIF**, or **losslessly trim** it
+  (the original is never touched).
+- **Settings (⌘,)** — output folder, quality (Efficient / Balanced / High), frame-rate cap,
+  microphone (None / Automatic / a device), replay buffer length and shortcut, GIF export settings,
+  and **Launch at login**.
 
 ## Sharing this build
 
@@ -102,7 +109,7 @@ This repo is documentation-first and built to be driven by coding agents:
 | `docs/00-product-brief.md` | Vision, goals, non-goals, v1 acceptance criteria |
 | `docs/01-architecture.md` | Module layout, dataflow, concurrency, state machine |
 | `docs/02-technical-reference.md` | All API knowledge + every bug already hit. Read first. |
-| `docs/03-milestones.md` | M0–M7 task breakdown with IDs, estimates, gates |
+| `docs/03-milestones.md` | M0–M14 task breakdown with IDs, estimates, gates |
 | `docs/04-testing-verification.md` | Concrete pass/fail checks per gate |
 | `docs/05-decisions.md` | ADRs — the "why" behind every non-obvious choice |
 | `docs/06-ui-spec.md` | Menu-bar app UI spec: menu states, notifications, onboarding, settings |

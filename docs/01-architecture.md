@@ -7,42 +7,31 @@ screenrec-app/
 ├── Package.swift
 ├── Sources/
 │   ├── RecorderCore/          # Library. ALL capture/encode/write logic. No UI imports.
-│   │   ├── Capture/
-│   │   │   ├── CaptureEngine.swift        # SCStream lifecycle, owns the one stream
-│   │   │   ├── CaptureConfiguration.swift # value type: display, mic, fps, quality…
-│   │   │   ├── SampleRouter.swift         # SCStreamOutput → fan-out to consumers
-│   │   │   ├── MicrophoneWatchdog.swift   # mic stopped delivering → .microphoneLost (M3-T6)
-│   │   │   ├── StallWatchdog.swift        # video silent while user active → log it (M3-T5)
-│   │   │   └── Permissions.swift          # TCC preflight/request, onboarding state
-│   │   ├── Recording/
-│   │   │   ├── RecordingSession.swift     # composes engine+recorder; the seam CLI/app share
-│   │   │   ├── MovieRecorder.swift        # AVAssetWriter session (3 inputs)
-│   │   │   ├── TimestampRebaser.swift     # epoch rebase + pause offset accounting
-│   │   │   └── BitrateModel.swift         # quality preset → bitrate math
-│   │   ├── Replay/
-│   │   │   ├── ReplayEncoder.swift        # VTCompressionSession wrapper
-│   │   │   ├── RingBuffer.swift           # generic timed ring of CMSampleBuffers
-│   │   │   └── ReplayMuxer.swift          # ring → passthrough AVAssetWriter → file
-│   │   └── Support/
-│   │       ├── OutputLocation.swift       # dir preflight (TCC!), naming, ~/Movies
-│   │       ├── DiskSpaceMonitor.swift     # output volume < 2 GB → .diskAlmostFull (M3-T3)
-│   │       ├── Polling.swift              # the one poll loop all three monitors share (M3-T5)
-│   │       └── SleepGuard.swift           # ProcessInfo activity assertion
-│   ├── screenrec-cli/         # Dev harness. Thin CLI over RecorderCore.
-│   │   └── main.swift
+│   │   ├── Capture/          # CaptureEngine (owns the one SCStream), CaptureConfiguration,
+│   │   │                     #   SampleRouter (fan-out), CapturableApp, Permissions,
+│   │   │                     #   MicrophoneWatchdog + MicrophoneRescue (M8), StallWatchdog,
+│   │   │                     #   AppTerminationWatch (M7), EngineEvent
+│   │   ├── Recording/        # RecordingSession (engine+recorder seam), MovieRecorder,
+│   │   │                     #   TimestampRebaser, BitrateModel, AudioEncodingSettings
+│   │   ├── Replay/           # ReplayEncoder (VTCompressionSession), RingBuffer,
+│   │   │                     #   ReplayAudioRing, ReplayMuxer (passthrough)
+│   │   ├── Export/           # Exporter (H.264 MP4), GifExporter, Trimmer, VideoFrameReader (M10)
+│   │   └── Support/          # OutputLocation, DiskSpaceMonitor, Polling, SleepGuard,
+│   │   │                     #   RecordingFileSentinel (M6), ResampledMicInput (M8), CoreInfo
+│   ├── screenrec-cli/         # Dev harness (ADR-011). main + Export/Trim/ReplayArm/ProbeStream
 │   ├── AppCore/               # Library. App state + view models. No AppKit/SwiftUI (M4-T1).
-│   │   ├── AppState.swift                 # @Observable, MainActor; folds EngineEvents
-│   │   └── StatusIcon.swift               # what the status item shows (docs/06)
-│   └── ScreenRecApp/          # Menu-bar app. SwiftUI views only. Depends on AppCore.
-│       ├── App.swift                      # @main, MenuBarExtra
-│       ├── Views/ (StatusIconView, MenuView, SettingsView, OnboardingView)
-│       ├── Hotkey.swift                   # Carbon RegisterEventHotKey wrapper
-│       └── Resources/Info.plist, AppIcon
-├── Scripts/
-│   ├── bundle.sh              # assembles ScreenRec.app from SPM build output + signs
-│   └── devsign.sh             # one-time: create/find stable signing identity
-├── Tests/RecorderCoreTests/   # unit tests (RingBuffer, TimestampRebaser, BitrateModel)
-├── tools/probe.swift          # file inspector (tracks/codecs/duration) — already works
+│   │   │                     #   AppState (@Observable, MainActor; folds EngineEvents),
+│   │   │                     #   Settings (+ Hotkey), PermissionsModel, OnboardingModel,
+│   │   │                     #   ReplayController, RecordingNotification, RecordingClock,
+│   │   │                     #   StatusIcon, DisplayOption, LoginItem, MenuHeader,
+│   │   │                     #   LastExport, LastReplay, RecentRecordings
+│   └── ScreenRecApp/          # Menu-bar app. SwiftUI + AppKit. Depends on AppCore.
+│       │                     #   App (@main, MenuBarExtra + AppDelegate), Notifier, Relaunch,
+│       │                     #   HotkeyCenter (Carbon), RegionSelectionOverlay (M11),
+│       └── Views/            #   StatusIconView, MenuView, SettingsView, OnboardingView, TrimView
+├── Scripts/                   # bundle.sh, devsign.sh, release.sh, smoke.sh (M13), hooks/pre-push
+├── Tests/                     # RecorderCoreTests + AppCoreTests (pure-decision + integration)
+├── tools/                     # probe, frames, menudriver, settingsdriver, hoverprobe, axdump
 └── docs/                      # you are here
 ```
 
