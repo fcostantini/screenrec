@@ -285,6 +285,10 @@ the old line is simply false above three green ticks.
   `.requiresApproval` status (user disabled it in System Settings) counts as on, with a
   notification pointing them there; a failed register reverts the toggle and notifies.
   **Works for the self-signed dev build — no notarization needed (measured M6-T5).**
+- **GIF** (M10-T3 follow-up) — a section below Instant Replay, three Pickers steering `Save as GIF`:
+  **Frames per second** (12/15/20/24) · **Width** (320/480/640/800 px; caps height too) · **Maximum
+  length** (10/15/30/60 s). Defaults 15 / 480 / 30. The CLI (`export --to-gif`) has its own
+  `--fps/--width/--seconds` flags and does not read these prefs.
 
 ⚠️ **AMENDED 2026-07-15 (Franco): the last two rows do not ship with M4-T4.**
 - **Instant replay settings move to M5, with the feature.** M4-T4 was going to store the keys
@@ -312,6 +316,7 @@ moved):
 | `replayHotkey` | Dict: keyCode Int, modifiers Int | **M5** |
 | `recordHotkey` | Dict: keyCode Int, modifiers Int; **absent ⇒ off** (M9-T4, opt-in global start/stop) | M9-T4 |
 | `showsMenuBarTimer` | Bool; **absent ⇒ on** (opt-out). The status-item label's live elapsed clock while recording (M9-T3) | M9-T3 |
+| `gifFPS` · `gifWidth` · `gifMaxSeconds` | Int; each snaps to its nearest picker choice on load, absent ⇒ 15 / 480 / 30. The `Save as GIF` caps (M10-T3 follow-up) | M10-T3 follow-up |
 
 ⚠️ **`launchAtLogin` is NOT a UserDefaults key (amended M6-T5).** The spec originally listed
 one, but `SMAppService` persists the login-item registration itself, so a stored bool would be

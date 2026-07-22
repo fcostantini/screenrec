@@ -50,6 +50,9 @@ import RecorderCore
         #expect(SettingsStore.Key.hotkeyKeyCode == "keyCode")
         #expect(SettingsStore.Key.hotkeyModifiers == "modifiers")
         #expect(SettingsStore.Key.showsMenuBarTimer == "showsMenuBarTimer")
+        #expect(SettingsStore.Key.gifFPS == "gifFPS")
+        #expect(SettingsStore.Key.gifWidth == "gifWidth")
+        #expect(SettingsStore.Key.gifMaxSeconds == "gifMaxSeconds")
     }
 
     @Test func savesUnderExactlyThoseKeysAndNoOthers() {
@@ -61,6 +64,7 @@ import RecorderCore
         #expect(Set(written.keys) == [
             "outputDirectory", "qualityPreset", "fpsCap",
             "replayArmed", "replaySeconds", "replayHotkey", "showsMenuBarTimer",
+            "gifFPS", "gifWidth", "gifMaxSeconds",
         ])
     }
 
@@ -263,6 +267,58 @@ import RecorderCore
         #expect(SettingsStore.load(from: defaults).replaySeconds == 900)   // to the max
         defaults.set(3, forKey: "replaySeconds")
         #expect(SettingsStore.load(from: defaults).replaySeconds == 5)     // to the floor
+    }
+
+    @Test func gifCapsRoundTrip() {
+        let defaults = makeDefaults().defaults
+        var settings = Settings.standard
+        settings.gifFPS = 20
+        settings.gifWidth = 640
+        settings.gifMaxSeconds = 15
+        SettingsStore.save(settings, to: defaults)
+        let loaded = SettingsStore.load(from: defaults)
+        #expect(loaded.gifFPS == 20)
+        #expect(loaded.gifWidth == 640)
+        #expect(loaded.gifMaxSeconds == 15)
+    }
+
+    @Test func gifCapsDefaultWhenAbsentAndSnapToTheNearestChoice() {
+        let defaults = makeDefaults().defaults
+        let empty = SettingsStore.load(from: defaults)
+        #expect(empty.gifFPS == 15)
+        #expect(empty.gifWidth == 480)
+        #expect(empty.gifMaxSeconds == 30)
+
+        // A hand-edited/future value snaps to the nearest picker choice (tie → the lower).
+        defaults.set(18, forKey: "gifFPS")           // → 20
+        defaults.set(500, forKey: "gifWidth")        // → 480
+        defaults.set(45, forKey: "gifMaxSeconds")    // → 30 (|45−30| == |45−60|, tie → 30)
+        let snapped = SettingsStore.load(from: defaults)
+        #expect(snapped.gifFPS == 20)
+        #expect(snapped.gifWidth == 480)
+        #expect(snapped.gifMaxSeconds == 30)
+    }
+
+    @Test(arguments: [0, -1])
+    func nonPositiveGifCapsFallBackToTheDefaults(value: Int) {
+        // `integer(forKey:)` is 0 for absent and garbage alike (the `rawGif* > 0` guard).
+        let defaults = makeDefaults().defaults
+        for key in ["gifFPS", "gifWidth", "gifMaxSeconds"] { defaults.set(value, forKey: key) }
+        let loaded = SettingsStore.load(from: defaults)
+        #expect(loaded.gifFPS == 15)
+        #expect(loaded.gifWidth == 480)
+        #expect(loaded.gifMaxSeconds == 30)
+    }
+
+    @Test func farOutOfRangeGifCapsSnapToTheNearestBound() {
+        let defaults = makeDefaults().defaults
+        defaults.set(1, forKey: "gifFPS")            // below the list → 12
+        defaults.set(9999, forKey: "gifWidth")       // above the list → 800
+        defaults.set(9999, forKey: "gifMaxSeconds")  // above the list → 60
+        let loaded = SettingsStore.load(from: defaults)
+        #expect(loaded.gifFPS == 12)
+        #expect(loaded.gifWidth == 800)
+        #expect(loaded.gifMaxSeconds == 60)
     }
 
     @Test func replayBufferLabelFormatsAsMinutesSeconds() {

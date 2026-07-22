@@ -125,6 +125,23 @@ struct SettingsView: View {
                     .buttonStyle(.link)
                     .font(.caption)
             }
+
+            Section("GIF") {
+                Picker("Frames per second", selection: $state.gifFPS) {
+                    ForEach(Settings.allowedGifFPS, id: \.self) { Text("\($0) fps").tag($0) }
+                }
+                Picker("Width", selection: $state.gifWidth) {
+                    ForEach(Settings.allowedGifWidths, id: \.self) { Text("\($0) px").tag($0) }
+                }
+                Picker("Maximum length", selection: $state.gifMaxSeconds) {
+                    ForEach(Settings.allowedGifMaxSeconds, id: \.self) { Text("\($0) s").tag($0) }
+                }
+                Text("Applies to Save as GIF. A longer clip is trimmed to its first Maximum length; "
+                    + "height follows the source's aspect.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .formStyle(.grouped)
         .frame(width: 420)

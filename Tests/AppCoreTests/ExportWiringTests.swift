@@ -4,6 +4,11 @@ import Testing
 @testable import AppCore
 import RecorderCore
 
+/// Records the config an injected GIF export was handed (the closure is `@Sendable`).
+private final class ConfigBox: @unchecked Sendable {
+    var value: GifConfiguration?
+}
+
 /// AppState → Exporter wiring, with the transcode injected — the real `Exporter` runs the
 /// hardware encoder (that's `ExporterTests`' job), so the wiring is tested on a fake.
 @MainActor
@@ -85,7 +90,7 @@ import RecorderCore
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
         let written = URL(fileURLWithPath: "/tmp/Clip.gif")
-        state.gifExportFunction = { _, _ in written }
+        state.gifExportFunction = { _, _, _ in written }
 
         state.exportToGIF(URL(fileURLWithPath: "/tmp/Clip.mov"))
         #expect(state.exportInProgress == "Clip.mov")
@@ -97,11 +102,32 @@ import RecorderCore
         #expect(posted.first?.fileURL == written)
     }
 
+    @Test func gifExportUsesTheSettingsCaps() async {
+        let state = makeState()
+        state.notifier = { _ in }
+        state.gifFPS = 20
+        state.gifWidth = 640
+        state.gifMaxSeconds = 15
+        let recorded = ConfigBox()
+        state.gifExportFunction = { _, output, configuration in
+            recorded.value = configuration
+            return output
+        }
+
+        state.exportToGIF(URL(fileURLWithPath: "/tmp/Clip.mov"))
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(recorded.value?.fps == 20)
+        #expect(recorded.value?.maxWidth == 640)
+        #expect(recorded.value?.maxHeight == 640)   // width caps height too
+        #expect(recorded.value?.maxSeconds == 15)
+    }
+
     @Test func oneExportAtATimeAcrossFormats() async {
         let state = makeState()
         state.notifier = { _ in }
         state.exportFunction = { _, output in output }
-        state.gifExportFunction = { _, output in output }
+        state.gifExportFunction = { _, output, _ in output }
 
         // An MP4 in flight blocks a GIF (they share one guard); no await between, so the MP4
         // task hasn't run yet.

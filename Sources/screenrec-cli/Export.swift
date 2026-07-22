@@ -43,16 +43,38 @@ func runExport(_ args: [String]) async {
     var toMP4 = false
     var toGIF = false
     var positionals: [String] = []
-    for arg in args {
-        switch arg {
+    var gifFPS: Int?
+    var gifWidth: Int?
+    var gifSeconds: Double?
+
+    var index = 0
+    func value(after flag: String) -> String {
+        index += 1
+        guard index < args.count else { die("\(flag) needs a value") }
+        return args[index]
+    }
+    while index < args.count {
+        switch args[index] {
         case "--to-mp4": toMP4 = true
         case "--to-gif": toGIF = true
+        // Round, don't truncate, and floor at 1: a sub-1.0 value would otherwise become 0 → a
+        // broken GIF (fps 0 keeps one frame; width 0 floors to a 2px clip).
+        case "--fps":
+            gifFPS = max(1, Int(parsePositive(value(after: "--fps"), flag: "--fps", unit: "fps", max: 120).rounded()))
+        case "--width":
+            gifWidth = max(1, Int(parsePositive(value(after: "--width"), flag: "--width", unit: "pixels", max: 4096).rounded()))
+        case "--seconds": gifSeconds = parsePositive(value(after: "--seconds"), flag: "--seconds", max: 900)
         case let flag where flag.hasPrefix("--"): die("Unknown export option: \(flag)")
-        default: positionals.append(arg)
+        default: positionals.append(args[index])
         }
+        index += 1
     }
     guard toMP4 != toGIF else { die("export needs exactly one of --to-mp4 or --to-gif") }
+    guard !toMP4 || (gifFPS == nil && gifWidth == nil && gifSeconds == nil) else {
+        die("--fps/--width/--seconds only apply to --to-gif")
+    }
     guard let inputPath = positionals.first else { die("export needs an input path") }
+    guard positionals.count <= 2 else { die("Unexpected extra argument: \(positionals[2])") }
 
     let input = URL(fileURLWithPath: (inputPath as NSString).expandingTildeInPath)
     guard FileManager.default.fileExists(atPath: input.path) else {
@@ -65,7 +87,9 @@ func runExport(_ args: [String]) async {
     print("Reading   \(input.lastPathComponent)")
     do {
         if toGIF {
-            try await runGIF(input: input, explicitOutput: explicitOutput)
+            try await runGIF(
+                input: input, explicitOutput: explicitOutput,
+                fps: gifFPS, width: gifWidth, seconds: gifSeconds)
         } else {
             try await runMP4(input: input, explicitOutput: explicitOutput)
         }
@@ -87,10 +111,18 @@ private func runMP4(input: URL, explicitOutput: URL?) async throws {
             Double(result.byteCount) / 1_000_000))
 }
 
-private func runGIF(input: URL, explicitOutput: URL?) async throws {
+private func runGIF(
+    input: URL, explicitOutput: URL?, fps: Int?, width: Int?, seconds: Double?
+) async throws {
     let output = explicitOutput ?? Exporter.availableURL(basedOn: GifExporter.gifSibling(of: input))
-    let result = try await GifExporter.exportGIF(from: input, to: output)
-    let window = result.truncated ? " · first \(Int(GifConfiguration().maxSeconds))s" : ""
+    let defaults = GifConfiguration()
+    let configuration = GifConfiguration(
+        maxWidth: width ?? defaults.maxWidth,
+        maxHeight: width ?? defaults.maxHeight,
+        fps: fps ?? defaults.fps,
+        maxSeconds: seconds ?? defaults.maxSeconds)
+    let result = try await GifExporter.exportGIF(from: input, to: output, configuration: configuration)
+    let window = result.truncated ? " · first \(Int(configuration.maxSeconds))s" : ""
     print(
         String(
             format: "Wrote     %@  (GIF %d×%d, %d frames, %.1f MB)%@",

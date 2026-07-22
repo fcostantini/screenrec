@@ -868,6 +868,11 @@ milestone is the trim/format side only, held deliberately (ADR-015). Capture def
       zero-dep (ImageIO is system, ADR-010). Offer on a saved replay and a recent recording (a "Save
       as GIF" action). **Verify:** a looping GIF from a test clip, size bounded by the caps, opens in
       Preview/browser.
+- [x] M10-T3 follow-up **GIF settings (Franco's ask, 2026-07-22).** The T3 caps were fixed defaults;
+      a **GIF** section in Settings (fps 12/15/20/24 · width 320/480/640/800 · max length 10/15/30/60 s,
+      snap-on-load) now steers `Save as GIF`, and the CLI gained `--fps/--width/--seconds` flags.
+      **Verify:** settings round-trip + snap unit tests; `settingsdriver` shot shows the section; a
+      persisted width 640 → real app `Save as GIF` → a 640-wide GIF.
 - [ ] M10-T4 **Lossless trim (in/out, passthrough).** Trim a `.mov` to `[in, out]` without
       re-encoding, reusing `ReplayMuxer`'s snapshot→keyframe-trim→passthrough approach, so "clip the
       useful 20 s before sharing" costs no quality. **Seams:** generalize the muxer's trim or a

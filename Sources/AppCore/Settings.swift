@@ -55,8 +55,22 @@ public struct Settings: Sendable, Equatable {
     public var recordHotkey: Hotkey?
     /// Whether the menu-bar label shows the live elapsed clock while recording (M9-T3). Default on.
     public var showsMenuBarTimer: Bool
+    /// The GIF export caps (M10-T3 follow-up): each is one of its `allowedGif…` list. Width also
+    /// caps height (aspect preserved). Steer `Save as GIF`; the CLI takes its own flags.
+    public var gifFPS: Int
+    public var gifWidth: Int
+    public var gifMaxSeconds: Int
 
     public static let allowedFrameRateCaps = [30, 60]
+    public static let allowedGifFPS = [12, 15, 20, 24]
+    public static let allowedGifWidths = [320, 480, 640, 800]
+    public static let allowedGifMaxSeconds = [10, 15, 30, 60]
+
+    /// The list member closest to `value` (ties → the lower), so a hand-edited or future-version
+    /// plist value snaps to a real picker choice instead of leaving the Picker blank.
+    static func nearest(_ value: Int, in allowed: [Int]) -> Int? {
+        allowed.min { abs($0 - value) < abs($1 - value) }
+    }
     /// The replay buffer length range (M9-T8): 5 s floor → 15 min. Seconds granularity via typed
     /// input; the slider snaps to `replaySliderStep`.
     public static let replaySecondsRange = 5...900
@@ -96,7 +110,10 @@ public struct Settings: Sendable, Equatable {
             replaySeconds: 60,
             replayHotkey: .standard,
             recordHotkey: nil,
-            showsMenuBarTimer: true)
+            showsMenuBarTimer: true,
+            gifFPS: 15,
+            gifWidth: 480,
+            gifMaxSeconds: 30)
     }
 }
 
@@ -125,6 +142,10 @@ public enum SettingsStore {
         public static let hotkeyModifiers = "modifiers"
         /// Absent ⇒ on (M9-T3): the menu-bar clock is opt-out, not opt-in.
         public static let showsMenuBarTimer = "showsMenuBarTimer"
+        /// The GIF export caps (M10-T3 follow-up); absent ⇒ 15 / 480 / 30.
+        public static let gifFPS = "gifFPS"
+        public static let gifWidth = "gifWidth"
+        public static let gifMaxSeconds = "gifMaxSeconds"
     }
 
     /// Reads settings, replacing anything unusable with the default.
@@ -199,6 +220,21 @@ public enum SettingsStore {
             settings.showsMenuBarTimer = defaults.bool(forKey: Key.showsMenuBarTimer)
         }
 
+        // Each GIF cap snaps to its nearest picker choice; absent/garbage (0) keeps the default.
+        let rawGifFPS = defaults.integer(forKey: Key.gifFPS)
+        if rawGifFPS > 0, let gifFPS = Settings.nearest(rawGifFPS, in: Settings.allowedGifFPS) {
+            settings.gifFPS = gifFPS
+        }
+        let rawGifWidth = defaults.integer(forKey: Key.gifWidth)
+        if rawGifWidth > 0, let width = Settings.nearest(rawGifWidth, in: Settings.allowedGifWidths) {
+            settings.gifWidth = width
+        }
+        let rawGifMaxSeconds = defaults.integer(forKey: Key.gifMaxSeconds)
+        if rawGifMaxSeconds > 0,
+           let seconds = Settings.nearest(rawGifMaxSeconds, in: Settings.allowedGifMaxSeconds) {
+            settings.gifMaxSeconds = seconds
+        }
+
         return settings
     }
 
@@ -246,5 +282,8 @@ public enum SettingsStore {
             defaults.removeObject(forKey: Key.recordHotkey)
         }
         defaults.set(settings.showsMenuBarTimer, forKey: Key.showsMenuBarTimer)
+        defaults.set(settings.gifFPS, forKey: Key.gifFPS)
+        defaults.set(settings.gifWidth, forKey: Key.gifWidth)
+        defaults.set(settings.gifMaxSeconds, forKey: Key.gifMaxSeconds)
     }
 }

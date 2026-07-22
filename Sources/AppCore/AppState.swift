@@ -108,6 +108,18 @@ public final class AppState {
         didSet { if showsMenuBarTimer != oldValue { persist() } }
     }
 
+    /// The GIF export caps (M10-T3 follow-up), each a `Settings.allowedGif…` choice. Steer
+    /// `Save as GIF`; a pure export pref, persisted.
+    public var gifFPS: Int {
+        didSet { if gifFPS != oldValue { persist() } }
+    }
+    public var gifWidth: Int {
+        didSet { if gifWidth != oldValue { persist() } }
+    }
+    public var gifMaxSeconds: Int {
+        didSet { if gifMaxSeconds != oldValue { persist() } }
+    }
+
     // MARK: - Instant replay (docs/06 idle item 3, Settings "Instant Replay")
 
     /// Arming starts the rolling buffer (its own capture stream while idle; a recording's
@@ -257,8 +269,8 @@ public final class AppState {
     public var exportFunction: @Sendable (_ source: URL, _ output: URL) async throws -> URL = {
         try await Exporter.exportToMP4(from: $0, to: $1).url
     }
-    public var gifExportFunction: @Sendable (_ source: URL, _ output: URL) async throws -> URL = {
-        try await GifExporter.exportGIF(from: $0, to: $1).url
+    public var gifExportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: GifConfiguration) async throws -> URL = {
+        try await GifExporter.exportGIF(from: $0, to: $1, configuration: $2).url
     }
 
     // MARK: - Onboarding (docs/06 "Onboarding window") — delegated to PermissionsModel (M9-T7)
@@ -344,6 +356,9 @@ public final class AppState {
         replayHotkey = settings.replayHotkey
         recordHotkey = settings.recordHotkey
         showsMenuBarTimer = settings.showsMenuBarTimer
+        gifFPS = settings.gifFPS
+        gifWidth = settings.gifWidth
+        gifMaxSeconds = settings.gifMaxSeconds
         replay = replayController ?? ReplayController()
         // `screenWasGrantedAtLaunch` is captured by PermissionsModel's own init. Populate the rows
         // before the first render, or the window flickers.
@@ -378,7 +393,8 @@ public final class AppState {
                 captureAppBundleID: selectedAppBundleID,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey, recordHotkey: recordHotkey,
-                showsMenuBarTimer: showsMenuBarTimer),
+                showsMenuBarTimer: showsMenuBarTimer,
+                gifFPS: gifFPS, gifWidth: gifWidth, gifMaxSeconds: gifMaxSeconds),
             to: defaults)
     }
 
@@ -458,11 +474,15 @@ public final class AppState {
             failure: RecordingNotifications.exportFailed)
     }
 
-    /// Saves a recording or clip as a looping GIF (M10-T3), the same off-main, one-at-a-time path.
+    /// Saves a recording or clip as a looping GIF (M10-T3), the same off-main, one-at-a-time path,
+    /// with the caps from Settings (M10-T3 follow-up).
     public func exportToGIF(_ source: URL) {
+        let configuration = GifConfiguration(
+            maxWidth: gifWidth, maxHeight: gifWidth, fps: gifFPS, maxSeconds: Double(gifMaxSeconds))
+        let gifExport = gifExportFunction  // snapshot the value; the closure captures no `self`
         performExport(
             source, to: Exporter.availableURL(basedOn: GifExporter.gifSibling(of: source)),
-            using: gifExportFunction,
+            using: { try await gifExport($0, $1, configuration) },
             success: { RecordingNotifications.savedAsGIF(url: $0) },
             failure: RecordingNotifications.gifExportFailed)
     }

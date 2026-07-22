@@ -15,7 +15,8 @@ func printUsage() {
                                        1920 wide, the two audio tracks mixed to one. Default
                                        <out> is the input's .mp4 sibling. The source is read-only.
       screenrec-cli export --to-gif <in> [<out>]  Save a clip as a looping animated .gif
-                                       (480 wide, 15 fps, first 30 s). Default <out> is the
+                                       (default 480 wide, 15 fps, first 30 s). Override with
+                                       --fps <n> --width <px> --seconds <n>. Default <out> is the
                                        input's .gif sibling. The source is read-only.
       screenrec-cli list-mics          List audio input devices
       screenrec-cli list-apps          List running apps capturable with record --app

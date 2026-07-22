@@ -5,6 +5,25 @@
 
 ## Now
 
+- **M10-T3 follow-up DONE — GIF settings (Settings pickers + CLI flags), LIVE-VERIFIED.** The T3 caps
+  (480/15/30) were fixed; now a **GIF** section in the Settings window — three Pickers, **Frames per
+  second** (12/15/20/24) · **Width** (320/480/640/800, caps height too) · **Maximum length**
+  (10/15/30/60 s) — steers `Save as GIF`, and the CLI gained **`--fps/--width/--seconds`** flags. New
+  persisted `Settings.gifFPS/gifWidth/gifMaxSeconds` (+ 3 contractual keys, snap-to-nearest-choice on
+  load); `AppState.exportToGIF` builds a `GifConfiguration` from them (the `gifExportFunction` seam grew
+  a config param). No change to `GifExporter`/`VideoFrameReader` — they already take a config. **343
+  tests (+5:** gif-caps round-trip, absent→defaults + snap, non-positive→defaults, far-out-of-range→
+  nearest bound, `exportToGIF` builds the config from the settings; + the 2 contractual-key pins gained
+  the 3 keys). Full dev loop green. **LIVE-VERIFIED (deployed, PID-swapped):** `settingsdriver shot`
+  shows the GIF section rendering (15 fps / 480 px / 30 s); **a persisted `gifWidth=640` → relaunch →
+  menudriver `Save as GIF` → a 640×400 GIF** (the setting reaches the encoder end-to-end); the CLI
+  `--width 640 --fps 20 --seconds 3` → 640×400 `· first 3s`. Prefs + test files restored/cleaned.
+  **Review (code-review agent; clean, one real CLI edge + polish; findings presented → Franco approved
+  batch):** ① CLI `--fps 0.9` truncated to 0 → broken GIF, now `max(1, round)`; ② `nearest` made
+  internal; ③ CLI dies on an unexpected extra positional; ④ snap tests for 0/neg + far-range; ⑤ a
+  shadowed `let fps` renamed. **No VERSION bump** — batches with T3 toward the owed MINOR (1.5.0).
+  **Next: M10-T4 (lossless trim) — the last M10 item; plan artifact first.**
+
 - **M10-T3 DONE — GIF export from a clip (core + CLI + app action), LIVE-VERIFIED.** A recording or
   saved replay → a **looping animated GIF** via ImageIO (zero-dep). New `GifExporter` + `VideoFrameReader`
   (RecorderCore/Export/): the frame reader is the M10-T1 `AVAssetReader` read side adapted to **CFR** —
