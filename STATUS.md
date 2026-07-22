@@ -5,6 +5,13 @@
 
 ## Now
 
+- **🎉 v1.6.0 CUT (2026-07-22) — M11 (region capture) earns the MINOR.** `VERSION` + `CoreInfo.version`
+  → 1.6.0 (pin test green), committed (`49b599d`), tagged `v1.6.0`, **pushed to origin** (main +
+  tag; 0 unpushed). The MINOR earns from M11's user-facing feature: record an arbitrary rectangle of
+  a display — T1 (core + CLI) + T2 (drag-to-select overlay + Source-picker wiring). Installed build
+  (/Users/Shared, redeployed) reports 1.6.0. Roadmap is empty again. **Next: Franco's call — declare
+  Gate G11, dogfood 1.6.0, or scope new work.**
+
 - **🎉 M11-T2 DONE — region selection overlay + menu wiring; M11 COMPLETE; LIVE-VERIFIED (2026-07-22).**
   A ⌘⇧4-style **drag-to-select overlay** (new AppKit `RegionSelectionOverlay` in ScreenRecApp: borderless
   `NSWindow` + drag-tracking `NSView`, dimmed veil punched by the selection, crosshair, live `w×h pt`
