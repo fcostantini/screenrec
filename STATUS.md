@@ -5,6 +5,15 @@
 
 ## Now
 
+- **📋 M11 (region capture) SCOPED (2026-07-22) — pausing here.** Franco's ask: record an arbitrary
+  rectangle of a display (a third `ContentSelection` mode beside whole-screen and per-app). Written up
+  in docs/03 M11 — **T1** region core + CLI (`.region(display:, rect:)`, SCK `sourceRect`, even-pixel
+  snap, fail-loud resolution) · **T2** a drag-to-select overlay + Source-picker `Select Region…`.
+  Confirmed it was **never previously discussed** (no ADR/task/field note/commit; docs/00 said "later:
+  window/app" = M7). **Open decisions for Franco (in the M11 writeup):** persist the last region vs.
+  fresh each time; secondary-display region in T2 or deferred; no live recording-boundary overlay.
+  Nothing started; all M11 boxes unticked. **Next when Franco resumes: M11-T1 — plan artifact first.**
+
 - **🎉 v1.5.0 CUT (2026-07-22) — M10 (share export & basic editing) earns the MINOR.** `VERSION` +
   `CoreInfo.version` → 1.5.0 (pin test green), tagged `v1.5.0`, pushed. The MINOR earns from M10's
   user-facing features: MP4 share export (T1/T2), GIF export (T3) + GIF settings, and lossless trim

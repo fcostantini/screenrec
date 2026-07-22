@@ -891,6 +891,60 @@ unchanged and the "no render stage / no studio" line (ADR-015) is documented and
 (h264 High/yuv420p/1920×1200/faststart, live), GIF (480×300 looping, live), lossless trim (hvc1
 preserved, exact 6.00s, original intact, live); the Trim window rendered live (AVPlayerView).
 
+## M11 — Region capture (post-M10; Franco's ask, 2026-07-22)
+
+A **third capture mode**: record an arbitrary rectangle of a display, not just the whole screen
+(M0–M6) or a chosen app's windows (M7). It slots into the existing `ContentSelection` enum
+(`.display` / `.app` → add `.region`), so the recording, replay and shared-stream paths all inherit
+it from one place — the M7 shape exactly. **Independent** of M7–M10; builds only on M2 (recording),
+M4 (menu) and M5 (replay). The capture default is unchanged (still whole-screen HEVC `.mov`,
+ADR-004); region is opt-in.
+
+**Mechanism (SCK):** `SCContentFilter(display:excludingWindows:[])` for the display, plus
+`SCStreamConfiguration.sourceRect` = the region (display-relative **points** — 02 §1's
+points-vs-pixels rule bites here) and `width`/`height` = the region's **pixel** size (points ×
+displayScale, snapped **even** for the encoder). `destinationRect` maps the region to the full
+output frame. The region is a fixed *screen* rectangle — it captures whatever is under it; it does
+**not** follow a window (that's `.app`).
+
+- [ ] M11-T1 **Region capture core + CLI.** Add `.region(display:, rect:)` to `ContentSelection`;
+      `CaptureEngine` builds the display filter + `sourceRect` and sizes the output to the region
+      (even pixels). Resolve at start: an off-screen/empty/zero-area rect, or a vanished display,
+      **fails loud** (the M7 `.app`-gone precedent — never a silent whole-screen fallback). No
+      StallWatchdog concerns beyond the display path's. CLI `record --region <x>,<y>,<w>,<h>` and
+      `replay-arm --region …` (the headless verify surface, ADR-011), coordinates in display points.
+      **Rulings to nail (T1's platform-facts §, like M7-T1's 02 §1a):** the sourceRect coordinate
+      space and origin (top-left vs bottom-left), Retina scaling to output pixels, even-dimension
+      snap, and behaviour when the rect straddles the display edge (clamp). **Verify:** a
+      region-scoped recording's frames contain **only** the rectangle's content (a bystander window
+      outside it is absent from every checked frame — the M7-T1 method); dimensions match the
+      snapped region; system audio still whole-machine (audio has no region). One display only —
+      cross-display region is out of scope (SCK `sourceRect` is per-display).
+- [ ] M11-T2 **Region selection overlay + menu wiring.** The interesting part: a **drag-to-select
+      overlay** (⌘⇧4-style) — a borderless, translucent, full-screen `NSWindow` per display, crosshair
+      cursor, a live `w×h` readout, click-drag to draw the rect, Return/second-click confirms, Escape
+      cancels. On confirm the rect (screen points) → `ContentSelection.region`, set as the Source.
+      The **Source ▸** picker (M7-T2) gains a **`Select Region…`** row; once picked, a checkmarked
+      `Region <w>×<h>` row shows the current selection (re-pick via `Select Region…` again). Recording
+      and armed replay follow the pick (M7-T2's shared-stream rebuild); the recording menu shows
+      `Recording region <w>×<h>`. **Decisions to confirm (Franco):** (a) **persist** the last region
+      (display + rect) like the app pick, re-selectable — or select fresh each time? (b) a picked
+      region on a **secondary display** — support in T2, or defer? (c) **no live on-screen boundary**
+      while recording (SCK draws none; the user set it) — out of scope, or wanted? **Verify:**
+      menudriver + the overlay (AX-drivable? — a taste/tooling call, may need a new driver) or a
+      seeded rect: `Select Region…` → draw → record → the `.mp4`/frames show only the region; the
+      overlay's Escape cancels cleanly; a mid-recording source-lock (M7) still holds.
+
+**Gate G11**: a region-selected recording **and** an armed replay both capture exactly the chosen
+rectangle (content outside it absent), at the correct even dimensions, playable; the selection
+overlay draws, reports `w×h`, confirms and cancels; the pick survives per the (a) ruling; failure
+paths (vanished display, empty rect) fail loud with actionable copy. The whole-screen and per-app
+modes are unaffected (one `ContentSelection`, three cases).
+
+**Non-goals (M11):** cross-display / multi-monitor single region; a region that follows a window
+(that's `.app`); freeform/non-rectangular selection; a live recording-boundary overlay; auto-zoom or
+any render stage (ADR-015 still holds).
+
 ## Dependency graph
 
 ```
