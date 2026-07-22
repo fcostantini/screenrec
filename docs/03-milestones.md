@@ -974,7 +974,7 @@ export and trim are untouched.
       Recording` the first actionable row** — move the export/replay receipts below it and auto-expire a
       stale export receipt. **Verify:** `menudriver dump` shows the values in the titles + the hotkey
       suffix; a stale receipt no longer squats above Start.
-- [ ] M12-T4 **Region entry is coherent and honest.** Move **`Select Region…` inside `Source ▸`**
+- [x] M12-T4 **Region entry is coherent and honest.** Move **`Select Region…` inside `Source ▸`**
       (under the region tag) so all three capture modes are entered from one place; add a **main-display-
       only hint** to the overlay when multiple displays are present; show **`pt · px`** in the overlay
       badge (a power user framing exactly 1920×1080 needs the pixel size). *(Actual secondary-display

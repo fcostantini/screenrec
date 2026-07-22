@@ -14,6 +14,10 @@ final class RegionSelectionController {
         guard window == nil, let screen = Self.mainScreen() else { return }
         let displayID = Self.displayID(of: screen)
         let view = RegionSelectionView(frame: NSRect(origin: .zero, size: screen.frame.size))
+        // The badge needs the display's backing scale for pixels; the caveat needs the display count
+        // (main-display-only is honest only when there's more than one) — M12-T4.
+        view.scale = screen.backingScaleFactor
+        view.displayCount = NSScreen.screens.count
         view.onConfirm = { [weak self] viewRect in
             let sourceRect = RegionSelection.sckRect(
                 fromViewRect: viewRect, displayHeightPoints: screen.frame.height)
@@ -68,6 +72,11 @@ private final class RegionSelectionView: NSView {
     var onConfirm: ((CGRect) -> Void)?
     var onCancel: (() -> Void)?
 
+    /// The main display's backing scale, for the badge's pixel size (M12-T4). Set by the controller.
+    var scale: CGFloat = 1
+    /// How many displays are attached, for the main-display-only caveat (M12-T4).
+    var displayCount: Int = 1
+
     /// The provisional selection, or nil before the first drag. Normalized (positive size).
     private var selection: NSRect?
     private var dragOrigin: NSPoint?
@@ -104,10 +113,14 @@ private final class RegionSelectionView: NSView {
             NSColor.white.setStroke()
             border.stroke()
 
-            drawBadge("\(Int(selection.width.rounded())) × \(Int(selection.height.rounded())) pt",
-                      near: selection)
+            drawBadge(
+                RegionSelection.badgeText(width: selection.width, height: selection.height, scale: scale),
+                near: selection)
         }
 
+        if let caveat = RegionSelection.mainDisplayHint(displayCount: displayCount) {
+            drawCaveat(caveat)
+        }
         drawHint("Drag to select a region   ·   Return to confirm   ·   Esc to cancel")
     }
 
@@ -139,6 +152,24 @@ private final class RegionSelectionView: NSView {
         let pill = NSRect(x: bounds.midX - size.width / 2 - padding, y: bounds.height * 0.08,
                           width: size.width + 2 * padding, height: size.height + padding)
         NSColor(calibratedWhite: 0.05, alpha: 0.82).setFill()
+        NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2).fill()
+        (text as NSString).draw(
+            at: NSPoint(x: pill.minX + padding, y: pill.minY + padding / 2), withAttributes: attributes)
+    }
+
+    /// The main-display-only caveat (M12-T4), a top-center pill in a warning tint so it reads as a
+    /// standing limitation, not an action hint. Below the menu bar (the view is unflipped: top is high y).
+    private func drawCaveat(_ text: String) {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
+            .foregroundColor: NSColor.white,
+        ]
+        let size = (text as NSString).size(withAttributes: attributes)
+        let padding: CGFloat = 10
+        let pill = NSRect(x: bounds.midX - size.width / 2 - padding,
+                          y: bounds.maxY - size.height - 3 * padding - 44,
+                          width: size.width + 2 * padding, height: size.height + padding)
+        NSColor(calibratedRed: 0.60, green: 0.36, blue: 0.0, alpha: 0.92).setFill()
         NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2).fill()
         (text as NSString).draw(
             at: NSPoint(x: pill.minX + padding, y: pill.minY + padding / 2), withAttributes: attributes)

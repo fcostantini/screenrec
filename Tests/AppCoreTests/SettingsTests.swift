@@ -221,6 +221,26 @@ import RecorderCore
         }
     }
 
+    // MARK: - Region overlay badge + caveat (M12-T4)
+
+    @Test func badgeTextShowsPointsAndPixels() {
+        // The power-user case: 960×540 pt on a 2× display is exactly 1920×1080 px.
+        #expect(RegionSelection.badgeText(width: 960, height: 540, scale: 2)
+            == "960 × 540 pt · 1920 × 1080 px")
+        // A 1× display: pixels equal points.
+        #expect(RegionSelection.badgeText(width: 800, height: 500, scale: 1)
+            == "800 × 500 pt · 800 × 500 px")
+        // Fractional drag points round independently for each unit.
+        #expect(RegionSelection.badgeText(width: 100.4, height: 50.6, scale: 2)
+            == "100 × 51 pt · 201 × 101 px")
+    }
+
+    @Test func mainDisplayCaveatShowsOnlyWithMoreThanOneDisplay() {
+        #expect(RegionSelection.mainDisplayHint(displayCount: 1) == nil)
+        #expect(RegionSelection.mainDisplayHint(displayCount: 2) == "Region capture uses the main display only")
+        #expect(RegionSelection.mainDisplayHint(displayCount: 3) != nil)
+    }
+
     @Test func automaticMicrophonePersistsAndWinsOverAStoredDevice() {
         // M6-T13: Automatic is a distinct persisted value (a bool key), and it takes precedence
         // over any device id left in the plist.

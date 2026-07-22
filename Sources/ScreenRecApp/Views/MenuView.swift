@@ -53,37 +53,43 @@ struct MenuView: View {
         exportStatusRow
         lastReplayRow
 
-        // A `Picker` in menu content renders as docs/06 items 5–7 ask: a submenu with a
-        // checkmark on the current entry. An explicit `Menu` forced `.inline` adds separators.
-        //
-        // Source (docs/06 item 5, M7-T2): screens above the divider, running apps below — the
-        // Microphone submenu's shape. A picked app that isn't running stays listed, dimmed and
-        // checkmarked, so the pick is visible without lying (its Start fails loud instead). The
-        // title carries the current pick (M12-T3), so a glance tells the truth without opening it.
-        Picker("Source: \(state.sourceMenuLabel)", selection: $state.sourceChoice) {
-            ForEach(state.displays) { screen in
-                Text(state.displays.count == 1 ? "Entire Screen" : "Entire Screen (\(screen.name))")
-                    .tag(SourceChoice.display(screen.id))
-            }
-            Divider()
-            ForEach(state.capturableApps, id: \.bundleID) { app in
-                Text(app.name).tag(SourceChoice.app(bundleID: app.bundleID))
-            }
-            if let missing = state.missingPickedApp {
-                Text("\(missing.name) (not running)")
-                    .tag(SourceChoice.app(bundleID: missing.bundleID))
-                    .disabled(true)
-            }
-            // The current region as a checkmarked, re-selectable tag (M11-T2); redraw via the
-            // Select Region… row below. Its tag matches `sourceChoice`'s region case.
-            if let region = state.selectedRegion {
+        // Source (docs/06 item 5, M7-T2): all three capture modes are entered from this one submenu
+        // (M12-T4). An inline `Picker` keeps SwiftUI's reliable checkmark on the current entry (an
+        // explicit hand-built Menu can't two-tone or check rows through the `.menu` bridge), and the
+        // `Select Region…` action sits below it — so region entry lives with the other sources, not
+        // as a stray top-level row. Screens above the divider, running apps below; a picked app that
+        // isn't running stays listed and checkmarked (its Start fails loud instead). The title
+        // carries the current pick (M12-T3), so a glance tells the truth without opening it.
+        Menu("Source: \(state.sourceMenuLabel)") {
+            Picker(selection: $state.sourceChoice) {
+                ForEach(state.displays) { screen in
+                    Text(state.displays.count == 1 ? "Entire Screen" : "Entire Screen (\(screen.name))")
+                        .tag(SourceChoice.display(screen.id))
+                }
                 Divider()
-                Text("Region \(AppState.regionLabel(region.rect.size))")
-                    .tag(SourceChoice.region(display: region.displayID, rect: region.rect))
-            }
+                ForEach(state.capturableApps, id: \.bundleID) { app in
+                    Text(app.name).tag(SourceChoice.app(bundleID: app.bundleID))
+                }
+                if let missing = state.missingPickedApp {
+                    Text("\(missing.name) (not running)")
+                        .tag(SourceChoice.app(bundleID: missing.bundleID))
+                        .disabled(true)
+                }
+                // The current region as a checkmarked, re-selectable tag (M11-T2); redraw via
+                // Select Region… below. Its tag matches `sourceChoice`'s region case.
+                if let region = state.selectedRegion {
+                    Divider()
+                    Text("Region \(AppState.regionLabel(region.rect.size))")
+                        .tag(SourceChoice.region(display: region.displayID, rect: region.rect))
+                }
+            } label: { EmptyView() }
+                .pickerStyle(.inline)
+            // No explicit Divider here: the inline Picker already renders a trailing separator, so
+            // Select Region… is cleanly set apart from the options (a second divider would double up).
+
+            // Opens the drag-to-select overlay (M11-T2) — an action, not a picker tag.
+            Button("Select Region…") { state.beginRegionSelection?() }
         }
-        // Opens the drag-to-select overlay (M11-T2) — an action, not a picker tag.
-        Button("Select Region…") { state.beginRegionSelection?() }
 
         // Reads through `presentMicrophonePreference`: the checkmark sits on None while a picked
         // device is away, without forgetting the pick. Writes are real user picks. Automatic

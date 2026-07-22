@@ -54,10 +54,16 @@ Order and grouping (separators between groups):
    accepted. Hidden while recording (see recording item 7).
    **Region (M11-T2):** below the app rows, when a region is set, a checkmarked `Region <w>×<h>`
    row (point size) shows the current pick — re-selectable, and it survives its display's absence
-   like the app pick (a start against a vanished display fails loud, M11-T1). A **`Select Region…`**
-   button under the picker opens a full-screen drag-to-select overlay (crosshair, live `w×h`, Return
-   confirms, Esc cancels); on confirm the rect (flipped from AppKit bottom-left to SCK top-left
-   points, docs/02 §1b) becomes the Source. Persisted (display + rect); main display only in v1.
+   like the app pick (a start against a vanished display fails loud, M11-T1). **M12-T4** moved
+   **`Select Region…` *inside* `Source ▸`** (below the checkmarked region tag), so all three capture
+   modes are entered from the one submenu — implemented as a `Menu` wrapping an inline `Picker` (the
+   Picker keeps SwiftUI's reliable checkmark; the `.menu` bridge can't check hand-built rows) plus the
+   action Button. The overlay opens full-screen (crosshair, Return confirms, Esc cancels); on confirm the
+   rect (flipped from AppKit bottom-left to SCK top-left points, docs/02 §1b) becomes the Source. Persisted
+   (display + rect); **main display only** in v1 — **M12-T4** makes that honest: the overlay's size badge
+   reads **`<w> × <h> pt · <W> × <H> px`** (points × the display's backing scale, so a power user can frame
+   exactly 1920×1080 px), and on a **multi-display** Mac a top-center caveat pill says *"Region capture
+   uses the main display only"* (`RegionSelection.badgeText`/`mainDisplayHint`, pure + tested).
 6. `Microphone ▸` submenu: `None`, **`Automatic (System Default)`**, a divider, then the input-device
    list. Checkmark on current. Disabled while recording. Devices enumerated **live** via the CoreAudio
    HAL (`AudioInputs.available`), not `AVCaptureDevice.DiscoverySession` — the latter caches and misses

@@ -50,6 +50,21 @@ public struct RegionSelection: Hashable, Sendable {
         CGRect(x: view.origin.x, y: displayHeightPoints - (view.origin.y + view.height),
                width: view.width, height: view.height)
     }
+
+    /// The overlay size badge (M12-T4): points and pixels, e.g. `960 × 540 pt · 1920 × 1080 px` — a
+    /// power user framing exactly 1920×1080 px needs the pixel size (points × the display's backing
+    /// scale). Pure, so the formatting is unit-tested away from the AppKit drawing.
+    public static func badgeText(width: CGFloat, height: CGFloat, scale: CGFloat) -> String {
+        let wpt = Int(width.rounded()), hpt = Int(height.rounded())
+        let wpx = Int((width * scale).rounded()), hpx = Int((height * scale).rounded())
+        return "\(wpt) × \(hpt) pt · \(wpx) × \(hpx) px"
+    }
+
+    /// The overlay's honesty caveat (M12-T4): region capture is main-display only (M11), so on a
+    /// multi-display Mac the overlay says so; a single display needs no caveat (nil). Pure predicate.
+    public static func mainDisplayHint(displayCount: Int) -> String? {
+        displayCount > 1 ? "Region capture uses the main display only" : nil
+    }
 }
 
 /// The app's persisted preferences (docs/06 "Settings window").

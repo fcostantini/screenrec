@@ -5,6 +5,36 @@
 
 ## Now
 
+- **⬚ M12-T4 DONE — region entry coherent + honest, LIVE-VERIFIED (2026-07-22).** Three parts: **(A)**
+  **`Select Region…` moved INSIDE `Source ▸`** (below the checkmarked region tag) so all three capture
+  modes are entered from one submenu — `Source ▸` became a `Menu` wrapping an **inline `Picker`** (keeps
+  SwiftUI's reliable checkmark; a hand-built Menu can't check rows through the `.menu` bridge) + the
+  `Select Region…` action Button; the stray top-level row is gone. **(B)** a multi-display **caveat pill**
+  ("Region capture uses the main display only") drawn top-center when `NSScreen.screens.count > 1`. **(C)**
+  the overlay size badge now reads **`<w>×<h> pt · <W>×<H> px`** (px = points × the display's backing
+  scale), so a power user can frame exactly 1920×1080 px. Pure `RegionSelection.badgeText(width:height:scale:)`
+  + `mainDisplayHint(displayCount:)` in AppCore (the overlay is AppKit, the logic is testable); the view
+  gets `scale`/`displayCount` from the controller. **No capture behaviour change** — still main-display
+  region only (M11); secondary-display *region capture* stays the deferred M11 follow-up, this is the
+  regrouping + honesty. **Call (Franco-approved default):** caveat/badge copy as above. **417 tests (+2:**
+  `badgeText` at 1×/2×/fractional; `mainDisplayHint` 1→nil, ≥2→string). Full dev loop green. Quality pass
+  self-review (small diff — 2 pure fns + overlay drawing + menu restructure; multi-agent review
+  disproportionate): the one call was `drawCaveat` repeating the pill boilerplate — left consistent with
+  the file's existing `drawHint`/`drawBadge` (different anchoring makes a forced shared helper less clear).
+  **LIVE-VERIFIED (deployed, menudriver + screenshot):** `dump` shows `Select Region…` inside `Source ▸`
+  with `✓ Discord` intact + no top-level row; **the inline-Picker rendering worked** (the flagged risk) —
+  removed one redundant `Divider()` when the dump showed the inline picker adds its own trailing separator
+  (a lone leading separator remains, an accepted inline-picker artifact); the overlay opened with the
+  bottom hint + **no top caveat** (correct on Franco's single display), and **Franco confirmed the badge
+  showed `pt · px`**. The multi-display caveat is **unit-covered** (can't show on one display). **⚠️ Field
+  note (VT wedge, resolved):** the accumulated CLI recordings/exports/replay-saves from this session's
+  T1–T3 live checks **wedged VideoToolbox** — the 15 HW-encoder replay tests hung 120 s each mid dev-loop;
+  it **self-healed in ~3 min** (I did docs+review meanwhile), then all 417 passed. M12-T4 never touches the
+  encoder — purely environmental (the v1.6.1 field-note issue; a reboot clears it instantly). **No VERSION
+  bump** (batches toward M12's MINOR). **Next: M12-T5 (surface armed replay's banner suppression —
+  first-arm alert + persistent dimmed menu row + onboarding line) — plan artifact first.** M12-T6 pending;
+  M14 unstarted. **4 M12 commits unpushed this session (T1–T4).**
+
 - **🪧 M12-T3 DONE — the menu tells the truth at a glance, LIVE-VERIFIED (2026-07-22).** Four parts:
   **(A)** the Source/Microphone/Quality submenu **titles carry the current pick** (`Source: Discord`,
   `Microphone: Automatic`, `Quality: High`) via pure `AppState.sourceMenuLabel`/`microphoneMenuLabel`
