@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import RecorderCore
 
@@ -30,6 +31,27 @@ public enum MicrophonePreference: Sendable, Equatable, Hashable {
     case device(id: String)
 }
 
+/// A persisted region pick (docs/06 item 5, M11-T2): a display and a rectangle in that display's
+/// SCK `sourceRect` space (top-left origin, points — docs/02 §1b). Persisted like the app pick;
+/// an off-screen rect after a resolution change still fails loud at start (M11-T1's `resolveRegion`).
+public struct RegionSelection: Hashable, Sendable {
+    public var displayID: CGDirectDisplayID?  // nil ⇒ the main display
+    public var rect: CGRect
+
+    public init(displayID: CGDirectDisplayID?, rect: CGRect) {
+        self.displayID = displayID
+        self.rect = rect
+    }
+
+    /// Converts a selection rectangle from AppKit view/screen points (bottom-left origin, the
+    /// overlay's space) to SCK `sourceRect` points (top-left origin — docs/02 §1b), given the
+    /// display's height in points. The one geometry flip between the overlay and the engine.
+    public static func sckRect(fromViewRect view: CGRect, displayHeightPoints: CGFloat) -> CGRect {
+        CGRect(x: view.origin.x, y: displayHeightPoints - (view.origin.y + view.height),
+               width: view.width, height: view.height)
+    }
+}
+
 /// The app's persisted preferences (docs/06 "Settings window").
 ///
 /// Launch-at-login (M6) arrives with the feature it configures.
@@ -46,6 +68,10 @@ public struct Settings: Sendable, Equatable {
     /// Nil ⇒ entire screen. Not validated against running apps at load — the pick survives the
     /// app being closed; a start while it's away fails loud (never a silent whole-screen fallback).
     public var captureAppBundleID: String?
+    /// The Source pick when it's a region (docs/06 item 5, M11-T2). Nil ⇒ not a region pick. Like
+    /// the app pick, not validated against the current displays at load — a start against a vanished
+    /// display fails loud (M11-T1).
+    public var captureRegion: RegionSelection?
     public var replayArmed: Bool
     /// docs/06 offers 30, 60 or 120.
     public var replaySeconds: Int
@@ -106,6 +132,7 @@ public struct Settings: Sendable, Equatable {
             frameRateCap: 60,
             microphonePreference: .none,
             captureAppBundleID: nil,
+            captureRegion: nil,
             replayArmed: false,
             replaySeconds: 60,
             replayHotkey: .standard,
@@ -132,6 +159,14 @@ public enum SettingsStore {
         public static let microphoneAutomatic = "microphoneAutomatic"
         /// Absent ⇒ entire screen (M7-T2).
         public static let captureAppBundleID = "captureAppBundleID"
+        /// Absent ⇒ not a region pick (M11-T2). A Dict of the inner keys below.
+        public static let captureRegion = "captureRegion"
+        /// Inner keys of `captureRegion` — the display id and the rect (SCK points, docs/02 §1b).
+        public static let regionDisplay = "display"
+        public static let regionX = "x"
+        public static let regionY = "y"
+        public static let regionWidth = "width"
+        public static let regionHeight = "height"
         public static let replayArmed = "replayArmed"
         public static let replaySeconds = "replaySeconds"
         public static let replayHotkey = "replayHotkey"
@@ -194,6 +229,11 @@ public enum SettingsStore {
             settings.captureAppBundleID = bundleID
         }
 
+        // Like the app pick: no display validation at load — a vanished display fails loud at start.
+        if let region = regionSelection(from: defaults.dictionary(forKey: Key.captureRegion)) {
+            settings.captureRegion = region
+        }
+
         settings.replayArmed = defaults.bool(forKey: Key.replayArmed)
 
         // A positive value clamps into the range (M9-T8); absent or garbage (`integer(forKey:)` is 0
@@ -238,6 +278,26 @@ public enum SettingsStore {
         return settings
     }
 
+    /// Validates a persisted region dict: a positive, finite rect; a non-negative display id if
+    /// present (else nil ⇒ main). Nil ⇒ absent/malformed — a bad value falls back to no region.
+    private static func regionSelection(from dict: [String: Any]?) -> RegionSelection? {
+        guard let dict,
+              let x = dict[Key.regionX] as? Double, x.isFinite,
+              let y = dict[Key.regionY] as? Double, y.isFinite,
+              let width = dict[Key.regionWidth] as? Double, width.isFinite, width > 0,
+              let height = dict[Key.regionHeight] as? Double, height.isFinite, height > 0
+        else { return nil }
+        // A CGDirectDisplayID is a UInt32; an out-of-range (negative or > UInt32.max) hand-edited
+        // value must fall back, not trap the cast — the loader tolerates any plist value.
+        var displayID: CGDirectDisplayID?
+        if let raw = dict[Key.regionDisplay] as? Int {
+            guard let id = CGDirectDisplayID(exactly: raw) else { return nil }
+            displayID = id
+        }
+        return RegionSelection(
+            displayID: displayID, rect: CGRect(x: x, y: y, width: width, height: height))
+    }
+
     /// Validates a persisted hotkey dict: both inner keys present, zero modifiers rejected, and both
     /// values bounded to fit the trapping UInt32 conversions at registration. Nil ⇒ absent/malformed.
     private static func hotkey(from dict: [String: Any]?) -> Hotkey? {
@@ -267,6 +327,15 @@ public enum SettingsStore {
         }
         // `set(_:Any?)` removes the key for nil — absent ⇒ entire screen, per the table.
         defaults.set(settings.captureAppBundleID, forKey: Key.captureAppBundleID)
+        if let region = settings.captureRegion {
+            var dict: [String: Any] = [
+                Key.regionX: Double(region.rect.origin.x), Key.regionY: Double(region.rect.origin.y),
+                Key.regionWidth: Double(region.rect.width), Key.regionHeight: Double(region.rect.height)]
+            if let displayID = region.displayID { dict[Key.regionDisplay] = Int(displayID) }
+            defaults.set(dict, forKey: Key.captureRegion)
+        } else {
+            defaults.removeObject(forKey: Key.captureRegion)
+        }
         defaults.set(settings.replayArmed, forKey: Key.replayArmed)
         defaults.set(settings.replaySeconds, forKey: Key.replaySeconds)
         defaults.set(

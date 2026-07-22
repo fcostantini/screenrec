@@ -43,6 +43,12 @@ import RecorderCore
         #expect(SettingsStore.Key.fpsCap == "fpsCap")
         #expect(SettingsStore.Key.microphoneID == "microphoneID")
         #expect(SettingsStore.Key.captureAppBundleID == "captureAppBundleID")
+        #expect(SettingsStore.Key.captureRegion == "captureRegion")
+        #expect(SettingsStore.Key.regionDisplay == "display")
+        #expect(SettingsStore.Key.regionX == "x")
+        #expect(SettingsStore.Key.regionY == "y")
+        #expect(SettingsStore.Key.regionWidth == "width")
+        #expect(SettingsStore.Key.regionHeight == "height")
         #expect(SettingsStore.Key.replayArmed == "replayArmed")
         #expect(SettingsStore.Key.replaySeconds == "replaySeconds")
         #expect(SettingsStore.Key.replayHotkey == "replayHotkey")
@@ -125,6 +131,48 @@ import RecorderCore
         let defaults = makeDefaults().defaults
         defaults.set("", forKey: SettingsStore.Key.captureAppBundleID)
         #expect(SettingsStore.load(from: defaults).captureAppBundleID == nil)
+    }
+
+    @Test func regionPickPersistsAndSurvivesItsDisplayBeingAway() {
+        // M11-T2: like the app pick — the region round-trips (display id + rect) and outlives its
+        // display; a vanished display fails loud at start (M11-T1), not at load.
+        let defaults = makeDefaults().defaults
+        var settings = makeSettings()
+        let region = RegionSelection(displayID: 7, rect: CGRect(x: 40, y: 60, width: 800, height: 500))
+        settings.captureRegion = region
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).captureRegion == region)
+
+        settings.captureRegion = nil
+        SettingsStore.save(settings, to: defaults)
+        #expect(defaults.object(forKey: "captureRegion") == nil)
+        #expect(SettingsStore.load(from: defaults).captureRegion == nil)
+    }
+
+    @Test func aRegionWithNoDisplayIdRoundTripsAsMain() {
+        let defaults = makeDefaults().defaults
+        var settings = makeSettings()
+        settings.captureRegion = RegionSelection(
+            displayID: nil, rect: CGRect(x: 0, y: 0, width: 640, height: 400))
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).captureRegion?.displayID == nil)
+    }
+
+    @Test func aMalformedRegionLoadsAsNoRegion() {
+        // A hand-edited or partial plist entry falls back to no region rather than a degenerate
+        // one that would fail every capture.
+        for bad in [
+            ["x": 40.0, "y": 60.0, "width": 800.0],                       // missing height
+            ["x": 40.0, "y": 60.0, "width": 0.0, "height": 500.0],        // zero width
+            ["x": 40.0, "y": 60.0, "width": 800.0, "height": -1.0],       // negative height
+            ["x": Double.nan, "y": 60.0, "width": 800.0, "height": 500.0],// non-finite
+            ["x": 40.0, "y": 60.0, "width": 800.0, "height": 500.0, "display": Int(-3)], // negative id
+            ["x": 40.0, "y": 60.0, "width": 800.0, "height": 500.0, "display": 9_999_999_999], // id > UInt32.max
+        ] as [[String: Any]] {
+            let defaults = makeDefaults().defaults
+            defaults.set(bad, forKey: SettingsStore.Key.captureRegion)
+            #expect(SettingsStore.load(from: defaults).captureRegion == nil)
+        }
     }
 
     @Test func automaticMicrophonePersistsAndWinsOverAStoredDevice() {

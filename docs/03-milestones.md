@@ -920,7 +920,7 @@ output frame. The region is a fixed *screen* rectangle — it captures whatever 
       outside it is absent from every checked frame — the M7-T1 method); dimensions match the
       snapped region; system audio still whole-machine (audio has no region). One display only —
       cross-display region is out of scope (SCK `sourceRect` is per-display).
-- [ ] M11-T2 **Region selection overlay + menu wiring.** The interesting part: a **drag-to-select
+- [x] M11-T2 **Region selection overlay + menu wiring.** The interesting part: a **drag-to-select
       overlay** (⌘⇧4-style) — a borderless, translucent, full-screen `NSWindow` per display, crosshair
       cursor, a live `w×h` readout, click-drag to draw the rect, Return/second-click confirms, Escape
       cancels. On confirm the rect (screen points) → `ContentSelection.region`, set as the Source.

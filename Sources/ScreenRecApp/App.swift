@@ -41,6 +41,13 @@ struct ScreenRecApp: App {
                 .compactMap(\.bundleIdentifier))
             return apps.filter { regular.contains($0.bundleID) }
         }
+        // Region selection (M11-T2): the menu's "Select Region…" opens the drag overlay, which
+        // hands back a rect in SCK points; AppKit lives here, not in AppCore. Weak capture — the
+        // closure is stored on `state`, which the controller must not retain.
+        let regionSelector = ScreenRecApp.regionSelector
+        state.beginRegionSelection = { [weak state] in
+            regionSelector.present { displayID, rect in state?.setRegion(displayID: displayID, rect: rect) }
+        }
         // Global shortcuts (M9-T4): map each intent to a Carbon hotkey id + the action it fires.
         // Carbon lives here; AppCore stays framework-free. Weak captures — the closure is stored on
         // `state`, which owns it.
@@ -62,6 +69,8 @@ struct ScreenRecApp: App {
     /// Shared with the delegate, which installs it before launch completes.
     fileprivate static let notifier = Notifier()
     fileprivate static let hotkeys = HotkeyCenter()
+    /// One overlay controller, reused per region pick (M11-T2).
+    fileprivate static let regionSelector = RegionSelectionController()
 
     var body: some Scene {
         MenuBarExtra {

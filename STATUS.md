@@ -5,6 +5,37 @@
 
 ## Now
 
+- **🎉 M11-T2 DONE — region selection overlay + menu wiring; M11 COMPLETE; LIVE-VERIFIED (2026-07-22).**
+  A ⌘⇧4-style **drag-to-select overlay** (new AppKit `RegionSelectionOverlay` in ScreenRecApp: borderless
+  `NSWindow` + drag-tracking `NSView`, dimmed veil punched by the selection, crosshair, live `w×h pt`
+  readout, Return/second-click confirms, Esc cancels, `minSide`/`clickSlop` reject degenerate drags),
+  wired into the **Source ▸** picker: a checkmarked `Region <w>×<h>` tag when set + a `Select Region…`
+  button that opens the overlay. `SourceChoice.region(display:, rect:)` (Hashable); `selectedRegion`
+  backing (persisted via new `RegionSelection` + `captureRegion` Settings Dict) reusing the M7-T2
+  `isRehomingSources` **one-rebuild batching**; `captureConfiguration` emits `.region`, so recording AND
+  armed replay inherit it. The one geometry ruling — **AppKit bottom-left → SCK top-left flip**
+  (`RegionSelection.sckRect`, pure/tested) — is the complement to T1's origin proof; docs/02 §1b amended.
+  AppKit stays out of AppCore (`beginRegionSelection` injected, `@MainActor`-typed). **368 tests (+10:**
+  the flip incl. the menu-bar case, `SourceChoice.region` ⇄ config, region persistence round-trip +
+  malformed/overflow-display-id fallback, one-rebuild batching, `regionLabel`; +1 case in the
+  malformed-region test). Full dev loop green. **Franco's decisions (asked + locked):** persist the
+  region · main display only (secondary deferred) · no live boundary. **LIVE-VERIFIED (deployed,
+  PID-swapped):** Franco drew a region — **"felt great"** (taste call); it persisted (`x=233,y=247,
+  1645×721`, display 1), the menu showed **`✓ Region 1645×721`**, and the **app recorded exactly that
+  rect** (3290×1442 px = 1645×721 pt ×2; content matched a `screencapture -R` of the persisted rect at
+  image-diff **0.056**); the rect's center (1055,607) ≈ screen center (1028,642) — the flip's magnitude is
+  right; the pick **survived a cold relaunch** (persist round-trip + the crash-fix load path). **Review
+  (code-review agent; 8/10; findings presented → Franco approved batch):** ① **crash-on-load fix** — a
+  persisted display id > `UInt32.max` trapped the `CGDirectDisplayID` cast (crash-loop); now
+  `CGDirectDisplayID(exactly:)` + an overflow test; ② `beginRegionSelection` `@MainActor`-typed to match
+  the injection convention; ③ `acceptsFirstMouse → true` so the first drag draws through a focus race.
+  Skipped ⑤ (unavoidable cross-module format dup). **Flip DIRECTION** is unit-tested (menu-bar top → y=0)
+  + T1-live-proven (SCK origin top-left); a centered drag can't disambiguate it live — an optional
+  menu-bar draw was offered as belt-and-suspenders, not taken. **Armed-replay-with-region** shares the
+  same `captureConfiguration` path (unit-covered), not separately live-driven. **No VERSION bump** — M11
+  is complete and owes a MINOR **1.6.0**; Franco's call to cut it with Gate G11. **Next: Franco's call —
+  cut 1.6.0 / declare G11, dogfood, or scope new work.** M11-T1 note below.
+
 - **🎉 M11-T1 DONE — region capture core + CLI, LIVE-VERIFIED (2026-07-22).** Third `ContentSelection`
   case `.region(display: DisplaySelection, rect: CGRect)` — record an arbitrary rectangle of a display.
   `CaptureEngine` builds the whole-display filter + `SCStreamConfiguration.sourceRect` (display points,

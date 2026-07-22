@@ -10,6 +10,9 @@ import os
 public enum SourceChoice: Hashable, Sendable {
     case display(CGDirectDisplayID?)
     case app(bundleID: String)
+    /// A rectangle of a display (M11-T2). `rect` is SCK `sourceRect` points (top-left, docs/02 §1b);
+    /// `display` nil ⇒ main. Chosen via the overlay, not typed — the picker only shows/re-picks it.
+    case region(display: CGDirectDisplayID?, rect: CGRect)
 }
 
 /// Which global shortcut a registration is for (M9-T4). The app maps each to a Carbon hotkey id and
@@ -58,6 +61,16 @@ public final class AppState {
     public var selectedAppBundleID: String? {
         didSet {
             guard selectedAppBundleID != oldValue, !isRehomingSources else { return }
+            persist()
+            replayConfigurationChanged()
+        }
+    }
+    /// The Source pick when it's a region (docs/06 item 5, M11-T2); nil ⇒ not a region. Set via the
+    /// drag overlay through `setRegion`; persisted, and — like the app pick — it survives its display
+    /// vanishing (a start then fails loud, never a silent whole-screen fallback).
+    public var selectedRegion: RegionSelection? {
+        didSet {
+            guard selectedRegion != oldValue, !isRehomingSources else { return }
             persist()
             replayConfigurationChanged()
         }
@@ -241,6 +254,9 @@ public final class AppState {
     /// The app being recorded, for the recording menu's "Recording <app> only" line (docs/06,
     /// M7-T2); nil for whole-screen. Named at start — the pick is locked for the session.
     public private(set) var activeAppName: String?
+    /// The region being recorded, for the "Recording region <w>×<h>" line (docs/06, M11-T2); nil
+    /// unless a region is the pick. Sized at start — the pick is locked for the session.
+    public private(set) var activeRegion: CGSize?
     /// Set when a recording didn't survive its own start, or degraded on the way. ADR-007
     /// forbids the silent version of either.
     public private(set) var lastFailure: String?
@@ -358,6 +374,7 @@ public final class AppState {
         frameRateCap = settings.frameRateCap
         microphonePreference = settings.microphonePreference
         selectedAppBundleID = settings.captureAppBundleID
+        selectedRegion = settings.captureRegion
         isReplayArmed = settings.replayArmed
         replaySeconds = settings.replaySeconds
         replayHotkey = settings.replayHotkey
@@ -398,6 +415,7 @@ public final class AppState {
                 outputDirectory: outputDirectory, quality: quality, frameRateCap: frameRateCap,
                 microphonePreference: microphonePreference,
                 captureAppBundleID: selectedAppBundleID,
+                captureRegion: selectedRegion,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey, recordHotkey: recordHotkey,
                 showsMenuBarTimer: showsMenuBarTimer,
@@ -742,9 +760,16 @@ public final class AppState {
     /// What the pickers currently describe. Pure, so the menu→capture translation is testable
     /// without starting anything.
     public var captureConfiguration: CaptureConfiguration {
-        CaptureConfiguration(
-            content: selectedAppBundleID.map { ContentSelection.app(bundleID: $0) }
-                ?? .display(selectedDisplayID.map(DisplaySelection.id) ?? .main),
+        let content: ContentSelection
+        if let region = selectedRegion {
+            content = .region(display: region.displayID.map(DisplaySelection.id) ?? .main, rect: region.rect)
+        } else if let bundleID = selectedAppBundleID {
+            content = .app(bundleID: bundleID)
+        } else {
+            content = .display(selectedDisplayID.map(DisplaySelection.id) ?? .main)
+        }
+        return CaptureConfiguration(
+            content: content,
             microphone: pickedMicrophoneID.map { MicrophoneSelection.device(id: $0) } ?? .none,
             // Honor the pick (M8-T2): a specific device recovers only onto itself; Automatic
             // follows the current system default at return time.
@@ -753,25 +778,50 @@ public final class AppState {
             quality: quality)
     }
 
-    /// The Source picker's one Hashable selection over both row kinds (docs/06 item 5, M7-T2).
-    /// Writing `.display` clears the app pick; the remembered display survives an app detour.
-    /// The two backing writes are batched (`isRehomingSources`) into ONE persist + rebuild.
+    /// The Source picker's one Hashable selection over its row kinds (docs/06 item 5, M7-T2/M11-T2).
+    /// Writing one kind clears the others; the remembered display survives an app/region detour.
+    /// The backing writes are batched (`isRehomingSources`) into ONE persist + rebuild.
     public var sourceChoice: SourceChoice {
-        get { selectedAppBundleID.map { .app(bundleID: $0) } ?? .display(selectedDisplayID) }
+        get {
+            if let region = selectedRegion { return .region(display: region.displayID, rect: region.rect) }
+            return selectedAppBundleID.map { .app(bundleID: $0) } ?? .display(selectedDisplayID)
+        }
         set {
             guard newValue != sourceChoice else { return }
             isRehomingSources = true
             switch newValue {
             case .display(let id):
                 selectedAppBundleID = nil
+                selectedRegion = nil
                 selectedDisplayID = id
             case .app(let bundleID):
                 selectedAppBundleID = bundleID
+                selectedRegion = nil
+            case .region(let displayID, let rect):
+                selectedAppBundleID = nil
+                selectedRegion = RegionSelection(displayID: displayID, rect: rect)
             }
             isRehomingSources = false
             persist()
             replayConfigurationChanged()
         }
+    }
+
+    /// Sets a drawn region as the Source (M11-T2) — the overlay's one entry point. Goes through
+    /// `sourceChoice` so it inherits the batched persist + single armed-stream rebuild.
+    public func setRegion(displayID: CGDirectDisplayID?, rect: CGRect) {
+        sourceChoice = .region(display: displayID, rect: rect)
+    }
+
+    /// Opens the drag-to-select overlay (M11-T2). Injected by the app — the overlay is AppKit,
+    /// banned in AppCore; nil in tests. The menu's "Select Region…" calls this. `@MainActor`-typed
+    /// like the other injections (it drives AppKit and `setRegion`).
+    public var beginRegionSelection: (@MainActor () -> Void)?
+
+    /// "<w>×<h>" for a region's size in points, e.g. the picker's `Region 820×512` row. The
+    /// engine snaps to even pixels at capture (M11-T1); the menu shows the chosen point size.
+    public static func regionLabel(_ size: CGSize) -> String {
+        "\(Int(size.width.rounded()))×\(Int(size.height.rounded()))"
     }
 
     // MARK: - Actions (docs/06 "Menu — idle/recording state", items 2–3)
@@ -787,6 +837,7 @@ public final class AppState {
         var configuration = captureConfiguration
         configuration.microphone = resolvedMicrophone()
         activeAppName = selectedAppBundleID.map(appName(for:))
+        activeRegion = selectedRegion?.rect.size
 
         let outputURL: URL
         do {
@@ -967,6 +1018,7 @@ public final class AppState {
         }
         activeMicrophoneName = nil
         activeAppName = nil
+        activeRegion = nil
         elapsedSeconds = 0
         recordedBytes = 0
         // `lastFailure` belongs to the session that raised it: left set, a transient notice would

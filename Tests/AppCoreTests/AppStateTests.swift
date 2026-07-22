@@ -317,6 +317,65 @@ import RecorderCore
         #expect(second.captureConfiguration.content == .app(bundleID: "com.example.app"))
     }
 
+    // MARK: - Source picker: region capture (docs/06 item 5, M11-T2)
+
+    @Test func aPickedRegionReachesTheConfiguration() {
+        let state = makeState()
+        let rect = CGRect(x: 40, y: 60, width: 800, height: 500)
+        state.setRegion(displayID: 7, rect: rect)
+        #expect(state.captureConfiguration.content == .region(display: .id(7), rect: rect))
+    }
+
+    @Test func aRegionWithoutADisplayResolvesToMain() {
+        let state = makeState()
+        let rect = CGRect(x: 0, y: 0, width: 640, height: 400)
+        state.setRegion(displayID: nil, rect: rect)
+        #expect(state.captureConfiguration.content == .region(display: .main, rect: rect))
+    }
+
+    @Test func sourceChoiceRegionRoundTripsAndClearsOtherPicks() {
+        let state = makeState()
+        state.selectedAppBundleID = "com.example.app"
+        let rect = CGRect(x: 40, y: 60, width: 800, height: 500)
+
+        state.sourceChoice = .region(display: nil, rect: rect)
+        #expect(state.sourceChoice == .region(display: nil, rect: rect))
+        #expect(state.selectedAppBundleID == nil)            // region clears the app pick
+
+        state.sourceChoice = .display(1)                     // and switching away clears the region
+        #expect(state.selectedRegion == nil)
+        #expect(state.captureConfiguration.content == .display(.id(1)))
+    }
+
+    @Test func theRegionPickPersistsAcrossLaunches() {
+        let defaults = makeDefaults()
+        let rect = CGRect(x: 40, y: 60, width: 800, height: 500)
+        let first = AppState(defaults: defaults)
+        first.setRegion(displayID: 7, rect: rect)
+
+        let second = AppState(defaults: defaults)
+        #expect(second.selectedRegion == RegionSelection(displayID: 7, rect: rect))
+        #expect(second.captureConfiguration.content == .region(display: .id(7), rect: rect))
+    }
+
+    @Test func sckRectFlipsAppKitBottomLeftToSckTopLeft() {
+        // The overlay hands back AppKit points (bottom-left origin); the engine wants SCK points
+        // (top-left, docs/02 §1b). The menu-bar case is the one M11-T1 proved live: an AppKit rect
+        // at the TOP of a 1285-pt display maps to SCK y = 0.
+        let top = RegionSelection.sckRect(
+            fromViewRect: CGRect(x: 0, y: 1165, width: 1200, height: 120), displayHeightPoints: 1285)
+        #expect(top == CGRect(x: 0, y: 0, width: 1200, height: 120))
+
+        let mid = RegionSelection.sckRect(
+            fromViewRect: CGRect(x: 40, y: 60, width: 800, height: 500), displayHeightPoints: 1285)
+        #expect(mid == CGRect(x: 40, y: 725, width: 800, height: 500))   // 1285 − (60 + 500)
+    }
+
+    @Test func regionLabelFormatsThePointSize() {
+        #expect(AppState.regionLabel(CGSize(width: 820, height: 512)) == "820×512")
+        #expect(AppState.regionLabel(CGSize(width: 800.4, height: 499.6)) == "800×500")
+    }
+
     // MARK: - Session shape
 
     @Test func nothingIsActiveBeforeStarting() {

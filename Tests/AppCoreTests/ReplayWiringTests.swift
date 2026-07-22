@@ -127,6 +127,20 @@ import RecorderCore
         #expect(spy.calls == [.configurationChanged])
     }
 
+    @Test func aRegionSwitchRestartsTheArmedStreamExactlyOnce() {
+        // A region pick writes two backing properties (clear app, set region); the `sourceChoice`
+        // setter batches them into one armed-stream rebuild, like the app/display switch (M11-T2).
+        let (state, spy, _) = makeState()
+        state.selectedAppBundleID = "com.example.app"
+        state.isReplayArmed = true
+        spy.calls = []
+
+        state.sourceChoice = .region(display: nil, rect: CGRect(x: 40, y: 60, width: 800, height: 500))
+        #expect(spy.calls == [.configurationChanged])
+        #expect(spy.lastConfiguration?.content
+            == .region(display: .main, rect: CGRect(x: 40, y: 60, width: 800, height: 500)))
+    }
+
     @Test func windowChangesResizeInPlaceInsteadOfRestarting() {
         // A length change must never take the rebuild path — that wipes the buffer.
         let (state, spy, _) = makeState()

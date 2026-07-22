@@ -49,6 +49,12 @@ Order and grouping (separators between groups):
    app returns (measured: quit → relaunch re-arms unaided). ⚠️ `.disabled(true)` on a Picker row
    does not survive the `.menu` bridge (measured M7-T2) — the not-running row renders undimmed;
    accepted. Hidden while recording (see recording item 7).
+   **Region (M11-T2):** below the app rows, when a region is set, a checkmarked `Region <w>×<h>`
+   row (point size) shows the current pick — re-selectable, and it survives its display's absence
+   like the app pick (a start against a vanished display fails loud, M11-T1). A **`Select Region…`**
+   button under the picker opens a full-screen drag-to-select overlay (crosshair, live `w×h`, Return
+   confirms, Esc cancels); on confirm the rect (flipped from AppKit bottom-left to SCK top-left
+   points, docs/02 §1b) becomes the Source. Persisted (display + rect); main display only in v1.
 6. `Microphone ▸` submenu: `None`, **`Automatic (System Default)`**, a divider, then the input-device
    list. Checkmark on current. Disabled while recording. Devices enumerated **live** via the CoreAudio
    HAL (`AudioInputs.available`), not `AVCaptureDevice.DiscoverySession` — the latter caches and misses
@@ -99,7 +105,8 @@ Order and grouping (separators between groups):
 3. **Stop & Save** — primary.
 4. — separator —
 5. Dimmed info rows: when app-scoped, `Recording <app> only` (M7-T2 — the recording menu names
-   its subject); active mic + `separate track`. Then the **Arm Instant Replay toggle
+   its subject); when region-scoped, `Recording region <w>×<h>` (M11-T2); active mic +
+   `separate track`. Then the **Arm Instant Replay toggle
    — live mid-recording** (amended 2026-07-17, M6-T8: arming attaches replay to the live
    stream, disarming detaches; the recording is unaffected either way) and, when armed,
    **Save Replay Now** with the shortcut column carrying the combo (this replaces the old

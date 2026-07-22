@@ -73,7 +73,16 @@ struct MenuView: View {
                     .tag(SourceChoice.app(bundleID: missing.bundleID))
                     .disabled(true)
             }
+            // The current region as a checkmarked, re-selectable tag (M11-T2); redraw via the
+            // Select Region… row below. Its tag matches `sourceChoice`'s region case.
+            if let region = state.selectedRegion {
+                Divider()
+                Text("Region \(AppState.regionLabel(region.rect.size))")
+                    .tag(SourceChoice.region(display: region.displayID, rect: region.rect))
+            }
         }
+        // Opens the drag-to-select overlay (M11-T2) — an action, not a picker tag.
+        Button("Select Region…") { state.beginRegionSelection?() }
 
         // Reads through `presentMicrophonePreference`: the checkmark sits on None while a picked
         // device is away, without forgetting the pick. Writes are real user picks. Automatic
@@ -136,9 +145,12 @@ struct MenuView: View {
         if let failure = state.lastFailure {
             Text(failure)
         } else {
-            // docs/06 recording item 5 (M7-T2): an app-scoped recording names its subject.
+            // docs/06 recording item 5 (M7-T2/M11-T2): a scoped recording names its subject.
             if let app = state.activeAppName {
                 Text("Recording \(app) only")
+            }
+            if let region = state.activeRegion {
+                Text("Recording region \(AppState.regionLabel(region))")
             }
             if let microphone = state.activeMicrophoneName {
                 Text("\(microphone) · separate track")

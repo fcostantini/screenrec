@@ -118,6 +118,12 @@ sized to the region (not the display). `resolveRegion` (CaptureEngine) is the pu
   continuous ~fps (§1a). So `.region` attaches the StallWatchdog exactly as whole-display does.
 - **One display only.** `sourceRect` is per-display; a region spanning two monitors is out of scope
   (M11 non-goal). The CLI region targets `.main`; the enum carries a `DisplaySelection` for M11-T2.
+- **The drag overlay (M11-T2) flips coordinate spaces.** Its `NSView` is AppKit points, **bottom-left**
+  origin; SCK's `sourceRect` is **top-left**. `RegionSelection.sckRect` does the one flip:
+  `sck.y = displayHeightPoints − (viewRect.y + viewRect.height)`, `x`/`w`/`h` unchanged. On the main
+  display the overlay window sits at frame origin `(0,0)`, so view-local points are display-local —
+  the flip's assumption. Live-verified end-to-end (a centered drag → a centered SCK rect that records
+  exactly that screen region); the direction is unit-tested against the menu-bar-at-top case.
 
 ## 2. TCC / permissions (both PoC field bugs lived here)
 
