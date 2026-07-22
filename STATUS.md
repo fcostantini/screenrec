@@ -5,6 +5,25 @@
 
 ## Now
 
+- **🛡 M13-T2 DONE — graceful finalize on OS-initiated quit, LIVE-VERIFIED (2026-07-22).**
+  `AppDelegate.applicationShouldTerminate` now returns `.terminateLater`, `await
+  stopAndWaitForFinalize()`, then `NSApp.reply(toApplicationShouldTerminate: true)` when a recording
+  session is active — so logout/shutdown/software-update/`⌘Q`-from-a-window finalize the take cleanly
+  instead of abandoning the writer to `.partial` recovery. Idle / armed-replay → `.terminateNow`
+  (nothing on disk to save). The delegate gets a `weak appState` set in `ScreenRecApp.init` (the
+  existing closure-wiring spot); `NSApplicationDelegate` is `@MainActor` in this SDK so it reads
+  AppState directly (no `assumeIsolated`). Composes with the menu Quit (which finalizes first → session
+  nil → `.terminateNow`, no double-finalize/confirm); OS path is silent by design (a modal could stall
+  a logout). No behavior change unless recording. Full dev loop green (368 tests). docs/06 quit note
+  amended. **LIVE-VERIFIED (deployed, PID-swapped):** an `osascript quit` mid-recording → **clean
+  finalized 3-track `.mov`, no `.partial`**, equivalent to the normal Stop&Save control; **idle quit →
+  76 ms** (`.terminateNow`). Small diff (delegate method + wiring), self-reviewed — multi-agent review
+  disproportionate. **⚠️ Field note:** menudriver-driven recordings run **much shorter than the shell
+  `sleep`** (the AX "Start Recording" click fires seconds late under CPU contention) — the CLI direct-
+  engine control was exact (6 s → 6.08 s), so the engine is fine; **use the CLI, not menudriver, for
+  precise-duration checks.** **Next: M13-T3 (extract + test RecordingSession's finalize fate-matrix) —
+  plan artifact first.** M13-T4/T5 pending; M12/M14 unstarted.
+
 - **🛡 M13 STARTED — M13-T1 DONE (CI / pre-push gate), VERIFIED (2026-07-22).** A versioned git pre-push
   hook (`Scripts/hooks/pre-push`, installed via `git config core.hooksPath Scripts/hooks`) runs the dev
   loop automatically before every push and blocks it on failure: `swift build` · `swift test` · **the

@@ -15,6 +15,9 @@ struct ScreenRecApp: App {
     @State private var state = AppState()
 
     init() {
+        // So a non-menu quit (logout/shutdown/⌘Q-from-a-window) finalizes an in-progress recording
+        // (M13-T2). Read on the main thread from `applicationShouldTerminate`.
+        delegate.appState = state
         let notifier = ScreenRecApp.notifier
         // Posting is the app's job; AppCore may not import UserNotifications (docs/01).
         state.notifier = { [weak notifier] in notifier?.post($0) }
@@ -104,9 +107,12 @@ struct ScreenRecApp: App {
     }
 }
 
-/// Exists for one reason: the notification delegate must be installed before launch finishes, or
-/// a click that *launches* the app is delivered to nobody.
+/// Installs the notification delegate before launch finishes (or a launching click is delivered to
+/// nobody), and finalizes an in-progress recording on any quit route (M13-T2).
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Set by `ScreenRecApp.init`. Weak — the App's `@State` owns it; this is a back-reference.
+    weak var appState: AppState?
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         ScreenRecApp.notifier.install()
         // docs/03's verify hook: print what was delivered, then exit before any UI appears.
@@ -114,6 +120,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Notifier.printDeliveredAndExit()
         }
         ScreenRecApp.notifier.requestAuthorizationIfNeeded()
+    }
+
+    /// Finalizes an in-progress recording before exit on quit routes that skip the menu's Quit —
+    /// logout, shutdown, a software update, or `⌘Q` while a window is key (ADR-007). The menu Quit
+    /// finalizes first, so `session` is already gone here (→ `.terminateNow`); idle / armed-replay
+    /// have nothing on disk to save. Silent by design — a modal during logout can stall it.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let appState, appState.isSessionActive else { return .terminateNow }
+        Task { @MainActor in
+            await appState.stopAndWaitForFinalize()
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 }
 

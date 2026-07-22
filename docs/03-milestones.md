@@ -1018,7 +1018,7 @@ run before or after M12 — independent.
       automatically — not only via manual CLI. No signing in CI (no identity); the unit suite needs no
       SCK/TCC, so it runs anywhere. **Verify:** the workflow/hook runs green locally; a deliberately-
       broken test fails it; the gated step actually exercises a real encode.
-- [ ] M13-T2 **Graceful finalize on OS-initiated quit.** `AppDelegate.applicationShouldTerminate` →
+- [x] M13-T2 **Graceful finalize on OS-initiated quit.** `AppDelegate.applicationShouldTerminate` →
       `.terminateLater`, finalize an in-progress recording via `stopAndWaitForFinalize()`, then
       `reply(toApplicationShouldTerminate: true)` — so logout/shutdown/`⌘Q`-from-a-window finalize
       cleanly instead of falling to `.partial` crash-recovery. Closes the one hole in the crash-safe

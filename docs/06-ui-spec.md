@@ -87,7 +87,11 @@ Order and grouping (separators between groups):
     can't be without dropping to a hand-built NSMenu. Revisit in M6 polish if it matters.
 11. — separator —
 12. `Settings…` (⌘,) · `Quit` (⌘Q). Quit while recording → confirm, then clean
-    finalize before exit (never abandon a writer).
+    finalize before exit (never abandon a writer). **Every OTHER quit route while recording**
+    (logout, shutdown, software update, `⌘Q` from a window) also finalizes — `applicationShouldTerminate`
+    returns `.terminateLater`, saves the take, then exits (M13-T2). That path is **silent** (no confirm
+    modal — one could stall a logout); only the explicit menu Quit confirms. Idle / armed-replay quit
+    immediately (nothing on disk to save).
 
 ## Menu — recording state
 
