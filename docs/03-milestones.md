@@ -1032,7 +1032,7 @@ run before or after M12 — independent.
       safety-critical test gap (the M9-T7-dropped `RecordingSessionTests` pairing). **Verify:** new unit
       tests cover all six branches; full dev loop green; live record/discard/`kill -9` behavior
       unchanged.
-- [ ] M13-T4 **Two small reliability notices.** (1) **Notify on a mic-grace silent drop** — extend
+- [x] M13-T4 **Two small reliability notices.** (1) **Notify on a mic-grace silent drop** — extend
       M9-T1's "started without a microphone" to the case where a *resolved* device misses
       `MovieRecorder`'s 0.75 s first-buffer grace (a plausible Bluetooth handshake), which today yields a
       silent mic-less take. (2) **Guard the region `.main` display resolution** so a multi-monitor

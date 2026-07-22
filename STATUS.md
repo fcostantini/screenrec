@@ -5,6 +5,25 @@
 
 ## Now
 
+- **🛡 M13-T4 DONE — two reliability notices (2026-07-22).** **(1) Mic-grace silent-drop notice:** if a
+  selected mic resolves to a device but never delivers its first buffer within `MovieRecorder`'s 0.75 s
+  grace, the recorder started mic-less **silently** — M9-T1 only covered a mic that didn't *resolve*. Now
+  `MovieRecorder` fires a one-shot `onMicrophoneDroppedAtStart` at grace-expiry `beginWriting` (mic
+  expected + absent), `RecordingSession` republishes it as a new **session-emitted**
+  `EngineEvent.microphoneDroppedAtStart` (docs/01 extend-the-surface, like `.discarded`), and AppState
+  posts *"Recording started · no microphone — the microphone didn't start in time"* + an in-menu
+  `lastFailure` note (so the active-mic row doesn't name a mic that isn't in the take). **(2) Region
+  wrong-display guard:** `resolveDisplay`'s `.main` fallback to `displays.first` (right for whole-screen)
+  would crop a **region** against the wrong display's geometry; a pure `allowsDisplayFallback(for:)`
+  (region → false) makes a region with no resolvable main display **fail loud** ("No display matched")
+  instead. **385 tests (+4:** MovieRecorder fires the drop past grace / not when the mic arrives in time;
+  the notice copy; `allowsDisplayFallback`). Ripple was mechanical (EngineEvent + MovieRecorder callback
+  + RecordingSession wire + AppState.apply + RecordingNotifications + CLI `describe`). Full dev loop green
+  via the pre-push gate; happy path unchanged (a normal 3-track take still gets its mic, no spurious
+  notice). Self-reviewed (additive, hot-path change mirrors the existing callback-defer pattern). **Next:
+  M13-T5 (release.sh + smoke.sh + README/docs refresh) — the last M13 item; plan artifact first.** M12/M14
+  unstarted.
+
 - **🛡 M13-T3 DONE — extracted + tested RecordingSession's finalize fate-matrix (2026-07-22).** The 6-way
   file-fate branch (discard / start-failure / deleted / stranded / write-never-began / normal-finish) —
   the most safety-critical logic in the product — is pulled out of the inline `start()` `Task` closure

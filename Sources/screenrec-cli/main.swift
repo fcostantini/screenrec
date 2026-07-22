@@ -154,6 +154,7 @@ func describe(_ event: EngineEvent) -> String {
     case .resumed: return "resumed"
     case .microphoneLost: return "microphoneLost"
     case .microphoneRecovered: return "microphoneRecovered"
+    case .microphoneDroppedAtStart: return "microphoneDroppedAtStart"
     case .recordingFileRestored: return "recordingFileRestored"
     case .fileProgress(let seconds, let bytes):
         return "fileProgress(\(seconds.isFinite ? Int(seconds) : 0)s, \(bytes) bytes)"

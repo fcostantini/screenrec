@@ -241,4 +241,11 @@ import RecorderCore
                              duration: 0)
         #expect(n?.title == "Recording saved · 00:00:00")
     }
+
+    @Test func aMicrophoneDroppedAtStartSaysNoMicrophone() {
+        // M13-T4: a resolved-but-slow mic that missed its grace — closes M9-T1's resolved-device gap.
+        let n = notification(.microphoneDroppedAtStart)
+        #expect(n?.title == "Recording started · no microphone")
+        #expect(n?.body.contains("in time") == true)
+    }
 }

@@ -36,6 +36,9 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     /// file — the earliest moment a file watcher can safely open it (before that, the path
     /// holds the reservation placeholder, a different inode). Set before capture starts.
     var onDidBeginWriting: (@Sendable () -> Void)?
+    /// Fires once, from the capture queue, if a mic was expected but never delivered a buffer
+    /// within the start grace — so the recording has no mic track (M13-T4). Set before capture.
+    var onMicrophoneDroppedAtStart: (@Sendable () -> Void)?
 
     private let lock = NSLock()
     private let writer: AVAssetWriter
@@ -133,8 +136,10 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         // after it. `lock` is non-reentrant — firing a handler under it could deadlock.
         var notifyWriteFailure = false
         var notifyDidBeginWriting = false
+        var notifyMicrophoneDropped = false
         defer { if notifyWriteFailure { onWriteFailure?() } }
         defer { if notifyDidBeginWriting { onDidBeginWriting?() } }
+        defer { if notifyMicrophoneDropped { onMicrophoneDroppedAtStart?() } }
         defer { lock.unlock() }
         guard !isFinished else { return }
 
@@ -178,7 +183,13 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
             // capture and fail the session. The `didFailToBeginWriting` guard above then keeps it
             // from re-attempting or re-notifying on later frames.
             if didFailToBeginWriting { notifyWriteFailure = true }
-            if didStartWriting { notifyDidBeginWriting = true }
+            if didStartWriting {
+                notifyDidBeginWriting = true
+                // The grace expired with a wanted mic still absent: it's dropped for good (a late
+                // buffer can't add an input after startSession). Say so — a silent mic-less take
+                // is exactly what ADR-007 forbids.
+                if includesMicrophone, microphoneInput == nil { notifyMicrophoneDropped = true }
+            }
         }
         guard didStartWriting else { return }
 

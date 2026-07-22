@@ -264,9 +264,23 @@ public actor CaptureEngine {
     private func resolveDisplay(from content: SCShareableContent) -> SCDisplay? {
         switch displaySelection {
         case .main:
-            return content.displays.first { $0.displayID == CGMainDisplayID() } ?? content.displays.first
+            let main = content.displays.first { $0.displayID == CGMainDisplayID() }
+            // A region's rect is tied to one display's geometry; never fall back to another display
+            // for it (M13-T4) — that would crop the wrong content. Whole-screen/app may fall back.
+            return Self.allowsDisplayFallback(for: configuration.content)
+                ? (main ?? content.displays.first) : main
         case .id(let id):
             return content.displays.first { $0.displayID == id }
+        }
+    }
+
+    /// Whether a missing `.main` display may fall back to any available display. Whole-screen and
+    /// app capture can (record whatever's there); a region cannot — a wrong display would crop the
+    /// wrong content, so it fails loud instead ("No display matched").
+    static func allowsDisplayFallback(for content: ContentSelection) -> Bool {
+        switch content {
+        case .display, .app: true
+        case .region: false
         }
     }
 

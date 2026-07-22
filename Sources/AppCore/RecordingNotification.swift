@@ -54,6 +54,15 @@ public enum RecordingNotifications {
                 body: "The microphone track resumed.",
                 fileURL: nil)
 
+        case .microphoneDroppedAtStart:
+            // A selected mic resolved but never delivered its first buffer in time (M13-T4), so the
+            // take has no mic track. M9-T1's start notice only covers a mic that didn't resolve at
+            // all; this closes the resolved-but-slow gap — a silent mic-less take (ADR-007).
+            return RecordingNotification(
+                title: "Recording started · no microphone",
+                body: "The microphone didn't start in time, so this recording has no microphone track.",
+                fileURL: nil)
+
         case .recordingFileRestored:
             // Same not-an-ending family as microphoneLost: lead with "still recording".
             return RecordingNotification(

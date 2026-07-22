@@ -147,6 +147,11 @@ public final class RecordingSession: @unchecked Sendable {
     public func start() async {
         // Set before capture starts so the write is visible to the capture queue that fires it.
         recorder.onDidBeginWriting = { [weak self] in self?.attachSentinel() }
+        // A wanted mic that never delivered → tell the caller (M13-T4). Republished as a
+        // session-emitted event, like `.discarded`.
+        recorder.onMicrophoneDroppedAtStart = { [weak self] in
+            self?.continuation.yield(.microphoneDroppedAtStart)
+        }
         engine.router.attach(recorder)
         let engine = self.engine
         let recorder = self.recorder
@@ -175,7 +180,7 @@ public final class RecordingSession: @unchecked Sendable {
                     startFailure = message
                 case .stopped(let reason):
                     endReason = reason
-                case .finished, .recordingFileRestored, .discarded:
+                case .finished, .recordingFileRestored, .discarded, .microphoneDroppedAtStart:
                     break                              // session-emitted; engine never sends them
                 }
             }

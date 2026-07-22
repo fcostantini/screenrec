@@ -983,6 +983,10 @@ public final class AppState {
         case .microphoneRecovered:
             // The rescue spliced the mic back (M8-T2); the loss notice would now be a lie.
             lastFailure = nil
+        case .microphoneDroppedAtStart:
+            // The wanted mic never started (M13-T4); the recording continues without it. Say so in
+            // the menu, or the active-mic-name row would name a mic that isn't in the take.
+            lastFailure = "No microphone — it didn't start in time."
         case .recordingFileRestored:
             break   // recording unaffected; the notification carries the news
         case .fileProgress:

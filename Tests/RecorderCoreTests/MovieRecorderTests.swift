@@ -105,6 +105,67 @@ import Testing
         #expect(tracks.filter { $0.mediaType == .audio }.count == 1)
     }
 
+    @Test func aMicrophoneMissingItsGraceFiresTheDropAndYieldsNoMicTrack() async throws {
+        // A selected mic that never delivers within the 0.75 s grace: the recorder starts without
+        // it and fires the drop signal (M13-T4) — surfaced as a notice, not a silent mic-less take.
+        let url = Self.temporaryOutputURL()
+        try? FileManager.default.removeItem(at: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let recorder = try MovieRecorder(
+            outputURL: url, frameRate: Self.fps, preset: .balanced, includesMicrophone: true)
+        let dropped = LockedBox<Bool>()
+        recorder.onMicrophoneDroppedAtStart = { dropped.set(true) }
+
+        let systemFormat = makeAudioFormat(sampleRate: 48_000, channels: 2)
+        // 2 s of video + system audio, NO mic buffer ever — well past the 0.75 s grace.
+        for index in 0..<(Self.fps * Self.seconds) {
+            let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
+            recorder.consume(
+                makeVideoSampleBuffer(width: Self.width, height: Self.height, pts: pts,
+                                 duration: CMTime(value: 1, timescale: CMTimeScale(Self.fps))),
+                type: .screen)
+            recorder.consume(
+                makeAudioSampleBuffer(format: systemFormat, frames: 48_000 / Self.fps, pts: pts),
+                type: .systemAudio)
+        }
+
+        #expect(dropped.value == true)
+        let asset = AVURLAsset(url: try await recorder.finish())
+        let audio = try await asset.load(.tracks).filter { $0.mediaType == .audio }
+        #expect(audio.count == 1)     // system audio only — no mic track
+    }
+
+    @Test func aMicrophoneArrivingInTimeDoesNotFireTheDrop() async throws {
+        let url = Self.temporaryOutputURL()
+        try? FileManager.default.removeItem(at: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let recorder = try MovieRecorder(
+            outputURL: url, frameRate: Self.fps, preset: .balanced, includesMicrophone: true)
+        let dropped = LockedBox<Bool>()
+        recorder.onMicrophoneDroppedAtStart = { dropped.set(true) }
+
+        let systemFormat = makeAudioFormat(sampleRate: 48_000, channels: 2)
+        let micFormat = makeAudioFormat(sampleRate: 24_000, channels: 1)
+        for index in 0..<(Self.fps * Self.seconds) {
+            let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
+            recorder.consume(
+                makeVideoSampleBuffer(width: Self.width, height: Self.height, pts: pts,
+                                 duration: CMTime(value: 1, timescale: CMTimeScale(Self.fps))),
+                type: .screen)
+            recorder.consume(
+                makeAudioSampleBuffer(format: systemFormat, frames: 48_000 / Self.fps, pts: pts),
+                type: .systemAudio)
+            recorder.consume(
+                makeAudioSampleBuffer(format: micFormat, frames: 24_000 / Self.fps, pts: pts),
+                type: .microphone)
+        }
+
+        _ = try await recorder.finish()
+        #expect(dropped.value != true)     // the mic made it in within the grace — no drop
+    }
+
     @Test func finishWithoutFramesThrows() async throws {
         let url = Self.temporaryOutputURL()
         try? FileManager.default.removeItem(at: url)

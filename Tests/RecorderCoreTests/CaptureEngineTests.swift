@@ -250,4 +250,13 @@ import Testing
         #expect(ContentSelection.region(display: .main, rect: rect)
             != .region(display: .main, rect: CGRect(x: 0, y: 0, width: 20, height: 10)))
     }
+
+    @Test func onlyRegionForbidsTheDisplayFallback() {
+        // A region's rect is tied to one display's geometry, so a missing main display must fail
+        // loud, not crop against `displays.first` (M13-T4). Whole-screen/app may fall back.
+        #expect(!CaptureEngine.allowsDisplayFallback(
+            for: .region(display: .main, rect: CGRect(x: 0, y: 0, width: 10, height: 10))))
+        #expect(CaptureEngine.allowsDisplayFallback(for: .display(.main)))
+        #expect(CaptureEngine.allowsDisplayFallback(for: .app(bundleID: "com.example.app")))
+    }
 }

@@ -28,6 +28,10 @@ public enum EngineEvent: Sendable, Equatable {
     /// The rescue stream spliced the mic back in (M8-T2): the track/ring resumes after a
     /// silent gap over the loss window.
     case microphoneRecovered
+    /// A selected mic resolved to a device but never delivered its first buffer within the
+    /// recorder's start grace, so the recording has no mic track (M13-T4). Session-emitted (the
+    /// recorder detects it), like `.discarded`; distinct from `.microphoneLost` (which had a track).
+    case microphoneDroppedAtStart
     /// The in-progress file was moved (Trash included) and the sentinel renamed it back;
     /// recording continues. Deletion is not an event — it fails the session.
     case recordingFileRestored
