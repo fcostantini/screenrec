@@ -150,3 +150,14 @@ be WhatsApp/web-compatible. So M10-T1 adds a **"Share…" export** to H.264 High
 (`yuv420p`, `+faststart`), zero-dep (AVFoundation, ADR-010). It is an **export path, not a default
 change** — recordings are still captured HEVC `.mov`; the `.mp4` is derived on demand for sharing.
 GIF export (M10-T3) rides the same read side.
+
+## ADR-017 ✅ No webcam / talking-head capture — screenrec stays a screen recorder (Franco, 2026-07-22)
+The v1.6.0 product review surfaced a webcam overlay as the one lever that would change the product's
+*category* — toward Loom/demo-narration. **Decided against.** screenrec's identity is a dependable,
+private **screen** recorder (ADR-014/015); a webcam is a different product's job. This **tightens** the
+brief's "webcam capture/overlay" non-goal from "architecture leaves room" to a **settled no** — the
+"leaves room" note is an architecture *fact* (it would be a 4th `SampleRouter` source), not an
+intention. Recorded as an ADR so it isn't re-litigated one convenience feature at a time; a future
+reversal is a deliberate new ADR, and the ADR-consistent path if it ever happened is a **separate
+webcam track** (no compositing), never PiP (which needs the parked render stage, ADR-015). The review's
+"webcam fork" is closed; click/cursor-emphasis remains parked behind ADR-015's render-stage decision.

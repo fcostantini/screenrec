@@ -945,6 +945,151 @@ modes are unaffected (one `ContentSelection`, three cases).
 (that's `.app`); freeform/non-rectangular selection; a live recording-boundary overlay; auto-zoom or
 any render stage (ADR-015 still holds).
 
+## M12 — Share & Surface (post-M11; from the v1.6.0 review, 2026-07-22)
+
+screenrec is excellent at *capture*; the value chain after "record" is thin, and the menu hides what
+it will do. M12 **closes the capture→share loop** and **makes the menu tell the truth at a glance.**
+Everything here is zero-dep AppKit + menu/notification wiring — **no capture-path changes.** Builds only
+on shipped work (M4 menu, M9-T2 receipts, M10 export, M11 region). The three capture modes, replay,
+export and trim are untouched.
+
+- [ ] M12-T1 **Share · Copy · Quick Look on recordings and exports.** Add three actions to every
+      recording and export row: **Share…** (`NSSharingServicePicker` — AirDrop/Messages/Mail), **Copy**
+      (`NSPasteboard`, writing the file so it pastes into Slack/Finder), and **Quick Look**
+      (`QLPreviewPanel`, spacebar). AppKit, so it lives in ScreenRecApp and is injected into AppState
+      like the other AppKit seams (`beginRegionSelection`/`appDisplayName` precedent) — AppCore stays
+      framework-free. This is the demo/bug-report share step (ADR-016's sibling), turning "reveal → drag"
+      into one action. **Verify:** each action works on a real `.mov` and on an exported `.mp4`/`.gif`;
+      Copy pastes into a target app; Quick Look previews.
+- [ ] M12-T2 **Exports become first-class.** Include `.mp4`/`.gif` in the recent-recordings scan (or a
+      separate **Recent exports** grouping), **persist `lastExport`** across relaunch (small receipt
+      store), and add **Rename…** + **Move to Trash** to the per-file submenu. Today exports are
+      Finder-only and the receipt is in-memory (lost on relaunch, overwritten by the next). **Verify:**
+      export a GIF → it appears in recents/exports and survives relaunch; rename and trash work; the
+      source is never touched by rename/trash of a derived export.
+- [ ] M12-T3 **The menu tells the truth at a glance.** Inline the current selection in the
+      **Source/Microphone/Quality** submenu *titles* (`Source: Region 820×512`, `Microphone: None`,
+      `Quality: Balanced` — the `.menu` bridge keeps title text); **advertise the opt-in start/stop
+      hotkey** on the Start/Stop rows when `recordHotkey != nil` (like the replay row); keep **`Start
+      Recording` the first actionable row** — move the export/replay receipts below it and auto-expire a
+      stale export receipt. **Verify:** `menudriver dump` shows the values in the titles + the hotkey
+      suffix; a stale receipt no longer squats above Start.
+- [ ] M12-T4 **Region entry is coherent and honest.** Move **`Select Region…` inside `Source ▸`**
+      (under the region tag) so all three capture modes are entered from one place; add a **main-display-
+      only hint** to the overlay when multiple displays are present; show **`pt · px`** in the overlay
+      badge (a power user framing exactly 1920×1080 needs the pixel size). *(Actual secondary-display
+      region capture stays the deferred M11 follow-up — this is the regrouping + honesty, not multi-
+      display capture.)* **Verify:** the menu enters region from inside `Source ▸`; the overlay hints on
+      a multi-display setup (or the hint condition is unit-covered); the badge shows both units.
+- [ ] M12-T5 **Surface armed replay's banner suppression.** While replay is armed the screen is
+      captured, so macOS hides **every app's** notification banners — invisible, cross-app, and
+      misattributed. Add a **one-time alert on first arm** ("While armed, macOS hides notification
+      banners from every app — Slack, Messages, and others…"), a **persistent dimmed menu row** under the
+      Arm toggle, and a line in onboarding's Notifications copy. **Verify:** the first-arm alert fires
+      once (persisted "seen" flag); the row renders while armed and clears on disarm.
+- [ ] M12-T6 **Keyboard-first QoL: global Pause/Resume + optional count-in.** An **opt-in global
+      Pause/Resume shortcut** (the demo companion to ⌥⌘S — the menu is itself captured, so mid-demo
+      pause must not require opening it; `HotkeyCenter` already keys N hotkeys), and an **optional 3-2-1
+      count-in** before recording (Settings toggle, off by default — a beat to switch to the target
+      window). **Verify:** the hotkey pauses/resumes a live recording from another app; the count-in
+      overlay shows and delays start by its duration.
+
+**Gate G12**: a recording can be **shared, copied, and Quick-Looked without opening Finder**; the menu
+shows source/mic/quality/hotkey **at a glance**; a first-time arm **warns about banner suppression**;
+region is entered from one place and states its main-display limit; exports appear in-app and survive
+relaunch. No capture-path regression — record / per-app / region / replay / export / trim all unchanged
+(the M11/M10/M8/M7 gates still pass).
+
+**Non-goals (M12):** multi-display *region capture* (deferred M11 follow-up); any render/compositing
+stage (ADR-015); webcam (ADR-017); cloud/upload sharing (the Share sheet uses the OS's own services —
+no screenrec-hosted anything).
+
+## M13 — Hardening (post-M11; from the v1.6.0 review, 2026-07-22)
+
+Reliability is genuinely delivered, but it rests on **manual (no-CI) discipline**, has **one OS-quit
+finalize gap**, and the safety-critical `RecordingSession` finalize tree is **untested**. M13 shores up
+the net you can't see. Mostly process + two small reliability fixes; **no user-facing features.** Can
+run before or after M12 — independent.
+
+- [ ] M13-T1 **CI / pre-push gate.** A GitHub Actions macOS job (or a local `git` pre-push hook while
+      the repo stays private) running `swift build && swift test && swift build -c release`, **plus an
+      isolated step running the gated hardware-encode tests** (`SCREENREC_HW_ENCODE_TESTS=1 swift test
+      --filter ExporterTests` etc.) so MP4 losslessness/faststart, GIF, and trim-passthrough are asserted
+      automatically — not only via manual CLI. No signing in CI (no identity); the unit suite needs no
+      SCK/TCC, so it runs anywhere. **Verify:** the workflow/hook runs green locally; a deliberately-
+      broken test fails it; the gated step actually exercises a real encode.
+- [ ] M13-T2 **Graceful finalize on OS-initiated quit.** `AppDelegate.applicationShouldTerminate` →
+      `.terminateLater`, finalize an in-progress recording via `stopAndWaitForFinalize()`, then
+      `reply(toApplicationShouldTerminate: true)` — so logout/shutdown/`⌘Q`-from-a-window finalize
+      cleanly instead of falling to `.partial` crash-recovery. Closes the one hole in the crash-safe
+      story (the graceful path is currently wired only to the menu Quit). **Verify (live):** start a
+      recording, trigger a non-menu quit (`⌘Q` from the Settings window, or `osascript -e 'quit app'`);
+      confirm a clean finalized file, not a recovered partial.
+- [ ] M13-T3 **Extract + test `RecordingSession`'s finalize fate-matrix.** Pull the 6-way file-fate
+      branch (discard / start-failure / deleted / stranded / write-never-began / normal-finish) out of
+      the inline `Task` closure into a pure `finalize(startFailure:endReason:) -> EngineEvent` over the
+      existing fields/boxes, and **unit-test each branch** — closing the top complexity hotspot AND the
+      safety-critical test gap (the M9-T7-dropped `RecordingSessionTests` pairing). **Verify:** new unit
+      tests cover all six branches; full dev loop green; live record/discard/`kill -9` behavior
+      unchanged.
+- [ ] M13-T4 **Two small reliability notices.** (1) **Notify on a mic-grace silent drop** — extend
+      M9-T1's "started without a microphone" to the case where a *resolved* device misses
+      `MovieRecorder`'s 0.75 s first-buffer grace (a plausible Bluetooth handshake), which today yields a
+      silent mic-less take. (2) **Guard the region `.main` display resolution** so a multi-monitor
+      `displays.first` fallback can't silently crop a region against the wrong display — fail loud
+      instead. **Verify:** unit tests for both; the mic-grace copy is reviewed against the M6-T3 bar.
+- [ ] M13-T5 **`release.sh` + `smoke.sh` + doc refresh.** `Scripts/release.sh` (assert clean tree, read
+      `VERSION`, run the 4-step loop, `git tag v$VERSION`, a README-vs-`VERSION` consistency check,
+      remind to push); `Scripts/smoke.sh` (`screenrec-cli record --duration 3` + `probe` asserting 3
+      tracks / ~3 s) for the dev box, which holds TCC — the only cheap catch for live-pipeline
+      regressions. Refresh **README** (stale "v1.0.0 / M0–M6"; add region/export/trim to "Use") and
+      **docs/01**'s file tree (predates the AppCore model split; mislocates `Hotkey`). **Verify:**
+      `release.sh` dry-run; `smoke.sh` green on the dev box; README/docs current.
+
+**Gate G13**: `swift test` (+ the gated encode step) runs in CI/pre-push and **fails on a deliberate
+regression**; an OS-initiated quit **finalizes cleanly** (not a recovered partial); the
+`RecordingSession` finalize branches are **unit-covered**; the mic-grace + region-display notices land;
+`release.sh`/`smoke.sh` exist and pass; README + docs/01 are current.
+
+**Non-goals (M13):** notarization / Developer ID (ADR-014); external CI services, matrix/Docker builds,
+coverage gates (enterprise overkill at this audience); auto-restart of a wedged stream (stall watchdog
+stays diagnostic-only, documented v1 policy).
+
+## M14 — Cleanup (post-M13; from the v1.6.0 review, 2026-07-22)
+
+Pure refactors, **no behavior change** — sharpen the biggest files once M12/M13 land. (The
+`RecordingSession` finalize extraction lands in M13-T3, not here.) The layering and concurrency model
+are load-bearing strengths and stay untouched.
+
+- [ ] M14-T1 **Extract `ExportModel` from `AppState` (1068 LOC).** Move the export cluster
+      (`exportInProgress`, `lastExport`, the three inject-closures, `performExport`, the trim target)
+      into an `@Observable ExportModel` that AppState owns and forwards to — mirroring `PermissionsModel`
+      (M9-T7). ~60 near-zero-coupling lines (it never touches `session`/`replay`/capture-config), and it
+      sharpens `ExportWiringTests`'s target. **Do NOT** extract the source-picker/capture-config or
+      recording-lifecycle clusters — intrinsically coupled to persist+replay, deliberately kept (M9-T7
+      ruling). **Verify:** full dev loop green; the export tests narrow; behavior unchanged.
+- [ ] M14-T2 **De-duplicate the AVAssetWriter drain pump + first-error box.** `ReplayMuxer` and
+      `Exporter` hand-roll the same `requestMediaDataWhenReady` + done-flag + `DispatchGroup` +
+      first-error pump (the comments call it "the ReplayMuxer idiom"), each with an identical
+      `@unchecked Sendable` first-error latch. Extract one `FirstError` box + one `drain(...)` helper into
+      `RecorderCore/Support`, used by both — one place to get "leave the group exactly once even if the
+      writer dies" right. **Verify:** full dev loop green **including** the gated encode tests; behavior
+      unchanged.
+- [ ] M14-T3 **Small hygiene: file-size helper · dead event · one doc line.** Add
+      `OutputLocation.currentFileSize(for:)` (partial-first) and call it from AppState + the CLI (kills an
+      avoidable cross-module dup); **retire `EngineEvent.fileProgress`** — declared and threaded through
+      ~4 switches but never emitted (AppState polls instead); add one line to `SampleRouter`'s doc that
+      `detach()` is **not** a hard callback barrier (a consumer can get one late `consume` after detach —
+      safe today, an implicit contract). **Verify:** full dev loop green; the CLI + app still report the
+      growing file size.
+
+**Gate G14**: all three refactors land with **no behavior change** (full dev loop green incl. the gated
+encode step); `AppState` is smaller; the drain logic lives in one place; no dead event arms remain in
+the `EngineEvent` switches.
+
+**Non-goals (M14):** any behavior change; extracting the source-picker/recording clusters (M9-T7 ruling
+stands); touching the concurrency model or the seam design (the review's "don't regress" list).
+
 ## Dependency graph
 
 ```
@@ -956,3 +1101,9 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3 ──▶ M4 ──▶ M6 ──┬─
 
 M5-T1..T4 (core replay, CLI-driven) can proceed in parallel with M3/M4 if two agents
 work simultaneously — they touch disjoint files by design.
+
+The graph above is the v1 (M0–M6) core. **M7–M14 are independent post-v1 milestones**, each building
+only on shipped work: M7 (per-app), M8 (mic recovery), M9 (post-review polish/debt), M10 (share export
++ basic editing), M11 (region), then the v1.6.0-review roadmap — **M12 (Share & Surface), M13
+(Hardening), M14 (Cleanup)**. M12 and M13 are independent of each other; M14 is pure cleanup best done
+after both.

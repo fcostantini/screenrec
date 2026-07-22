@@ -5,6 +5,22 @@
 
 ## Now
 
+- **📋 v1.6.0 review done + roadmap M12–M14 DOCUMENTED (2026-07-22).** A full dual-lens review (artifact:
+  architecture/cleanliness · UX/UI · reliability/test/build · product — three parallel deep-dives +
+  synthesis) ran against v1.6.0. Verdict: mature, disciplined, **excellent at capture**; the leverage is
+  post-capture. **Roadmap written into docs/03 (Franco approved the sequencing):**
+  **M12 — Share & Surface** (T1 native Share/Copy/Quick Look · T2 exports first-class [recents + persist
+  + rename/trash] · T3 menu-tells-the-truth [inline submenu values, hotkey visibility, receipts order] ·
+  T4 region entry coherent+honest · T5 armed-replay banner-suppression warning · T6 global Pause/Resume +
+  count-in), **M13 — Hardening** (T1 CI/pre-push + gated encode tests · T2 graceful OS-quit finalize ·
+  T3 extract+test RecordingSession finalize tree · T4 mic-grace + region-display notices · T5
+  release.sh/smoke.sh + README/docs refresh), **M14 — Cleanup** (T1 extract ExportModel · T2 dedup the
+  AVAssetWriter drain pump · T3 file-size helper + retire fileProgress + SampleRouter doc line). Gates
+  G12/G13/G14 defined; M12 & M13 independent, M14 after both. **Webcam DECLINED — ADR-017** (settled no;
+  brief non-goal tightened; click/cursor-emphasis stays parked behind ADR-015). **Nothing started — all
+  M12–M14 boxes unticked.** **Next: Franco's pick of milestone; M12-T1 is the highest-value start —
+  plan artifact first (mandatory).**
+
 - **🎉 v1.6.0 CUT (2026-07-22) — M11 (region capture) earns the MINOR.** `VERSION` + `CoreInfo.version`
   → 1.6.0 (pin test green), committed (`49b599d`), tagged `v1.6.0`, **pushed to origin** (main +
   tag; 0 unpushed). The MINOR earns from M11's user-facing feature: record an arbitrary rectangle of

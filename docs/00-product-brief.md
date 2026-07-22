@@ -53,7 +53,8 @@ demos, bug reports, and meetings" — not streamers, not video editors.
   editing — lossless trim and shareable-format export (`.mp4`/GIF) — is now in-scope as a future
   (M10), reusing existing passthrough/transcode machinery. The render/compositing stage (auto-zoom,
   backgrounds) stays a non-goal pending a deliberate future decision.
-- Webcam capture/overlay. (Architecture leaves room: it would be a 4th source.)
+- Webcam capture/overlay. **Settled no (ADR-017, 2026-07-22)** — screenrec stays a *screen* recorder.
+  (Architecture still *leaves room* — it would be a 4th source — but that's a fact, not an intention.)
 - Streaming, sharing, cloud anything.
 - App Store distribution / sandboxing (see ADR-006). Windows. macOS < 15 (see ADR-001).
 - Echo cancellation (document "use headphones"; see 02-technical-reference §8).
