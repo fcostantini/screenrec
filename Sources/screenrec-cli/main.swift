@@ -18,6 +18,10 @@ func printUsage() {
                                        (default 480 wide, 15 fps, first 30 s). Override with
                                        --fps <n> --width <px> --seconds <n>. Default <out> is the
                                        input's .gif sibling. The source is read-only.
+      screenrec-cli trim <in> --from <t> --to <t> [<out>]  Losslessly trim a recording to
+                                       [from, to] by copying the streams (no re-encode); times are
+                                       M:SS or seconds. The in-point snaps to the nearest keyframe.
+                                       Default <out> is the input's " trimmed" sibling; read-only.
       screenrec-cli list-mics          List audio input devices
       screenrec-cli list-apps          List running apps capturable with record --app
       screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
@@ -571,6 +575,8 @@ case "replay-arm":
     await runReplayArm(Array(arguments.dropFirst()))
 case "export":
     await runExport(Array(arguments.dropFirst()))
+case "trim":
+    await runTrim(Array(arguments.dropFirst()))
 case "-h", "--help":
     printUsage()
 default:

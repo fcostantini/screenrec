@@ -186,14 +186,19 @@ struct MenuView: View {
         }
     }
 
-    /// The per-file submenu shared by recents and the replay receipt: reveal in Finder, or derive
-    /// a shareable MP4 / looping GIF (blocked while one export already runs — one at a time).
+    /// The per-file submenu shared by recents and the replay receipt: reveal in Finder, derive a
+    /// shareable MP4 / looping GIF (blocked while one export runs), or open the Trim window.
     @ViewBuilder private func fileActions(_ url: URL) -> some View {
         Button("Reveal in Finder") { Finder.reveal(url) }
         Button("Export as MP4") { state.exportToMP4(url) }
             .disabled(state.exportInProgress != nil)
         Button("Save as GIF") { state.exportToGIF(url) }
             .disabled(state.exportInProgress != nil)
+        Button("Trim…") {
+            state.trimTarget = url
+            openWindow(id: trimWindowID)
+            NSApplication.shared.activate(ignoringOtherApps: true)
+        }
     }
 
     /// Arm toggle + save row, shared by both menus (docs/06 idle item 3 / recording item 5:

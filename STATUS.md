@@ -5,6 +5,33 @@
 
 ## Now
 
+- **🎉 M10-T4 DONE — lossless trim; GATE G10 PASSED; M10 COMPLETE (2026-07-22).** Trim a recording to
+  `[in, out]` by **copying the streams — no re-encode** (`AVAssetExportSession` passthrough +
+  `timeRange`, `export(to:as:)`). New `Trimmer` (RecorderCore/Export/): guards output==input +
+  empty-range, writes `<stem> trimmed.mov` (collision-resolved), original read-only. CLI **`trim <in>
+  --from <t> --to <t> [<out>]`** (M:SS or seconds). App: a **`Trim…`** submenu row opens a spare **Trim
+  window** (`AppState.trimTarget` + a fixed `Window`): an **`AVPlayerView`** preview, **Set In/Set
+  Out** from the playhead, **Trim & Save** → `AppState.trim` reusing T2's off-main / one-at-a-time /
+  receipt / notification (`trimmed`/`trimFailed`; `LastExport.menuTitle` now picks the verb by
+  extension: `.mov`→"Trimmed"). **349 tests (+8:** trimmedSibling, output==input, empty-range, a
+  **gated** integration proving hvc1 preserved + ~1 s + the clamp-to-duration empty-range branch; the
+  trim wiring — range plumbing + "Trimmed" receipt/notification; copy). Full dev loop green.
+  **LIVE-VERIFIED:** CLI on a real 4112×2570 hvc1 recording, trim [3–9] → **same hvc1, exactly 6.00s,
+  plays, original untouched** (edit-list exact trim; b-frames preserved — probe's non-monotonic warning
+  is benign, `has_b_frames=2` on both); the **Trim window rendered live** (player + Set In/Set Out +
+  Trim & Save + keyframe note, deployed build, settingsdriver shot). **⚠️ Live crash found + fixed:**
+  SwiftUI's `VideoPlayer` fatal-errors instantiating metadata in the CLT (no-Xcode) SPM build
+  (`getSuperclassMetadata` in `_AVKit_SwiftUI`, SIGABRT) — replaced with `AVPlayerView` via
+  `NSViewRepresentable` (field note). **Review (code-review agent; clean, no correctness bugs;
+  findings presented → Franco approved batch):** ④ CLI rejects negative/invalid timecodes with a clear
+  message; ⑤ `trimmedSibling` always `.mov`; ② pinned the clamp-to-duration empty-range branch (gated
+  test); ① the losslessness (same-codec) assertion is gated behind `SCREENREC_HW_ENCODE_TESTS` — the
+  routine `swift test` can't catch a regression to a re-encoding preset (**blind spot on record**; I
+  run the gated test each verify). Also enabled `settingsdriver shot --window <title>` (any window, not
+  just Settings). **No VERSION bump** — M10's features (T1–T4 + GIF settings) owe a MINOR **1.5.0**;
+  **Franco's call to cut it now that M10 is complete.** **Next: M10 is done — the roadmap is empty.
+  Franco's call (cut 1.5.0, dogfood, or new milestones).**
+
 - **M10-T3 follow-up DONE — GIF settings (Settings pickers + CLI flags), LIVE-VERIFIED.** The T3 caps
   (480/15/30) were fixed; now a **GIF** section in the Settings window — three Pickers, **Frames per
   second** (12/15/20/24) · **Width** (320/480/640/800, caps height too) · **Maximum length**
@@ -915,6 +942,21 @@ video (deterministic, reproducible).
 | G6   | ✅ **v1 declared 2026-07-20 (v1.0.0)** — M6 complete bar the deferred T4 bucket; G6 = the sum of the soak legs (below) + acceptance criteria, all green | §7 leg 1 ✅ 2026-07-17: 2 h battery, real usage + Zoom, replay armed, 3 mid-run replay saves; 19.5 GB / 7223.42 s, tracks ≤110 ms apart; battery 99→62%, CPU avg 12.9% / max 19.3%, RSS 98–485 MB trendless, zero thermal warnings; Franco: "smooth throughout, no desync" (claps at 0/1/2 h). §7 kill leg ✅ (amended to 1 h, Franco): kill -9 at 3540 s → playable 3539.53 s, **0.47 s lost** (≤10 s); app relaunched Ready. ⚠️ relaunch dropped the persisted armed state (transient pipeline failure → self-disarm; field note) — open follow-up, not a gate fail (§7 doesn't cover it). |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-22 (M10-T4): **SwiftUI's `VideoPlayer` CRASHES the app in our build.** Opening the Trim
+  window with `VideoPlayer(player:)` fatal-errored at launch — SIGABRT, `swift::fatalError` →
+  `getSuperclassMetadata` inside `_AVKit_SwiftUI` while instantiating generic metadata. It's the
+  Command-Line-Tools (no-Xcode) SPM build: SwiftUI's generic `VideoPlayer` can't resolve its metadata.
+  Fix: wrap AppKit's concrete **`AVPlayerView` in an `NSViewRepresentable`** (`TrimView.PlayerView`) —
+  no generics, no crash. Any future SwiftUI+AVKit view should assume `VideoPlayer` is off-limits here.
+  Also: `AVAssetExportSession(.passthrough)` gives an **exact-duration** trim via an edit list (not a
+  keyframe-snapped longer clip) while staying lossless (same codec) — cleaner than expected.
+
+- 2026-07-22 (M10-T4 debt): **`LastExport.menuTitle` infers the verb from the output extension**
+  (`.mp4`→"Exported to MP4", `.gif`→"Saved as GIF", `.mov`→"Trimmed"). Correct today — the three
+  derive actions write distinct extensions and no other path routes a `.mov` through `performExport`
+  (`lastReplay` is separate) — but the invariant is unenforced. If a future `.mov`→`.mov` derive
+  appears, store the verb/kind in `LastExport` instead of inferring it.
 
 - 2026-07-21 (M10-T3): **`AVAssetReaderVideoCompositionOutput` ignores the composition's
   `frameDuration` for the OUTPUT rate** — it emits one frame per SOURCE frame. Setting

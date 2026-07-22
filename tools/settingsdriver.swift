@@ -7,12 +7,17 @@ import ApplicationServices
 //
 //   swift tools/settingsdriver.swift shot <out.png>   screenshot the Settings window
 //   swift tools/settingsdriver.swift toggle           press the sole checkbox, print before → after
+//   ... --window <title>   target a window other than Settings (e.g. "Trim")
 //
 // The Settings form has exactly one AXCheckBox (Launch at login); its label is a sibling
 // AXStaticText, so the checkbox is found by role, not by title.
 
 let bundleID = "dev.fcostantini.screenrec.app"
-let windowTitle = "ScreenRec Settings"
+let windowTitle: String = {
+    let args = CommandLine.arguments
+    if let index = args.firstIndex(of: "--window"), index + 1 < args.count { return args[index + 1] }
+    return "ScreenRec Settings"
+}()
 
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data("settingsdriver: \(message)\n".utf8)); exit(1)

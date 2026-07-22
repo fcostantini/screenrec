@@ -873,7 +873,7 @@ milestone is the trim/format side only, held deliberately (ADR-015). Capture def
       snap-on-load) now steers `Save as GIF`, and the CLI gained `--fps/--width/--seconds` flags.
       **Verify:** settings round-trip + snap unit tests; `settingsdriver` shot shows the section; a
       persisted width 640 → real app `Save as GIF` → a 640-wide GIF.
-- [ ] M10-T4 **Lossless trim (in/out, passthrough).** Trim a `.mov` to `[in, out]` without
+- [x] M10-T4 **Lossless trim (in/out, passthrough).** Trim a `.mov` to `[in, out]` without
       re-encoding, reusing `ReplayMuxer`'s snapshot→keyframe-trim→passthrough approach, so "clip the
       useful 20 s before sharing" costs no quality. **Seams:** generalize the muxer's trim or a
       sibling `Trimmer` sharing the keyframe logic; a spare in/out UI (first editing surface — docs/06
@@ -883,10 +883,13 @@ milestone is the trim/format side only, held deliberately (ADR-015). Capture def
       no re-encode (same codec/params), correct trimmed duration ±1 keyframe, playable; original
       untouched.
 
-**Gate G10**: an `.mp4`, a GIF, and a losslessly-trimmed clip all produced from a real
-recording/replay via the app, each playable and correct (h264/aac/faststart; GIF loops within caps;
-trim is passthrough, duration correct, original intact); the capture default is unchanged and the
-"no render stage / no studio" line (ADR-015) is documented and held.
+**Gate G10 ✅ PASSED (2026-07-22)**: an `.mp4`, a GIF, and a losslessly-trimmed clip all produced
+from a real recording/replay via the app, each playable and correct (h264/aac/faststart; GIF loops
+within caps; trim is passthrough, duration correct, original intact); the capture default is
+unchanged and the "no render stage / no studio" line (ADR-015) is documented and held. **M10 (T1–T4
++ the GIF-settings follow-up) COMPLETE.** Evidence: M10-T1..T4 verifies (STATUS) — MP4 export
+(h264 High/yuv420p/1920×1200/faststart, live), GIF (480×300 looping, live), lossless trim (hvc1
+preserved, exact 6.00s, original intact, live); the Trim window rendered live (AVPlayerView).
 
 ## Dependency graph
 

@@ -6,9 +6,15 @@ import Foundation
 public struct LastExport: Equatable, Sendable {
     public let url: URL
 
-    /// The verb follows the format, so a GIF's receipt doesn't read "Exported to MP4".
+    /// The verb follows the output format — the three derive actions write distinct extensions
+    /// (`.mp4` export, `.gif`, `.mov` trim), so the extension names the action.
     public var menuTitle: String {
-        let verb = url.pathExtension.lowercased() == "gif" ? "Saved as GIF" : "Exported to MP4"
+        let verb: String
+        switch url.pathExtension.lowercased() {
+        case "gif": verb = "Saved as GIF"
+        case "mov": verb = "Trimmed"
+        default: verb = "Exported to MP4"
+        }
         return "\(verb) · \(url.lastPathComponent)"
     }
 }

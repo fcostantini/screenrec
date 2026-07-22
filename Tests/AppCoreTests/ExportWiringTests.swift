@@ -9,6 +9,11 @@ private final class ConfigBox: @unchecked Sendable {
     var value: GifConfiguration?
 }
 
+/// Records the range an injected trim was handed.
+private final class RangeBox: @unchecked Sendable {
+    var value: (start: Double, end: Double)?
+}
+
 /// AppState → Exporter wiring, with the transcode injected — the real `Exporter` runs the
 /// hardware encoder (that's `ExporterTests`' job), so the wiring is tested on a fake.
 @MainActor
@@ -148,6 +153,37 @@ private final class ConfigBox: @unchecked Sendable {
         let failed = RecordingNotifications.gifExportFailed()
         #expect(failed.title == "Couldn't save GIF")
         #expect(failed.fileURL == nil)
+    }
+
+    @Test func trimSetsReceiptAndNotifiesWithTheRange() async {
+        let state = makeState()
+        var posted: [RecordingNotification] = []
+        state.notifier = { posted.append($0) }
+        let written = URL(fileURLWithPath: "/tmp/Clip trimmed.mov")
+        let range = RangeBox()
+        state.trimFunction = { _, _, start, end in
+            range.value = (start, end)
+            return written
+        }
+
+        state.trim(URL(fileURLWithPath: "/tmp/Clip.mov"), from: 2, to: 8)
+        #expect(state.exportInProgress == "Clip.mov")
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(range.value?.start == 2)
+        #expect(range.value?.end == 8)
+        #expect(state.lastExport?.url == written)
+        #expect(state.lastExport?.menuTitle == "Trimmed · Clip trimmed.mov")  // .mov ⇒ "Trimmed"
+        #expect(posted.first?.title == "Trimmed")
+        #expect(posted.first?.fileURL == written)
+    }
+
+    @Test func trimNotificationCopy() {
+        let ok = RecordingNotifications.trimmed(url: URL(fileURLWithPath: "/tmp/Clip trimmed.mov"))
+        #expect(ok.title == "Trimmed")
+        #expect(ok.fileURL == URL(fileURLWithPath: "/tmp/Clip trimmed.mov"))
+        #expect(RecordingNotifications.trimFailed().title == "Couldn't trim")
+        #expect(RecordingNotifications.trimFailed().fileURL == nil)
     }
 
     @Test func exportNotificationCopy() {

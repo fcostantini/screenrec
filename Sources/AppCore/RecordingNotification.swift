@@ -148,6 +148,21 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
+    /// The lossless trim (M10-T4) finished — reveal the clipped copy.
+    public static func trimmed(url: URL) -> RecordingNotification {
+        RecordingNotification(
+            title: "Trimmed",
+            body: "\(url.lastPathComponent) — ready to share. Click to reveal.",
+            fileURL: url)
+    }
+
+    public static func trimFailed() -> RecordingNotification {
+        RecordingNotification(
+            title: "Couldn't trim",
+            body: "The original recording is untouched. Try again, or check the output folder is writable.",
+            fileURL: nil)
+    }
+
     /// Launch-at-login registration threw (M6-T5) — the toggle reverted, so point the user at
     /// where they can change it directly.
     public static func loginItemFailed() -> RecordingNotification {

@@ -68,9 +68,9 @@ Order and grouping (separators between groups):
    item 10).
 10. Recent recordings: up to 5 most-recent files from the output dir, **indented one level**
     under `Open Recordings Folder` so they read as its contents rather than as more commands
-    (Franco, 2026-07-15). **M10-T2/T3 made each a submenu** — `<name> ▸ { Reveal in Finder · Export
-    as MP4 · Save as GIF }` — so the export/share actions have a home; the old direct
-    click-to-reveal moved into the submenu. An export shows a top-of-menu `Exporting <name>…` row while it runs (stamped at open,
+    (Franco, 2026-07-15). **M10-T2/T3/T4 made each a submenu** — `<name> ▸ { Reveal in Finder · Export
+    as MP4 · Save as GIF · Trim… }` — so the export/share/edit actions have a home; the old direct
+    click-to-reveal moved into the submenu. `Trim…` opens the Trim window (below). An export shows a top-of-menu `Exporting <name>…` row while it runs (stamped at open,
     not ticking — the M6-T10 constraint) and an `Exported to MP4 · <name>` receipt that reveals the
     `.mp4` on click (the recents list is `.mov`-only, so this is the export's in-menu pointer). The
     saved-replay receipt (M9-T2) gained the same `{ Reveal · Export as MP4 }` submenu. ⚠️
@@ -322,6 +322,20 @@ moved):
 one, but `SMAppService` persists the login-item registration itself, so a stored bool would be
 a redundant second source of truth that can drift. The toggle reads `SMAppService.mainApp.status`
 live and writes through `register()`/`unregister()`. No key.
+
+## Trim window (M10-T4 — the first editing surface, ADR-015)
+
+Opened from a recent recording's `Trim…` submenu row; a plain `Window` (id `trim`) reading
+`AppState.trimTarget`, like Settings (an LSUIElement app can't spawn document windows). Spare by
+design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
+- An **`AVPlayerView`** preview (AppKit via `NSViewRepresentable` — SwiftUI's generic `VideoPlayer`
+  fatal-errors in the Command-Line-Tools SPM build; field note).
+- **Set In** / **Set Out** grab the playhead; `In M:SS` / `Out M:SS` readouts; `Trimmed length ≈`.
+- **Trim & Save** runs the lossless passthrough copy (`AppState.trim`, off-main via `performExport`,
+  the one-at-a-time/receipt/notification path) and dismisses. Disabled for a <0.1 s range or while
+  an export runs.
+- Copy states the ruling: *"Lossless — the streams are copied, so the in-point snaps to the nearest
+  keyframe. The original is kept; this saves a new ' trimmed' file."*
 
 ## Copy rules
 

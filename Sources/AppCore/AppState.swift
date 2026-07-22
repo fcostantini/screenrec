@@ -272,6 +272,13 @@ public final class AppState {
     public var gifExportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: GifConfiguration) async throws -> URL = {
         try await GifExporter.exportGIF(from: $0, to: $1, configuration: $2).url
     }
+    public var trimFunction: @Sendable (_ source: URL, _ output: URL, _ start: Double, _ end: Double) async throws -> URL = {
+        try await Trimmer.trim(from: $0, to: $1, start: $2, end: $3).url
+    }
+
+    /// The recording the Trim window is editing (M10-T4), or nil. Set when `Trim…` opens the
+    /// window; the view reads it. Transient — not persisted.
+    public var trimTarget: URL?
 
     // MARK: - Onboarding (docs/06 "Onboarding window") — delegated to PermissionsModel (M9-T7)
 
@@ -485,6 +492,16 @@ public final class AppState {
             using: { try await gifExport($0, $1, configuration) },
             success: { RecordingNotifications.savedAsGIF(url: $0) },
             failure: RecordingNotifications.gifExportFailed)
+    }
+
+    /// Losslessly trims `source` to `[start, end]` (M10-T4), the same off-main, one-at-a-time path.
+    public func trim(_ source: URL, from start: Double, to end: Double) {
+        let trim = trimFunction  // snapshot; the closure captures no `self`
+        performExport(
+            source, to: Exporter.availableURL(basedOn: Trimmer.trimmedSibling(of: source)),
+            using: { try await trim($0, $1, start, end) },
+            success: { RecordingNotifications.trimmed(url: $0) },
+            failure: RecordingNotifications.trimFailed)
     }
 
     /// Runs an export off the main path — the menu row and the notification carry the outcome. One
