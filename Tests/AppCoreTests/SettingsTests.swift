@@ -59,6 +59,35 @@ import RecorderCore
         #expect(SettingsStore.Key.gifFPS == "gifFPS")
         #expect(SettingsStore.Key.gifWidth == "gifWidth")
         #expect(SettingsStore.Key.gifMaxSeconds == "gifMaxSeconds")
+        #expect(SettingsStore.Key.lastExportPath == "lastExportPath")
+    }
+
+    // MARK: - The export receipt (M12-T2)
+
+    @Test func lastExportReceiptRoundTripsWhenTheFileExists() throws {
+        let defaults = makeDefaults().defaults
+        let file = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("receipt-\(UUID().uuidString).mp4")
+        try Data("x".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        SettingsStore.saveLastExport(file, to: defaults)
+        #expect(SettingsStore.loadLastExport(from: defaults) == file)
+    }
+
+    @Test func aReceiptWhoseFileIsGoneIsDroppedOnLoad() {
+        // A persisted pointer to a file since moved or trashed must not resurface as a broken row.
+        let defaults = makeDefaults().defaults
+        SettingsStore.saveLastExport(
+            URL(fileURLWithPath: "/tmp/gone-\(UUID().uuidString).mp4"), to: defaults)
+        #expect(SettingsStore.loadLastExport(from: defaults) == nil)
+    }
+
+    @Test func savingNilClearsTheReceipt() {
+        let defaults = makeDefaults().defaults
+        SettingsStore.saveLastExport(URL(fileURLWithPath: "/tmp/x.mp4"), to: defaults)
+        SettingsStore.saveLastExport(nil, to: defaults)
+        #expect(defaults.string(forKey: SettingsStore.Key.lastExportPath) == nil)
     }
 
     @Test func savesUnderExactlyThoseKeysAndNoOthers() {

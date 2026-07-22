@@ -89,6 +89,24 @@ import Testing
         #expect(RecentRecordings.inDirectory(directory).count == 5)
     }
 
+    @Test func exportsScanKeepsMp4AndGifNewestFirstAndCapsAtThree() throws {
+        // The Recent Exports group (M12-T2): the same scan, filtered to the export extensions —
+        // recordings are excluded, and its own smaller limit keeps the menu compact.
+        let directory = try makeFixture([
+            ("clip.mov", 1),               // a recording — excluded from exports
+            ("a.mp4", 50), ("b.gif", 40), ("c.mp4", 30), ("d.gif", 20),
+        ])
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let exports = RecentRecordings.inDirectory(
+            directory, extensions: RecentRecordings.exportExtensions,
+            limit: RecentRecordings.exportLimit)
+        #expect(exports.map(\.lastPathComponent) == ["d.gif", "c.mp4", "b.gif"])
+        #expect(RecentRecordings.exportLimit == 3)
+        // Symmetry: the default recordings scan ignores the exports.
+        #expect(RecentRecordings.inDirectory(directory).map(\.lastPathComponent) == ["clip.mov"])
+    }
+
     @Test func aMissingDirectoryYieldsNoRowsRatherThanThrowing() {
         // The user can point the app at a folder that later goes away (an unmounted volume).
         // The menu still has to open — the failure belongs on the record attempt, where it can

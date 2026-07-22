@@ -5,6 +5,39 @@
 
 ## Now
 
+- **🗂 M12-T2 DONE — exports become first-class, LIVE-VERIFIED (2026-07-22).** Three parts landed:
+  **(A)** a **`Recent Exports`** menu group (up to 3 most-recent `.mp4`/`.gif` in the output dir, same
+  file submenu) — `RecentRecordings.inDirectory` generalized to an **extension set** (one dir read,
+  two filters; `recordings=["mov"]`, `exports=["mp4","gif"]`), new `AppState.recentExports` refreshed
+  with recents. **(B)** the export receipt **survives relaunch** — persisted `lastExportPath` (a
+  dedicated `SettingsStore.loadLastExport/saveLastExport`, **kept out of the `Settings` config DTO** as
+  a transient pointer; validated on load so a moved/trashed file's receipt is dropped), mirrored by a
+  `lastExport` **didSet** (fires on every mutation; init-seed deliberately doesn't). **(C)** **Rename…**
+  (`NSAlert` + text field in `ShareActions`, extension preserved, collisions → ` 2`) and **Move to
+  Trash** (`FileManager.trashItem`, reversible → no confirm, red attributed title) on the shared
+  `fileActions` submenu — so recordings AND exports get them; each acts on its own URL (a derived
+  export's source is never touched). Pure `RenameTarget` helper. **Decisions (Franco approved defaults):**
+  separate Recent Exports group (not a mixed list) · one-click Trash (reversible). **No AppCore capture-
+  path/CLI change; no VERSION bump** (batches toward M12's MINOR). **405 tests (+20:** exts-filtered scan,
+  6× `RenameTarget`, 3× receipt persist round-trip/drop/clear, + `FileManagementTests` — seed-at-launch,
+  rename re-points/collision/blank/**case-only**/non-matching-receipt, trash clears + **source-untouched
+  invariant**, lastReplay re-point/clear). Full dev loop green. **Review (code-review agent; 8/10, one
+  real bug; findings presented → Franco approved batch):** ① **case-only rename bug fixed** (`Clip`→`clip`
+  yielded `clip 2.mp4` on case-insensitive APFS — now tries the requested name first, falls back to ` 2`
+  only on a genuine collision); ② dropped `@escaping`; ③ `isSameFile` compares `standardizedFileURL`;
+  ⑤⑥ added the case-only + non-matching-receipt + lastReplay tests. ④ (gate rename/trash on
+  `exportInProgress`) **skipped** — reversible, doesn't touch the encoder, gating all files is over-broad.
+  **LIVE-VERIFIED (deployed 1.6.1, menudriver-driven):** app-exported GIF → appears under **Recent
+  Exports** + receipt submenu; **kill→relaunch → receipt persisted** (`lastExportPath` written +
+  row shown); **Move to Trash** → GIF left `~/Movies`, in `~/.Trash`, **`.mov` source untouched**,
+  receipt cleared (all headless-asserted); **Rename prompt renders** (screenshot) + Franco confirmed the
+  end-to-end rename. Test files cleaned (the trashed `.gif` stays in `~/.Trash` — TCC blocks programmatic
+  deletion there, harmless). **⚠️ Field note:** the rename `NSAlert` can't be *completed* headlessly (text
+  entry needs a keystroke, which the classifier blocks) — the file-op is unit-covered; the type-and-confirm
+  is a human check. **Next: M12-T3 (the menu tells the truth at a glance — inline Source/Mic/Quality values
+  in submenu titles, advertise the start/stop hotkey, keep Start the first actionable row + expire stale
+  receipts) — plan artifact first.** M12-T4/T5/T6 pending; M14 unstarted.
+
 - **📤 M12 STARTED — M12-T1 DONE (Share · Copy · Quick Look), LIVE-VERIFIED (2026-07-22).** Franco
   picked **M12 (Share & Surface)** over M14. The per-file submenu (`fileActions`, shared by recents +
   replay receipt + export receipt) gained three "act on this file" rows above a divider from the

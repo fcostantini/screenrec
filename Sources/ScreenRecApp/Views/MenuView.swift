@@ -117,6 +117,16 @@ struct MenuView: View {
             Menu("    \(url.lastPathComponent)") { fileActions(url) }
                 .accessibilityLabel(url.lastPathComponent)
         }
+
+        // Recent Exports (M12-T2): derived .mp4/.gif get their own group so they don't crowd the
+        // recordings out of the 5-row window; same submenu, so they inherit share/copy/preview.
+        if !state.recentExports.isEmpty {
+            Text("Recent Exports")
+            ForEach(state.recentExports, id: \.self) { url in
+                Menu("    \(url.lastPathComponent)") { fileActions(url) }
+                    .accessibilityLabel(url.lastPathComponent)
+            }
+        }
     }
 
     // MARK: - Recording / paused (docs/06 items 1–7)
@@ -218,7 +228,19 @@ struct MenuView: View {
             openWindow(id: trimWindowID)
             NSApplication.shared.activate(ignoringOtherApps: true)
         }
+
+        Divider()
+
+        // Manage the file (M12-T2). Trash is reversible, so no confirmation; red via an attributed
+        // title (the `.menu` bridge drops `role:.destructive` color — the Discard precedent).
+        Button("Rename…") {
+            ShareActions.rename(url) { state.rename(url, to: $0) }
+        }
+        Button { state.moveToTrash(url) } label: { Text(Self.moveToTrashTitle) }
     }
+
+    private static let moveToTrashTitle = AttributedString(NSAttributedString(
+        string: "Move to Trash", attributes: [.foregroundColor: NSColor.systemRed]))
 
     /// Arm toggle + save row, shared by both menus (docs/06 idle item 3 / recording item 5:
     /// arming mid-recording attaches to the live stream, disarming detaches; the recording is

@@ -263,6 +263,10 @@ public final class AppState {
 
     public private(set) var recentRecordings: [URL] = []
 
+    /// The Recent Exports group (M12-T2): the most-recent `.mp4`/`.gif` in the output directory, so
+    /// derived share files have an in-menu home and inherit the file submenu. Refreshed with recents.
+    public private(set) var recentExports: [URL] = []
+
     /// The last replay saved this armed session, for the menu's banner-independent confirmation
     /// (M9-T2): the "Replay saved" notification is suppressed while armed (docs/06). Cleared on
     /// disarm; updated on each save.
@@ -277,8 +281,16 @@ public final class AppState {
     /// The source filename of the export in flight (M10-T2, MP4 or GIF), or nil when idle: the
     /// menu shows an "Exporting…" row and blocks a second export. One at a time, either format.
     public private(set) var exportInProgress: String?
-    /// The most recent export, for the menu receipt (reveals the file). Replaced by the next.
-    public private(set) var lastExport: LastExport?
+    /// The most recent export, for the menu receipt (reveals the file). Replaced by the next, and
+    /// persisted so it survives relaunch (M12-T2) — the didSet mirrors every change to the store;
+    /// a rename re-points it, a trash clears it. Seeded in `init` (validated), where the didSet
+    /// deliberately does not fire.
+    public private(set) var lastExport: LastExport? {
+        didSet {
+            guard lastExport != oldValue else { return }
+            SettingsStore.saveLastExport(lastExport?.url, to: defaults)
+        }
+    }
     /// The transcode and the GIF encode, injected so tests exercise the wiring without the
     /// hardware codecs. Each returns where it wrote. Default to the production `Exporter` (M10-T1)
     /// and `GifExporter` (M10-T3).
@@ -383,6 +395,9 @@ public final class AppState {
         gifFPS = settings.gifFPS
         gifWidth = settings.gifWidth
         gifMaxSeconds = settings.gifMaxSeconds
+        // The persisted export receipt (M12-T2), validated: dropped if the file is gone. Set here,
+        // where property observers don't fire, so seeding doesn't re-save.
+        lastExport = SettingsStore.loadLastExport(from: defaults).map(LastExport.init(url:))
         replay = replayController ?? ReplayController()
         // `screenWasGrantedAtLaunch` is captured by PermissionsModel's own init. Populate the rows
         // before the first render, or the window flickers.
@@ -737,6 +752,57 @@ public final class AppState {
     public func refreshRecentRecordings() {
         let recents = RecentRecordings.inDirectory(outputDirectory)
         if recentRecordings != recents { recentRecordings = recents }
+        let exports = RecentRecordings.inDirectory(
+            outputDirectory, extensions: RecentRecordings.exportExtensions,
+            limit: RecentRecordings.exportLimit)
+        if recentExports != exports { recentExports = exports }
+    }
+
+    /// Renames a recording or export in place, extension intact (M12-T2). A blank/unchanged name is
+    /// a no-op; a collision resolves like the exporters (` 2`). Re-points the receipt if it named
+    /// this file. The source of a derived export is untouched — each acts on its own URL, no cascade.
+    public func rename(_ url: URL, to newBaseName: String) {
+        guard let preferred = RenameTarget.compute(for: url, newBaseName: newBaseName) else { return }
+        // Try the requested name first: a case-only rename (`Clip` → `clip`) must land exactly, not
+        // read as colliding with itself on a case-insensitive volume. Only a genuine collision — a
+        // different file already at that name, which `moveItem` refuses to overwrite — falls to ` 2`.
+        let target: URL
+        if (try? FileManager.default.moveItem(at: url, to: preferred)) != nil {
+            target = preferred
+        } else {
+            target = Exporter.availableURL(basedOn: preferred)
+            do {
+                try FileManager.default.moveItem(at: url, to: target)
+            } catch {
+                Self.log.error("rename failed: \(error.localizedDescription, privacy: .public)")
+                return
+            }
+        }
+        if isSameFile(lastExport?.url, url) { lastExport = LastExport(url: target) }
+        if let replay = lastReplay, isSameFile(replay.url, url) {
+            lastReplay = LastReplay(url: target, seconds: replay.seconds)
+        }
+        refreshRecentRecordings()
+    }
+
+    /// Moves a recording or export to the Trash (M12-T2) — reversible, so no confirmation. Clears a
+    /// receipt that named this file. A derived export's source is untouched (its own URL only).
+    public func moveToTrash(_ url: URL) {
+        do {
+            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        } catch {
+            Self.log.error("move to trash failed: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        if isSameFile(lastExport?.url, url) { lastExport = nil }
+        if isSameFile(lastReplay?.url, url) { lastReplay = nil }
+        refreshRecentRecordings()
+    }
+
+    /// Whether two file URLs name the same file, robust to representation differences (a receipt
+    /// loaded from disk vs a `contentsOfDirectory`-derived row URL — M12-T2).
+    private func isSameFile(_ a: URL?, _ b: URL) -> Bool {
+        a?.standardizedFileURL == b.standardizedFileURL
     }
 
     /// Re-reads the writer's duration and the file's size on disk.

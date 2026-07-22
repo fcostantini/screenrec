@@ -961,7 +961,7 @@ export and trim are untouched.
       framework-free. This is the demo/bug-report share step (ADR-016's sibling), turning "reveal → drag"
       into one action. **Verify:** each action works on a real `.mov` and on an exported `.mp4`/`.gif`;
       Copy pastes into a target app; Quick Look previews.
-- [ ] M12-T2 **Exports become first-class.** Include `.mp4`/`.gif` in the recent-recordings scan (or a
+- [x] M12-T2 **Exports become first-class.** Include `.mp4`/`.gif` in the recent-recordings scan (or a
       separate **Recent exports** grouping), **persist `lastExport`** across relaunch (small receipt
       store), and add **Rename…** + **Move to Trash** to the per-file submenu. Today exports are
       Finder-only and the receipt is in-memory (lost on relaunch, overwritten by the next). **Verify:**

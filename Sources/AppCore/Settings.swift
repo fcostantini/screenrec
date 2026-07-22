@@ -181,6 +181,27 @@ public enum SettingsStore {
         public static let gifFPS = "gifFPS"
         public static let gifWidth = "gifWidth"
         public static let gifMaxSeconds = "gifMaxSeconds"
+        /// The last export's path, for the receipt that survives relaunch (M12-T2). Absent ⇒ no
+        /// receipt. Not part of `Settings` (it's a transient pointer, not user config) — its own
+        /// load/save below. Dropped on load if the file is gone (moved/trashed).
+        public static let lastExportPath = "lastExportPath"
+    }
+
+    /// The persisted export receipt (M12-T2), validated against the filesystem: a pointer to a file
+    /// that's since been moved or trashed is dropped, so a broken receipt never shows.
+    public static func loadLastExport(from defaults: UserDefaults) -> URL? {
+        guard let path = defaults.string(forKey: Key.lastExportPath), !path.isEmpty,
+              FileManager.default.fileExists(atPath: path)
+        else { return nil }
+        return URL(fileURLWithPath: path)
+    }
+
+    public static func saveLastExport(_ url: URL?, to defaults: UserDefaults) {
+        if let url {
+            defaults.set(url.path, forKey: Key.lastExportPath)
+        } else {
+            defaults.removeObject(forKey: Key.lastExportPath)
+        }
     }
 
     /// Reads settings, replacing anything unusable with the default.

@@ -83,8 +83,14 @@ Order and grouping (separators between groups):
     **Copy** writes the file to the pasteboard so ⌘V drops it into Slack/Finder. `Trim…` opens the Trim
     window (below). An export shows a top-of-menu `Exporting <name>…` row while it runs (stamped at open,
     not ticking — the M6-T10 constraint) and an `Exported to MP4 · <name>` receipt — **M12-T1 made it a
-    submenu too**, so the exported `.mp4`/`.gif` gets the same actions (the recents list is `.mov`-only,
-    so this is the export's in-menu pointer). The saved-replay receipt (M9-T2) shares the same submenu. ⚠️
+    submenu too**, so the exported `.mp4`/`.gif` gets the same actions. **M12-T2** then gave exports a
+    real home: a **`Recent Exports`** group below the recordings (up to 3 most-recent `.mp4`/`.gif` in the
+    output dir, same submenu), and the receipt now **survives relaunch** (persisted `lastExportPath`,
+    validated — a receipt whose file was moved/trashed is dropped). The submenu also gained a third,
+    **manage** group: **`Rename…`** (an `NSAlert` text field, extension preserved, collisions → ` 2`) and
+    **`Move to Trash`** (reversible → no confirmation, red attributed title). Both act on the row's own file
+    only — trashing/renaming a derived `.mp4` never touches its `.mov` source. The saved-replay receipt
+    (M9-T2) shares the same submenu. ⚠️
     Implementation notes from M4-T2: a SwiftUI `.menu`
     `MenuBarExtra` exposes neither `NSMenuItem.indentationLevel` (the indent is leading
     whitespace in the title, with an explicit accessibility label so VoiceOver reads the
@@ -333,6 +339,7 @@ moved):
 | `recordHotkey` | Dict: keyCode Int, modifiers Int; **absent ⇒ off** (M9-T4, opt-in global start/stop) | M9-T4 |
 | `showsMenuBarTimer` | Bool; **absent ⇒ on** (opt-out). The status-item label's live elapsed clock while recording (M9-T3) | M9-T3 |
 | `gifFPS` · `gifWidth` · `gifMaxSeconds` | Int; each snaps to its nearest picker choice on load, absent ⇒ 15 / 480 / 30. The `Save as GIF` caps (M10-T3 follow-up) | M10-T3 follow-up |
+| `lastExportPath` | String path; **absent ⇒ no receipt** (M12-T2). The last export, so its menu receipt survives relaunch. **Dropped on load if the file is gone** (moved/trashed). Not part of `Settings` — a transient pointer, not user config; its own load/save | M12-T2 |
 
 ⚠️ **`launchAtLogin` is NOT a UserDefaults key (amended M6-T5).** The spec originally listed
 one, but `SMAppService` persists the login-item registration itself, so a stored bool would be

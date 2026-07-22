@@ -26,6 +26,26 @@ enum ShareActions {
         QuickLookController.shared.preview(url)
     }
 
+    /// Prompts for a new base name (M12-T2) with a modal `NSAlert` + text field — an LSUIElement
+    /// app has no window to host a rename, so the alert is it. The extension is fixed (informative
+    /// text); the field pre-fills the current base name. `newBaseName` fires only on confirm.
+    @MainActor static func rename(_ url: URL, newBaseName: (String) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "Rename “\(url.lastPathComponent)”"
+        alert.informativeText = "The extension stays the same."
+        alert.addButton(withTitle: "Rename")
+        alert.addButton(withTitle: "Cancel")
+
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.stringValue = url.deletingPathExtension().lastPathComponent
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        newBaseName(field.stringValue)
+    }
+
     @MainActor private static let anchor = AnchorWindow()
 }
 
