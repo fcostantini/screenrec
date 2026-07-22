@@ -5,6 +5,25 @@
 
 ## Now
 
+- **🛡 M13-T3 DONE — extracted + tested RecordingSession's finalize fate-matrix (2026-07-22).** The 6-way
+  file-fate branch (discard / start-failure / deleted / stranded / write-never-began / normal-finish) —
+  the most safety-critical logic in the product — is pulled out of the inline `start()` `Task` closure
+  into a **pure static `finalizePlan(...) -> FinalizePlan`** (the decision) + a thin `executeFinalize(_:)`
+  (the side effects: cancel/finish/remove/yield) + 3 pure message helpers. **Behaviour-preserving** (each
+  branch maps 1:1; priority + copy + read-timing identical — `fileFate`/`discardRequested` are frozen by
+  `cancelSentinel()` before the plan is computed). `FileFate` → internal (was private). **381 tests (+13
+  `RecordingSessionTests`:** the M9-T7-dropped pairing — all 6 branches + priority precedence [discard
+  beats everything; start-failure beats fate incl. the "fail-beats-save" stranded pair; fate beats
+  write-never-began] + the message helpers). Full dev loop green; **headless CLI smoke of the normal
+  branch** (3 s → clean 3.07 s 3-track file). **Review (code-review agent; verdict: behaviour-preserving
+  YES, no behaviour change; findings presented → Franco approved batch):** ② added the start-failure-vs-
+  stranded precedence assertion; ③ added a `finalizeFailureMessage` content test; ④ dropped an unused
+  `Equatable` from `FileFate`. **Skipped ① (accepted gap):** `executeFinalize`'s side-effect mapping
+  (cancel/finish/remove/which-event) stays untested — unit-testing it needs a `MovieRecorder`
+  protocol/spy (scope creep beyond "test the decision"); it keeps its existing live/gate coverage
+  (discard, kill→partial, sentinel tests). **Next: M13-T4 (mic-grace + region-display reliability
+  notices) — plan artifact first.** M13-T5 pending; M12/M14 unstarted.
+
 - **🛡 M13-T2 DONE — graceful finalize on OS-initiated quit, LIVE-VERIFIED (2026-07-22).**
   `AppDelegate.applicationShouldTerminate` now returns `.terminateLater`, `await
   stopAndWaitForFinalize()`, then `NSApp.reply(toApplicationShouldTerminate: true)` when a recording

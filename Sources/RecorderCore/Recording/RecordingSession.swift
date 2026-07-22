@@ -24,6 +24,55 @@ public final class RecordingSession: @unchecked Sendable {
         continuation.yield(.failed(message: message))
     }
 
+    /// The decided fate of a finished recording's file — the pure output of `finalizePlan`, run by
+    /// `executeFinalize`. One case per branch, and the priority they're chosen in is what a lost
+    /// take turns on, so it's unit-tested exhaustively (M13-T3).
+    enum FinalizePlan: Equatable {
+        /// The user threw the take away: remove the file everywhere it might be, finalize nothing.
+        case discard(strandedPath: String?)
+        /// The recording never really started; nothing playable exists.
+        case failToStart(message: String)
+        /// The partial was unlinked mid-recording — unsalvageable (no relink API).
+        case failDeleted
+        /// The file was moved intact and the writer's fd still points at it — finalize there.
+        case finalizeStranded(path: String, reason: EndReason)
+        /// The writer never began (unwritable output folder, 02 §2).
+        case failWriteNeverBegan
+        /// The ordinary path: finish the writer and finalize the partial.
+        case finalizeNormal(reason: EndReason)
+    }
+
+    /// Decides a finished recording's fate from the end-of-loop state. Pure, so the priority is
+    /// exhaustively testable: a **discard** wins over everything, then a **start failure**, then the
+    /// sentinel's **fate** (deleted/stranded), then a writer that **never began**, else the normal
+    /// finish. Side effects (cancel/finish/remove) belong to `executeFinalize`.
+    static func finalizePlan(
+        discardRequested: Bool, startFailure: String?, fate: FileFate?,
+        failedToBeginWriting: Bool, endReason: EndReason
+    ) -> FinalizePlan {
+        if discardRequested {
+            if case .strandedAt(let path) = fate { return .discard(strandedPath: path) }
+            return .discard(strandedPath: nil)
+        }
+        if let startFailure { return .failToStart(message: startFailure) }
+        switch fate {
+        case .deleted: return .failDeleted
+        case .strandedAt(let path): return .finalizeStranded(path: path, reason: endReason)
+        case nil: break
+        }
+        if failedToBeginWriting { return .failWriteNeverBegan }
+        return .finalizeNormal(reason: endReason)
+    }
+
+    static let deletedMessage =
+        "The recording file was deleted while recording, so the video couldn't be saved."
+    static func writeNeverBeganMessage(folder: String) -> String {
+        "Couldn't write the recording to \"\(folder)\". Choose another folder."
+    }
+    static func strandedFinalizeFailedMessage(path: String) -> String {
+        "Couldn't finish saving the recording. The file is at \(path)."
+    }
+
     /// Unified event surface: `started`, forwarded progress/pause events, then exactly one of
     /// `finished` (file finalized) or `failed` (nothing playable), after which it finishes.
     public nonisolated let events: AsyncStream<EngineEvent>
@@ -34,7 +83,8 @@ public final class RecordingSession: @unchecked Sendable {
     /// The final `.mov` the caller asked for; the writer works on its `.partial` companion.
     private let finalURL: URL
     /// What the sentinel decided the file's fate was; set from its queue, read at teardown.
-    private enum FileFate {
+    /// Internal (not private) so `finalizePlan` can be fed it in tests (M13-T3).
+    enum FileFate {
         case deleted
         /// Moved somewhere the rename-back failed from; the fragments there are intact.
         case strandedAt(String)
@@ -134,73 +184,73 @@ public final class RecordingSession: @unchecked Sendable {
             // Before finalize's own rename, or the sentinel would fight it.
             self.cancelSentinel()
 
-            if discardRequested.value == true {
-                // The user threw the take away: never finalize, and make sure the file is gone in
-                // every writer state. `cancel()` removes the `.partial` only while the writer is
-                // still `.writing`; a `.failed` writer, or a file moved out from under us
-                // (`.strandedAt`), would otherwise survive for the launch recovery sweep to
-                // resurrect. Remove it wherever it landed. Wins over every other fate.
-                recorder.cancel()
-                try? FileManager.default.removeItem(at: recorder.outputURL)
-                if case .strandedAt(let path)? = fileFate.value {
-                    try? FileManager.default.removeItem(atPath: path)
-                }
-                continuation.yield(.discarded)
-            } else if let startFailure {
-                recorder.cancel()
-                continuation.yield(.failed(message: startFailure))
-            } else if let fate = fileFate.value {
-                switch fate {
-                case .deleted:
-                    // The partial was unlinked mid-recording; the writer has been feeding a
-                    // doomed inode ever since. Unsalvageable (no relink API) — say so plainly.
-                    recorder.cancel()
-                    continuation.yield(.failed(message:
-                        "The recording file was deleted while recording, so the video couldn't be saved."))
-                case .strandedAt(let path):
-                    // The file is intact wherever it went, and the writer's fd still points at
-                    // it — finalize there and report a save, never a loss.
-                    do {
-                        _ = try await recorder.finish()
-                        var url = URL(fileURLWithPath: path)
-                        if url.pathExtension == "partial",
-                           let final = try? OutputLocation.finalizePartial(url) {
-                            url = final
-                        }
-                        continuation.yield(.finished(
-                            url: url, reason: endReason, droppedFrames: recorder.droppedFrameCount))
-                    } catch {
-                        // The file is at the moved-to path, outside the output folder, so launch
-                        // recovery won't sweep it — name where it actually is.
-                        Self.finalizeFailed(error, message:
-                            "Couldn't finish saving the recording. The file is at \(path).",
-                            on: continuation)
-                    }
-                }
-            } else if recorder.failedToBeginWriting {
-                // The writer never began (unwritable output, 02 §2). Cancel to drop the O_EXCL
-                // placeholder; fail with the folder named — there is nothing to finalize.
-                recorder.cancel()
-                let folder = recorder.outputURL.deletingLastPathComponent().lastPathComponent
-                continuation.yield(.failed(message:
-                    "Couldn't write the recording to \"\(folder)\". Choose another folder."))
-            } else {
-                do {
-                    let partial = try await recorder.finish()
-                    // Rename failure after a successful finish is NOT a lost recording — the
-                    // complete movie sits at the partial path. Report it saved there; the next
-                    // launch's recovery sweep renames it.
-                    let url = (try? OutputLocation.finalizePartial(partial)) ?? partial
-                    continuation.yield(.finished(
-                        url: url, reason: endReason, droppedFrames: recorder.droppedFrameCount))
-                } catch {
-                    // The `.partial` sits in the output folder; the next launch's sweep renames it.
-                    Self.finalizeFailed(error, message: Self.finalizeFailureMessage, on: continuation)
-                }
-            }
+            let plan = Self.finalizePlan(
+                discardRequested: discardRequested.value == true,
+                startFailure: startFailure, fate: fileFate.value,
+                failedToBeginWriting: recorder.failedToBeginWriting, endReason: endReason)
+            await executeFinalize(plan)
             continuation.finish()
         }
         await engine.start()
+    }
+
+    /// Runs a `FinalizePlan`'s side effects and yields exactly one terminal event. The branch was
+    /// chosen by the pure `finalizePlan`; this does the mechanical cancel/finish/remove and maps a
+    /// `finish()` success/failure to `finished`/`failed`.
+    private func executeFinalize(_ plan: FinalizePlan) async {
+        switch plan {
+        case .discard(let strandedPath):
+            // Never finalize; make sure the file is gone in every writer state. `cancel()` removes
+            // the `.partial` only while `.writing`; a `.failed` writer, or a file moved out from
+            // under us, would otherwise survive for the launch recovery sweep to resurrect.
+            recorder.cancel()
+            try? FileManager.default.removeItem(at: recorder.outputURL)
+            if let strandedPath { try? FileManager.default.removeItem(atPath: strandedPath) }
+            continuation.yield(.discarded)
+        case .failToStart(let message):
+            recorder.cancel()
+            continuation.yield(.failed(message: message))
+        case .failDeleted:
+            // The partial was unlinked mid-recording; the writer has been feeding a doomed inode
+            // ever since. Unsalvageable (no relink API) — say so plainly.
+            recorder.cancel()
+            continuation.yield(.failed(message: Self.deletedMessage))
+        case .finalizeStranded(let path, let reason):
+            // The file is intact wherever it went, and the writer's fd still points at it —
+            // finalize there and report a save, never a loss.
+            do {
+                _ = try await recorder.finish()
+                var url = URL(fileURLWithPath: path)
+                if url.pathExtension == "partial",
+                   let final = try? OutputLocation.finalizePartial(url) {
+                    url = final
+                }
+                continuation.yield(.finished(
+                    url: url, reason: reason, droppedFrames: recorder.droppedFrameCount))
+            } catch {
+                // The file is at the moved-to path, outside the output folder, so launch recovery
+                // won't sweep it — name where it actually is.
+                Self.finalizeFailed(
+                    error, message: Self.strandedFinalizeFailedMessage(path: path), on: continuation)
+            }
+        case .failWriteNeverBegan:
+            // Cancel to drop the O_EXCL placeholder; fail with the folder named — nothing to finalize.
+            recorder.cancel()
+            let folder = recorder.outputURL.deletingLastPathComponent().lastPathComponent
+            continuation.yield(.failed(message: Self.writeNeverBeganMessage(folder: folder)))
+        case .finalizeNormal(let reason):
+            do {
+                let partial = try await recorder.finish()
+                // A rename failure after a successful finish is NOT a lost recording — the complete
+                // movie sits at the partial path; the next launch's sweep renames it.
+                let url = (try? OutputLocation.finalizePartial(partial)) ?? partial
+                continuation.yield(.finished(
+                    url: url, reason: reason, droppedFrames: recorder.droppedFrameCount))
+            } catch {
+                // The `.partial` sits in the output folder; the next launch's sweep renames it.
+                Self.finalizeFailed(error, message: Self.finalizeFailureMessage, on: continuation)
+            }
+        }
     }
 
     /// Guards the partial. Runs from `onDidBeginWriting` — the one moment that's provably

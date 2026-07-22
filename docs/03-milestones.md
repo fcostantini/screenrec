@@ -1025,7 +1025,7 @@ run before or after M12 — independent.
       story (the graceful path is currently wired only to the menu Quit). **Verify (live):** start a
       recording, trigger a non-menu quit (`⌘Q` from the Settings window, or `osascript -e 'quit app'`);
       confirm a clean finalized file, not a recovered partial.
-- [ ] M13-T3 **Extract + test `RecordingSession`'s finalize fate-matrix.** Pull the 6-way file-fate
+- [x] M13-T3 **Extract + test `RecordingSession`'s finalize fate-matrix.** Pull the 6-way file-fate
       branch (discard / start-failure / deleted / stranded / write-never-began / normal-finish) out of
       the inline `Task` closure into a pure `finalize(startFailure:endReason:) -> EngineEvent` over the
       existing fields/boxes, and **unit-test each branch** — closing the top complexity hotspot AND the
