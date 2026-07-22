@@ -5,6 +5,12 @@
 
 ## Now
 
+- **🎉 v1.5.0 CUT (2026-07-22) — M10 (share export & basic editing) earns the MINOR.** `VERSION` +
+  `CoreInfo.version` → 1.5.0 (pin test green), tagged `v1.5.0`, pushed. The MINOR earns from M10's
+  user-facing features: MP4 share export (T1/T2), GIF export (T3) + GIF settings, and lossless trim
+  (T4). Gate G10 passed; the roadmap is now empty. **Next: Franco's call — dogfood 1.5.0, or scope new
+  milestones.**
+
 - **🎉 M10-T4 DONE — lossless trim; GATE G10 PASSED; M10 COMPLETE (2026-07-22).** Trim a recording to
   `[in, out]` by **copying the streams — no re-encode** (`AVAssetExportSession` passthrough +
   `timeRange`, `export(to:as:)`). New `Trimmer` (RecorderCore/Export/): guards output==input +
