@@ -5,6 +5,35 @@
 
 ## Now
 
+- **📤 M12 STARTED — M12-T1 DONE (Share · Copy · Quick Look), LIVE-VERIFIED (2026-07-22).** Franco
+  picked **M12 (Share & Surface)** over M14. The per-file submenu (`fileActions`, shared by recents +
+  replay receipt + export receipt) gained three "act on this file" rows above a divider from the
+  "make a new file" rows: **Quick Look** (`QLPreviewPanel`, space toggles), **Share…**
+  (`NSSharingServicePicker` — AirDrop/Mail/Messages, OS services only), **Copy** (writes the file URL
+  to `NSPasteboard` so ⌘V drops it into Slack/Finder). New `ScreenRecApp/Views/ShareActions.swift`
+  (sibling of `Finder.swift`; `ShareActions.share/copy/quickLook` + a private `AnchorWindow` — an
+  invisible 1×1 window at the pointer that anchors the picker since the menu has closed — + a private
+  `QuickLookController` singleton for the unowned QL data source). **The export receipt
+  (`exportStatusRow`) became a submenu too** (was reveal-only), so an exported `.mp4`/`.gif` gets the
+  same actions — the only way to reach exports in T1 (they aren't in the `.mov`-only recents scan
+  until M12-T2). **Seam decision (Franco approved defaults):** called from `MenuView` directly (the
+  `Finder.reveal` precedent), **not** injected into AppState — these touch nothing in AppCore, unlike
+  `beginRegionSelection`. **No AppCore/capture-path/CLI changes; no VERSION bump** (batches toward
+  M12's MINOR when Franco cuts). **385 tests unchanged** — T1 is pure AppKit glue with no AppCore
+  logic to unit-test (same shape as `Finder.reveal`, which has none); the build gate + the live check
+  are the coverage. Full dev loop green (build/test/release/bundle-sign). Quality pass: one self-review
+  find applied — unified the three call sites under `ShareActions.` and made the QL singleton private.
+  **LIVE-VERIFIED (deployed 1.6.1 to /Users/Shared, menudriver-driven):** submenu `dump` shows
+  `Reveal · Quick Look · Share… · Copy | Export · GIF · Trim` under every file row; **Copy** →
+  pasteboard held the file URL (`.mov` then, after an app export, the `.mp4`); **Quick Look** →
+  panel previewed the clip (screenshot); **Share…** → OS share sheet with AirDrop/Mail/Messages,
+  file shown as "Video · 1,6 MB" (screenshot); the **export receipt rendered as a submenu** with the
+  three actions. Test files cleaned. **⚠️ Field note:** `osascript`-via-System-Events keystrokes
+  (e.g. Escape to dismiss a panel) are blocked by the auto-mode classifier — use menudriver's AX path;
+  opening the menu-bar menu dismisses a stray QL/share panel anyway. **Next: M12-T2 (exports become
+  first-class — recents/exports grouping, persist `lastExport`, Rename/Trash) — plan artifact first.**
+  M12-T3/T4/T5/T6 pending; M14 unstarted.
+
 - **🎉 v1.6.1 CUT (2026-07-22) — M13 (Hardening) earns the PATCH; release.sh dogfooded.** `VERSION` +
   `CoreInfo.version` → 1.6.1, committed (`96ccb03`), and cut via the **new `Scripts/release.sh`** —
   which ran its full gate green (build · test · encode×3 · release-build · **bundle-sign**) and tagged

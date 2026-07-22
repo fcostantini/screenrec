@@ -186,22 +186,29 @@ struct MenuView: View {
 
     /// The MP4 export's in-menu signal (M10-T2), shared by both menus: an "Exporting…" row while
     /// one runs (stamped at open — nothing may tick into an open menu, M6-T10), then a receipt
-    /// that reveals the `.mp4`. The `.mov`-only recents list never shows the export, so this is
-    /// its pointer.
+    /// submenu over the export (M12-T1: share/copy/Quick Look it too). The `.mov`-only recents list
+    /// never shows the export, so this is its pointer.
     @ViewBuilder private var exportStatusRow: some View {
         if let name = state.exportInProgress {
             Text("Exporting \(name)…")
             Divider()
         } else if let last = state.lastExport {
-            Button(last.menuTitle) { Finder.reveal(last.url) }
+            Menu(last.menuTitle) { fileActions(last.url) }
             Divider()
         }
     }
 
-    /// The per-file submenu shared by recents and the replay receipt: reveal in Finder, derive a
-    /// shareable MP4 / looping GIF (blocked while one export runs), or open the Trim window.
+    /// The per-file submenu shared by recents, the replay receipt and the export receipt. Two groups:
+    /// act on this file (reveal · Quick Look · Share · Copy, M12-T1), then derive a new one — a
+    /// shareable MP4 / looping GIF (blocked while one export runs) or the Trim window.
     @ViewBuilder private func fileActions(_ url: URL) -> some View {
         Button("Reveal in Finder") { Finder.reveal(url) }
+        Button("Quick Look") { ShareActions.quickLook(url) }
+        Button("Share…") { ShareActions.share(url) }
+        Button("Copy") { ShareActions.copy(url) }
+
+        Divider()
+
         Button("Export as MP4") { state.exportToMP4(url) }
             .disabled(state.exportInProgress != nil)
         Button("Save as GIF") { state.exportToGIF(url) }

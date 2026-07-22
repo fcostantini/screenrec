@@ -74,12 +74,17 @@ Order and grouping (separators between groups):
    item 10).
 10. Recent recordings: up to 5 most-recent files from the output dir, **indented one level**
     under `Open Recordings Folder` so they read as its contents rather than as more commands
-    (Franco, 2026-07-15). **M10-T2/T3/T4 made each a submenu** — `<name> ▸ { Reveal in Finder · Export
-    as MP4 · Save as GIF · Trim… }` — so the export/share/edit actions have a home; the old direct
-    click-to-reveal moved into the submenu. `Trim…` opens the Trim window (below). An export shows a top-of-menu `Exporting <name>…` row while it runs (stamped at open,
-    not ticking — the M6-T10 constraint) and an `Exported to MP4 · <name>` receipt that reveals the
-    `.mp4` on click (the recents list is `.mov`-only, so this is the export's in-menu pointer). The
-    saved-replay receipt (M9-T2) gained the same `{ Reveal · Export as MP4 }` submenu. ⚠️
+    (Franco, 2026-07-15). **M10-T2/T3/T4 made each a submenu**, then **M12-T1 added the share/preview
+    row** — `<name> ▸ { Reveal in Finder · Quick Look · Share… · Copy | Export as MP4 · Save as GIF ·
+    Trim… }` (the `|` is a divider: act-on-this-file above, derive-a-new-file below) — so the
+    export/share/edit actions have a home; the old direct click-to-reveal moved into the submenu.
+    **Quick Look** opens the system preview panel (`QLPreviewPanel`, space toggles); **Share…** the OS
+    share sheet (`NSSharingServicePicker` — AirDrop/Messages/Mail, no screenrec-hosted anything);
+    **Copy** writes the file to the pasteboard so ⌘V drops it into Slack/Finder. `Trim…` opens the Trim
+    window (below). An export shows a top-of-menu `Exporting <name>…` row while it runs (stamped at open,
+    not ticking — the M6-T10 constraint) and an `Exported to MP4 · <name>` receipt — **M12-T1 made it a
+    submenu too**, so the exported `.mp4`/`.gif` gets the same actions (the recents list is `.mov`-only,
+    so this is the export's in-menu pointer). The saved-replay receipt (M9-T2) shares the same submenu. ⚠️
     Implementation notes from M4-T2: a SwiftUI `.menu`
     `MenuBarExtra` exposes neither `NSMenuItem.indentationLevel` (the indent is leading
     whitespace in the title, with an explicit accessibility label so VoiceOver reads the

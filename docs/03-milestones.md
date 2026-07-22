@@ -953,7 +953,7 @@ Everything here is zero-dep AppKit + menu/notification wiring — **no capture-p
 on shipped work (M4 menu, M9-T2 receipts, M10 export, M11 region). The three capture modes, replay,
 export and trim are untouched.
 
-- [ ] M12-T1 **Share · Copy · Quick Look on recordings and exports.** Add three actions to every
+- [x] M12-T1 **Share · Copy · Quick Look on recordings and exports.** Add three actions to every
       recording and export row: **Share…** (`NSSharingServicePicker` — AirDrop/Messages/Mail), **Copy**
       (`NSPasteboard`, writing the file so it pastes into Slack/Finder), and **Quick Look**
       (`QLPreviewPanel`, spacebar). AppKit, so it lives in ScreenRecApp and is injected into AppState
