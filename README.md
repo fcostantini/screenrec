@@ -115,7 +115,7 @@ field bugs are baked into `docs/02`.
 
 ## Contributing / development loop
 
-There is no CI. This ordered loop is the gate — run it top to bottom after any change:
+This ordered loop is the gate — run it top to bottom after any change:
 
 ```sh
 swift build            # debug build compiles
@@ -126,3 +126,16 @@ Scripts/bundle.sh      # assemble + sign dist/ScreenRec.app (must stay signable)
 
 Then run the current task's Verify step (see `docs/03-milestones.md`). Agents: start
 with `CLAUDE.md`, then `STATUS.md`.
+
+**Automated gate (install once per clone):** a versioned pre-push hook runs the loop —
+`swift build` · `swift test` · the hardware-encode tests a default `swift test` skips
+(`SCREENREC_HW_ENCODE_TESTS=1`) · `swift build -c release` — and blocks the push if any step
+fails:
+
+```sh
+git config core.hooksPath Scripts/hooks   # points git at Scripts/hooks/pre-push
+```
+
+Signing (`bundle.sh`) is left out of the hook (it belongs to the release path); bypass in a
+genuine emergency with `git push --no-verify`. On a private repo a local hook is the right call —
+a GitHub Actions macOS runner would just burn paid minutes; add one only if the repo goes public.

@@ -1011,7 +1011,7 @@ finalize gap**, and the safety-critical `RecordingSession` finalize tree is **un
 the net you can't see. Mostly process + two small reliability fixes; **no user-facing features.** Can
 run before or after M12 — independent.
 
-- [ ] M13-T1 **CI / pre-push gate.** A GitHub Actions macOS job (or a local `git` pre-push hook while
+- [x] M13-T1 **CI / pre-push gate.** A GitHub Actions macOS job (or a local `git` pre-push hook while
       the repo stays private) running `swift build && swift test && swift build -c release`, **plus an
       isolated step running the gated hardware-encode tests** (`SCREENREC_HW_ENCODE_TESTS=1 swift test
       --filter ExporterTests` etc.) so MP4 losslessness/faststart, GIF, and trim-passthrough are asserted

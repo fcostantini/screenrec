@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#
+# Pre-push gate (M13-T1) — the CLAUDE.md dev loop run automatically before every push, PLUS the
+# hardware-encode tests a default `swift test` skips (export/trim/GIF losslessness). A regression is
+# caught before it reaches origin instead of relying on remembering to run the loop.
+#
+# Install once per clone:  git config core.hooksPath Scripts/hooks
+# Bypass in a genuine emergency (e.g. a docs-only push):  git push --no-verify
+#
+# Signing (Scripts/bundle.sh) is deliberately NOT here — it's slower and belongs to the release
+# path; this gate stays build + test + encode + release-build so pushes stay fast.
+
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if [ -t 1 ]; then G=$'\033[32m'; R=$'\033[31m'; D=$'\033[90m'; Z=$'\033[0m'; else G=; R=; D=; Z=; fi
+
+log=$(mktemp -t screenrec-prepush)
+trap 'rm -f "$log"' EXIT
+
+# step "<label>" <command…> — runs quietly, prints ✓/timing on success, dumps the tail and aborts
+# the push on failure.
+step() {
+  local label=$1; shift
+  local start=$SECONDS
+  if "$@" >"$log" 2>&1; then
+    printf '%s✓%s %-22s %s%ss%s\n' "$G" "$Z" "$label" "$D" "$((SECONDS - start))" "$Z"
+  else
+    printf '%s✗ %s%s\n\n' "$R" "$label" "$Z"
+    tail -40 "$log"
+    printf '\n%spush aborted.%s fix, or `git push --no-verify` to override.\n' "$R" "$Z"
+    exit 1
+  fi
+}
+
+printf '%s▸ pre-push gate (Scripts/hooks/pre-push)%s\n' "$D" "$Z"
+step "swift build"          swift build
+step "swift test"           swift test
+# The gated encode tests run one suite per invocation, on purpose: Swift-Testing runs a suite's
+# cases concurrently, and Apple Silicon's VideoToolbox pool faults if several encode at once (the
+# reason they're env-gated, docs/02 field notes). One suite at a time keeps ≤1 live VT session.
+step "encode: Exporter"     env SCREENREC_HW_ENCODE_TESTS=1 swift test --filter ExporterTests
+step "encode: Trimmer"      env SCREENREC_HW_ENCODE_TESTS=1 swift test --filter TrimmerTests
+step "encode: GifExporter"  env SCREENREC_HW_ENCODE_TESTS=1 swift test --filter GifExporterTests
+step "swift build -c release"  swift build -c release
+
+printf '%sgate passed — pushing.%s\n' "$G" "$Z"

@@ -11,6 +11,19 @@ Environment notes for agents:
 - Never write test recordings to Desktop/Documents/Downloads (TCC — 02 §2). Use the
   session scratchpad or `~/Movies`, and clean up after.
 
+## Automated gate — pre-push hook (M13-T1)
+
+`Scripts/hooks/pre-push` runs the dev loop automatically before every `git push` and blocks it
+on any failure: `swift build` · `swift test` · the **hardware-encode tests** a default `swift test`
+skips (`SCREENREC_HW_ENCODE_TESTS=1 swift test --filter {Exporter,Trimmer,GifExporter}Tests`, one
+suite per invocation so they don't oversubscribe VideoToolbox — 02 field notes) · `swift build -c
+release`. Install once per clone: `git config core.hooksPath Scripts/hooks`. Signing (`bundle.sh`)
+is left to the release path; bypass with `git push --no-verify`. This is the standing regression
+gate — the milestone §-gates below stay the source of truth for feature/behaviour verification.
+**Future (public-repo only):** a GitHub Actions macOS job running the same four steps (minus signing —
+no identity in CI) as an unbypassable backstop; skipped now because a private repo bills macOS
+runner minutes at a 10× multiplier for no added authority when Franco is the sole committer.
+
 ## §1 — G0: Scaffolding
 
 ```sh

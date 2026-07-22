@@ -5,6 +5,20 @@
 
 ## Now
 
+- **🛡 M13 STARTED — M13-T1 DONE (CI / pre-push gate), VERIFIED (2026-07-22).** A versioned git pre-push
+  hook (`Scripts/hooks/pre-push`, installed via `git config core.hooksPath Scripts/hooks`) runs the dev
+  loop automatically before every push and blocks it on failure: `swift build` · `swift test` · **the
+  gated hardware-encode tests** (`SCREENREC_HW_ENCODE_TESTS=1 swift test --filter {Exporter,Trimmer,
+  GifExporter}Tests`, one suite per invocation to avoid VT oversubscription — closes the review's "blind
+  spot on record") · `swift build -c release`. Signing (`bundle.sh`) deliberately left to `release.sh`
+  (M13-T5) so pushes stay fast; `--no-verify` bypasses. **Decision (Franco): local hook, not GitHub
+  Actions** — private repo + solo committer, so Actions would only burn paid macOS minutes (10×); a
+  public-repo Actions backstop is stubbed in docs/04. **Verified live:** gate runs green ~8 s;
+  **exit 1 on a deliberately-failing test (blocks push), exit 0 when green**; the three gated integration
+  tests confirmed to **run (not skip)** with the env var and **skip** without it. README + docs/04
+  updated (install line, gate note, Actions stub). No product code touched. **Next: M13-T2 (graceful
+  OS-quit finalize) — plan artifact first.** M12/M14 unstarted; M13-T3/T4/T5 pending.
+
 - **📋 v1.6.0 review done + roadmap M12–M14 DOCUMENTED (2026-07-22).** A full dual-lens review (artifact:
   architecture/cleanliness · UX/UI · reliability/test/build · product — three parallel deep-dives +
   synthesis) ran against v1.6.0. Verdict: mature, disciplined, **excellent at capture**; the leverage is
