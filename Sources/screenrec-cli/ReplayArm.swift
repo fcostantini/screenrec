@@ -1,3 +1,4 @@
+import CoreGraphics
 import Darwin
 import Foundation
 import RecorderCore
@@ -6,6 +7,7 @@ struct ReplayArmOptions {
     var seconds = 60.0
     var duration: Double?
     var appBundleID: String?
+    var region: CGRect?
     var micID: String?
     var micEnabled = true
     var outputDir = OutputLocation.defaultDirectory()
@@ -25,6 +27,8 @@ func parseReplayArmOptions(_ args: [String]) -> ReplayArmOptions {
         case "--app":
             guard let value = iterator.next() else { die("--app needs a bundle id (see list-apps)") }
             options.appBundleID = value
+        case "--region":
+            options.region = parseRegion(iterator.next())
         case "--mic":
             guard let value = iterator.next() else { die("--mic needs a device id") }
             options.micID = value
@@ -35,6 +39,10 @@ func parseReplayArmOptions(_ args: [String]) -> ReplayArmOptions {
         default:
             die("Unknown option: \(arg)")
         }
+    }
+    if options.region != nil, options.appBundleID != nil {
+        die("--region and --app can't be combined "
+            + "(a region captures the screen; an app captures its windows)")
     }
     return options
 }
@@ -123,7 +131,7 @@ func runReplayArm(_ args: [String]) async {
 
     let mic = resolveMicrophone(micEnabled: options.micEnabled, preferredID: options.micID)
     if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
-    let content: ContentSelection = options.appBundleID.map { .app(bundleID: $0) } ?? .display(.main)
+    let content = contentSelection(appBundleID: options.appBundleID, region: options.region)
     let configuration = CaptureConfiguration(
         content: content, microphone: mic.selection, microphoneRecovery: mic.recovery)
     let engine = CaptureEngine(configuration: configuration)
@@ -183,6 +191,7 @@ func runReplayArm(_ args: [String]) async {
     if stopHints.isEmpty { stopHints.append("until the stream ends") }
     print("replay-arm: balanced HEVC → \(Int(options.seconds)) s ring  (\(stopHints.joined(separator: " · ")))")
     if let bundleID = options.appBundleID { print("  capturing app: \(bundleID)") }
+    if let region = options.region { print("  capturing region: \(describeRegion(region)) on the main display") }
     let pid = ProcessInfo.processInfo.processIdentifier
     print("  pid \(pid) — save from another shell:  kill -USR1 \(pid)")
 

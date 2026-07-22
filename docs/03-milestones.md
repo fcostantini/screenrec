@@ -907,7 +907,7 @@ displayScale, snapped **even** for the encoder). `destinationRect` maps the regi
 output frame. The region is a fixed *screen* rectangle — it captures whatever is under it; it does
 **not** follow a window (that's `.app`).
 
-- [ ] M11-T1 **Region capture core + CLI.** Add `.region(display:, rect:)` to `ContentSelection`;
+- [x] M11-T1 **Region capture core + CLI.** Add `.region(display:, rect:)` to `ContentSelection`;
       `CaptureEngine` builds the display filter + `sourceRect` and sizes the output to the region
       (even pixels). Resolve at start: an off-screen/empty/zero-area rect, or a vanished display,
       **fails loud** (the M7 `.app`-gone precedent — never a silent whole-screen fallback). No

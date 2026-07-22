@@ -5,6 +5,34 @@
 
 ## Now
 
+- **🎉 M11-T1 DONE — region capture core + CLI, LIVE-VERIFIED (2026-07-22).** Third `ContentSelection`
+  case `.region(display: DisplaySelection, rect: CGRect)` — record an arbitrary rectangle of a display.
+  `CaptureEngine` builds the whole-display filter + `SCStreamConfiguration.sourceRect` (display points,
+  top-left origin) and sizes the output to the region in **even pixels**; new pure
+  `resolveRegion(rect:displayPointSize:scale:)` clamps an edge-straddle and **fails loud** (off-screen /
+  zero-area / non-finite / sub-2px) — never a silent whole-screen fallback. `destinationRect` left
+  default (the fill is 1:1). Region flows through `RecordingSession → CaptureEngine` **untouched**, so
+  recording AND armed replay both inherit it; **AppState unchanged** (region isn't UI-selectable till T2).
+  CLI **`record --region x,y,w,h`** + **`replay-arm --region …`** (display points, main display; mutually
+  exclusive with `--app`), shared `parseRegion`/`contentSelection`/`describeRegion` helpers. **358 tests
+  (+9:** resolveRegion matrix — inside/clamp/even-snap/off-screen/zero-area/non-finite/sub-2px/fractional-
+  straddle-no-overrun, `attachesStallWatchdog(.region)`, Equatable). Full dev loop green (build/test/
+  release/bundle-sign). **New platform-facts §1b in docs/02** (the sourceRect rulings, like M7-T1's §1a).
+  **LIVE-VERIFIED headless:** dimensions exact (800×500 pt → **1600×1000 px**, 1200×120 pt → 2400×240 px,
+  probed); all fail-loud paths correct copy + no file (off-screen via engine; zero/malformed/non-numeric/
+  `--region`+`--app` via CLI); **origin/crop proven by measurement** — `record --region 0,0,1200,120` frame
+  matched `screencapture -R 0,0,1200,120` (menu bar, top-left points) at image-diff **0.019**, vs **0.170**
+  for the bottom strip → **top-left display-points confirmed** (viewed: the frame is the menu bar + Firefox
+  top, crop tight); region clips carried whole-machine system audio (region has no audio scoping).
+  **Review (code-review agent; 8/10, no crash bugs; findings presented → Franco approved batch):** ① wrote
+  the owed docs/02 §1b; ② **floor (not round) the pixel snap** so `sourceRect` can't overrun the display
+  edge by ≤0.5px on a fractional straddle (+ boundary test); ③ dropped a redundant `scale > 0` guard that
+  would have misreported; ④ trimmed a 5-line doc comment. Skipped ⑤ (cross-module format duplication —
+  unavoidable). **No VERSION bump** — the CLI is the dev harness, not the shipped app (M7-T3 precedent);
+  the MINOR lands with **M11-T2** (the overlay + Source picker) or when Franco cuts. **Next: M11-T2 —
+  region selection overlay + menu wiring; plan artifact first.** The three T2 decisions still need Franco
+  (persist-vs-fresh region · secondary-display region · no live boundary — see the M11 scope note below).
+
 - **📋 M11 (region capture) SCOPED (2026-07-22) — pausing here.** Franco's ask: record an arbitrary
   rectangle of a display (a third `ContentSelection` mode beside whole-screen and per-app). Written up
   in docs/03 M11 — **T1** region core + CLI (`.region(display:, rect:)`, SCK `sourceRect`, even-pixel

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import RecorderCore
 
@@ -28,12 +29,14 @@ func printUsage() {
       screenrec-cli probe-stream [--duration N] [--mic <id>] [--no-mic]
                                        Capture and report per-source buffers/formats/PTS
       screenrec-cli replay-arm [--seconds N] [--duration N] [--app <bundle-id>]
-                               [--mic <id>] [--no-mic] [--output <dir>]
+                               [--region <x,y,w,h>] [--mic <id>] [--no-mic] [--output <dir>]
                                        Arm instant replay: screen + system audio + mic into
                                        rolling N-second rings (default 60). Prints occupancy
                                        every 2 s. --app scopes video + system audio to one
                                        app (see list-apps); if that app quits, the armed
                                        stream ends (no auto-retry — that's the GUI's job).
+                                       --region records a rectangle of the main display
+                                       (display points; mutually exclusive with --app).
                                        Save the last N seconds anytime with 's'+Return or
                                        `kill -USR1 <pid>` → "Replay <date>.mov" in --output
                                        (default ~/Movies); any other line (or Return) stops.
@@ -44,6 +47,8 @@ func printUsage() {
       --preset <name>    efficient | balanced | high   (default: balanced)
       --app <bundle-id>  Record one app instead of the whole screen — its windows and
                          its audio only (see list-apps)
+      --region <x,y,w,h> Record a rectangle of the main display (display points, top-left
+                         origin). Mutually exclusive with --app; off-screen/empty fails.
       --mic <id>         Use a specific microphone (see list-mics)
       --no-mic           Record without a microphone
       --output <dir>     Output directory when no [path] is given (default: ~/Movies)
@@ -78,6 +83,48 @@ func parsePositive(
 func parseOutputDirectory(_ value: String?) -> URL {
     guard let value else { die("--output needs a path") }
     return URL(fileURLWithPath: (value as NSString).expandingTildeInPath, isDirectory: true)
+}
+
+/// Parses `--region x,y,w,h` into a display-point rect (top-left origin — docs/02 §1b). The
+/// engine clamps/off-screen-checks it; here we only reject a malformed or non-positive spec.
+/// Shared by record and replay-arm so the two harnesses can't drift.
+func parseRegion(_ value: String?) -> CGRect {
+    guard let value else { die("--region needs x,y,w,h, e.g. 40,60,800,500") }
+    let fields = value.split(separator: ",", omittingEmptySubsequences: false)
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+    guard fields.count == 4 else {
+        die("--region needs four comma-separated numbers x,y,w,h, e.g. 40,60,800,500")
+    }
+    let numbers = fields.map { Double($0) }
+    guard let x = numbers[0], let y = numbers[1], let w = numbers[2], let h = numbers[3],
+          x.isFinite, y.isFinite, w.isFinite, h.isFinite else {
+        die("--region values must be numbers, e.g. 40,60,800,500")
+    }
+    guard w > 0, h > 0 else {
+        die("--region needs a positive width and height, e.g. 40,60,800,500 "
+            + "(got width \(w), height \(h))")
+    }
+    // Keep the four values inside the point-space the engine will clamp against, so a stray
+    // huge number is a clear usage error rather than a far-off-screen fail at start.
+    let limit = 1_000_000.0
+    guard abs(x) <= limit, abs(y) <= limit, w <= limit, h <= limit else {
+        die("--region values are out of range (max \(Int(limit)) points)")
+    }
+    return CGRect(x: x, y: y, width: w, height: h)
+}
+
+/// Builds the capture content from the mutually-exclusive source flags: a region or an app on
+/// the main display, else the whole main screen. The caller rejects region + app together.
+func contentSelection(appBundleID: String?, region: CGRect?) -> ContentSelection {
+    if let region { return .region(display: .main, rect: region) }
+    if let appBundleID { return .app(bundleID: appBundleID) }
+    return .display(.main)
+}
+
+/// Human-readable "x,y w×h pt" for the CLI's region echo/dry-run.
+func describeRegion(_ rect: CGRect) -> String {
+    func n(_ v: CGFloat) -> String { v == v.rounded() ? String(Int(v)) : String(format: "%.1f", v) }
+    return "\(n(rect.origin.x)),\(n(rect.origin.y)) \(n(rect.width))×\(n(rect.height)) pt"
 }
 
 func describe(_ state: PermissionState) -> String {
@@ -203,6 +250,7 @@ struct RecordOptions {
     var duration: Double?
     var preset: QualityPreset = .balanced
     var appBundleID: String?
+    var region: CGRect?
     var micID: String?
     var micEnabled = true
     var outputDir = OutputLocation.defaultDirectory()
@@ -245,6 +293,8 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
         case "--app":
             guard let value = iterator.next() else { die("--app needs a bundle id (see list-apps)") }
             options.appBundleID = value
+        case "--region":
+            options.region = parseRegion(iterator.next())
         case "--mic":
             guard let value = iterator.next() else { die("--mic needs a device id") }
             options.micID = value
@@ -272,6 +322,10 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
     // A script owns its own timeline, so a duration bound would race it.
     if options.script != nil, options.duration != nil {
         die("--script and --duration can't be combined (the script controls timing)")
+    }
+    if options.region != nil, options.appBundleID != nil {
+        die("--region and --app can't be combined "
+            + "(a region captures the screen; an app captures its windows)")
     }
     return options
 }
@@ -331,7 +385,15 @@ func printRecordDryRun(_ options: RecordOptions) {
     print("Recording configuration (dry-run — no capture):")
     print("  Screen recording permission: \(describe(Permissions.screenRecordingState()))")
     print("  Preset:   \(options.preset.rawValue)")
-    print("  Capture:  \(options.appBundleID.map { "app \($0)" } ?? "entire screen")")
+    let captureDescription: String
+    if let region = options.region {
+        captureDescription = "region \(describeRegion(region)) on the main display"
+    } else if let bundleID = options.appBundleID {
+        captureDescription = "app \(bundleID)"
+    } else {
+        captureDescription = "entire screen"
+    }
+    print("  Capture:  \(captureDescription)")
     print("  FPS cap:  \(CaptureConfiguration().frameRateCap)")
     print("  Duration: \(options.duration.map { "\(Int($0))s" } ?? "until stopped")")
 
@@ -472,7 +534,7 @@ func performRecording(_ options: RecordOptions) async {
 
     let mic = resolveMicrophone(micEnabled: options.micEnabled, preferredID: options.micID)
     if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
-    let content: ContentSelection = options.appBundleID.map { .app(bundleID: $0) } ?? .display(.main)
+    let content = contentSelection(appBundleID: options.appBundleID, region: options.region)
     let configuration = CaptureConfiguration(
         content: content, microphone: mic.selection,
         microphoneRecovery: mic.recovery, quality: options.preset)
@@ -498,6 +560,7 @@ func performRecording(_ options: RecordOptions) async {
     }
     print("record: \(options.preset.rawValue) → \(outputURL.path)  (\(stopHint))")
     if let bundleID = options.appBundleID { print("  capturing app: \(bundleID)") }
+    if let region = options.region { print("  capturing region: \(describeRegion(region)) on the main display") }
 
     await session.start()
     let ticker = Task { await runProgressTicker(session, outputURL: outputURL) }

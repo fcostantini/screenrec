@@ -87,6 +87,38 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   resolvable yet. `CapturableApps`/`list-apps` read the same enumeration the engine resolves
   against, so a listed app is always bindable.
 
+## 1b. Region capture (`SCStreamConfiguration.sourceRect`) — measured 2026-07-22, M11-T1
+
+Record an arbitrary rectangle of one display. Mechanism: a plain **whole-display** filter
+(`SCContentFilter(display:excludingWindows:[])`) plus `sourceRect` to crop it, and `width`/`height`
+sized to the region (not the display). `resolveRegion` (CaptureEngine) is the pure seam.
+
+- **Coordinate space & origin — MEASURED top-left, in display points.** `sourceRect` is in the
+  same space as `filter.contentRect`: **points, origin top-left** — NOT AppKit's bottom-left screen
+  points. Verified conclusively: a `record --region 0,0,1200,120` frame matched `screencapture -R
+  0,0,1200,120` (the menu bar — a known top-left-points shot) at a normalized image diff of 0.019,
+  and did NOT match the same-size bottom strip (diff 0.170, ≈ the top-vs-bottom difference itself).
+  A bottom-left origin would have captured the bottom strip at `y=0`; it captured the menu bar.
+- **Retina → pixels:** output `width`/`height` = region points × `filter.pointPixelScale`, same as
+  the whole-display path (§1). On this display that's ×2 (800×500 pt → 1600×1000 px, live-probed).
+- **Even-dimension snap:** encoders want even chroma dims, so pixels are **floored to even**, and
+  `sourceRect` is trimmed to `evenPx / scale`. The floor (not round) matters: rounding up could push
+  `sourceRect.maxX` a sub-pixel past the display edge on a fractional straddle — floor keeps
+  `sourceRect ⊆ clamped ⊆ display`. The point→pixel map then stays exact 1:1.
+- **Edge-straddle → clamp; off-screen → fail loud.** A rect that overruns an edge is clamped to the
+  display (`rect.intersection`); one that doesn't overlap at all (or is zero-area / non-finite /
+  rounds under 2 px) **fails to start** with actionable copy — never a silent whole-screen fallback
+  (the M7 `.app`-gone precedent).
+- **`destinationRect` is left default (omitted).** docs/03 M11 floated setting it; in practice the
+  default (fill the full region-sized output) places the cropped source 1:1 with no letterbox —
+  live-verified exact. Setting it is unnecessary.
+- **Audio has NO region.** Region uses the plain display filter, so system audio is whole-machine —
+  unlike an `.app` filter, which scopes system audio to the app (§1a). The mic path is unaffected.
+- **Frame delivery is the display path's** (frame-on-change from the whole display), not `.app`'s
+  continuous ~fps (§1a). So `.region` attaches the StallWatchdog exactly as whole-display does.
+- **One display only.** `sourceRect` is per-display; a region spanning two monitors is out of scope
+  (M11 non-goal). The CLI region targets `.main`; the enum carries a `DisplaySelection` for M11-T2.
+
 ## 2. TCC / permissions (both PoC field bugs lived here)
 
 - **Screen & System Audio Recording** (`kTCCServiceScreenCapture`): covers system audio

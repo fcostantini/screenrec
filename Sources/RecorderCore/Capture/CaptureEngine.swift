@@ -117,7 +117,20 @@ public actor CaptureEngine {
             let handler = StreamHandler(router: router) { [weak self] error in
                 Task { await self?.terminate(Self.endReason(forStreamError: error)) }
             }
-            let (filter, streamConfig) = makeStreamConfiguration(for: display, including: includedApp)
+            let filter = Self.makeFilter(for: display, including: includedApp)
+            let regionRender: RegionRender?
+            if case .region(_, let rect) = configuration.content {
+                switch Self.resolveRegion(
+                    rect: rect, displayPointSize: filter.contentRect.size,
+                    scale: CGFloat(filter.pointPixelScale)
+                ) {
+                case .fail(let message): return failToStart(message)
+                case .ok(let render): regionRender = render
+                }
+            } else {
+                regionRender = nil
+            }
+            let streamConfig = makeStreamConfiguration(for: filter, region: regionRender)
             let stream = SCStream(filter: filter, configuration: streamConfig, delegate: handler)
             try stream.addStreamOutput(handler, type: .screen, sampleHandlerQueue: screenQueue)
             try stream.addStreamOutput(handler, type: .audio, sampleHandlerQueue: audioQueue)
@@ -239,10 +252,12 @@ public actor CaptureEngine {
     }
 
     /// An `.app` filter still needs a display to composite on; it takes the `.main` default.
+    /// `.region` names its own display.
     private var displaySelection: DisplaySelection {
         switch configuration.content {
         case .display(let selection): selection
         case .app: .main
+        case .region(let display, _): display
         }
     }
 
@@ -255,22 +270,33 @@ public actor CaptureEngine {
         }
     }
 
-    private func makeStreamConfiguration(
+    private static func makeFilter(
         for display: SCDisplay, including app: SCRunningApplication?
-    ) -> (SCContentFilter, SCStreamConfiguration) {
-        let filter: SCContentFilter
+    ) -> SCContentFilter {
         if let app {
-            filter = SCContentFilter(display: display, including: [app], exceptingWindows: [])
-        } else {
-            filter = SCContentFilter(display: display, excludingWindows: [])
+            return SCContentFilter(display: display, including: [app], exceptingWindows: [])
         }
-        let (width, height) = CaptureConfiguration.pixelDimensions(
-            pointSize: filter.contentRect.size,
-            pointPixelScale: CGFloat(filter.pointPixelScale)
-        )
+        return SCContentFilter(display: display, excludingWindows: [])
+    }
+
+    private func makeStreamConfiguration(
+        for filter: SCContentFilter, region: RegionRender?
+    ) -> SCStreamConfiguration {
         let config = SCStreamConfiguration()
-        config.width = width
-        config.height = height
+        if let region {
+            // Crop to the region: SCK captures `sourceRect` (display points) into a
+            // region-sized output. `width`/`height` already match the crop 1:1 (docs/02 §1b).
+            config.sourceRect = region.sourceRect
+            config.width = region.width
+            config.height = region.height
+        } else {
+            let (width, height) = CaptureConfiguration.pixelDimensions(
+                pointSize: filter.contentRect.size,
+                pointPixelScale: CGFloat(filter.pointPixelScale)
+            )
+            config.width = width
+            config.height = height
+        }
         // Clamp the public, unvalidated fps: 0/negative yields a CMTime SCK rejects, and a
         // value above Int32.max traps the CMTimeScale initializer.
         let fps = min(max(configuration.frameRateCap, 1), 240)
@@ -280,7 +306,7 @@ public actor CaptureEngine {
         var microphoneID: String?
         if case .device(let id) = configuration.microphone { microphoneID = id }
         config.applyAudioCapture(microphoneID: microphoneID)
-        return (filter, config)
+        return config
     }
 
     // MARK: - Pure decisions (unit-tested with injected state)
@@ -317,12 +343,81 @@ public actor CaptureEngine {
 
     /// The stall watchdog's premise — user active ⇒ frames expected — only holds for
     /// whole-display capture: under an app filter the user can be active all day in an app
-    /// that isn't being recorded (docs/02 §7).
+    /// that isn't being recorded (docs/02 §7). A `.region` is a display-filter capture
+    /// (frame-on-change from the whole display), so it inherits the display path's behavior.
     static func attachesStallWatchdog(to content: ContentSelection) -> Bool {
         switch content {
-        case .display: true
+        case .display, .region: true
         case .app: false
         }
+    }
+
+    /// A region resolved against its display: the crop in display points plus the output pixel
+    /// size (even-snapped). `sourceRect` is trimmed so it maps 1:1 onto `width`×`height`.
+    struct RegionRender: Equatable {
+        let sourceRect: CGRect
+        let width: Int
+        let height: Int
+    }
+
+    enum RegionDecision: Equatable {
+        case ok(RegionRender)
+        case fail(String)
+    }
+
+    /// Resolves a region (display points, top-left origin — docs/02 §1b) against the display,
+    /// clamping an edge-straddle. Fails loud when non-finite/non-positive, off the display, or
+    /// under 2 px. Output pixels floor even (encoders want even chroma dims) and `sourceRect` is
+    /// trimmed to `evenPx / scale`, floored so it never overruns the clamped edge.
+    static func resolveRegion(
+        rect: CGRect, displayPointSize: CGSize, scale: CGFloat
+    ) -> RegionDecision {
+        // `scale` is a display's backing factor (≥ 1); a width == 0 short-circuits before the
+        // division below, so scale is never a divide-by-zero here and needs no guard.
+        guard rect.origin.x.isFinite, rect.origin.y.isFinite,
+              rect.width.isFinite, rect.height.isFinite,
+              rect.width > 0, rect.height > 0 else {
+            return .fail(regionInvalidSizeMessage(rect: rect))
+        }
+        let clamped = rect.intersection(CGRect(origin: .zero, size: displayPointSize))
+        guard !clamped.isNull, clamped.width > 0, clamped.height > 0 else {
+            return .fail(regionOffScreenMessage(rect: rect, displayPointSize: displayPointSize))
+        }
+        // Floor (not round) to whole even pixels so `sourceRect = px / scale` can never overrun
+        // the clamped edge; the epsilon absorbs float error so an exact N.0 keeps N, not N−1.
+        let width = evenFloor(Int(clamped.width * scale + 1e-6))
+        let height = evenFloor(Int(clamped.height * scale + 1e-6))
+        guard width > 0, height > 0 else { return .fail(regionTooSmallMessage) }
+        let sourceRect = CGRect(
+            x: clamped.origin.x, y: clamped.origin.y,
+            width: CGFloat(width) / scale, height: CGFloat(height) / scale)
+        return .ok(RegionRender(sourceRect: sourceRect, width: width, height: height))
+    }
+
+    /// Largest even integer ≤ `value` (assumed ≥ 0).
+    private static func evenFloor(_ value: Int) -> Int { value - (value % 2) }
+
+    static func regionInvalidSizeMessage(rect: CGRect) -> String {
+        "The capture region needs a positive width and height "
+            + "(got width \(coordinate(rect.width)), height \(coordinate(rect.height)))."
+    }
+
+    static func regionOffScreenMessage(rect: CGRect, displayPointSize: CGSize) -> String {
+        "The capture region (x \(coordinate(rect.origin.x)), y \(coordinate(rect.origin.y)), "
+            + "\(coordinate(rect.width))×\(coordinate(rect.height)) pt) doesn't overlap the "
+            + "\(coordinate(displayPointSize.width))×\(coordinate(displayPointSize.height))-pt "
+            + "display. Pick a region that's on screen."
+    }
+
+    static let regionTooSmallMessage =
+        "The capture region is too small — it rounds to fewer than 2 pixels. Choose a larger region."
+
+    /// Formats a coordinate without a trailing `.0` for whole values; guards the `Int` cast
+    /// against non-finite/huge inputs so an off-screen message can't trap.
+    private static func coordinate(_ value: CGFloat) -> String {
+        guard value.isFinite else { return "\(value)" }
+        if value == value.rounded(), abs(value) < 1e15 { return String(Int(value)) }
+        return String(format: "%.1f", value)
     }
 
     /// Maps a start-time error to user-facing guidance. Ungranted permission arrives as a
