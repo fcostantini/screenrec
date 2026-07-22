@@ -33,7 +33,10 @@ Order and grouping (separators between groups):
    gated on a *blocking* row (nobody gets nagged about an optional one) — this only keeps the
    door openable. Onboarding never *reappears* on its own once satisfied; it can always be
    *asked for*.
-2. **Start Recording** — primary action, bold.
+2. **Start Recording** — primary action, bold. **M12-T3: the first actionable row** — the export/replay
+   receipts (below) sit *under* Start/Arm, never squatting above it. When the opt-in start/stop shortcut
+   is enabled (`recordHotkey`), Start advertises the combo in the shortcut column (the `Save Replay Now`
+   pattern), and `Stop & Save` does the same while recording.
 3. **Instant Replay armed** — checkmark toggle; right hint `⌥⌘R saves`. Persisted.
    **M5** (Franco, 2026-07-15): a toggle that arms nothing is a lie for a whole milestone.
 4. — separator —
@@ -67,6 +70,14 @@ Order and grouping (separators between groups):
    device. The recording menu's active-mic line names the *resolved* device, so the menu doesn't lie.
    (A `.menu` Picker honors a `Divider()`, though not text color — see "Menu text styling".)
 7. `Quality ▸` submenu: Efficient / Balanced / High (docs/02 §3 presets).
+
+   **M12-T3 — the titles carry the current pick.** These three submenu rows read `Source: <pick>` /
+   `Microphone: <pick>` / `Quality: <pick>` (e.g. `Source: Region 820×512`, `Microphone: None`,
+   `Quality: High`), so a glance tells the truth without opening the submenu (the `.menu` bridge keeps
+   the title text). The Source value mirrors the checkmarked row (whole screen — named only when there's
+   a display choice — / app name / `Region <w>×<h>`); Microphone reads through `presentMicrophonePreference`,
+   so an away device shows `None`, and Automatic shortens to `Automatic`; a picked-but-closed app shows
+   its name (the `(not running)` detail stays on the submenu row). Pure `sourceMenuLabel`/`microphoneMenuLabel`.
 8. — separator —
 9. `Open Recordings Folder — <~/path>` — reveals the output dir in Finder, and **shows the current
    destination** as a home-relative path (e.g. `~/Movies`) so it's visible without opening (Franco,
@@ -81,9 +92,12 @@ Order and grouping (separators between groups):
     **Quick Look** opens the system preview panel (`QLPreviewPanel`, space toggles); **Share…** the OS
     share sheet (`NSSharingServicePicker` — AirDrop/Messages/Mail, no screenrec-hosted anything);
     **Copy** writes the file to the pasteboard so ⌘V drops it into Slack/Finder. `Trim…` opens the Trim
-    window (below). An export shows a top-of-menu `Exporting <name>…` row while it runs (stamped at open,
-    not ticking — the M6-T10 constraint) and an `Exported to MP4 · <name>` receipt — **M12-T1 made it a
-    submenu too**, so the exported `.mp4`/`.gif` gets the same actions. **M12-T2** then gave exports a
+    window (below). An export shows an `Exporting <name>…` row while it runs (stamped at open, not ticking
+    — the M6-T10 constraint) and an `Exported to MP4 · <name>` receipt — **M12-T1 made it a submenu too**,
+    so the exported `.mp4`/`.gif` gets the same actions. **M12-T3** sits these receipts **below Start/Arm**
+    (Start is the first actionable row) and **expires a stale one**: a persisted receipt older than one hour
+    (`LastExport.date`, checked at menu open) is dropped, so it can't reappear as fresh from an earlier
+    session — the file still lives in Recent Exports. **M12-T2** gave exports a
     real home: a **`Recent Exports`** group below the recordings (up to 3 most-recent `.mp4`/`.gif` in the
     output dir, same submenu), and the receipt now **survives relaunch** (persisted `lastExportPath`,
     validated — a receipt whose file was moved/trashed is dropped). The submenu also gained a third,
@@ -339,7 +353,7 @@ moved):
 | `recordHotkey` | Dict: keyCode Int, modifiers Int; **absent ⇒ off** (M9-T4, opt-in global start/stop) | M9-T4 |
 | `showsMenuBarTimer` | Bool; **absent ⇒ on** (opt-out). The status-item label's live elapsed clock while recording (M9-T3) | M9-T3 |
 | `gifFPS` · `gifWidth` · `gifMaxSeconds` | Int; each snaps to its nearest picker choice on load, absent ⇒ 15 / 480 / 30. The `Save as GIF` caps (M10-T3 follow-up) | M10-T3 follow-up |
-| `lastExportPath` | String path; **absent ⇒ no receipt** (M12-T2). The last export, so its menu receipt survives relaunch. **Dropped on load if the file is gone** (moved/trashed). Not part of `Settings` — a transient pointer, not user config; its own load/save | M12-T2 |
+| `lastExportPath` · `lastExportDate` | String path + Date (M12-T2/T3); **absent ⇒ no receipt**. The last export, so its menu receipt survives relaunch — dropped on load if the file is gone (moved/trashed) **or has no date** (a pre-T3 entry), and expired at menu open once the date is **older than one hour** (M12-T3). Not part of `Settings` — a transient pointer, not user config; its own load/save | M12-T2/T3 |
 
 ⚠️ **`launchAtLogin` is NOT a UserDefaults key (amended M6-T5).** The spec originally listed
 one, but `SMAppService` persists the login-item registration itself, so a stored bool would be

@@ -60,6 +60,7 @@ import RecorderCore
         #expect(SettingsStore.Key.gifWidth == "gifWidth")
         #expect(SettingsStore.Key.gifMaxSeconds == "gifMaxSeconds")
         #expect(SettingsStore.Key.lastExportPath == "lastExportPath")
+        #expect(SettingsStore.Key.lastExportDate == "lastExportDate")
     }
 
     // MARK: - The export receipt (M12-T2)
@@ -71,23 +72,39 @@ import RecorderCore
         try Data("x".utf8).write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
 
-        SettingsStore.saveLastExport(file, to: defaults)
-        #expect(SettingsStore.loadLastExport(from: defaults) == file)
+        let export = LastExport(url: file, date: Date(timeIntervalSince1970: 1_000_000))
+        SettingsStore.saveLastExport(export, to: defaults)
+        #expect(SettingsStore.loadLastExport(from: defaults) == export)   // url AND date survive
     }
 
     @Test func aReceiptWhoseFileIsGoneIsDroppedOnLoad() {
         // A persisted pointer to a file since moved or trashed must not resurface as a broken row.
         let defaults = makeDefaults().defaults
         SettingsStore.saveLastExport(
-            URL(fileURLWithPath: "/tmp/gone-\(UUID().uuidString).mp4"), to: defaults)
+            LastExport(url: URL(fileURLWithPath: "/tmp/gone-\(UUID().uuidString).mp4"), date: Date()),
+            to: defaults)
         #expect(SettingsStore.loadLastExport(from: defaults) == nil)
     }
 
-    @Test func savingNilClearsTheReceipt() {
+    @Test func aPreT3ReceiptWithNoDateIsDroppedOnLoad() throws {
+        // An entry persisted before M12-T3 has a path but no date; without a date it can't be aged,
+        // so it's dropped rather than shown undismissable.
         let defaults = makeDefaults().defaults
-        SettingsStore.saveLastExport(URL(fileURLWithPath: "/tmp/x.mp4"), to: defaults)
+        let file = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("legacy-\(UUID().uuidString).mp4")
+        try Data("x".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        defaults.set(file.path, forKey: SettingsStore.Key.lastExportPath)   // path only, no date
+        #expect(SettingsStore.loadLastExport(from: defaults) == nil)
+    }
+
+    @Test func savingNilClearsBothReceiptKeys() {
+        let defaults = makeDefaults().defaults
+        SettingsStore.saveLastExport(
+            LastExport(url: URL(fileURLWithPath: "/tmp/x.mp4"), date: Date()), to: defaults)
         SettingsStore.saveLastExport(nil, to: defaults)
         #expect(defaults.string(forKey: SettingsStore.Key.lastExportPath) == nil)
+        #expect(defaults.object(forKey: SettingsStore.Key.lastExportDate) == nil)
     }
 
     @Test func savesUnderExactlyThoseKeysAndNoOthers() {

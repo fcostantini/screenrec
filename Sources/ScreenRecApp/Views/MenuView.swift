@@ -43,23 +43,24 @@ struct MenuView: View {
 
         Divider()
 
-        exportStatusRow
-        lastReplayRow
-
-        Button("Start Recording") { Task { await state.start() } }
-            .disabled(state.readiness != .ready)
-
+        // docs/06 (M12-T3): Start is the first actionable row — the export/replay receipts sit
+        // below it, never squatting above the primary action.
+        startRecordingRow
         replayControls
 
         Divider()
+
+        exportStatusRow
+        lastReplayRow
 
         // A `Picker` in menu content renders as docs/06 items 5–7 ask: a submenu with a
         // checkmark on the current entry. An explicit `Menu` forced `.inline` adds separators.
         //
         // Source (docs/06 item 5, M7-T2): screens above the divider, running apps below — the
         // Microphone submenu's shape. A picked app that isn't running stays listed, dimmed and
-        // checkmarked, so the pick is visible without lying (its Start fails loud instead).
-        Picker("Source", selection: $state.sourceChoice) {
+        // checkmarked, so the pick is visible without lying (its Start fails loud instead). The
+        // title carries the current pick (M12-T3), so a glance tells the truth without opening it.
+        Picker("Source: \(state.sourceMenuLabel)", selection: $state.sourceChoice) {
             ForEach(state.displays) { screen in
                 Text(state.displays.count == 1 ? "Entire Screen" : "Entire Screen (\(screen.name))")
                     .tag(SourceChoice.display(screen.id))
@@ -87,7 +88,7 @@ struct MenuView: View {
         // Reads through `presentMicrophonePreference`: the checkmark sits on None while a picked
         // device is away, without forgetting the pick. Writes are real user picks. Automatic
         // (docs/06 item 6) follows the system default at capture start.
-        Picker("Microphone", selection: Binding(
+        Picker("Microphone: \(state.microphoneMenuLabel)", selection: Binding(
             get: { state.presentMicrophonePreference },
             set: { state.microphonePreference = $0 }
         )) {
@@ -99,7 +100,7 @@ struct MenuView: View {
             }
         }
 
-        Picker("Quality", selection: $state.quality) {
+        Picker("Quality: \(state.quality.menuTitle)", selection: $state.quality) {
             ForEach(QualityPreset.allCases, id: \.self) { preset in
                 Text(preset.menuTitle).tag(preset)
             }
@@ -148,7 +149,8 @@ struct MenuView: View {
         } else {
             Button("Pause") { Task { await state.pause() } }
         }
-        Button("Stop & Save") { Task { await state.stop() } }
+        // Stop advertises the same opt-in shortcut (M12-T3): while recording, the combo stops.
+        recordActionRow("Stop & Save") { Task { await state.stop() } }
 
         Divider()
 
@@ -266,6 +268,28 @@ struct MenuView: View {
         }
     }
 
+    /// Start Recording, first actionable row, advertising the opt-in start/stop shortcut (M12-T3).
+    @ViewBuilder private var startRecordingRow: some View {
+        recordActionRow("Start Recording") { Task { await state.start() } }
+            .disabled(state.readiness != .ready)
+    }
+
+    /// A record action (Start / Stop) that advertises the opt-in start/stop shortcut when it's set
+    /// (M12-T3), the `saveReplayRow` pattern: the glyph column when SwiftUI can map the combo, else
+    /// a `· ⌥⌘S` title suffix; a plain title when the shortcut is off (`recordHotkey == nil`).
+    @ViewBuilder private func recordActionRow(
+        _ title: String, action: @escaping () -> Void
+    ) -> some View {
+        if let hotkey = state.recordHotkey, let key = HotkeyDisplay.keyEquivalent(for: hotkey) {
+            Button(title, action: action)
+                .keyboardShortcut(key, modifiers: HotkeyDisplay.eventModifiers(for: hotkey))
+        } else if let hotkey = state.recordHotkey {
+            Button("\(title) · \(HotkeyDisplay.string(for: hotkey))", action: action)
+        } else {
+            Button(title, action: action)
+        }
+    }
+
     /// Always a button, never inert text: docs/06 draws it disabled outside blocking conditions,
     /// but notifications don't block, so `needsOnboarding` goes false and a user who dismissed
     /// the prompt would have no route back to the setup window. Auto-open still only fires on a
@@ -291,6 +315,7 @@ struct MenuView: View {
     /// change, so a no-op reopen publishes nothing and the open menu isn't rebuilt (M6-T10).
     private func refreshAtOpen() {
         state.refreshRecentRecordings()
+        state.expireStaleExportReceipt()   // drop a receipt aged out since a prior session (M12-T3)
         if !state.isSessionActive {
             state.refreshSources(displays: DisplayOption.liveScreens())
             // Async because SCShareableContent takes ~a second; on the first open the app rows

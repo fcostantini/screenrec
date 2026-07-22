@@ -288,7 +288,7 @@ public final class AppState {
     public private(set) var lastExport: LastExport? {
         didSet {
             guard lastExport != oldValue else { return }
-            SettingsStore.saveLastExport(lastExport?.url, to: defaults)
+            SettingsStore.saveLastExport(lastExport, to: defaults)
         }
     }
     /// The transcode and the GIF encode, injected so tests exercise the wiring without the
@@ -396,8 +396,9 @@ public final class AppState {
         gifWidth = settings.gifWidth
         gifMaxSeconds = settings.gifMaxSeconds
         // The persisted export receipt (M12-T2), validated: dropped if the file is gone. Set here,
-        // where property observers don't fire, so seeding doesn't re-save.
-        lastExport = SettingsStore.loadLastExport(from: defaults).map(LastExport.init(url:))
+        // where property observers don't fire, so seeding doesn't re-save. Staleness (M12-T3) is
+        // judged at menu open, not here.
+        lastExport = SettingsStore.loadLastExport(from: defaults)
         replay = replayController ?? ReplayController()
         // `screenWasGrantedAtLaunch` is captured by PermissionsModel's own init. Populate the rows
         // before the first render, or the window flickers.
@@ -555,7 +556,7 @@ public final class AppState {
                 let url = try await export(source, output)
                 guard let self else { return }
                 exportInProgress = nil
-                lastExport = LastExport(url: url)
+                lastExport = LastExport(url: url, date: Date())
                 notifier?(success(url))
             } catch {
                 guard let self else { return }
@@ -749,6 +750,29 @@ public final class AppState {
         return microphonePreference
     }
 
+    /// The current Source pick as menu text (M12-T3), so the submenu title tells the truth without
+    /// being opened: `Region 1645×721`, an app's name, or the whole screen (named when there's a
+    /// choice of display). Mirrors the checkmarked picker row.
+    public var sourceMenuLabel: String {
+        if let region = selectedRegion { return "Region \(Self.regionLabel(region.rect.size))" }
+        if let bundleID = selectedAppBundleID { return appName(for: bundleID) }
+        if displays.count > 1,
+           let screen = displays.first(where: { $0.id == selectedDisplayID }) {
+            return "Entire Screen (\(screen.name))"
+        }
+        return "Entire Screen"
+    }
+
+    /// The current Microphone pick as menu text (M12-T3): `None`, `Automatic`, or the device name —
+    /// through `presentMicrophonePreference`, so an away device reads `None` (checkmark truth).
+    public var microphoneMenuLabel: String {
+        switch presentMicrophonePreference {
+        case .none: return "None"
+        case .automatic: return "Automatic"
+        case .device(let id): return microphones.first(where: { $0.uniqueID == id })?.name ?? "None"
+        }
+    }
+
     public func refreshRecentRecordings() {
         let recents = RecentRecordings.inDirectory(outputDirectory)
         if recentRecordings != recents { recentRecordings = recents }
@@ -756,6 +780,19 @@ public final class AppState {
             outputDirectory, extensions: RecentRecordings.exportExtensions,
             limit: RecentRecordings.exportLimit)
         if recentExports != exports { recentExports = exports }
+    }
+
+    /// The window an export receipt stays "fresh" (M12-T3): long enough that an export-then-relaunch
+    /// keeps its receipt, short enough that one from an earlier day doesn't resurface.
+    static let exportReceiptFreshness: TimeInterval = 3600   // 1 hour
+
+    /// Drops a persisted export receipt (M12-T2) that has aged past `exportReceiptFreshness` (M12-T3),
+    /// so it can't squat above Start from a session hours ago. The file still lives in Recent Exports.
+    /// Called at menu open, riding the same stamp-at-open refresh as the recents (M6-T10).
+    public func expireStaleExportReceipt() {
+        if let export = lastExport, export.isStale(now: Date(), freshFor: Self.exportReceiptFreshness) {
+            lastExport = nil
+        }
     }
 
     /// Renames a recording or export in place, extension intact (M12-T2). A blank/unchanged name is
@@ -778,7 +815,9 @@ public final class AppState {
                 return
             }
         }
-        if isSameFile(lastExport?.url, url) { lastExport = LastExport(url: target) }
+        if let export = lastExport, isSameFile(export.url, url) {
+            lastExport = LastExport(url: target, date: export.date)   // renaming keeps the export time
+        }
         if let replay = lastReplay, isSameFile(replay.url, url) {
             lastReplay = LastReplay(url: target, seconds: replay.seconds)
         }

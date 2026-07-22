@@ -185,22 +185,28 @@ public enum SettingsStore {
         /// receipt. Not part of `Settings` (it's a transient pointer, not user config) — its own
         /// load/save below. Dropped on load if the file is gone (moved/trashed).
         public static let lastExportPath = "lastExportPath"
+        /// When that export finished (M12-T3), so a stale receipt can expire. Stored beside the path.
+        public static let lastExportDate = "lastExportDate"
     }
 
-    /// The persisted export receipt (M12-T2), validated against the filesystem: a pointer to a file
-    /// that's since been moved or trashed is dropped, so a broken receipt never shows.
-    public static func loadLastExport(from defaults: UserDefaults) -> URL? {
+    /// The persisted export receipt (M12-T2/T3), validated against the filesystem: a pointer to a
+    /// file that's since been moved or trashed — or a pre-T3 entry with no date — is dropped, so a
+    /// broken receipt never shows. Staleness (the date) is judged later, at menu open.
+    public static func loadLastExport(from defaults: UserDefaults) -> LastExport? {
         guard let path = defaults.string(forKey: Key.lastExportPath), !path.isEmpty,
-              FileManager.default.fileExists(atPath: path)
+              FileManager.default.fileExists(atPath: path),
+              let date = defaults.object(forKey: Key.lastExportDate) as? Date
         else { return nil }
-        return URL(fileURLWithPath: path)
+        return LastExport(url: URL(fileURLWithPath: path), date: date)
     }
 
-    public static func saveLastExport(_ url: URL?, to defaults: UserDefaults) {
-        if let url {
-            defaults.set(url.path, forKey: Key.lastExportPath)
+    public static func saveLastExport(_ export: LastExport?, to defaults: UserDefaults) {
+        if let export {
+            defaults.set(export.url.path, forKey: Key.lastExportPath)
+            defaults.set(export.date, forKey: Key.lastExportDate)
         } else {
             defaults.removeObject(forKey: Key.lastExportPath)
+            defaults.removeObject(forKey: Key.lastExportDate)
         }
     }
 

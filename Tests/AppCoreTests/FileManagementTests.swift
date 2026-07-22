@@ -28,7 +28,7 @@ import RecorderCore
     /// An AppState over `defaults` whose persisted receipt already points at `receipt` (the M12-T2
     /// seed path). The caller keeps `defaults` so it can inspect what a rename/trash wrote back.
     private func makeState(receipt: URL, defaults: UserDefaults) -> AppState {
-        SettingsStore.saveLastExport(receipt, to: defaults)
+        SettingsStore.saveLastExport(LastExport(url: receipt, date: Date()), to: defaults)
         return AppState(defaults: defaults)
     }
 
@@ -66,7 +66,7 @@ import RecorderCore
         #expect(FileManager.default.fileExists(atPath: renamed.path))
         #expect(!FileManager.default.fileExists(atPath: export.path))
         #expect(state.lastExport?.url == renamed)
-        #expect(SettingsStore.loadLastExport(from: defaults) == renamed)
+        #expect(SettingsStore.loadLastExport(from: defaults)?.url == renamed)
         // The invariant: renaming a derived .mp4 never touches its .mov source.
         #expect(FileManager.default.fileExists(atPath: source.path))
     }
@@ -104,6 +104,23 @@ import RecorderCore
         state.rename(directory.appendingPathComponent("Clip.mp4"), to: "clip")
         #expect(FileManager.default.fileExists(atPath: directory.appendingPathComponent("clip.mp4").path))
         #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("clip 2.mp4").path))
+    }
+
+    @Test func renamePreservesTheExportReceiptDate() throws {
+        // The anti-squat invariant (M12-T3): renaming keeps the original export time, so a renamed
+        // old receipt can't become fresh (date: Date()) and re-squat above Start.
+        let directory = try makeFixture(["Old.mp4"])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let old = directory.appendingPathComponent("Old.mp4")
+
+        let defaults = makeDefaults()
+        let exportedAt = Date(timeIntervalSince1970: 1_000_000)   // long ago, unmistakably not "now"
+        SettingsStore.saveLastExport(LastExport(url: old, date: exportedAt), to: defaults)
+        let state = AppState(defaults: defaults)
+
+        state.rename(old, to: "Renamed")
+        #expect(state.lastExport?.url == directory.appendingPathComponent("Renamed.mp4"))
+        #expect(state.lastExport?.date == exportedAt)             // preserved, not refreshed to now
     }
 
     @Test func renamingADifferentFileLeavesTheReceiptUntouched() throws {

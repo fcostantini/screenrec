@@ -5,6 +5,38 @@
 
 ## Now
 
+- **🪧 M12-T3 DONE — the menu tells the truth at a glance, LIVE-VERIFIED (2026-07-22).** Four parts:
+  **(A)** the Source/Microphone/Quality submenu **titles carry the current pick** (`Source: Discord`,
+  `Microphone: Automatic`, `Quality: High`) via pure `AppState.sourceMenuLabel`/`microphoneMenuLabel`
+  (region→app→named-display priority mirroring `sourceChoice`; mic through `presentMicrophonePreference`
+  so an away device reads `None`, Automatic shortens to `Automatic`) + `quality.menuTitle` — the `.menu`
+  bridge keeps title text. **(B)** **Start Recording** (and **Stop & Save**) **advertise the opt-in
+  start/stop hotkey** when `recordHotkey != nil` — a shared `recordActionRow` mirroring `saveReplayRow`
+  (glyph column when SwiftUI maps the combo, else `· ⌥⌘S` suffix; plain when off). **(C)** the
+  export/replay **receipts move below Start/Arm** so Start is the first actionable row (idle menu). **(D)**
+  a persisted receipt **older than 1 h expires** at menu open (`LastExport.date` + pure
+  `isStale(now:freshFor:)` + `expireStaleExportReceipt()` in `refreshAtOpen`, riding the M6-T10
+  stamp-at-open refresh) — clearing it also removes the persisted keys; the file still lives in Recent
+  Exports. `SettingsStore.load/saveLastExport` now round-trip a whole `LastExport` (path + `lastExportDate`);
+  a pre-T3 path-without-date entry is dropped. **Calls (Franco approved defaults):** 1 h freshness ·
+  recording-menu receipts left in place (only Stop gains the suffix) · short `Automatic` · app name (no
+  "(not running)") in the title. **No AppCore capture-path/CLI change; no VERSION bump** (batches toward
+  M12's MINOR). **415 tests (+10:** 4 source labels, 2 mic labels [none/automatic/away + a real-device
+  conditional], `isStale` boundary [>, not >=], expire-clears-stale/keeps-fresh, pre-T3-no-date drop,
+  both-keys-nil clear, rename-preserves-date). Full dev loop green. **Review (code-review agent; verdict
+  CLEAN, no code defects; findings presented → Franco approved):** every flagged concern cleared
+  (init-seed vs didSet, menu-open mutation vs M6-T10, label/checkmark agreement, `isStale` boundary,
+  hotkey double-fire — `start()`'s synchronous `session==nil` guard makes it idempotent); added 2 tests
+  (the real-device mic label + rename-preserves-date), skipped the orphan-key nit (self-healing).
+  **LIVE-VERIFIED (deployed, menudriver dump + `defaults` planting):** titles show real values; Start
+  first with `[⌥⌘S]` when a hotkey is planted; a **2 h-old receipt expired** (no top row + persisted
+  keys cleaned, still in Recent Exports) while a **fresh one showed** below Start/Arm. Test artifacts
+  cleaned (planted keys + dummy file removed, app relaunched clean). **⚠️ Field note:** `defaults write
+  -date "<UTC str>"` DOES store a real `date` (read by `object(forKey:) as? Date`) — the fresh-receipt
+  miss was self-inflicted (the stale run's expiry had already removed `lastExportPath`; I only rewrote
+  the date). **Next: M12-T4 (region entry coherent + honest — `Select Region…` inside `Source ▸`,
+  multi-display hint, `pt · px` overlay badge) — plan artifact first.** M12-T5/T6 pending; M14 unstarted.
+
 - **🗂 M12-T2 DONE — exports become first-class, LIVE-VERIFIED (2026-07-22).** Three parts landed:
   **(A)** a **`Recent Exports`** menu group (up to 3 most-recent `.mp4`/`.gif` in the output dir, same
   file submenu) — `RecentRecordings.inDirectory` generalized to an **extension set** (one dir read,

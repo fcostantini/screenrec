@@ -967,7 +967,7 @@ export and trim are untouched.
       Finder-only and the receipt is in-memory (lost on relaunch, overwritten by the next). **Verify:**
       export a GIF → it appears in recents/exports and survives relaunch; rename and trash work; the
       source is never touched by rename/trash of a derived export.
-- [ ] M12-T3 **The menu tells the truth at a glance.** Inline the current selection in the
+- [x] M12-T3 **The menu tells the truth at a glance.** Inline the current selection in the
       **Source/Microphone/Quality** submenu *titles* (`Source: Region 820×512`, `Microphone: None`,
       `Quality: Balanced` — the `.menu` bridge keeps title text); **advertise the opt-in start/stop
       hotkey** on the Start/Stop rows when `recordHotkey != nil` (like the replay row); keep **`Start
