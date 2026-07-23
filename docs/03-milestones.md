@@ -1061,7 +1061,7 @@ Pure refactors, **no behavior change** — sharpen the biggest files once M12/M1
 `RecordingSession` finalize extraction lands in M13-T3, not here.) The layering and concurrency model
 are load-bearing strengths and stay untouched.
 
-- [ ] M14-T1 **Extract `ExportModel` from `AppState` (1068 LOC).** Move the export cluster
+- [x] M14-T1 **Extract `ExportModel` from `AppState` (1068 LOC).** Move the export cluster
       (`exportInProgress`, `lastExport`, the three inject-closures, `performExport`, the trim target)
       into an `@Observable ExportModel` that AppState owns and forwards to — mirroring `PermissionsModel`
       (M9-T7). ~60 near-zero-coupling lines (it never touches `session`/`replay`/capture-config), and it

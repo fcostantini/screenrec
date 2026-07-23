@@ -5,6 +5,31 @@
 
 ## Now
 
+- **🧹 M14 STARTED — M14-T1 DONE (extracted `ExportModel`), behaviour-preserving, LIVE-VERIFIED
+  (2026-07-23).** The export/trim cluster is split out of `AppState` into a new `@Observable
+  ExportModel` (the `PermissionsModel` M9-T7 pattern): `exportInProgress`, `lastExport` (+ persist
+  didSet + seed), the 3 inject closures, `trimTarget`, `performExport`, `exportToMP4`/`exportToGIF
+  (config param)/`trim`, `expireStaleReceipt`, and `renameReceipt`/`clearReceipt`. **⚠️ The task's
+  "near-zero-coupling" premise had drifted** (M12-T2/T3 added persistence + staleness + rename/trash +
+  Recent Exports to the cluster) — flagged in the plan; Franco chose to proceed. Resolved cleanly:
+  ExportModel takes `defaults` (init) + a `notify` closure (AppState wires `{ [weak self] in
+  self?.notifier?($0) }`, late-bound); AppState keeps the gif caps and passes a built `GifConfiguration`
+  (new pure `gifConfiguration` helper); **rename/trash STAY in AppState** (they also touch `lastReplay`
+  + the recents refresh) and forward the receipt update; **`recentExports` STAYS** (menu-refresh). `exports`
+  is **internal** (not private) so `ExportWiringTests` inject via `state.exports.<closure>` — the sharpened
+  target. AppState **1270 → 1196 LOC**. **426 tests pass UNCHANGED** (the behaviour-preserving bar — every
+  export/rename/trash/staleness test green through the forwarders). Full dev loop green (encoder suites in
+  isolation, VT-wedge lesson). **Review (code-review agent; 9/10, verdict CLEAN behaviour-preserving move,
+  no blockers/should-fix):** all six risk areas confirmed — **@Observable propagation holds** (forwarders
+  register the dependency on the nested model's tracked props, the PermissionsModel mechanism), notify has
+  no retain cycle + is call-time-current, persistence/seed timing identical, rename/trash byte-identical,
+  gif config mapping identical. Two nits left (defensible, no fix): `isSameFile` 1-line dup (each model
+  owns its receipt-identity check), a behaviour-neutral didSet guard. **LIVE-VERIFIED:** deployed, exported
+  via menudriver → the **`Exported to MP4 · …` receipt appeared in the menu** (the one real refactor risk —
+  UI re-render through the forwarder — confirmed). Test files cleaned. **No VERSION bump** (internal, PATCH-
+  worthy, batches). **Next: M14-T2 (dedup the AVAssetWriter drain pump + first-error box into
+  RecorderCore/Support) — plan artifact first.** M14-T3 pending.
+
 - **🎉 v1.7.0 CUT (2026-07-23) — M12 (Share & Surface) earns the MINOR; release.sh clean this time.**
   `VERSION` + `CoreInfo.version` → 1.7.0 (pin test green), committed (`495584c`), and cut via
   **`Scripts/release.sh`** — full gate green (build · test · encode×3 · release-build · **bundle-sign**),

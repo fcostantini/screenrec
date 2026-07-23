@@ -315,35 +315,18 @@ public final class AppState {
     private var flashTask: Task<Void, Never>?
     private static let flashDuration: Duration = .seconds(2)
 
-    /// The source filename of the export in flight (M10-T2, MP4 or GIF), or nil when idle: the
-    /// menu shows an "Exporting…" row and blocks a second export. One at a time, either format.
-    public private(set) var exportInProgress: String?
-    /// The most recent export, for the menu receipt (reveals the file). Replaced by the next, and
-    /// persisted so it survives relaunch (M12-T2) — the didSet mirrors every change to the store;
-    /// a rename re-points it, a trash clears it. Seeded in `init` (validated), where the didSet
-    /// deliberately does not fire.
-    public private(set) var lastExport: LastExport? {
-        didSet {
-            guard lastExport != oldValue else { return }
-            SettingsStore.saveLastExport(lastExport, to: defaults)
-        }
-    }
-    /// The transcode and the GIF encode, injected so tests exercise the wiring without the
-    /// hardware codecs. Each returns where it wrote. Default to the production `Exporter` (M10-T1)
-    /// and `GifExporter` (M10-T3).
-    public var exportFunction: @Sendable (_ source: URL, _ output: URL) async throws -> URL = {
-        try await Exporter.exportToMP4(from: $0, to: $1).url
-    }
-    public var gifExportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: GifConfiguration) async throws -> URL = {
-        try await GifExporter.exportGIF(from: $0, to: $1, configuration: $2).url
-    }
-    public var trimFunction: @Sendable (_ source: URL, _ output: URL, _ start: Double, _ end: Double) async throws -> URL = {
-        try await Trimmer.trim(from: $0, to: $1, start: $2, end: $3).url
-    }
+    /// The export/trim cluster (M14-T1), the `PermissionsModel` pattern: AppState owns it and
+    /// forwards the public surface below, so the view/CLI/test surface is unchanged. Its receipt
+    /// persistence uses `defaults`; its notifications forward to `notifier` (both wired in `init`).
+    /// `internal` (not `private`) so `ExportModelTests` can inject the export-function spies.
+    let exports: ExportModel
 
-    /// The recording the Trim window is editing (M10-T4), or nil. Set when `Trim…` opens the
-    /// window; the view reads it. Transient — not persisted.
-    public var trimTarget: URL?
+    public var exportInProgress: String? { exports.exportInProgress }
+    public var lastExport: LastExport? { exports.lastExport }
+    public var trimTarget: URL? {
+        get { exports.trimTarget }
+        set { exports.trimTarget = newValue }
+    }
 
     // MARK: - Onboarding (docs/06 "Onboarding window") — delegated to PermissionsModel (M9-T7)
 
@@ -435,14 +418,16 @@ public final class AppState {
         gifWidth = settings.gifWidth
         gifMaxSeconds = settings.gifMaxSeconds
         hasSeenReplayBannerWarning = settings.seenReplayBannerWarning
-        // The persisted export receipt (M12-T2), validated: dropped if the file is gone. Set here,
-        // where property observers don't fire, so seeding doesn't re-save. Staleness (M12-T3) is
-        // judged at menu open, not here.
-        lastExport = SettingsStore.loadLastExport(from: defaults)
+        // The export cluster (M14-T1): it seeds its own persisted receipt from `defaults`.
+        exports = ExportModel(defaults: defaults)
         replay = replayController ?? ReplayController()
         // `screenWasGrantedAtLaunch` is captured by PermissionsModel's own init. Populate the rows
         // before the first render, or the window flickers.
         refreshOnboarding()
+
+        // Export notifications forward to whatever `notifier` the app wires (M14-T1) — read at call
+        // time, so it tracks the notifier set after init.
+        exports.notify = { [weak self] in self?.notifier?($0) }
 
         replay.onMicrophoneLost = { [weak self] in
             self?.notifier?(RecordingNotifications.replayMicrophoneLost())
@@ -548,65 +533,18 @@ public final class AppState {
         }
     }
 
-    /// Transcodes a recording or saved clip to a shareable `.mp4` (M10-T2).
-    public func exportToMP4(_ source: URL) {
-        performExport(
-            source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source)),
-            using: exportFunction,
-            success: { RecordingNotifications.exported(url: $0) },
-            failure: RecordingNotifications.exportFailed)
-    }
-
-    /// Saves a recording or clip as a looping GIF (M10-T3), the same off-main, one-at-a-time path,
-    /// with the caps from Settings (M10-T3 follow-up).
-    public func exportToGIF(_ source: URL) {
-        let configuration = GifConfiguration(
-            maxWidth: gifWidth, maxHeight: gifWidth, fps: gifFPS, maxSeconds: Double(gifMaxSeconds))
-        let gifExport = gifExportFunction  // snapshot the value; the closure captures no `self`
-        performExport(
-            source, to: Exporter.availableURL(basedOn: GifExporter.gifSibling(of: source)),
-            using: { try await gifExport($0, $1, configuration) },
-            success: { RecordingNotifications.savedAsGIF(url: $0) },
-            failure: RecordingNotifications.gifExportFailed)
-    }
-
-    /// Losslessly trims `source` to `[start, end]` (M10-T4), the same off-main, one-at-a-time path.
+    // Export/trim actions forward to `exports` (M14-T1). GIF is the one that carries state: AppState
+    // owns the gif caps (persisted config), so it builds the `GifConfiguration` and passes it in.
+    public func exportToMP4(_ source: URL) { exports.exportToMP4(source) }
+    public func exportToGIF(_ source: URL) { exports.exportToGIF(source, configuration: gifConfiguration) }
     public func trim(_ source: URL, from start: Double, to end: Double) {
-        let trim = trimFunction  // snapshot; the closure captures no `self`
-        performExport(
-            source, to: Exporter.availableURL(basedOn: Trimmer.trimmedSibling(of: source)),
-            using: { try await trim($0, $1, start, end) },
-            success: { RecordingNotifications.trimmed(url: $0) },
-            failure: RecordingNotifications.trimFailed)
+        exports.trim(source, from: start, to: end)
     }
 
-    /// Runs an export off the main path — the menu row and the notification carry the outcome. One
-    /// export at a time; the source is only read, so it never touches a live recording. Only a
-    /// success sets `lastExport`; the "Exporting…" row shadows any prior receipt while this runs,
-    /// so a failed re-export leaves the previous export's pointer intact.
-    private func performExport(
-        _ source: URL,
-        to output: URL,
-        using export: @escaping @Sendable (URL, URL) async throws -> URL,
-        success: @escaping (URL) -> RecordingNotification,
-        failure: @escaping () -> RecordingNotification
-    ) {
-        guard exportInProgress == nil else { return }
-        exportInProgress = source.lastPathComponent
-        Task { [weak self, export] in
-            do {
-                let url = try await export(source, output)
-                guard let self else { return }
-                exportInProgress = nil
-                lastExport = LastExport(url: url, date: Date())
-                notifier?(success(url))
-            } catch {
-                guard let self else { return }
-                exportInProgress = nil
-                Self.log.error("export failed: \(error.localizedDescription, privacy: .public)")
-                notifier?(failure())
-            }
-        }
+    /// The `Save as GIF` caps as a `GifConfiguration` (M10-T3 follow-up), built from the persisted
+    /// settings AppState owns. Pure, so the settings→config mapping is testable on its own.
+    var gifConfiguration: GifConfiguration {
+        GifConfiguration(maxWidth: gifWidth, maxHeight: gifWidth, fps: gifFPS, maxSeconds: Double(gifMaxSeconds))
     }
 
     private func syncReplayArming() {
@@ -832,24 +770,14 @@ public final class AppState {
     public func refreshRecentRecordings() {
         let recents = RecentRecordings.inDirectory(outputDirectory)
         if recentRecordings != recents { recentRecordings = recents }
-        let exports = RecentRecordings.inDirectory(
+        let exportFiles = RecentRecordings.inDirectory(
             outputDirectory, extensions: RecentRecordings.exportExtensions,
             limit: RecentRecordings.exportLimit)
-        if recentExports != exports { recentExports = exports }
+        if recentExports != exportFiles { recentExports = exportFiles }
     }
 
-    /// The window an export receipt stays "fresh" (M12-T3): long enough that an export-then-relaunch
-    /// keeps its receipt, short enough that one from an earlier day doesn't resurface.
-    static let exportReceiptFreshness: TimeInterval = 3600   // 1 hour
-
-    /// Drops a persisted export receipt (M12-T2) that has aged past `exportReceiptFreshness` (M12-T3),
-    /// so it can't squat above Start from a session hours ago. The file still lives in Recent Exports.
-    /// Called at menu open, riding the same stamp-at-open refresh as the recents (M6-T10).
-    public func expireStaleExportReceipt() {
-        if let export = lastExport, export.isStale(now: Date(), freshFor: Self.exportReceiptFreshness) {
-            lastExport = nil
-        }
-    }
+    /// Drops a stale export receipt at menu open (M12-T3) — forwards to `exports` (M14-T1).
+    public func expireStaleExportReceipt() { exports.expireStaleReceipt() }
 
     /// Renames a recording or export in place, extension intact (M12-T2). A blank/unchanged name is
     /// a no-op; a collision resolves like the exporters (` 2`). Re-points the receipt if it named
@@ -871,9 +799,7 @@ public final class AppState {
                 return
             }
         }
-        if let export = lastExport, isSameFile(export.url, url) {
-            lastExport = LastExport(url: target, date: export.date)   // renaming keeps the export time
-        }
+        exports.renameReceipt(from: url, to: target)   // re-points the export receipt if it named this
         if let replay = lastReplay, isSameFile(replay.url, url) {
             lastReplay = LastReplay(url: target, seconds: replay.seconds)
         }
@@ -889,7 +815,7 @@ public final class AppState {
             Self.log.error("move to trash failed: \(error.localizedDescription, privacy: .public)")
             return
         }
-        if isSameFile(lastExport?.url, url) { lastExport = nil }
+        exports.clearReceipt(for: url)   // clears the export receipt if it named this
         if isSameFile(lastReplay?.url, url) { lastReplay = nil }
         refreshRecentRecordings()
     }

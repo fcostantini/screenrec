@@ -28,7 +28,7 @@ private final class RangeBox: @unchecked Sendable {
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
         let written = URL(fileURLWithPath: "/tmp/Clip.mp4")
-        state.exportFunction = { _, _ in written }
+        state.exports.exportFunction = { _, _ in written }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
         #expect(state.exportInProgress == "Clip.mov")   // set before the background task runs
@@ -47,7 +47,7 @@ private final class RangeBox: @unchecked Sendable {
         let state = makeState()
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
-        state.exportFunction = { _, _ in throw ExportError.writerFailed("nope") }
+        state.exports.exportFunction = { _, _ in throw ExportError.writerFailed("nope") }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
         while state.exportInProgress != nil { await Task.yield() }
@@ -62,13 +62,13 @@ private final class RangeBox: @unchecked Sendable {
         let state = makeState()
         state.notifier = { _ in }
         let firstURL = URL(fileURLWithPath: "/tmp/A.mp4")
-        state.exportFunction = { _, _ in firstURL }
+        state.exports.exportFunction = { _, _ in firstURL }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/A.mov"))
         while state.exportInProgress != nil { await Task.yield() }
         #expect(state.lastExport?.url == firstURL)
 
-        state.exportFunction = { _, _ in throw ExportError.writerFailed("nope") }
+        state.exports.exportFunction = { _, _ in throw ExportError.writerFailed("nope") }
         state.exportToMP4(URL(fileURLWithPath: "/tmp/B.mov"))
         while state.exportInProgress != nil { await Task.yield() }
         #expect(state.lastExport?.url == firstURL)   // A's pointer isn't erased by B's failure
@@ -78,7 +78,7 @@ private final class RangeBox: @unchecked Sendable {
         let state = makeState()
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
-        state.exportFunction = { _, output in output }
+        state.exports.exportFunction = { _, output in output }
 
         // No suspension point between the two calls, so the first export's task hasn't run yet —
         // the guard sees `exportInProgress` set and drops the second.
@@ -95,7 +95,7 @@ private final class RangeBox: @unchecked Sendable {
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
         let written = URL(fileURLWithPath: "/tmp/Clip.gif")
-        state.gifExportFunction = { _, _, _ in written }
+        state.exports.gifExportFunction = { _, _, _ in written }
 
         state.exportToGIF(URL(fileURLWithPath: "/tmp/Clip.mov"))
         #expect(state.exportInProgress == "Clip.mov")
@@ -114,7 +114,7 @@ private final class RangeBox: @unchecked Sendable {
         state.gifWidth = 640
         state.gifMaxSeconds = 15
         let recorded = ConfigBox()
-        state.gifExportFunction = { _, output, configuration in
+        state.exports.gifExportFunction = { _, output, configuration in
             recorded.value = configuration
             return output
         }
@@ -131,8 +131,8 @@ private final class RangeBox: @unchecked Sendable {
     @Test func oneExportAtATimeAcrossFormats() async {
         let state = makeState()
         state.notifier = { _ in }
-        state.exportFunction = { _, output in output }
-        state.gifExportFunction = { _, output, _ in output }
+        state.exports.exportFunction = { _, output in output }
+        state.exports.gifExportFunction = { _, output, _ in output }
 
         // An MP4 in flight blocks a GIF (they share one guard); no await between, so the MP4
         // task hasn't run yet.
@@ -161,7 +161,7 @@ private final class RangeBox: @unchecked Sendable {
         state.notifier = { posted.append($0) }
         let written = URL(fileURLWithPath: "/tmp/Clip trimmed.mov")
         let range = RangeBox()
-        state.trimFunction = { _, _, start, end in
+        state.exports.trimFunction = { _, _, start, end in
             range.value = (start, end)
             return written
         }
