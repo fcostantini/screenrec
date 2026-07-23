@@ -5,6 +5,17 @@
 
 ## Now
 
+- **🎉 v1.7.0 CUT (2026-07-23) — M12 (Share & Surface) earns the MINOR; release.sh clean this time.**
+  `VERSION` + `CoreInfo.version` → 1.7.0 (pin test green), committed (`495584c`), and cut via
+  **`Scripts/release.sh`** — full gate green (build · test · encode×3 · release-build · **bundle-sign**),
+  tagged `v1.7.0`, pushed main + tag. **0 unpushed; tag on origin; installed build reports 1.7.0**
+  (redeployed to /Users/Shared). The MINOR earns from M12's six user-facing features (T1–T6). **VT stayed
+  healthy** — the lesson from v1.6.1 held: **ran release.sh in the BACKGROUND** (not a short foreground
+  timeout), so it was never killed mid-VideoToolbox-encode and never leaked/wedged; the pre-push hook's
+  gate passed too. **The roadmap is down to one: M14 (Cleanup)** — internal debt (extract `ExportModel`,
+  dedup the `AVAssetWriter` drain pump, retire `fileProgress`). **Next: Franco's pick — dogfood 1.7.0, or
+  M14.**
+
 - **⏸️ M12-T6 DONE — global Pause/Resume + 3-2-1 count-in; M12 COMPLETE, LIVE-VERIFIED (2026-07-23).**
   Two opt-in demo conveniences: **(A)** a **global Pause/Resume shortcut** (⌥⌘P), the M9-T4 start/stop
   twin — `GlobalShortcut.togglePause`, persisted `pauseHotkey` (nil ⇒ off), `HotkeyCenter` id 3, pure
