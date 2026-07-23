@@ -213,7 +213,7 @@ public final class ReplayMuxer: @unchecked Sendable {
         writer.startSession(atSourceTime: .zero)
 
         let group = DispatchGroup()
-        let failure = AppendFailure()
+        let failure = FirstError()
         for (input, entries, offset) in feeds {
             append(entries, rebasedBy: offset, to: input, writer: writer, group: group, failure: failure)
         }
@@ -250,60 +250,32 @@ public final class ReplayMuxer: @unchecked Sendable {
                 bitRate: bitRate))
     }
 
-    /// First append problem across the three drains; one message is enough to fail the save.
-    private final class AppendFailure: @unchecked Sendable {
-        private let lock = NSLock()
-        private var stored: String?
-
-        var message: String? {
-            lock.lock()
-            defer { lock.unlock() }
-            return stored
-        }
-
-        func report(_ message: String) {
-            lock.lock()
-            if stored == nil { stored = message }
-            lock.unlock()
-        }
-    }
-
-    /// Feeds one input from an in-memory entry list, rebasing each sample to `pts − offset`.
-    /// `requestMediaDataWhenReady` re-invokes the block as the writer drains; the captured
-    /// index and `done` flag carry progress across invocations (serial per input queue).
+    /// Feeds one input from an in-memory entry list, rebasing each sample to `pts − offset`. The
+    /// captured `index` carries progress across the pump's re-invocations (serial per input queue);
+    /// `WriterDrain` owns the group/finish discipline. A failed writer (`.writing` lost) or a retime
+    /// failure ends the pump — the latter after recording the message.
     private func append(
         _ entries: [RingEntry<CMSampleBuffer>],
         rebasedBy offset: CMTime,
         to input: AVAssetWriterInput,
         writer: AVAssetWriter,
         group: DispatchGroup,
-        failure: AppendFailure
+        failure: FirstError
     ) {
-        group.enter()
         let queue = DispatchQueue(label: "dev.fcostantini.screenrec.replay.mux.append")
         var index = 0
-        var done = false
-        input.requestMediaDataWhenReady(on: queue) {
-            guard !done else { return }
-            func finish() {
-                done = true
-                input.markAsFinished()
-                group.leave()
+        WriterDrain.drain(into: input, on: queue, group: group) {
+            guard writer.status == .writing else { return false }
+            guard index < entries.count else { return false }
+            let entry = entries[index]
+            index += 1
+            guard let sample = SampleTiming.retimed(
+                entry.element, to: CMTimeSubtract(entry.pts, offset)) else {
+                failure.report("Couldn't retime a \(input.mediaType.rawValue) sample.")
+                return false
             }
-            while input.isReadyForMoreMediaData {
-                // A failed writer may never call this block again — leave now or the
-                // group.wait() above deadlocks and the isSaving latch wedges every later save.
-                guard writer.status == .writing else { return finish() }
-                guard index < entries.count else { return finish() }
-                let entry = entries[index]
-                index += 1
-                guard let sample = SampleTiming.retimed(
-                    entry.element, to: CMTimeSubtract(entry.pts, offset)) else {
-                    failure.report("Couldn't retime a \(input.mediaType.rawValue) sample.")
-                    return finish()
-                }
-                input.append(sample)
-            }
+            input.append(sample)
+            return true
         }
     }
 }

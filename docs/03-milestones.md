@@ -1068,7 +1068,7 @@ are load-bearing strengths and stay untouched.
       sharpens `ExportWiringTests`'s target. **Do NOT** extract the source-picker/capture-config or
       recording-lifecycle clusters — intrinsically coupled to persist+replay, deliberately kept (M9-T7
       ruling). **Verify:** full dev loop green; the export tests narrow; behavior unchanged.
-- [ ] M14-T2 **De-duplicate the AVAssetWriter drain pump + first-error box.** `ReplayMuxer` and
+- [x] M14-T2 **De-duplicate the AVAssetWriter drain pump + first-error box.** `ReplayMuxer` and
       `Exporter` hand-roll the same `requestMediaDataWhenReady` + done-flag + `DispatchGroup` +
       first-error pump (the comments call it "the ReplayMuxer idiom"), each with an identical
       `@unchecked Sendable` first-error latch. Extract one `FirstError` box + one `drain(...)` helper into

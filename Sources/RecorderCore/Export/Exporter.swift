@@ -306,7 +306,7 @@ private struct TranscodePlan {
         writer.startSession(atSourceTime: sessionStart)
 
         let group = DispatchGroup()
-        let failure = FailureBox()
+        let failure = FirstError()
         drain(videoOutput, into: videoInput, label: "video", group: group, failure: failure) { sample in
             guard let progress, durationSeconds > 0 else { return }
             let elapsed = CMTimeGetSeconds(
@@ -334,46 +334,29 @@ private struct TranscodePlan {
         progress?(1)
     }
 
-    /// Pumps one reader output into one writer input on its own serial queue, re-invoked by
-    /// `requestMediaDataWhenReady` as the writer drains. The `done` flag guards the single
-    /// `group.leave()` against a re-fire after finishing (the ReplayMuxer pattern).
+    /// Pumps one reader output into one writer input on its own serial queue; `WriterDrain` owns the
+    /// group/finish discipline. A reader that left `.reading`, an exhausted source, or a refused
+    /// append ends the pump — the last after recording the writer's error.
     private func drain(
         _ source: AVAssetReaderOutput,
         into input: AVAssetWriterInput,
         label: String,
         group: DispatchGroup,
-        failure: FailureBox,
+        failure: FirstError,
         onSample: (@Sendable (CMSampleBuffer) -> Void)?
     ) {
-        group.enter()
         let queue = DispatchQueue(label: "dev.fcostantini.screenrec.export.\(label)")
-        var done = false
-        input.requestMediaDataWhenReady(on: queue) {
-            guard !done else { return }
-            func finish() {
-                done = true
-                input.markAsFinished()
-                group.leave()
+        WriterDrain.drain(into: input, on: queue, group: group) {
+            guard reader.status == .reading else { return false }
+            guard let sample = source.copyNextSampleBuffer() else { return false }
+            guard input.append(sample) else {
+                failure.report(
+                    writer.error?.localizedDescription
+                        ?? "The writer refused a \(input.mediaType.rawValue) sample.")
+                return false
             }
-            while input.isReadyForMoreMediaData {
-                guard reader.status == .reading else { return finish() }
-                guard let sample = source.copyNextSampleBuffer() else { return finish() }
-                guard input.append(sample) else {
-                    failure.report(
-                        writer.error?.localizedDescription
-                            ?? "The writer refused a \(input.mediaType.rawValue) sample.")
-                    return finish()
-                }
-                onSample?(sample)
-            }
+            onSample?(sample)
+            return true
         }
-    }
-
-    /// First append/writer error across the two drains; one message fails the export.
-    private final class FailureBox: @unchecked Sendable {
-        private let lock = NSLock()
-        private var stored: String?
-        var message: String? { lock.withLock { stored } }
-        func report(_ message: String) { lock.withLock { if stored == nil { stored = message } } }
     }
 }

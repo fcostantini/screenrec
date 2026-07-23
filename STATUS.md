@@ -5,6 +5,26 @@
 
 ## Now
 
+- **🔧 M14-T2 DONE — deduped the AVAssetWriter drain pump, behaviour-preserving, LIVE-VERIFIED
+  (2026-07-23).** `ReplayMuxer` + `Exporter` hand-rolled the same `requestMediaDataWhenReady` +
+  `DispatchGroup` + `done`-flag + first-error latch ("the ReplayMuxer idiom"). Extracted **one
+  `WriterDrain.drain(into:on:group:pump:)`** (the deadlock-critical skeleton — enter, the serial
+  requestMediaDataWhenReady loop, and `group.leave()` **exactly once** via the `done` guard even if the
+  writer dies) + **one `FirstError`** latch, into `RecorderCore/Support/WriterDrain.swift` (~50 LOC).
+  Each call site keeps only its per-sample **`pump: () -> Bool`** (ReplayMuxer: retime an in-memory
+  entry; Exporter: `copyNextSampleBuffer` + progress) — `false` finishes (clean end or a reported
+  failure). Deleted `AppendFailure`/`FailureBox` (byte-identical) + both hand-rolled skeletons. **Trimmer
+  untouched** (AVAssetExportSession passthrough, no drain). Behaviour-identical: same enter/leave, same
+  done-once guard, same first-error semantics, per-sample logic moved verbatim. **Full dev loop green:
+  411 non-VT + 15 `ReplayMuxer`/`ReplayEncoder` (exercise the drain — a deadlock regression would *hang*
+  these, strong coverage) + the **gated encode tests** (`SCREENREC_HW_ENCODE_TESTS=1` Exporter+GifExporter,
+  the real HW encoder through the drain) all green in isolation.** Quality pass: manual senior review
+  (small verbatim extraction, deadlock-critical → the drain-exercising tests are the real proof; multi-
+  agent review disproportionate). **LIVE-VERIFIED headless:** a real CLI record→export through the deduped
+  drain → playable H.264 1920×1200 + AAC `.mp4` (probe: 2.03 s, valid tracks). Test files cleaned. **No
+  VERSION bump** (internal). **Next: M14-T3 (file-size helper · retire dead `EngineEvent.fileProgress` ·
+  one SampleRouter doc line) — the LAST M14 task, then M14 owes its PATCH. Plan artifact first.**
+
 - **🧹 M14 STARTED — M14-T1 DONE (extracted `ExportModel`), behaviour-preserving, LIVE-VERIFIED
   (2026-07-23).** The export/trim cluster is split out of `AppState` into a new `@Observable
   ExportModel` (the `PermissionsModel` M9-T7 pattern): `exportInProgress`, `lastExport` (+ persist
