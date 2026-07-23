@@ -244,6 +244,15 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
+    /// The system refused the pause/resume shortcut (M12-T6). Pausing from the menu still works.
+    public static func pauseHotkeyUnavailable() -> RecordingNotification {
+        RecordingNotification(
+            title: "Pause/resume shortcut unavailable",
+            body: "Another app may be using that shortcut. Choose a different one in "
+                + "ScreenRec Settings. Pausing from the menu still works.",
+            fileURL: nil)
+    }
+
     /// The start/stop shortcut fired while the app can't record yet (M9-T4) — say so, never a
     /// silent no-op; the setup window names the missing permission.
     public static func recordingHotkeyBlocked() -> RecordingNotification {

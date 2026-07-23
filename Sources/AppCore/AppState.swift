@@ -20,6 +20,7 @@ public enum SourceChoice: Hashable, Sendable {
 public enum GlobalShortcut: Sendable, Equatable {
     case saveReplay
     case toggleRecording
+    case togglePause
 }
 
 /// The menu-bar app's view state.
@@ -187,6 +188,29 @@ public final class AppState {
             registerRecordHotkey()
         }
     }
+
+    /// The optional global pause/resume shortcut (M12-T6). Nil ⇒ off — opt-in like `recordHotkey`,
+    /// since an always-live combo the user didn't choose could clash.
+    public var pauseHotkey: Hotkey? {
+        didSet {
+            guard pauseHotkey != oldValue else { return }
+            persist()
+            registerPauseHotkey()
+        }
+    }
+
+    /// Whether Start runs a 3-2-1 count-in first (M12-T6). Off by default. Persisted.
+    public var countInEnabled: Bool = false {
+        didSet {
+            guard countInEnabled != oldValue else { return }
+            persist()
+        }
+    }
+
+    /// Runs the count-in overlay, calling the completion when it reaches zero (M12-T6). Injected by
+    /// the app (AppKit is banned in AppCore); nil in tests. Guarded by `isCountingIn` against re-entry.
+    public var runCountIn: (@MainActor (@escaping () -> Void) -> Void)?
+    private var isCountingIn = false
 
     /// Registers/unregisters a global shortcut, reporting whether the system accepted it. Injected by
     /// the app (Carbon lives there, not in AppCore); a nil hotkey unregisters that shortcut.
@@ -404,6 +428,8 @@ public final class AppState {
         replaySeconds = settings.replaySeconds
         replayHotkey = settings.replayHotkey
         recordHotkey = settings.recordHotkey
+        pauseHotkey = settings.pauseHotkey
+        countInEnabled = settings.countInEnabled
         showsMenuBarTimer = settings.showsMenuBarTimer
         gifFPS = settings.gifFPS
         gifWidth = settings.gifWidth
@@ -448,6 +474,7 @@ public final class AppState {
                 captureRegion: selectedRegion,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey, recordHotkey: recordHotkey,
+                pauseHotkey: pauseHotkey, countInEnabled: countInEnabled,
                 showsMenuBarTimer: showsMenuBarTimer,
                 gifFPS: gifFPS, gifWidth: gifWidth, gifMaxSeconds: gifMaxSeconds,
                 seenReplayBannerWarning: hasSeenReplayBannerWarning),
@@ -670,6 +697,20 @@ public final class AppState {
         let accepted = hotkeyRegistrar(recordHotkey, .toggleRecording)   // nil ⇒ unregister ⇒ true
         if recordHotkey != nil, !accepted {
             notifier?(RecordingNotifications.recordHotkeyUnavailable())
+        }
+    }
+
+    /// The app calls this once at launch (M12-T6): the pause shortcut isn't tied to a live recording —
+    /// it registers up front and just does nothing until there's something to pause.
+    public func activatePauseHotkey() {
+        registerPauseHotkey()
+    }
+
+    private func registerPauseHotkey() {
+        guard let hotkeyRegistrar else { return }
+        let accepted = hotkeyRegistrar(pauseHotkey, .togglePause)   // nil ⇒ unregister ⇒ true
+        if pauseHotkey != nil, !accepted {
+            notifier?(RecordingNotifications.pauseHotkeyUnavailable())
         }
     }
 
@@ -948,11 +989,30 @@ public final class AppState {
 
     public func start() async {
         // See `isSessionActive`: the menu is clickable again before the first frame lands.
-        guard session == nil else { return }
+        guard session == nil, !isCountingIn else { return }
 
         lastFailure = nil
         // The menu disables Start unless this holds; unreachable from the UI.
         guard readiness == .ready else { return }
+
+        // Optional 3-2-1 count-in (M12-T6): show the overlay, then begin capture when it reaches
+        // zero — the countdown itself isn't recorded. `isCountingIn` blocks a second Start during it.
+        if countInEnabled, let runCountIn {
+            isCountingIn = true
+            runCountIn { [weak self] in
+                Task { @MainActor in
+                    self?.isCountingIn = false
+                    await self?.beginCapture()
+                }
+            }
+            return
+        }
+        await beginCapture()
+    }
+
+    /// The actual capture start, after any count-in. Split from `start()` so the count-in can defer it.
+    private func beginCapture() async {
+        guard session == nil else { return }
 
         var configuration = captureConfiguration
         configuration.microphone = resolvedMicrophone()
@@ -1054,6 +1114,24 @@ public final class AppState {
     static func recordToggleAction(isSessionActive: Bool, isReady: Bool) -> RecordToggleAction {
         if isSessionActive { return .stop }   // a paused session is still active — stop wins
         return isReady ? .start : .blockedNotify
+    }
+
+    /// What the global pause/resume shortcut does (M12-T6): a live recording pauses, a paused one
+    /// resumes, and with nothing recording it does nothing (a silent no-op, not a failure).
+    public func togglePause() async {
+        switch Self.pauseToggleAction(isSessionActive: isSessionActive, isPaused: isPaused) {
+        case .pause: await pause()
+        case .resume: await resume()
+        case .ignore: break
+        }
+    }
+
+    enum PauseToggleAction: Equatable { case pause, resume, ignore }
+
+    /// Pure so the three branches are unit-tested without live capture (which `pause`/`resume` need).
+    static func pauseToggleAction(isSessionActive: Bool, isPaused: Bool) -> PauseToggleAction {
+        guard isSessionActive else { return .ignore }   // nothing to pause
+        return isPaused ? .resume : .pause
     }
 
     /// Stops a recording and waits for the file to finalize. The app calls this before

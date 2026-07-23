@@ -150,13 +150,13 @@ struct MenuView: View {
         exportStatusRow
         lastReplayRow
 
+        // Pause/Resume advertise the opt-in pause shortcut (M12-T6), Stop the start/stop one (M12-T3).
         if state.isPaused {
-            Button("Resume") { Task { await state.resume() } }
+            shortcutRow("Resume", hotkey: state.pauseHotkey) { Task { await state.resume() } }
         } else {
-            Button("Pause") { Task { await state.pause() } }
+            shortcutRow("Pause", hotkey: state.pauseHotkey) { Task { await state.pause() } }
         }
-        // Stop advertises the same opt-in shortcut (M12-T3): while recording, the combo stops.
-        recordActionRow("Stop & Save") { Task { await state.stop() } }
+        shortcutRow("Stop & Save", hotkey: state.recordHotkey) { Task { await state.stop() } }
 
         Divider()
 
@@ -280,20 +280,20 @@ struct MenuView: View {
 
     /// Start Recording, first actionable row, advertising the opt-in start/stop shortcut (M12-T3).
     @ViewBuilder private var startRecordingRow: some View {
-        recordActionRow("Start Recording") { Task { await state.start() } }
+        shortcutRow("Start Recording", hotkey: state.recordHotkey) { Task { await state.start() } }
             .disabled(state.readiness != .ready)
     }
 
-    /// A record action (Start / Stop) that advertises the opt-in start/stop shortcut when it's set
-    /// (M12-T3), the `saveReplayRow` pattern: the glyph column when SwiftUI can map the combo, else
-    /// a `· ⌥⌘S` title suffix; a plain title when the shortcut is off (`recordHotkey == nil`).
-    @ViewBuilder private func recordActionRow(
-        _ title: String, action: @escaping () -> Void
+    /// An action row advertising its opt-in global shortcut when set (M12-T3/T6) — the `saveReplayRow`
+    /// pattern: the glyph column when SwiftUI can map the combo, else a `· ⌥⌘S` title suffix; a plain
+    /// title when off. Start/Stop pass `recordHotkey`; Pause/Resume pass `pauseHotkey`.
+    @ViewBuilder private func shortcutRow(
+        _ title: String, hotkey: Hotkey?, action: @escaping () -> Void
     ) -> some View {
-        if let hotkey = state.recordHotkey, let key = HotkeyDisplay.keyEquivalent(for: hotkey) {
+        if let hotkey, let key = HotkeyDisplay.keyEquivalent(for: hotkey) {
             Button(title, action: action)
                 .keyboardShortcut(key, modifiers: HotkeyDisplay.eventModifiers(for: hotkey))
-        } else if let hotkey = state.recordHotkey {
+        } else if let hotkey {
             Button("\(title) · \(HotkeyDisplay.string(for: hotkey))", action: action)
         } else {
             Button(title, action: action)

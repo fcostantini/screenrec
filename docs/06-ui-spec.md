@@ -327,6 +327,16 @@ the old line is simply false above three green ticks.
   user didn't choose can clash); enabling seeds ⌥⌘S and shows the recorder pill. Fires
   `AppState.toggleRecording` (active session ⇒ Stop & Save; idle+ready ⇒ Start; blocked ⇒ notify).
   Backed by `recordHotkey`.
+- **Global pause/resume shortcut** (M12-T6) — the start/stop twin: opt-in toggle, seeds ⌥⌘P, recorder
+  pill. Fires `AppState.togglePause` (recording ⇒ Pause; paused ⇒ Resume; **idle ⇒ silent no-op** — a
+  notification there would be noise, unlike the record hotkey's real "blocked" failure). Lets a demo be
+  paused without opening the menu (which is itself captured). Backed by `pauseHotkey`; a third
+  `HotkeyCenter` id beside replay=1, record=2.
+- **Count in before recording (3-2-1)** (M12-T6) — opt-in toggle, off by default. When on, Start shows a
+  3→2→1 count-in overlay (a big translucent number on the main display, **click-through and not a veil**,
+  so the target window can be brought forward during the beat), **then** begins capture — the countdown
+  itself isn't recorded, and the file starts ~3 s after Start. Backed by `countInEnabled`; the count-in
+  runs on both menu-Start and the ⌥⌘S hotkey (it's in `AppState.start`).
 - Instant replay: buffer length — **a slider that snaps to 15 s (5 s–15 min), plus a typed `M:SS`
   field for exact values (M9-T8;** slider is continuous/tick-free, applied on release; was a 30 s /
   60 s / 2 min picker) · hotkey recorder (default ⌥⌘R) — **M5**
@@ -369,6 +379,8 @@ moved):
 | `replaySeconds` | Int seconds; **M9-T8 slider range 5–900** (clamped on load — a positive out-of-range value snaps to the nearest bound, absent/≤0 ⇒ 60). Was 30\|60\|120 | **M5** |
 | `replayHotkey` | Dict: keyCode Int, modifiers Int | **M5** |
 | `recordHotkey` | Dict: keyCode Int, modifiers Int; **absent ⇒ off** (M9-T4, opt-in global start/stop) | M9-T4 |
+| `pauseHotkey` | Dict: keyCode Int, modifiers Int; **absent ⇒ off** (M12-T6, opt-in global pause/resume) | M12-T6 |
+| `countInEnabled` | Bool; **absent ⇒ off** (M12-T6). Start runs a 3-2-1 count-in before capture | M12-T6 |
 | `showsMenuBarTimer` | Bool; **absent ⇒ on** (opt-out). The status-item label's live elapsed clock while recording (M9-T3) | M9-T3 |
 | `seenReplayBannerWarning` | Bool; **absent ⇒ false** (not seen). Once true the first-arm banner-suppression alert never fires again (M12-T5) | M12-T5 |
 | `gifFPS` · `gifWidth` · `gifMaxSeconds` | Int; each snaps to its nearest picker choice on load, absent ⇒ 15 / 480 / 30. The `Save as GIF` caps (M10-T3 follow-up) | M10-T3 follow-up |

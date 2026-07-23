@@ -67,8 +67,15 @@ struct ScreenRecApp: App {
                 return hotkeys.setHotkey(hotkey, id: 2) { [weak state] in
                     Task { await state?.toggleRecording() }
                 }
+            case .togglePause:
+                return hotkeys.setHotkey(hotkey, id: 3) { [weak state] in
+                    Task { await state?.togglePause() }
+                }
             }
         }
+        // The 3-2-1 count-in (M12-T6): AppKit overlay lives here, run before capture by AppState.
+        let countIn = ScreenRecApp.countIn
+        state.runCountIn = { completion in countIn.run(completion: completion) }
     }
 
     /// Shared with the delegate, which installs it before launch completes.
@@ -76,6 +83,8 @@ struct ScreenRecApp: App {
     fileprivate static let hotkeys = HotkeyCenter()
     /// One overlay controller, reused per region pick (M11-T2).
     fileprivate static let regionSelector = RegionSelectionController()
+    /// One count-in overlay controller, reused per recording start (M12-T6).
+    fileprivate static let countIn = CountInController()
 
     var body: some Scene {
         MenuBarExtra {
@@ -160,6 +169,8 @@ private struct StatusIconLabel: View {
                 state.activateReplayIfArmed()
                 // The start/stop shortcut isn't tied to arming, so it registers on its own (M9-T4).
                 state.activateRecordHotkey()
+                // Likewise the pause/resume shortcut (M12-T6).
+                state.activatePauseHotkey()
                 state.syncLaunchAtLogin()
                 // Before any recording can start, so a live partial is never mistaken
                 // for a crash orphan.

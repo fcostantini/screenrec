@@ -100,6 +100,16 @@ import RecorderCore
         #expect(AppState.recordToggleAction(isSessionActive: false, isReady: false) == .blockedNotify)
     }
 
+    // MARK: - Global pause/resume shortcut (M12-T6)
+
+    @Test func thePauseToggleReadsOffSessionAndPauseState() {
+        // Pure, so the three branches are testable without live capture (which pause/resume need).
+        #expect(AppState.pauseToggleAction(isSessionActive: true, isPaused: false) == .pause)
+        #expect(AppState.pauseToggleAction(isSessionActive: true, isPaused: true) == .resume)
+        #expect(AppState.pauseToggleAction(isSessionActive: false, isPaused: false) == .ignore)  // nothing to pause
+        #expect(AppState.pauseToggleAction(isSessionActive: false, isPaused: true) == .ignore)
+    }
+
     @Test(arguments: endReasons) func everyEndingReturnsToIdle(reason: EndReason) {
         let state = recordingState()
         state.apply(.finished(url: Self.outputURL, reason: reason, droppedFrames: 0))

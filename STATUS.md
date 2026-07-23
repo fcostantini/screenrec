@@ -5,6 +5,33 @@
 
 ## Now
 
+- **⏸️ M12-T6 DONE — global Pause/Resume + 3-2-1 count-in; M12 COMPLETE, LIVE-VERIFIED (2026-07-23).**
+  Two opt-in demo conveniences: **(A)** a **global Pause/Resume shortcut** (⌥⌘P), the M9-T4 start/stop
+  twin — `GlobalShortcut.togglePause`, persisted `pauseHotkey` (nil ⇒ off), `HotkeyCenter` id 3, pure
+  `pauseToggleAction` (recording→pause · paused→resume · idle→silent no-op) + `togglePause()`, Settings
+  toggle + recorder pill, registered at launch; **(B)** an optional **3-2-1 count-in** — `countInEnabled`
+  (off default), `start()` gates on an injected `runCountIn` that shows a new `CountInController` overlay
+  (big translucent number, **click-through, no veil** — the target window stays visible/clickable),
+  **then** the extracted `beginCapture()` runs (countdown isn't recorded). New `pauseHotkeyUnavailable()`
+  notice. **Franco feedback addressed:** the pause shortcut is now **advertised on the Pause/Resume rows**
+  (⌥⌘P) — generalized the M12-T3 `recordActionRow` → `shortcutRow(_:hotkey:)`, so Start/Stop use
+  `recordHotkey` and Pause/Resume use `pauseHotkey`. **426 tests (+4:** `pauseToggleAction` 4-way,
+  `pauseHotkey` opt-in round-trip + set→nil-clear + malformed-loads-off, `countInEnabled` round-trip; +
+  key pins). Full dev loop green (**run the encoder suites in isolation** — the full-suite foreground run
+  re-wedges VT). **Review (code-review agent; 8.5/10, no blockers — verified the `start()`→`beginCapture()`
+  split preserves exact ordering + no double-start + overlay-out-of-frame-0 + no timer retain cycle;
+  findings applied):** ② count-in `Timer` moved to **`.common` mode** (else a menu-open freezes the count
+  — the StatusIconView pattern); ① re-entry `assertionFailure` in `CountInController` (surfaces a future
+  regression loudly vs silently wedging Start); ③ pause-hotkey clear-leg test. **LIVE-VERIFIED (deployed):**
+  count-in overlay rendered a big translucent "3" over the visible desktop (screenshot), and capture
+  **began ~3 s after Start** (file stamped 10.40.21 vs click ~10.40.17); **Franco confirmed ⌥⌘P
+  pauses/resumes from another app** ("All well"); the recording menu now shows **`Pause  [⌥⌘P]`**. Test
+  recordings + the test-injected `pauseHotkey` cleaned up. **🎉 M12 (Share & Surface) COMPLETE — all six
+  tasks (T1 Share/Copy/QuickLook · T2 exports first-class · T3 menu-truth · T4 region coherent · T5 banner
+  warning · T6 keyboard QoL).** M12 owes a **MINOR (1.7.0)** — 6 user-facing features since 1.6.1; Franco's
+  call to cut (VERSION + `CoreInfo.version` + tag). **6 M12 commits unpushed this session (T1–T6).**
+  **Next: Franco's pick — cut 1.7.0, or M14 (Cleanup, the last planned milestone).**
+
 - **🔕 M12-T5 DONE — armed replay's banner suppression surfaced, LIVE-VERIFIED (2026-07-23).** Three
   touches so the OS hiding every app's notification banners while armed is no longer invisible: **(A)** a
   **one-time alert on the first arm ever** (persisted `seenReplayBannerWarning` flag) — fired from the

@@ -79,6 +79,34 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // M12-T6: opt-in, the start/stop twin. Pause the recording mid-demo without opening the
+            // menu (which is itself captured). Enabling seeds ⌥⌘P; the recorder pill changes it.
+            Toggle("Global pause/resume shortcut", isOn: Binding(
+                get: { state.pauseHotkey != nil },
+                set: { state.pauseHotkey = $0 ? (state.pauseHotkey ?? .pauseDefault) : nil }))
+            if state.pauseHotkey != nil {
+                LabeledContent("Pause/resume shortcut") {
+                    HotkeyRecorderButton(
+                        hotkey: Binding(
+                            get: { state.pauseHotkey ?? .pauseDefault },
+                            set: { state.pauseHotkey = $0 }),
+                        accessibilityName: "Pause/resume recording shortcut",
+                        suspendGlobalHotkey: { _ = state.hotkeyRegistrar?(nil, .togglePause) },
+                        restoreGlobalHotkey: {
+                            if let hk = state.pauseHotkey {
+                                _ = state.hotkeyRegistrar?(hk, .togglePause)
+                            }
+                        })
+                }
+                Text("Pauses or resumes the current recording from any app. Must include ⌥ or ⌃.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            // M12-T6: a 3-2-1 beat before capture to switch to the target window. The countdown
+            // isn't in the recording.
+            Toggle("Count in before recording (3-2-1)", isOn: $state.countInEnabled)
+
             Section("Instant Replay") {
                 LabeledContent("Replay buffer") {
                     HStack(spacing: 10) {

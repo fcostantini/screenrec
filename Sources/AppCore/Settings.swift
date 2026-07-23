@@ -21,6 +21,10 @@ public struct Hotkey: Sendable, Equatable {
     /// ⌥⌘S: the combo seeded when the user first enables the start/stop shortcut (M9-T4).
     /// kVK_ANSI_S with optionKey | cmdKey.
     public static let recordDefault = Hotkey(keyCode: 1, modifiers: 2048 | 256)
+
+    /// ⌥⌘P: the combo seeded when the user first enables the pause/resume shortcut (M12-T6).
+    /// kVK_ANSI_P with optionKey | cmdKey.
+    public static let pauseDefault = Hotkey(keyCode: 35, modifiers: 2048 | 256)
 }
 
 /// The user's microphone pick, before resolution to a concrete device (docs/06 item 6):
@@ -94,6 +98,10 @@ public struct Settings: Sendable, Equatable {
     /// The optional global start/stop recording shortcut (M9-T4). Nil ⇒ off — an always-live combo
     /// the user didn't choose could silently clash, so this is opt-in.
     public var recordHotkey: Hotkey?
+    /// The optional global pause/resume shortcut (M12-T6). Nil ⇒ off — opt-in like `recordHotkey`.
+    public var pauseHotkey: Hotkey?
+    /// Whether Start runs a 3-2-1 count-in first (M12-T6). Default off.
+    public var countInEnabled: Bool
     /// Whether the menu-bar label shows the live elapsed clock while recording (M9-T3). Default on.
     public var showsMenuBarTimer: Bool
     /// The GIF export caps (M10-T3 follow-up): each is one of its `allowedGif…` list. Width also
@@ -156,6 +164,8 @@ public struct Settings: Sendable, Equatable {
             replaySeconds: 60,
             replayHotkey: .standard,
             recordHotkey: nil,
+            pauseHotkey: nil,
+            countInEnabled: false,
             showsMenuBarTimer: true,
             gifFPS: 15,
             gifWidth: 480,
@@ -192,6 +202,10 @@ public enum SettingsStore {
         public static let replayHotkey = "replayHotkey"
         /// Absent ⇒ the start/stop shortcut is off (M9-T4). Same Dict shape as `replayHotkey`.
         public static let recordHotkey = "recordHotkey"
+        /// Absent ⇒ the pause/resume shortcut is off (M12-T6). Same Dict shape as `replayHotkey`.
+        public static let pauseHotkey = "pauseHotkey"
+        /// Absent ⇒ no count-in (M12-T6).
+        public static let countInEnabled = "countInEnabled"
         /// `replayHotkey`/`recordHotkey` are Dicts (docs/06): these are their inner keys.
         public static let hotkeyKeyCode = "keyCode"
         public static let hotkeyModifiers = "modifiers"
@@ -302,6 +316,8 @@ public enum SettingsStore {
         }
         // Absent or malformed ⇒ the start/stop shortcut stays off (M9-T4).
         settings.recordHotkey = hotkey(from: defaults.dictionary(forKey: Key.recordHotkey))
+        settings.pauseHotkey = hotkey(from: defaults.dictionary(forKey: Key.pauseHotkey))
+        settings.countInEnabled = defaults.bool(forKey: Key.countInEnabled)
 
         // Opt-out, so absent means on (the `.standard` default holds); only an explicit stored
         // value overrides it.
@@ -400,6 +416,14 @@ public enum SettingsStore {
         } else {
             defaults.removeObject(forKey: Key.recordHotkey)
         }
+        if let pauseHotkey = settings.pauseHotkey {
+            defaults.set(
+                [Key.hotkeyKeyCode: pauseHotkey.keyCode, Key.hotkeyModifiers: pauseHotkey.modifiers],
+                forKey: Key.pauseHotkey)
+        } else {
+            defaults.removeObject(forKey: Key.pauseHotkey)
+        }
+        defaults.set(settings.countInEnabled, forKey: Key.countInEnabled)
         defaults.set(settings.showsMenuBarTimer, forKey: Key.showsMenuBarTimer)
         defaults.set(settings.seenReplayBannerWarning, forKey: Key.seenReplayBannerWarning)
         defaults.set(settings.gifFPS, forKey: Key.gifFPS)

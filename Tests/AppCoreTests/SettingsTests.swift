@@ -62,6 +62,41 @@ import RecorderCore
         #expect(SettingsStore.Key.lastExportPath == "lastExportPath")
         #expect(SettingsStore.Key.lastExportDate == "lastExportDate")
         #expect(SettingsStore.Key.seenReplayBannerWarning == "seenReplayBannerWarning")
+        #expect(SettingsStore.Key.pauseHotkey == "pauseHotkey")
+        #expect(SettingsStore.Key.countInEnabled == "countInEnabled")
+    }
+
+    // MARK: - Pause/resume shortcut + count-in (M12-T6)
+
+    @Test func pauseHotkeyIsOptInAndRoundTrips() {
+        let defaults = makeDefaults().defaults
+        #expect(SettingsStore.load(from: defaults).pauseHotkey == nil)   // absent ⇒ off
+        var settings = Settings.standard
+        settings.pauseHotkey = .pauseDefault
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).pauseHotkey == .pauseDefault)
+
+        // Turning it off clears the key back to absent (not a stale dict).
+        settings.pauseHotkey = nil
+        SettingsStore.save(settings, to: defaults)
+        #expect(defaults.dictionary(forKey: SettingsStore.Key.pauseHotkey) == nil)
+        #expect(SettingsStore.load(from: defaults).pauseHotkey == nil)
+    }
+
+    @Test func aMalformedPauseHotkeyLoadsAsOff() {
+        // Half a shortcut is not a shortcut — it falls back whole (the recordHotkey rule).
+        let defaults = makeDefaults().defaults
+        defaults.set(["keyCode": 35], forKey: SettingsStore.Key.pauseHotkey)   // no modifiers
+        #expect(SettingsStore.load(from: defaults).pauseHotkey == nil)
+    }
+
+    @Test func countInEnabledRoundTripsAndDefaultsToOff() {
+        let defaults = makeDefaults().defaults
+        #expect(SettingsStore.load(from: defaults).countInEnabled == false)   // absent ⇒ off
+        var settings = Settings.standard
+        settings.countInEnabled = true
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).countInEnabled == true)
     }
 
     @Test func seenReplayBannerWarningRoundTripsAndDefaultsToFalse() {
@@ -126,7 +161,7 @@ import RecorderCore
         #expect(Set(written.keys) == [
             "outputDirectory", "qualityPreset", "fpsCap",
             "replayArmed", "replaySeconds", "replayHotkey", "showsMenuBarTimer",
-            "gifFPS", "gifWidth", "gifMaxSeconds", "seenReplayBannerWarning",
+            "gifFPS", "gifWidth", "gifMaxSeconds", "seenReplayBannerWarning", "countInEnabled",
         ])
     }
 

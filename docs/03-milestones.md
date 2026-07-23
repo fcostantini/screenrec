@@ -987,7 +987,7 @@ export and trim are untouched.
       banners from every app — Slack, Messages, and others…"), a **persistent dimmed menu row** under the
       Arm toggle, and a line in onboarding's Notifications copy. **Verify:** the first-arm alert fires
       once (persisted "seen" flag); the row renders while armed and clears on disarm.
-- [ ] M12-T6 **Keyboard-first QoL: global Pause/Resume + optional count-in.** An **opt-in global
+- [x] M12-T6 **Keyboard-first QoL: global Pause/Resume + optional count-in.** An **opt-in global
       Pause/Resume shortcut** (the demo companion to ⌥⌘S — the menu is itself captured, so mid-demo
       pause must not require opening it; `HotkeyCenter` already keys N hotkeys), and an **optional 3-2-1
       count-in** before recording (Settings toggle, off by default — a beat to switch to the target
