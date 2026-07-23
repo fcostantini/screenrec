@@ -158,10 +158,12 @@ public enum OnboardingModel {
         let action: OnboardingRow.Action
         switch state {
         case .granted:
-            detail = "ScreenRec will tell you when a recording is saved."
+            detail = "ScreenRec will tell you when a recording is saved. "
+                + "While replay is armed, macOS may hide banners from other apps."
             action = .review(.notifications)
         case .notDetermined:
-            detail = "Optional — tells you when a recording is saved, and why it ended."
+            detail = "Optional — tells you when a recording is saved, and why it ended. "
+                + "While armed, macOS may hide banners from other apps."
             action = .request
         case .denied:
             detail = "Skipped. ScreenRec works fine without notifications."

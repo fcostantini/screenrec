@@ -51,6 +51,8 @@ struct ScreenRecApp: App {
         state.beginRegionSelection = { [weak state] in
             regionSelector.present { displayID, rect in state?.setRegion(displayID: displayID, rect: rect) }
         }
+        // First-arm banner-suppression alert (M12-T5): AppKit lives here, fired once ever by AppState.
+        state.onReplayBannerWarning = { NotificationSettings.showArmedBannerWarning() }
         // Global shortcuts (M9-T4): map each intent to a Carbon hotkey id + the action it fires.
         // Carbon lives here; AppCore stays framework-free. Weak captures — the closure is stored on
         // `state`, which owns it.

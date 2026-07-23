@@ -257,6 +257,10 @@ struct MenuView: View {
         Toggle("Arm Instant Replay", isOn: $state.isReplayArmed)
             .disabled(state.readiness != .ready && !state.isReplayArmed)
         if state.isReplayArmed {
+            // docs/06 §Notifications (M12-T5): while armed the screen is captured, so macOS hides
+            // every app's banners — unless the user allowed them when sharing (not readable via API,
+            // so "may"). A standing, dimmed reminder of why they might have gone quiet.
+            Text("Notification banners may be hidden while armed")
             saveReplayRow
         }
     }

@@ -121,7 +121,7 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Open Notification Settings…") { openNotificationSettings() }
+                Button("Open Notification Settings…") { NotificationSettings.open() }
                     .buttonStyle(.link)
                     .font(.caption)
             }
@@ -209,14 +209,6 @@ struct SettingsView: View {
         case .inaccessible(let reason):
             // Keep the old folder; accepting an unwritable one defers the failure to record time.
             folderProblem = reason
-        }
-    }
-
-    /// Best effort: deep-links to the Notifications pane; degrades to opening System Settings if
-    /// the pane identifier shifts.
-    private func openNotificationSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
-            NSWorkspace.shared.open(url)
         }
     }
 }

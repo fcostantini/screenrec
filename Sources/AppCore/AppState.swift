@@ -141,10 +141,23 @@ public final class AppState {
     public var isReplayArmed: Bool {
         didSet {
             guard isReplayArmed != oldValue else { return }
+            // First arm ever (M12-T5): flag it seen now so persist() below stores it, but fire the
+            // alert only AFTER arming — a modal here would defer capture until it was dismissed.
+            let isFirstArm = isReplayArmed && !hasSeenReplayBannerWarning
+            if isFirstArm { hasSeenReplayBannerWarning = true }
             persist()
             syncReplayArming()
+            if isFirstArm { onReplayBannerWarning?() }
         }
     }
+
+    /// Whether the one-time banner-suppression alert has been shown (M12-T5); persisted so it fires
+    /// only on the very first arm ever. Seeded in `init`; `persist()` writes it.
+    public private(set) var hasSeenReplayBannerWarning: Bool = false
+
+    /// Shows the first-arm alert (M12-T5): the AppKit `NSAlert` is injected (banned in AppCore), nil
+    /// in tests. Fired once ever, after which the dimmed menu row is the standing reminder.
+    public var onReplayBannerWarning: (@MainActor () -> Void)?
 
     /// The rolling window; docs/06 offers 30/60/120. Changing it resizes the rings in place —
     /// the buffer survives: grow fills over time, shrink evicts the excess now.
@@ -395,6 +408,7 @@ public final class AppState {
         gifFPS = settings.gifFPS
         gifWidth = settings.gifWidth
         gifMaxSeconds = settings.gifMaxSeconds
+        hasSeenReplayBannerWarning = settings.seenReplayBannerWarning
         // The persisted export receipt (M12-T2), validated: dropped if the file is gone. Set here,
         // where property observers don't fire, so seeding doesn't re-save. Staleness (M12-T3) is
         // judged at menu open, not here.
@@ -435,7 +449,8 @@ public final class AppState {
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey, recordHotkey: recordHotkey,
                 showsMenuBarTimer: showsMenuBarTimer,
-                gifFPS: gifFPS, gifWidth: gifWidth, gifMaxSeconds: gifMaxSeconds),
+                gifFPS: gifFPS, gifWidth: gifWidth, gifMaxSeconds: gifMaxSeconds,
+                seenReplayBannerWarning: hasSeenReplayBannerWarning),
             to: defaults)
     }
 

@@ -61,6 +61,16 @@ import RecorderCore
         #expect(SettingsStore.Key.gifMaxSeconds == "gifMaxSeconds")
         #expect(SettingsStore.Key.lastExportPath == "lastExportPath")
         #expect(SettingsStore.Key.lastExportDate == "lastExportDate")
+        #expect(SettingsStore.Key.seenReplayBannerWarning == "seenReplayBannerWarning")
+    }
+
+    @Test func seenReplayBannerWarningRoundTripsAndDefaultsToFalse() {
+        let defaults = makeDefaults().defaults
+        #expect(SettingsStore.load(from: defaults).seenReplayBannerWarning == false)   // absent ⇒ not seen
+        var settings = Settings.standard
+        settings.seenReplayBannerWarning = true
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).seenReplayBannerWarning == true)
     }
 
     // MARK: - The export receipt (M12-T2)
@@ -116,7 +126,7 @@ import RecorderCore
         #expect(Set(written.keys) == [
             "outputDirectory", "qualityPreset", "fpsCap",
             "replayArmed", "replaySeconds", "replayHotkey", "showsMenuBarTimer",
-            "gifFPS", "gifWidth", "gifMaxSeconds",
+            "gifFPS", "gifWidth", "gifMaxSeconds", "seenReplayBannerWarning",
         ])
     }
 

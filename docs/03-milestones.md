@@ -981,7 +981,7 @@ export and trim are untouched.
       region capture stays the deferred M11 follow-up — this is the regrouping + honesty, not multi-
       display capture.)* **Verify:** the menu enters region from inside `Source ▸`; the overlay hints on
       a multi-display setup (or the hint condition is unit-covered); the badge shows both units.
-- [ ] M12-T5 **Surface armed replay's banner suppression.** While replay is armed the screen is
+- [x] M12-T5 **Surface armed replay's banner suppression.** While replay is armed the screen is
       captured, so macOS hides **every app's** notification banners — invisible, cross-app, and
       misattributed. Add a **one-time alert on first arm** ("While armed, macOS hides notification
       banners from every app — Slack, Messages, and others…"), a **persistent dimmed menu row** under the

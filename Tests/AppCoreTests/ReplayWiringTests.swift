@@ -328,6 +328,37 @@ import RecorderCore
         #expect(posted.first?.fileURL == url)
     }
 
+    // MARK: - First-arm banner-suppression warning (M12-T5)
+
+    @Test func theFirstArmEverFiresTheWarningOnceAndPersistsSeen() {
+        let (state, _, defaults) = makeState()
+        var fired = 0
+        state.onReplayBannerWarning = { fired += 1 }
+        #expect(!state.hasSeenReplayBannerWarning)
+
+        state.isReplayArmed = true
+        #expect(fired == 1)
+        #expect(state.hasSeenReplayBannerWarning)
+        #expect(defaults.bool(forKey: SettingsStore.Key.seenReplayBannerWarning))   // persisted
+
+        // Disarm and re-arm in the same session: the alert never fires again.
+        state.isReplayArmed = false
+        state.isReplayArmed = true
+        #expect(fired == 1)
+    }
+
+    @Test func aLaunchThatHasAlreadySeenTheWarningNeverFiresIt() {
+        let defaults = UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!
+        defaults.set(true, forKey: SettingsStore.Key.seenReplayBannerWarning)
+        let state = AppState(defaults: defaults, replayController: ReplaySpy())
+        var fired = 0
+        state.onReplayBannerWarning = { fired += 1 }
+
+        #expect(state.hasSeenReplayBannerWarning)     // seeded from defaults
+        state.isReplayArmed = true
+        #expect(fired == 0)
+    }
+
     @Test func saveSuccessRecordsTheLastReplayForTheMenu() async {
         // M9-T2: the in-app receipt the banner-suppressed "Replay saved" can't be.
         let (state, spy, _) = makeState()

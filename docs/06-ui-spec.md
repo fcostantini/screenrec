@@ -259,6 +259,18 @@ privacy trade to make knowingly. Decision deferred (Franco, 2026-07-16): documen
 later — candidates are onboarding copy, a product-brief honesty note, or nothing until users
 hit it.
 
+✅ **RESOLVED — M12-T5 surfaces it (2026-07-23), three touches:** (1) a **one-time alert on the
+first arm ever** ("Notifications may be hidden while replay is armed"; OK + **Open Notification
+Settings…** routing to the M9-T2 fix), gated on a persisted `seenReplayBannerWarning` flag so it fires
+exactly once; (2) a **standing dimmed menu row** under the Arm toggle while armed — `Notification
+banners may be hidden while armed` — cleared on disarm; (3) a **line in onboarding's Notifications
+copy** (granted + not-yet-asked states) so the caveat is seen at setup. **All three say "may"
+deliberately** (Franco, 2026-07-23): the global "Allow notifications when mirroring or sharing the
+display" toggle that actually governs suppression **isn't readable via any public API** (`UNNotification­Settings`
+exposes per-app auth/alert/preview, not this global switch), so an unconditional "are hidden" would lie
+to anyone who's enabled it — the copy names that exact toggle and stays true either way. The M9-T2
+Settings caption + deep-link stay as the durable reference. No change to the OS suppression itself.
+
 ## Onboarding window (first launch, or any missing permission)
 
 Single window, checklist of two rows, each with live status (✓ green / ○ pending) and
@@ -358,6 +370,7 @@ moved):
 | `replayHotkey` | Dict: keyCode Int, modifiers Int | **M5** |
 | `recordHotkey` | Dict: keyCode Int, modifiers Int; **absent ⇒ off** (M9-T4, opt-in global start/stop) | M9-T4 |
 | `showsMenuBarTimer` | Bool; **absent ⇒ on** (opt-out). The status-item label's live elapsed clock while recording (M9-T3) | M9-T3 |
+| `seenReplayBannerWarning` | Bool; **absent ⇒ false** (not seen). Once true the first-arm banner-suppression alert never fires again (M12-T5) | M12-T5 |
 | `gifFPS` · `gifWidth` · `gifMaxSeconds` | Int; each snaps to its nearest picker choice on load, absent ⇒ 15 / 480 / 30. The `Save as GIF` caps (M10-T3 follow-up) | M10-T3 follow-up |
 | `lastExportPath` · `lastExportDate` | String path + Date (M12-T2/T3); **absent ⇒ no receipt**. The last export, so its menu receipt survives relaunch — dropped on load if the file is gone (moved/trashed) **or has no date** (a pre-T3 entry), and expired at menu open once the date is **older than one hour** (M12-T3). Not part of `Settings` — a transient pointer, not user config; its own load/save | M12-T2/T3 |
 

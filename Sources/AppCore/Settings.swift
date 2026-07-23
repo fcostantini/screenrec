@@ -101,6 +101,10 @@ public struct Settings: Sendable, Equatable {
     public var gifFPS: Int
     public var gifWidth: Int
     public var gifMaxSeconds: Int
+    /// Whether the one-time "banners are hidden while armed" alert has been shown (M12-T5). Absent
+    /// ⇒ false (not yet seen); once true the alert never fires again — the dimmed menu row is the
+    /// ongoing reminder.
+    public var seenReplayBannerWarning: Bool
 
     public static let allowedFrameRateCaps = [30, 60]
     public static let allowedGifFPS = [12, 15, 20, 24]
@@ -155,7 +159,8 @@ public struct Settings: Sendable, Equatable {
             showsMenuBarTimer: true,
             gifFPS: 15,
             gifWidth: 480,
-            gifMaxSeconds: 30)
+            gifMaxSeconds: 30,
+            seenReplayBannerWarning: false)
     }
 }
 
@@ -192,6 +197,8 @@ public enum SettingsStore {
         public static let hotkeyModifiers = "modifiers"
         /// Absent ⇒ on (M9-T3): the menu-bar clock is opt-out, not opt-in.
         public static let showsMenuBarTimer = "showsMenuBarTimer"
+        /// Absent ⇒ the first-arm banner-suppression alert hasn't been shown (M12-T5).
+        public static let seenReplayBannerWarning = "seenReplayBannerWarning"
         /// The GIF export caps (M10-T3 follow-up); absent ⇒ 15 / 480 / 30.
         public static let gifFPS = "gifFPS"
         public static let gifWidth = "gifWidth"
@@ -301,6 +308,7 @@ public enum SettingsStore {
         if defaults.object(forKey: Key.showsMenuBarTimer) != nil {
             settings.showsMenuBarTimer = defaults.bool(forKey: Key.showsMenuBarTimer)
         }
+        settings.seenReplayBannerWarning = defaults.bool(forKey: Key.seenReplayBannerWarning)
 
         // Each GIF cap snaps to its nearest picker choice; absent/garbage (0) keeps the default.
         let rawGifFPS = defaults.integer(forKey: Key.gifFPS)
@@ -393,6 +401,7 @@ public enum SettingsStore {
             defaults.removeObject(forKey: Key.recordHotkey)
         }
         defaults.set(settings.showsMenuBarTimer, forKey: Key.showsMenuBarTimer)
+        defaults.set(settings.seenReplayBannerWarning, forKey: Key.seenReplayBannerWarning)
         defaults.set(settings.gifFPS, forKey: Key.gifFPS)
         defaults.set(settings.gifWidth, forKey: Key.gifWidth)
         defaults.set(settings.gifMaxSeconds, forKey: Key.gifMaxSeconds)

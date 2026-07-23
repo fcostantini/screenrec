@@ -5,6 +5,35 @@
 
 ## Now
 
+- **🔕 M12-T5 DONE — armed replay's banner suppression surfaced, LIVE-VERIFIED (2026-07-23).** Three
+  touches so the OS hiding every app's notification banners while armed is no longer invisible: **(A)** a
+  **one-time alert on the first arm ever** (persisted `seenReplayBannerWarning` flag) — fired from the
+  `isReplayArmed` didSet **after** `syncReplayArming` (so a modal never defers capture) via an injected
+  `onReplayBannerWarning` closure (AppKit `NSAlert` wired in App.swift, the `beginRegionSelection` seam
+  pattern); **(B)** a **standing dimmed menu row** under the Arm toggle while armed, cleared on disarm;
+  **(C)** a **line in onboarding's** Notifications copy (granted + not-asked). New `NotificationSettings`
+  helper (ScreenRecApp) holds the deep-link (dedup'd from SettingsView) + the alert; the alert's second
+  button routes to the M9-T2 fix. **⚠️ Copy correction (Franco caught it live):** the setting that actually
+  governs suppression — the global "Allow notifications when mirroring or sharing the display" toggle — is
+  **NOT readable via any public API** (`UNNotificationSettings` is per-app auth/alert/preview, not this
+  global switch), so an unconditional "banners ARE hidden" would **lie to anyone who's enabled it** (Franco
+  has). All three surfaces reworded to **"may be hidden" / "Unless you've turned on …"**, naming the exact
+  toggle — true either way. **422 tests (+5:** first-arm fires-once + persists-seen + re-arm-silent,
+  already-seen-never-fires, `seenReplayBannerWarning` round-trip + key pin, onboarding copy contains/omits
+  the caveat). Full dev loop green. Quality pass self-review (small diff — flag + closure + copy + a
+  helper; multi-agent review disproportionate) caught the one real fix: **fire the alert AFTER
+  `syncReplayArming`** so the modal doesn't defer capture on first arm. **LIVE-VERIFIED (deployed, menudriver +
+  screenshot):** first arm → the revised conditional alert rendered (OK + Open Notification Settings…),
+  `seen` persisted; re-arm → **no alert** + the dimmed **"Notification banners may be hidden while armed"**
+  row shows; disarm → row gone. **⚠️ Field notes:** (1) the **VT wedge recurred** — my full-suite
+  foreground `swift test` keeps hitting the 120s Bash-timeout kill mid-encode and re-leaking sessions;
+  **run the encoder suites (`ReplayMuxer`/`ReplayEncoder`) in isolation or the whole suite in the
+  background** to avoid it (it self-heals in ~3 min). (2) A redeploy right after a first-arm can relaunch
+  **already-armed** if `replayArmed=true` synced — reset both flags (or expect a click to disarm); an arm
+  click landing before readiness settles is a no-op. **No VERSION bump** (batches toward M12's MINOR).
+  **Next: M12-T6 (keyboard-first QoL — opt-in global Pause/Resume + optional 3-2-1 count-in) — the LAST
+  M12 task; plan artifact first.** M14 unstarted. **5 M12 commits unpushed this session (T1–T5).**
+
 - **⬚ M12-T4 DONE — region entry coherent + honest, LIVE-VERIFIED (2026-07-22).** Three parts: **(A)**
   **`Select Region…` moved INSIDE `Source ▸`** (below the checkmarked region tag) so all three capture
   modes are entered from one submenu — `Source ▸` became a `Menu` wrapping an **inline `Picker`** (keeps

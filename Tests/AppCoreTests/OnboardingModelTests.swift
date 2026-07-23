@@ -160,6 +160,18 @@ import RecorderCore
         #expect(r.action == .openSettings(.notifications))
     }
 
+    @Test(arguments: [PermissionState.granted, .notDetermined])
+    func notificationsCopyWarnsAboutArmedBannerSuppression(state: PermissionState) {
+        // M12-T5: the caveat is seen during setup, not just discovered later. "may" — the global
+        // "allow when sharing" toggle that governs it isn't readable via API.
+        #expect(row(.notifications, rows(notifications: state)).detail.contains("may hide banners"))
+    }
+
+    @Test func deniedNotificationsCopyOmitsTheBannerCaveat() {
+        // With no notifications at all, the "hidden while armed" caveat doesn't apply.
+        #expect(!row(.notifications, rows(notifications: .denied)).detail.contains("may hide banners"))
+    }
+
     @Test(arguments: PermissionKind.allCases)
     func everyGrantedRowStaysRevocable(kind: PermissionKind) {
         // A granted row used to have no button, so a permission once given had no route out
