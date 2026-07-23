@@ -5,6 +5,17 @@
 
 ## Now
 
+- **🎉 v1.7.1 CUT (2026-07-23) — M14 (Cleanup) earns the PATCH; roadmap empty.** `VERSION` +
+  `CoreInfo.version` → 1.7.1 (pin green), committed (`3581e3d`), cut via **`Scripts/release.sh` run in the
+  BACKGROUND** (VT-wedge lesson) — full gate green (build · test · encode×3 · release · bundle-sign),
+  tagged `v1.7.1`, pushed main + tag. **0 unpushed; tag on origin; installed 1.7.1** (/Users/Shared).
+  PATCH not MINOR: M14 is behaviour-preserving refactors (ExportModel extraction · WriterDrain dedup ·
+  hygiene), no new user-facing feature (ADR-013). VT stayed healthy — background run never killed
+  mid-encode. **🏁 The v1.6.0-review roadmap (M12 Share&Surface · M13 Hardening · M14 Cleanup) is fully
+  SHIPPED.** Tags this arc: v1.6.1 (M13), v1.7.0 (M12), v1.7.1 (M14). **Next: Franco's call — dogfood, or
+  scope new work (no planned milestones remain; webcam DECLINED ADR-017, studio/compositing parked
+  ADR-015).**
+
 - **🧽 M14-T3 DONE — small hygiene; M14 COMPLETE, GATE G14 PASSED (2026-07-23).** Three independent
   behaviour-preserving cleanups: **(1)** hoisted the byte-identical growing-file-size probe (AppState +
   CLI) into one **`OutputLocation.currentFileSize(for:)`** (partial-first), both callers use it, both
