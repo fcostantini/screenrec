@@ -175,8 +175,7 @@ import RecorderCore
     // MARK: - Silence
 
     @Test(arguments: [
-        EngineEvent.started, .paused, .resumed, .fileProgress(seconds: 5, bytes: 1),
-        .stopped(.userStopped),
+        EngineEvent.started, .paused, .resumed, .stopped(.userStopped),
     ])
     func nothingElseInterruptsTheUser(event: EngineEvent) {
         // A notification per pause would be noise; `stopped` is the writer-less path the app

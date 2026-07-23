@@ -1075,7 +1075,7 @@ are load-bearing strengths and stay untouched.
       `RecorderCore/Support`, used by both — one place to get "leave the group exactly once even if the
       writer dies" right. **Verify:** full dev loop green **including** the gated encode tests; behavior
       unchanged.
-- [ ] M14-T3 **Small hygiene: file-size helper · dead event · one doc line.** Add
+- [x] M14-T3 **Small hygiene: file-size helper · dead event · one doc line.** Add
       `OutputLocation.currentFileSize(for:)` (partial-first) and call it from AppState + the CLI (kills an
       avoidable cross-module dup); **retire `EngineEvent.fileProgress`** — declared and threaded through
       ~4 switches but never emitted (AppState polls instead); add one line to `SampleRouter`'s doc that

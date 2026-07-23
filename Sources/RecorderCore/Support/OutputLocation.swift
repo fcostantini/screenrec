@@ -197,6 +197,20 @@ public struct OutputLocation: Sendable {
         url.appendingPathExtension("partial")
     }
 
+    /// Current on-disk size of a recording that may still be growing (a fragmented `.mov` grows as
+    /// it's written). The in-progress file lives at the `.partial` companion — the final name appears
+    /// only at finalize — so probe the partial first, or a live header reads stuck at zero. Shared by
+    /// AppState's menu detail and the CLI's live line (M14-T3).
+    public static func currentFileSize(for url: URL) -> Int64 {
+        for candidate in [partialURL(for: url), url] {
+            if let attributes = try? FileManager.default.attributesOfItem(atPath: candidate.path),
+               let size = attributes[.size] as? NSNumber {
+                return size.int64Value
+            }
+        }
+        return 0
+    }
+
     /// Renames a finished `.partial` to its final name, resolving collisions the same way
     /// reservation does (`… 2.mov`). An extension-less intended name (CLI exact path) must
     /// not grow a trailing dot. Returns the final URL.

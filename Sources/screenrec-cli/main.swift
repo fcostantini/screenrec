@@ -156,8 +156,6 @@ func describe(_ event: EngineEvent) -> String {
     case .microphoneRecovered: return "microphoneRecovered"
     case .microphoneDroppedAtStart: return "microphoneDroppedAtStart"
     case .recordingFileRestored: return "recordingFileRestored"
-    case .fileProgress(let seconds, let bytes):
-        return "fileProgress(\(seconds.isFinite ? Int(seconds) : 0)s, \(bytes) bytes)"
     case .stopped(let reason): return "stopped(\(describe(reason)))"
     case .finished(let url, let reason, let dropped):
         return "finished(\(url.lastPathComponent), \(describe(reason)), dropped \(dropped))"
@@ -432,18 +430,6 @@ func plannedOutputURL(_ options: RecordOptions) -> URL {
     }
 }
 
-/// Current on-disk size of the growing recording (fragmented .mov grows as it's written).
-/// The in-progress file is the `.partial` companion; the final name exists only after
-/// finalize, so probe the partial first.
-func recordingFileSize(_ url: URL) -> Int64 {
-    for candidate in [OutputLocation.partialURL(for: url), url] {
-        if let attributes = try? FileManager.default.attributesOfItem(atPath: candidate.path),
-           let size = attributes[.size] as? NSNumber {
-            return size.int64Value
-        }
-    }
-    return 0
-}
 
 /// In-place progress line, refreshed twice a second. `recordedDuration` is NaN before the first
 /// frame (docs/02 §10), so the duration is guarded.
@@ -451,7 +437,8 @@ func runProgressTicker(_ session: RecordingSession, outputURL: URL) async {
     while !Task.isCancelled {
         let raw = session.recordedDuration.seconds
         let seconds = raw.isFinite ? raw : 0
-        let size = ByteCountFormatter.string(fromByteCount: recordingFileSize(outputURL), countStyle: .file)
+        let size = ByteCountFormatter.string(
+            fromByteCount: OutputLocation.currentFileSize(for: outputURL), countStyle: .file)
         let line = String(format: "\r  ⏺ %02d:%02d   %@      ", Int(seconds) / 60, Int(seconds) % 60, size)
         FileHandle.standardOutput.write(Data(line.utf8))
         try? await Task.sleep(nanoseconds: 500_000_000)

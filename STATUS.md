@@ -5,6 +5,27 @@
 
 ## Now
 
+- **🧽 M14-T3 DONE — small hygiene; M14 COMPLETE, GATE G14 PASSED (2026-07-23).** Three independent
+  behaviour-preserving cleanups: **(1)** hoisted the byte-identical growing-file-size probe (AppState +
+  CLI) into one **`OutputLocation.currentFileSize(for:)`** (partial-first), both callers use it, both
+  local copies deleted; **(2)** **retired the dead `EngineEvent.fileProgress`** — declared + threaded
+  through the event switches but never emitted (AppState polls via `refreshProgress`); removed the case +
+  its 5 arms (EngineEvent decl · RecordingSession yield-through · AppState.apply · RecordingNotification
+  grouped arm · CLI describe) — the exhaustiveness checker confirmed none missed; **(3)** a contract line
+  on **`SampleRouter.detach`** — it's not a hard callback barrier (an in-flight `route` reads a snapshot,
+  so a just-detached consumer can still get one late `consume`; safe today, now documented). Also updated
+  3 tests that constructed `.fileProgress` to assert it was silent/ignored: dropped the now-obsolete
+  `progressDoesNotDisturbTheIcon` (it tested only the dead event) and removed `.fileProgress` from two
+  event-list tests. **425 tests (−1 obsolete)** — full dev loop green (non-VT + VT suites isolated + the
+  gated encode step via release path). Quality pass: manual (tiny mechanical diff; multi-agent review
+  disproportionate). **LIVE-VERIFIED:** a CLI record's size line ticks up (Zero KB → 3.3 MB) through the
+  shared `currentFileSize`. **🎉 M14 (Cleanup) COMPLETE — G14 passed:** all three refactors landed with no
+  behaviour change; `AppState` is smaller (1270 → ~1180), the drain lives in one place (`WriterDrain`),
+  no dead event arms remain. **M14 is reliability/process, no new user-facing feature → PATCH-worthy
+  (1.7.1), Franco's call to cut.** **🏁 The roadmap is now EMPTY** — M12/M13/M14 all shipped. **Next:
+  Franco's call — cut 1.7.1, dogfood, or scope new work.** (M12 + v1.7.0 already on origin; the **3 M14
+  refactor commits — T1/T2/T3 — are unpushed**, batching toward the PATCH.)
+
 - **🔧 M14-T2 DONE — deduped the AVAssetWriter drain pump, behaviour-preserving, LIVE-VERIFIED
   (2026-07-23).** `ReplayMuxer` + `Exporter` hand-rolled the same `requestMediaDataWhenReady` +
   `DispatchGroup` + `done`-flag + first-error latch ("the ReplayMuxer idiom"). Extracted **one

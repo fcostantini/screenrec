@@ -37,6 +37,10 @@ public final class SampleRouter: @unchecked Sendable {
         lock.unlock()
     }
 
+    /// Not a hard callback barrier: `route` reads the consumer snapshot under the lock and delivers
+    /// outside it, so a route already in flight can still deliver **one late `consume`** to a consumer
+    /// detached a moment ago. Safe today — consumers tolerate a trailing buffer — but it's a real
+    /// contract: detaching does not guarantee no further `consume` (M14-T3).
     public func detach(_ consumer: any SampleConsumer) {
         lock.lock()
         consumers[ObjectIdentifier(consumer)] = nil

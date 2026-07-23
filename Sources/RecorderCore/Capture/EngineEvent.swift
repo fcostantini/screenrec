@@ -35,7 +35,6 @@ public enum EngineEvent: Sendable, Equatable {
     /// The in-progress file was moved (Trash included) and the sentinel renamed it back;
     /// recording continues. Deletion is not an event — it fails the session.
     case recordingFileRestored
-    case fileProgress(seconds: Double, bytes: Int64)
     case stopped(EndReason)                         // engine ran with no writer (e.g. engine-smoke)
     case finished(url: URL, reason: EndReason, droppedFrames: Int)  // file finalized, playable
     /// The user threw the take away mid-recording: the file is removed, nothing saved.

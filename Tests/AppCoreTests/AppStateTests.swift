@@ -163,13 +163,6 @@ import RecorderCore
         #expect(state.statusIcon == .paused)
     }
 
-    @Test func progressDoesNotDisturbTheIcon() {
-        let state = recordingState()
-        state.apply(.paused)
-        state.apply(.fileProgress(seconds: 12, bytes: 1_000_000))
-        #expect(state.statusIcon == .paused)
-    }
-
     // MARK: - The pickers → CaptureConfiguration (docs/06 items 5–7)
 
     @Test func defaultsMatchTheCaptureDefaults() {
@@ -424,8 +417,7 @@ import RecorderCore
         let state = makeState()
         let (events, continuation) = AsyncStream.makeStream(of: EngineEvent.self)
         for event: EngineEvent in [
-            .started, .fileProgress(seconds: 5, bytes: 500_000), .paused, .resumed,
-            .microphoneLost,
+            .started, .paused, .resumed, .microphoneLost,
             .finished(url: Self.outputURL, reason: .diskAlmostFull, droppedFrames: 3),
         ] {
             continuation.yield(event)

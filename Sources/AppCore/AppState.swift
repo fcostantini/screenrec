@@ -828,13 +828,13 @@ public final class AppState {
 
     /// Re-reads the writer's duration and the file's size on disk.
     ///
-    /// Polled, not pushed: `EngineEvent.fileProgress` is declared but nothing emits it. Suits
-    /// docs/06 here anyway ("≤ 1 Hz, menu open only").
+    /// Polled, not pushed — no per-sample progress event (there was a dead `fileProgress` arm, retired
+    /// M14-T3). Suits docs/06 here anyway ("≤ 1 Hz, menu open only").
     public func refreshProgress() {
         let duration = session?.recordedDuration.seconds ?? 0
         // NaN until the first frame starts the session (docs/02 §10).
         let seconds = duration.isFinite ? duration : 0
-        let bytes = currentOutputURL.map(Self.fileSize) ?? 0
+        let bytes = currentOutputURL.map(OutputLocation.currentFileSize(for:)) ?? 0
         // Assign only on real change: @Observable publishes on every set, and a publish
         // rebuilds the OPEN menu's AppKit rows — which garbles hover/highlight state.
         // Idle both values sit at zero, so the idle menu never rebuilds at all.
@@ -1113,8 +1113,6 @@ public final class AppState {
             lastFailure = "No microphone — it didn't start in time."
         case .recordingFileRestored:
             break   // recording unaffected; the notification carries the news
-        case .fileProgress:
-            break   // nothing emits this; `refreshProgress()` polls instead
         }
     }
 
@@ -1182,15 +1180,4 @@ public final class AppState {
         }
     }
 
-    private static func fileSize(_ url: URL) -> Int64 {
-        // In-progress recordings live at the `.partial` companion; the final name appears
-        // only at finalize. Probe the partial first so the header's size isn't stuck at zero.
-        for candidate in [OutputLocation.partialURL(for: url), url] {
-            if let attributes = try? FileManager.default.attributesOfItem(atPath: candidate.path),
-               let size = attributes[.size] as? NSNumber {
-                return size.int64Value
-            }
-        }
-        return 0
-    }
 }
