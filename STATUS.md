@@ -5,6 +5,48 @@
 
 ## Now
 
+- **🗺️ ROADMAP REFILLED (2026-07-24) — a full-repo review produced M15–M18; nothing implemented yet.**
+  A code/architecture + product review of v1.7.1 (clean tree at `6c6dd0e`) produced **18 findings — 6
+  code (A1–A6), 12 product (B1–B12)** — now encoded as four milestones in docs/03. **Next: M15-T1**
+  (plan artifact first, per the working contract). Order and rationale:
+  - **M15 — Gate & Debt** (A1–A6, **PATCH**). Do first. **The headline is that `swift test` is not
+    reliably green** — see the finding below; the rest is the settings mirror (A2), export partial-file
+    discipline (A3), stale comments + dead `EndReason` cases (A4/A6) and rotating this file (A5).
+  - **M16 — Honest State** (B1–B4, B8, B9, **MINOR**). The review's thesis: extend ADR-007 from "never
+    a broken file" to "never a lying state" — armed replay's sleep assertion (B1) and its cost (B8),
+    optional system audio (B2), silent-audio detection + a level indicator (B3), an onboarding
+    capability self-test (B4), and showing the version (B9).
+  - **M17 — Window capture** (B5, **MINOR**). The last missing scoping mode; M11's shape exactly.
+  - **M18 — Editing & Menu polish** (B6, B7, B10–B12, **MINOR**). Trim honesty + precise mode, MP4
+    export options, menu row-count, and five small papercuts.
+  M17/M18 are interchangeable; **M17-T2 adds menu rows that M18-T3 is removing** — whichever runs
+  second inherits the coordination (flagged in both tasks). Review artifact:
+  `claude.ai/code/artifact/b5915b92-c083-4e2e-8cc9-f590901d8e8c`.
+  **⚠️ Two things the review changed about how to read this repo:** (1) the running app was **not**
+  driven during it — no menus opened, no screenshots — so every UI finding is read from view source
+  and docs/06, i.e. inference, not measurement; (2) B4 was **missing** from the artifact's bundle
+  table (Franco caught it) and is now M16-T6.
+
+- **🔴 FIELD NOTE / OPEN — `swift test` failed 3× in a row on a clean tree (2026-07-24), no source
+  changes.** This is M15-T1 and the most urgent item on the board, because with no CI this suite *is*
+  the gate and it fronts the pre-push hook. Measured at v1.7.1, `6c6dd0e`:
+  - **Run 1 — aborted.** `Precondition failed: encoder session never became ready`
+    (`SyntheticBuffers.swift:24`). It's a `precondition` in a *shared helper*, so the process dies and
+    the other 424 tests never report — one flake costs the whole run's signal.
+  - **Run 2 — 6 issues, 121.7 s** (`ReplayEncoderTests` 5, `ReplayMuxerTests` 1).
+  - **Run 3 — 4 issues, 121.6 s**, one carrying `The replay encoder failed on a frame (VT error
+    -12912)` — VideoToolbox encoder malfunction / resource exhaustion. Each failing test burns a 120 s
+    timeout first; the suite historically runs in ~2 s.
+  **The mechanism was already known** (field note 2026-07-21: swift-testing parallelises suites,
+  several hold a live `VTCompressionSession`, Apple Silicon allows only a handful) — **but the
+  mitigation only ever reached the three env-gated encode suites.** The pre-push hook runs those one
+  at a time with `--filter` and its comment says exactly why; `ReplayEncoderTests`/`ReplayMuxerTests`
+  are always-on, carry no `.serialized` trait, and run concurrently with everything else. Candidate
+  fixes and the trade-offs are in M15-T1's Rulings; the recommendation is to gate the two VT suites
+  the same way the other three already are, plus replacing that `precondition` with a recorded
+  failure. **Until this lands, treat a red `swift test` as unproven rather than as a regression, and
+  re-run the encoder suites in isolation to tell the two apart.**
+
 - **🎉 v1.7.1 CUT (2026-07-23) — M14 (Cleanup) earns the PATCH; roadmap empty.** `VERSION` +
   `CoreInfo.version` → 1.7.1 (pin green), committed (`3581e3d`), cut via **`Scripts/release.sh` run in the
   BACKGROUND** (VT-wedge lesson) — full gate green (build · test · encode×3 · release · bundle-sign),
