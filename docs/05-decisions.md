@@ -46,7 +46,7 @@ degraded recordings are the unforgivable failure.
 recording). **Amended M8-T1 (2026-07-20) for mic *format change*:** every mic buffer is
 normalized to one fixed format (`ResampledMicInput`, 48 kHz mono) before any consumer, so a
 device/codec flip is absorbed transparently — that trigger no longer exists
-(`EndReason.microphoneChanged` is retired-but-declared). Every other trigger here still stands.
+(`EndReason.microphoneChanged` was retired, then deleted in M15-T4). Every other trigger here still stands.
 
 ## ADR-008 🅿 Cursor-as-data (Screen Studio-style) deferred
 v1 burns the cursor in (`showsCursor = true`). The editor-grade alternative (record

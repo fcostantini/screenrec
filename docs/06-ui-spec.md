@@ -206,7 +206,7 @@ form). Never the word "error" for a fail-stop.
 | Replay mic recovered while armed — **M8-T2** | `Replay still armed · microphone reconnected` | `Replays saved from now on include the microphone again.` | — |
 
 Fail-stop causes, one per reachable `EndReason`:
-`display disconnected` · `microphone changed` · `disk almost full` ·
+`display disconnected` · `the recorded app quit` · `disk almost full` ·
 `screen capture stopped unexpectedly` (an unclassified `streamError` — say what happened, never
 the raw SCK string, never the word "error")
 
@@ -219,8 +219,8 @@ the raw SCK string, never the word "error")
   there isn't one, so it's the one place "Couldn't" is right (as in "Couldn't save replay").
 - **`Mac went to sleep` is deleted — it was copy for a state that cannot occur.** M3-T4 measured
   that SCK reports sleep, lock and unplug as the same code (-3815 → `displayDisconnected`), so
-  `EndReason.systemSleep` is unreachable. The enum case stays (docs/01 defines it; M5/M6 may find
-  a source) but nothing renders it.
+  `EndReason.systemSleep` is unreachable. M5/M6 never found a source, so the case was **deleted**
+  in M15-T4 along with `microphoneChanged`.
 
 **M6-T7 — the in-progress file defends itself.** The active recording is written as
 `Recording ….mov.partial` (renamed to `.mov` at finalize, so the recents rows never list an

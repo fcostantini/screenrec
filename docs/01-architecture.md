@@ -91,8 +91,7 @@ is the seam that makes this trivial.
 
   ```swift
   enum EndReason: Sendable {
-      case userStopped, displayDisconnected, microphoneChanged,
-           diskAlmostFull, systemSleep
+      case userStopped, displayDisconnected, appQuit, diskAlmostFull
       case streamError(String)
   }
   enum EngineEvent: Sendable {

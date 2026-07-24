@@ -21,8 +21,7 @@ import RecorderCore
     /// Every way a session can end. All of them are `finished` — the fail-stops are ADR-007
     /// successes, not errors — so all of them must land on the same icon.
     private static let endReasons: [EndReason] = [
-        .userStopped, .displayDisconnected, .appQuit, .microphoneChanged,
-        .diskAlmostFull, .systemSleep, .streamError("-3815"),
+        .userStopped, .displayDisconnected, .appQuit, .diskAlmostFull, .streamError("-3815"),
     ]
 
     /// An AppState on a throwaway preferences domain.

@@ -5,6 +5,20 @@
 
 ## Now
 
+- **✅ M15-T4 DONE (2026-07-24) — stale comments, two dead `EndReason` cases, one duplicated helper.**
+  `EndReason.microphoneChanged` (unreachable since M8-T1 normalized every mic buffer) and `.systemSleep`
+  (never reachable — SCK reports sleep, lock and lid-close as one code) are **deleted**, per M14-T3's
+  precedent, rippling through the CLI's `describe`, the notification `cause` switch, two test fixtures
+  and docs 01/02/05/06. Three stale doc comments corrected (`makeMicrophoneInput` claimed device-native
+  audio format; `Settings.replaySeconds` and `AppState.replaySeconds` both still said "30/60/120" after
+  M9-T8 made it a range). `isSameFile` is now one `URL` extension (`FileIdentity.swift`), kept distinct
+  from `Exporter.sameFile` on purpose — that one resolves symlinks and file identity, this one answers
+  "does this receipt point at that row" and must still work once the file is gone.
+  **A fifth drift surfaced while fixing the fourth:** docs/06's fail-stop cause list was wrong in *both*
+  directions — it named `microphone changed` **and** omitted `the recorded app quit` (M7). Now matches
+  the `cause` switch exactly. **429 tests unchanged, full dev loop green, CLI verified by hand.**
+  **Next: M15-T5** (rotate this file) — the last M15 task.
+
 - **✅ M15-T3 DONE (2026-07-24) — exports get the recording path's `.partial` discipline.** The three
   exporters (`Exporter`/`GifExporter`/`Trimmer`) write to a `.partial` companion and rename only on
   success, and the launch sweep learned to tell a recording partial from an export one. **Premise

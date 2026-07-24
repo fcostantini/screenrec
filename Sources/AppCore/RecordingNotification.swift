@@ -268,12 +268,8 @@ public enum RecordingNotifications {
         switch reason {
         case .displayDisconnected: "display disconnected"
         case .appQuit: "the recorded app quit"
-        case .microphoneChanged: "microphone changed"
         case .diskAlmostFull: "disk almost full — free up space before recording again"
         case .streamError: "screen capture stopped unexpectedly"
-        // Unreachable: SCK reports sleep, lock and unplug as one code (-3815 →
-        // displayDisconnected). Mapped anyway so the switch stays total.
-        case .systemSleep: "the Mac went to sleep"
         // Not a cause — `.userStopped` takes the manual-stop branch above.
         case .userStopped: "you stopped it"
         }

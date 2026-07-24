@@ -452,8 +452,8 @@ public actor CaptureEngine {
     /// Classifies an unexpected stream death into the most specific `EndReason` (docs/01).
     /// Measured: a display going away ends the stream with `.noCaptureSource`. Lid-close and
     /// monitor-unplug are unobserved and may use other codes — unmapped errors keep their raw
-    /// code in the message so it can be identified rather than guessed. `.systemSleep` is
-    /// unreachable on purpose: nothing measured distinguishes it (docs/02 §7).
+    /// code in the message so it can be identified rather than guessed. Display sleep, screen lock
+    /// and lid-close all arrive as the same code, so none of them gets its own reason (docs/02 §7).
     static func endReason(forStreamError error: Error) -> EndReason {
         let nsError = error as NSError
         guard nsError.domain == SCStreamError.errorDomain else {

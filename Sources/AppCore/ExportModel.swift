@@ -136,19 +136,13 @@ public final class ExportModel {
     /// Re-points the receipt after a rename (M12-T2) if it named `oldURL`, keeping the export time —
     /// so a renamed old receipt doesn't become fresh. AppState's rename forwards here.
     public func renameReceipt(from oldURL: URL, to newURL: URL) {
-        if let export = lastExport, isSameFile(export.url, oldURL) {
+        if let export = lastExport, export.url.isSameFile(as: oldURL) {
             lastExport = LastExport(url: newURL, date: export.date)
         }
     }
 
     /// Clears the receipt after a trash (M12-T2) if it named `url`. AppState's trash forwards here.
     public func clearReceipt(for url: URL) {
-        if isSameFile(lastExport?.url, url) { lastExport = nil }
-    }
-
-    /// Whether two file URLs name the same file, robust to representation differences (a receipt
-    /// loaded from disk vs a `contentsOfDirectory`-derived row URL — M12-T2).
-    private func isSameFile(_ a: URL?, _ b: URL) -> Bool {
-        a?.standardizedFileURL == b.standardizedFileURL
+        if lastExport?.url.isSameFile(as: url) == true { lastExport = nil }
     }
 }

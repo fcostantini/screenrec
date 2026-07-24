@@ -280,7 +280,7 @@ Consequences for anyone designing mic recovery:
   ONE fixed format — 48 kHz mono Float32 (`ResampledMicInput`, `AVAudioConverter`, primeless,
   output PTS = input PTS) — in the engine's mic path *before* `SampleRouter` fan-out, so no
   consumer ever sees a device format. M3-T2's fail-stop-on-flip is retired
-  (`EndReason.microphoneChanged` declared-but-unreachable; ADR-007 amended); the ring's
+  (`EndReason.microphoneChanged` deleted outright in M15-T4; ADR-007 amended); the ring's
   re-latch still guards system audio only. Measured live (`mic-swap-spike --record-repoint`):
   a recording rode an AirPods→built-in `updateConfiguration` re-point with one continuous
   31 s mic track spanning the swap, signal on both sides.
@@ -336,8 +336,8 @@ Consequences for anyone designing mic recovery:
   -3815 → `finished(.displayDisconnected)` → playable file). ⚠️ SCK reports display **sleep**,
   screen **lock**, and **lid-close / system sleep** identically as -3815 — lid-close confirmed
   2026-07-15 (§4.3: the machine slept mid-recording, the process was suspended, and it finalized
-  `displayDisconnected` + a playable 11.2 s file on wake). So **`EndReason.systemSleep` is
-  confirmed dead, not merely unused**: there is no signal to map it from, and every guess at
+  `displayDisconnected` + a playable 11.2 s file on wake). So **`EndReason.systemSleep` was
+  confirmed dead, not merely unused** (and deleted in M15-T4): there is no signal to map it from, and every guess at
   wiring it up would have been wrong. Do not invent a distinction the API doesn't give you.
   (Monitor unplug stays untested — this machine has only a built-in display.)
   `CaptureEngine.endReason(forStreamError:)` maps it; unmapped SCK errors keep their code in the

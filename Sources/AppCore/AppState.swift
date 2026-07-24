@@ -160,8 +160,8 @@ public final class AppState {
     /// in tests. Fired once ever, after which the dimmed menu row is the standing reminder.
     public var onReplayBannerWarning: (@MainActor () -> Void)?
 
-    /// The rolling window; docs/06 offers 30/60/120. Changing it resizes the rings in place —
-    /// the buffer survives: grow fills over time, shrink evicts the excess now.
+    /// The rolling window, `Settings.replaySecondsRange` (5 s – 15 min, M9-T8). Changing it resizes
+    /// the rings in place — the buffer survives: grow fills over time, shrink evicts the excess now.
     public var replaySeconds: Int {
         didSet {
             persist()
@@ -800,7 +800,7 @@ public final class AppState {
             }
         }
         exports.renameReceipt(from: url, to: target)   // re-points the export receipt if it named this
-        if let replay = lastReplay, isSameFile(replay.url, url) {
+        if let replay = lastReplay, replay.url.isSameFile(as: url) {
             lastReplay = LastReplay(url: target, seconds: replay.seconds)
         }
         refreshRecentRecordings()
@@ -816,14 +816,8 @@ public final class AppState {
             return
         }
         exports.clearReceipt(for: url)   // clears the export receipt if it named this
-        if isSameFile(lastReplay?.url, url) { lastReplay = nil }
+        if lastReplay?.url.isSameFile(as: url) == true { lastReplay = nil }
         refreshRecentRecordings()
-    }
-
-    /// Whether two file URLs name the same file, robust to representation differences (a receipt
-    /// loaded from disk vs a `contentsOfDirectory`-derived row URL — M12-T2).
-    private func isSameFile(_ a: URL?, _ b: URL) -> Bool {
-        a?.standardizedFileURL == b.standardizedFileURL
     }
 
     /// Re-reads the writer's duration and the file's size on disk.

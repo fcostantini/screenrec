@@ -371,8 +371,9 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         ]
     }
 
-    /// Builds the mic AAC input matching the device-native sample rate/channel count read
-    /// from its first buffer (docs/02 §4). Returns nil if the format carries no audio ASBD.
+    /// Builds the mic AAC input from the first buffer's format. Since M8-T1 that is always
+    /// `ResampledMicInput`'s fixed format, not the device's, so the input is welded to the same
+    /// shape for every device (docs/02 §4). Returns nil if the format carries no audio ASBD.
     private static func makeMicrophoneInput(format: CMFormatDescription) -> AVAssetWriterInput? {
         guard let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee else {
             return nil

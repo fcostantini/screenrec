@@ -12,7 +12,7 @@ import RecorderCore
 
     /// Every reason a recording can end for, other than the user asking.
     private static let failStops: [EndReason] = [
-        .displayDisconnected, .appQuit, .microphoneChanged, .diskAlmostFull, .streamError("-3818"),
+        .displayDisconnected, .appQuit, .diskAlmostFull, .streamError("-3818"),
     ]
 
     private func notification(_ event: EngineEvent, duration: TimeInterval = 754) -> RecordingNotification? {

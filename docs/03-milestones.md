@@ -1194,7 +1194,7 @@ layering or the seam design.
       through the new path; live CLI mp4 + gif + trim all landing at their final names; the A/B kill
       test above. ⚠️ AVFoundation also leaves its own `<name>.sb-<hex>` temp on a hard kill — invisible
       to the menu, not swept (field note).
-- [ ] M15-T4 **Stale comments, dead enum cases, one duplicated helper.** Four doc drifts, each one
+- [x] M15-T4 **Stale comments, dead enum cases, one duplicated helper.** Four doc drifts, each one
       measurement out of date: **(1)** `MovieRecorder.makeMicrophoneInput` claims it matches "the
       device-native sample rate/channel count read from its first buffer" — since M8-T1 every mic
       buffer is normalised to a fixed 48 kHz mono format, and the same class's `consume` comment 200
@@ -1209,6 +1209,15 @@ layering or the seam design.
       ripple through the CLI's `describe` and the notification `cause` switch) or stay declared with
       a sharper comment — M14-T3's precedent says go. **Verify:** full dev loop green; the
       exhaustiveness checker confirms no arm was missed; `grep` shows one `isSameFile`.
+      **DONE — both cases deleted.** `EndReason` is now `userStopped`/`displayDisconnected`/`appQuit`/
+      `diskAlmostFull`/`streamError`, rippling through the CLI's `describe`, the notification `cause`
+      switch, two test fixtures and docs 01/02/05/06. `isSameFile` is one `URL` extension
+      (`FileIdentity.swift`) — deliberately still distinct from `Exporter.sameFile`, which resolves
+      symlinks and file identity; the AppCore one answers "does this receipt point at that row" and must
+      keep working once the file is gone. **A fifth drift surfaced while fixing the fourth:** docs/06's
+      fail-stop cause list was wrong in *both* directions — it named `microphone changed` (unreachable
+      since M8-T1) **and** omitted `the recorded app quit` (added by M7). It now matches the `cause`
+      switch exactly. **429 tests unchanged; full dev loop green; CLI verified by hand.**
 - [ ] M15-T5 **Rotate STATUS.md and the milestones doc.** `STATUS.md` is 2,619 lines / 236 KB —
       larger than any source file by a wide margin — and CLAUDE.md mandates it as the entry point for
       every session. Its own contract says "keep Now brutally short", and Now *is* short; the problem

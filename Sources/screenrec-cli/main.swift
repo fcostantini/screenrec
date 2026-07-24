@@ -140,9 +140,7 @@ func describe(_ reason: EndReason) -> String {
     case .userStopped: return "userStopped"
     case .displayDisconnected: return "displayDisconnected"
     case .appQuit: return "appQuit"
-    case .microphoneChanged: return "microphoneChanged"
     case .diskAlmostFull: return "diskAlmostFull"
-    case .systemSleep: return "systemSleep"
     case .streamError(let message): return "streamError(\(message))"
     }
 }

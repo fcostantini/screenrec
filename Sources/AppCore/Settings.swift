@@ -92,7 +92,7 @@ public struct Settings: Sendable, Equatable {
     /// display fails loud (M11-T1).
     public var captureRegion: RegionSelection?
     public var replayArmed: Bool
-    /// docs/06 offers 30, 60 or 120.
+    /// The rolling window, `replaySecondsRange` (5 s – 15 min) since M9-T8; loads clamp into it.
     public var replaySeconds: Int
     public var replayHotkey: Hotkey
     /// The optional global start/stop recording shortcut (M9-T4). Nil ⇒ off — an always-live combo
