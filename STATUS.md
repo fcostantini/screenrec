@@ -5,6 +5,36 @@
 
 ## Now
 
+- **✅ M15-T1 DONE (2026-07-24) — `swift test` is deterministic again: 8/10 failing → 0/20, slowest 3 s.**
+  Two changes, both in `Tests/`, **no production code touched**: `@Suite(.serialized)` on
+  `ReplayEncoderTests` + `ReplayMuxerTests`, and the `SyntheticBuffers.swift` readiness `precondition`
+  replaced with `Issue.record` + early return. **Option (a) from the plan — gating the two suites behind
+  `SCREENREC_HW_ENCODE_TESTS=1` — proved unnecessary, so replay-encoder coverage stays in the default
+  loop.** Evidence:
+
+  | Stage | Runs | Failed | Wall clock |
+  |---|---|---|---|
+  | Baseline (unmodified) | 10 | **8** | 2–3 s green / 122–124 s failing |
+  | `Issue.record` only | 10 | **7** | unchanged — *no improvement* |
+  | `+ @Suite(.serialized)` | 20 | **0** | slowest **3 s** |
+
+  Also: the three gated encode suites green in isolation (Exporter 12, Trimmer 4, GifExporter 4); full
+  dev loop green (build · **425 tests / 3 s** · release · signed bundle).
+  **⚠️ Two premises I asserted in the review were wrong; the measurement corrected them —**
+  **(1)** the `precondition` was never the common failure (it fired **0 times in 10 real runs**), and
+  removing it alone changed nothing (7/10). It is worth keeping — forced to fire it now records **13
+  issues with 0 aborts and all 425 tests still reporting**, where before one flake killed the run — but
+  it is robustness, not the cure. **(2)** The ~120 s is not a prior run's abort poisoning the next; it
+  is spent *inside* each test, which then mostly **passes** at ~122 s. See the field note for the real
+  mechanism. **Next: M15-T2** (collapse the settings mirror) — plan artifact first.
+
+- **✅ RESOLVED by M15-T1 — the "`swift test` failed 3× in a row" entry below overstated it.** The
+  correct characterisation is **flaky, with strong autocorrelation**: a 10-run baseline measured 8
+  failures in the pattern `pass, fail×6, pass, fail, fail` — so it recovers on its own and re-trips,
+  rather than staying broken. Everything else in that entry stands; the *cause* it named (VT
+  oversubscription) was right, the *amplifier* it named (the `precondition` poisoning the next run) was
+  not. Kept below unedited as the original observation.
+
 - **🗺️ ROADMAP REFILLED (2026-07-24) — a full-repo review produced M15–M18; nothing implemented yet.**
   A code/architecture + product review of v1.7.1 (clean tree at `6c6dd0e`) produced **18 findings — 6
   code (A1–A6), 12 product (B1–B12)** — now encoded as four milestones in docs/03. **Next: M15-T1**
@@ -1452,6 +1482,31 @@ video (deterministic, reproducible).
 | G6   | ✅ **v1 declared 2026-07-20 (v1.0.0)** — M6 complete bar the deferred T4 bucket; G6 = the sum of the soak legs (below) + acceptance criteria, all green | §7 leg 1 ✅ 2026-07-17: 2 h battery, real usage + Zoom, replay armed, 3 mid-run replay saves; 19.5 GB / 7223.42 s, tracks ≤110 ms apart; battery 99→62%, CPU avg 12.9% / max 19.3%, RSS 98–485 MB trendless, zero thermal warnings; Franco: "smooth throughout, no desync" (claps at 0/1/2 h). §7 kill leg ✅ (amended to 1 h, Franco): kill -9 at 3540 s → playable 3539.53 s, **0.47 s lost** (≤10 s); app relaunched Ready. ⚠️ relaunch dropped the persisted armed state (transient pipeline failure → self-disarm; field note) — open follow-up, not a gate fail (§7 doesn't cover it). |
 
 ## Field notes (append; things learned that docs don't cover yet)
+
+- 2026-07-24 (M15-T1): **`VTCompressionSessionCreate` BLOCKS — it does not fail — once the hardware
+  encoder pool is exhausted, and the block is ~120 s.** This is the whole story behind the flaky
+  suite, and it is not what the 2026-07-21 note assumed. Measured mechanics:
+  - **14 tests can hold a live session at once** (`ReplayMuxerTests` 8/8 build a `ReplayEncoder`,
+    `ReplayEncoderTests` 6/7). Swift Testing parallelises across suites, so they all race.
+  - Under exhaustion the tests **still mostly pass — after ~122 s each**. Because they block in
+    parallel on the same resource, the whole run lands at ~123 s, not 14×120 s. So **a green run is
+    not proof of health; wall clock is the real signal.** Judge this suite by duration, not exit code.
+  - The failures that do appear are downstream symptoms (`nothingBuffered`, `files.count == 0`), which
+    is why the failing test names moved around run to run and never pointed at the cause.
+  - `@Suite(.serialized)` on the two suites caps it at ~2 concurrent sessions: **8/10 runs failing →
+    0/20, slowest 3 s.**
+  - **`ReplayEncoder.deinit` already invalidates its session — nothing leaks and production was never
+    affected.** This was purely a test-harness concurrency bug.
+  - **Killing the leaked `VTEncoderXPCService` processes does NOT heal it.** Tried it: a fresh service
+    is re-exhausted immediately by the same 14-way race. Encoder-service age is a symptom, not a lever.
+  - ⚠️ **Don't run `swift test` under a short foreground timeout.** A 2-minute cap SIGTERMs it
+    mid-encode — exactly the degrade-the-next-run trap the 2026-07-21 note warns about. Background it,
+    or give it minutes. (Learned by doing it.)
+
+- 2026-07-24 (M15-T1, out of scope — for a future task): `ReplayMuxerTests.swift:106` and `:128` call
+  `DispatchSemaphore.wait()` from an async context — a warning today, **an error under Swift 6 language
+  mode**, which the package will eventually want (it is pinned to `.v5` in `Package.swift`). Pre-existing,
+  untouched here. Slot into a debt task alongside any future language-mode move.
 
 - 2026-07-22 (M10-T4): **SwiftUI's `VideoPlayer` CRASHES the app in our build.** Opening the Trim
   window with `VideoPlayer(player:)` fatal-errored at launch — SIGABRT, `swift::fatalError` →

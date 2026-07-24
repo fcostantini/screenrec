@@ -1,5 +1,6 @@
 import CoreMedia
 import CoreVideo
+import Testing
 
 @testable import RecorderCore
 
@@ -21,7 +22,12 @@ func encodeSyntheticFrames(into encoder: ReplayEncoder, count: Int, startingAt f
                 usleep(10_000)
                 waited += 1
             }
-            precondition(encoder.isReadyForTesting, "encoder session never became ready")
+            // Recorded, not `precondition`: this fires on VT oversubscription, not a broken invariant,
+            // and an abort here would take the whole run down with it — 424 unrelated tests included.
+            guard encoder.isReadyForTesting else {
+                Issue.record("VT encoder session never became ready within 4 s — VideoToolbox may be oversubscribed")
+                return
+            }
         }
     }
     encoder.completePendingFrames()

@@ -6,6 +6,10 @@ import Testing
 
 /// End-to-end without a capture stream: synthesized frames go through the REAL VT encoder
 /// (no TCC needed) into the rings, and the muxer writes a real file the asset APIs then judge.
+///
+/// Serialized for the same reason as `ReplayEncoderTests`: every case builds a `ReplayEncoder`, so
+/// running them in parallel exhausts the hardware encoder pool.
+@Suite(.serialized)
 struct ReplayMuxerTests {
 
     private func temporaryDirectory() -> URL {

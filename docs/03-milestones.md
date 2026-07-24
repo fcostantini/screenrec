@@ -1099,7 +1099,7 @@ reasons doesn't get fixed, it gets bypassed. Everything else here is accumulated
 surfaced. **No user-facing features → PATCH (ADR-013).** Nothing touches the sample path, the
 layering or the seam design.
 
-- [ ] M15-T1 **Make `swift test` deterministic again.** Measured 2026-07-24 on a clean tree at
+- [x] M15-T1 **Make `swift test` deterministic again.** Measured 2026-07-24 on a clean tree at
       v1.7.1, three consecutive runs, no source changes: **run 1 aborted** (`Precondition failed:
       encoder session never became ready`, `SyntheticBuffers.swift:24` — a `precondition` in a shared
       helper, so the process dies and the other 424 tests never report); **runs 2 and 3 failed** with
@@ -1113,21 +1113,26 @@ layering or the seam design.
       **Seams:** `Tests/RecorderCoreTests/{ReplayEncoder,ReplayMuxer}Tests.swift`,
       `SyntheticBuffers.swift`, `Scripts/hooks/pre-push`, `Scripts/release.sh`, and docs/04's
       "Automated gate" section + CLAUDE.md/README's dev loop if the promised command changes.
-      **Rulings (pick one primary, measure it):** **(a) recommended —** gate the two VT suites behind
-      `SCREENREC_HW_ENCODE_TESTS=1` exactly like `Exporter`/`Trimmer`/`GifExporter`, and add two more
-      one-suite-per-invocation `--filter` steps to the hook and `release.sh`. This is the *already
-      proven* mechanism, it makes the inner-loop `swift test` VT-free and fast, and the **push** gate
-      keeps identical strength. Cost: replay-encoder coverage leaves the default loop — state that
-      trade in the commit. **(b)** `@Suite(.serialized)` on both suites — cheap, but it serialises
-      *within* a suite, not *across* them, so it reduces rather than eliminates the overlap; worth
-      adding on top of (a), not instead of it. **(c)** a process-wide VT admission gate in the test
-      helper — the only option that truly guarantees ≤1 live session, but it has to reach encoder
-      construction/`invalidate()`, so it's the most intrusive. **Regardless of the pick:** replace the
-      `precondition` at `SyntheticBuffers.swift:24` with a recorded test failure (`Issue.record`) so
-      one flake can never take the whole run down with it. **Verify:** `swift test` **five
-      consecutive times, all green**, none exceeding the historical ~2 s (no 120 s timeouts) — paste
-      all five results into STATUS.md; the gated VT steps pass in isolation; a deliberately-broken
-      test still fails the hook.
+      **RESOLVED — `@Suite(.serialized)` on both VT suites, plus `Issue.record` in place of the
+      `precondition`. Option (a) (gating them behind `SCREENREC_HW_ENCODE_TESTS=1`) was NOT needed, so
+      replay coverage stays in the default loop.** Measured: baseline **8/10 runs failed**; serialising
+      the two suites → **0/20 failed, slowest 3 s** (evidence table in STATUS.md).
+      **⚠️ Two premises in the paragraph above were wrong, and the measurement is what corrected them:**
+      **(1)** the `precondition` is *not* the common failure — forced to fire 13× it proves the run now
+      reports instead of aborting, but in 10 real runs it never fired once, and removing it alone left
+      the rate unchanged (7/10). It is a robustness fix, not the cure. **(2)** The ~120 s is *not* a
+      previous run's abort poisoning the next one; it is spent **inside** each test, and those tests
+      then mostly **pass** at ~122 s. Root cause is plainly the concurrent session count: 14 tests can
+      hold a live `VTCompressionSession` (`ReplayMuxerTests` 8/8, `ReplayEncoderTests` 6/7), and
+      `VTCompressionSessionCreate` **blocks rather than fails** once the hardware pool is exhausted.
+      `ReplayEncoder.deinit` already invalidates, so nothing leaks and **production was never
+      affected** — this was purely a test-harness concurrency bug. (Killing the leaked
+      `VTEncoderXPCService` processes does *not* heal it: the 14-way race re-exhausts a fresh service
+      immediately.) **Verify (as run):** 20 consecutive `swift test`, 0 failures, none over 10 s —
+      against a 10-run baseline of 8 failures at ~123 s each; the readiness path deliberately provoked
+      (wait budget → 0) recording 13 issues with **0 aborts and all 425 tests still reporting**, which
+      also serves as the deliberately-broken-test check; the three gated encode suites green in
+      isolation; full dev loop green.
 - [ ] M15-T2 **Collapse the settings mirror.** Every preference exists three times: 17 fields on
       `Settings`, 17 mirrored stored properties on `AppState`, and a `persist()` that rebuilds the
       whole struct from 17 arguments on every change — plus a `Key`, a `load` branch, a `save` branch

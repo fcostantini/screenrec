@@ -5,6 +5,11 @@ import Testing
 
 /// VideoToolbox needs no TCC grant, so the encoder is exercised headlessly with synthesized
 /// frames — real HEVC encodes, not mocks.
+///
+/// Serialized: every case here holds a live `VTCompressionSession`, and Apple Silicon admits only a
+/// handful at once — running them in parallel exhausts the pool, and `VTCompressionSessionCreate`
+/// then blocks ~120 s per case instead of failing.
+@Suite(.serialized)
 struct ReplayEncoderTests {
 
     /// `onFailure` arrives on a capture/VT thread; a bare captured `var` would race the test's
