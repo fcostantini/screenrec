@@ -6,6 +6,17 @@
 
 ## Now
 
+- **🎉 v1.7.2 CUT (2026-07-24) — M15 (Gate & Debt) earns the PATCH.** `VERSION` +
+  `CoreInfo.version` → 1.7.2 (pin test green), committed (`b01772f`), cut via **`Scripts/release.sh` run
+  in the BACKGROUND** — full gate green (clean tree · version pin · build · test · encode×3 · release
+  build · bundle-sign), tagged `v1.7.2`, pushed main + tag; the pre-push hook's gate passed too.
+  **0 unpushed; tag on origin; `dist/ScreenRec.app` reports 1.7.2.** PATCH not MINOR (ADR-013): M15 is
+  reliability + process, no new user-facing feature. VT stayed healthy — the release ran to completion
+  and was never killed mid-encode.
+  **⚠️ NOT INSTALLED: `/Users/Shared/ScreenRec.app` is still 1.7.1 and running (pid 72381).** Deploying
+  means quitting the live menu-bar app, so it's left for Franco — the built bundle is at
+  `dist/ScreenRec.app`. **Next: Franco's call — deploy 1.7.2, or start M16 (Honest State).**
+
 - **🎉 M15 COMPLETE — GATE G15 PASSED (2026-07-24). Roadmap: M16 → M17 → M18 remain.** Four tasks
   shipped (T1 test determinism, T3 export partials, T4 drift/dead-code, T5 this rotation); **T2 closed
   "won't do"**. G15's four criteria all met: `swift test` green **20×** with no run over 10 s (was 8/10
