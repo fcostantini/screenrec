@@ -1133,21 +1133,34 @@ layering or the seam design.
       (wait budget → 0) recording 13 issues with **0 aborts and all 425 tests still reporting**, which
       also serves as the deliberately-broken-test check; the three gated encode suites green in
       isolation; full dev loop green.
-- [ ] M15-T2 **Collapse the settings mirror.** Every preference exists three times: 17 fields on
-      `Settings`, 17 mirrored stored properties on `AppState`, and a `persist()` that rebuilds the
-      whole struct from 17 arguments on every change — plus a `Key`, a `load` branch, a `save` branch
-      and a docs/06 table row. Adding one preference means editing eight places, and forgetting one
-      is a setting that silently doesn't stick (M12 alone ran three keys through all eight sites).
-      **Seams:** hold `private var settings: Settings` on `AppState` and expose **computed forwarding
-      properties**, each keeping its own existing `didSet` side effects verbatim (`persist()` /
-      `replayConfigurationChanged()` / `syncReplayArming()` / `windowChanged` / the hotkey
-      registrations / the `isRehomingSources` batching). `persist()` becomes one line; ~80 lines
-      leave `AppState`. **⚠️ This is NOT the cluster M9-T7 ruled against extracting** — that ruling
-      was "don't add a callback layer over intrinsic coupling". This removes a mirror and adds no
-      indirection; the coupling stays exactly where it is. **Verify:** the full suite passes
-      **unchanged** (the behaviour-preserving bar, M14-T1's precedent — every settings round-trip,
-      arming and replay-rebuild test green through the computed properties); `AppState` is smaller;
-      live check that a Settings change still persists across a relaunch.
+- **M15-T2 — DECLINED, not deferred (Franco, 2026-07-24).** *Was: collapse the settings mirror — 17
+      `Settings` fields, 17 mirrored stored properties on `AppState`, and a `persist()` rebuilding the
+      struct from 17 arguments, into one `private var settings: Settings` behind computed forwarders.*
+      **Closed "won't do" (the ADR-014 / M9-T7 pattern) — do not re-attempt without a new ruling.** Two
+      findings from the planning pass killed it:
+      **(1) The bug it claimed to prevent barely exists.** The review said a forgotten preference
+      silently stops persisting. It doesn't: `Settings` uses the **memberwise** initialiser and
+      `persist()` passes all 17 arguments, so a new field **breaks the build**. The only silent case is
+      a field declared *with a default value*, which gains a memberwise default and lets `persist()`
+      keep compiling — one declaration style, not the general case. So the justification was only ever
+      size and single-source-of-truth.
+      **(2) It conflicts with `@Observable`, unavoidably.** The macro tracks **stored** properties, so
+      today's 17 are tracked individually — writing `gifFPS` notifies only `gifFPS` readers. Backing
+      them with one stored `settings` makes every getter read that one property, so **any** preference
+      write notifies **every** preference reader: granularity 17 → 1. On a codebase where M6-T10 makes
+      spurious publishes actively harmful (a publish rebuilds the open menu's AppKit rows and garbles
+      hover) and which is full of assign-only-on-change guards written for exactly that reason, that is
+      a deliberate loosening of a load-bearing mechanism. The `PermissionsModel`/`ExportModel`
+      precedent does **not** transfer: those keep granularity because they are `let` references to
+      `@Observable` **classes** whose properties are each tracked; a `Settings` **struct** has no such
+      tracking. Backing it with a `SettingsModel` class would preserve granularity and **not do the
+      task** — the 17 properties merely move to another file and `persist()` still assembles a
+      `Settings` — which is the "layer over intrinsic coupling for negative clarity value" shape M9-T7
+      already rejected. Hand-rolling `@ObservationIgnored` + `access`/`withMutation` 17 times was
+      considered and is strictly more code than today.
+      **Ruling: ~70 lines is not worth loosening the observation graph.** `AppState` keeps its 17
+      properties and its 15-line `persist()`. If the mirror ever needs revisiting, the trigger is a
+      *new* reason (e.g. a language-mode move that changes observation semantics), not this one.
 - [ ] M15-T3 **Exports defend themselves like recordings do.** Recordings get `.partial` + an O_EXCL
       reservation + a vnode sentinel + a launch recovery sweep. MP4/GIF/trim exports write straight
       to the final path, so a quit or crash mid-export leaves a **truncated file at a real name** —
@@ -1194,10 +1207,11 @@ layering or the seam design.
       in CLAUDE.md resolves; STATUS.md ≤ ~250 lines; a cold read of CLAUDE.md → STATUS.md → the
       current task still answers "what do I do now" without opening a history file.
 
-**Gate G15**: `swift test` runs green **five times in a row** with no VT timeouts (the evidence table
-in STATUS.md); a killed mid-export leaves nothing behind; the settings mirror is gone with the suite
-passing unchanged; no stale comment or dead enum arm remains; STATUS.md is back under ~250 lines and
-the reading order still works cold. No behaviour change reaches the user (PATCH).
+**Gate G15**: `swift test` runs green **20 times in a row** with no run over 10 s (the evidence table
+in STATUS.md — the original "five times" bar was too weak against an intermittent failure, corrected
+at T1); a killed mid-export leaves nothing behind; no stale comment or dead enum arm remains;
+STATUS.md is back under ~250 lines and the reading order still works cold. No behaviour change
+reaches the user (PATCH). *(T2 is closed "won't do" and is not part of this gate.)*
 
 **Non-goals (M15):** any user-facing feature (that's M16+); a GitHub Actions runner (docs/04's
 public-repo-only note stands); re-opening the M9-T7 source-picker ruling; touching the sample path.

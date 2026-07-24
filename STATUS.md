@@ -5,6 +5,19 @@
 
 ## Now
 
+- **🚫 M15-T2 DECLINED (Franco, 2026-07-24) — closed "won't do", not deferred.** The settings-mirror
+  collapse is off the board; full reasoning in docs/03 under M15-T2. Two planning-pass findings killed
+  it: **(1)** the bug it claimed to prevent barely exists — `Settings` uses the memberwise init and
+  `persist()` passes all 17 args, so a new field **breaks the build**; only a field declared *with a
+  default* slips through silently. **(2)** `@Observable` tracks **stored** properties, so one backing
+  `settings` struct would coarsen granularity **17 → 1** — every preference write notifying every
+  preference reader, on a codebase where M6-T10 makes spurious publishes actively harmful. The
+  `PermissionsModel`/`ExportModel` precedent doesn't transfer (those are `let` refs to `@Observable`
+  **classes** with individually-tracked properties; a struct has none), and the class-backed variant
+  preserves granularity while **not doing the task** — it relocates the mirror, the exact shape M9-T7
+  rejected. **Ruling: ~70 lines isn't worth loosening the observation graph.** **Next: M15-T3**
+  (export partial-file discipline) — plan artifact first.
+
 - **✅ M15-T1 DONE (2026-07-24) — `swift test` is deterministic again: 8/10 failing → 0/20, slowest 3 s.**
   Two changes, both in `Tests/`, **no production code touched**: `@Suite(.serialized)` on
   `ReplayEncoderTests` + `ReplayMuxerTests`, and the `SyntheticBuffers.swift` readiness `precondition`
