@@ -1218,7 +1218,7 @@ layering or the seam design.
       fail-stop cause list was wrong in *both* directions — it named `microphone changed` (unreachable
       since M8-T1) **and** omitted `the recorded app quit` (added by M7). It now matches the `cause`
       switch exactly. **429 tests unchanged; full dev loop green; CLI verified by hand.**
-- [ ] M15-T5 **Rotate STATUS.md and the milestones doc.** `STATUS.md` is 2,619 lines / 236 KB —
+- [x] M15-T5 **Rotate STATUS.md and the milestones doc.** `STATUS.md` is 2,619 lines / 236 KB —
       larger than any source file by a wide margin — and CLAUDE.md mandates it as the entry point for
       every session. Its own contract says "keep Now brutally short", and Now *is* short; the problem
       is ~950 lines of newest-first session log sitting between it and the structured sections. The
@@ -1233,6 +1233,17 @@ layering or the seam design.
       the tick boxes *are* the record; only the session log moves). **Verify:** every doc reference
       in CLAUDE.md resolves; STATUS.md ≤ ~250 lines; a cold read of CLAUDE.md → STATUS.md → the
       current task still answers "what do I do now" without opening a history file.
+      **DONE. STATUS.md 2,769 → 237 lines.** Field notes → **`docs/07-field-notes.md`** (1,236 lines)
+      and promoted to **#4 in CLAUDE.md's reading order** — they were the most valuable artefact in the
+      repo and the least findable. Closed session logs, the v1 status write-up and the M2-T6 calibration
+      table → **`docs/history/2026-07-sessions.md`** (1,320 lines), explicitly unmaintained. STATUS.md
+      keeps Now (today's entries + the current release), Needs Franco, the gate table, and a pointer
+      table. **Rotation verified lossless**: every original non-blank line accounted for in the three
+      files bar the two headings deliberately rewritten. CLAUDE.md's five "STATUS.md field notes"
+      references and README's doc map now point at the new homes, and the session-end checklist gained a
+      standing instruction to re-rotate past ~250 lines so this doesn't silently regrow.
+      **Ruling taken as recommended:** closed milestones' task text stays in docs/03 — the tick boxes
+      are the audit trail; only the session log moved.
 
 **Gate G15**: `swift test` runs green **20 times in a row** with no run over 10 s (the evidence table
 in STATUS.md — the original "five times" bar was too weak against an intermittent failure, corrected

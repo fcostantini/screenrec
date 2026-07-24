@@ -10,10 +10,13 @@ crash-safe long recordings, pause/resume, instant replay. Apple frameworks only.
 2. **`docs/03-milestones.md`** — the task you'll pick, its checklist and exit gate.
 3. **`docs/02-technical-reference.md`** — REQUIRED reading before touching capture,
    writing, timing, or TCC code. It encodes bugs we already hit; do not rediscover them.
-4. `docs/01-architecture.md` (module map, concurrency rules), `docs/05-decisions.md`
+4. **`docs/07-field-notes.md`** — what SCK/VideoToolbox/AVFoundation *actually* do, measured.
+   Skim before any capture/encode/test-harness work; most entries cost hours to learn.
+5. `docs/01-architecture.md` (module map, concurrency rules), `docs/05-decisions.md`
    (don't contradict ✅ ADRs), `docs/04-testing-verification.md` (gates),
    `docs/00-product-brief.md` (scope; check non-goals before adding anything),
    `docs/06-ui-spec.md` (required before any M4/M5 UI work).
+6. `docs/history/` — closed session logs. Not maintained; read only to answer "why did we".
 
 Reference implementation: `~/code/screenrec-poc` (our working Tier-1; same author).
 
@@ -24,8 +27,9 @@ Reference implementation: `~/code/screenrec-poc` (our working Tier-1; same autho
 - A milestone is DONE only when its gate in 04-testing passes. Paste gate evidence
   (commands + output) into STATUS.md. Gates marked (human) — flag them in STATUS.md
   under "Needs Franco" instead of skipping silently.
-- Update STATUS.md before ending any session: what changed, gate status, next task,
-  anything surprising you learned (append to the "Field notes" section).
+- Update STATUS.md before ending any session: what changed, gate status, next task.
+  Anything surprising you learned goes to `docs/07-field-notes.md` (newest first, dated,
+  attributed to the task) — STATUS.md's "Now" stays short.
 - `RecorderCore` never imports AppKit/SwiftUI. No external dependencies (ADR-010).
   Swift language mode v5 (see 02 §10). Read GPL reference repos for patterns only —
   never copy code.
@@ -56,20 +60,20 @@ untracked files) as a critical senior Swift reviewer:
   - **history** ("this used to…", "the first pass did X", "shipped for an afternoon",
     "deferred from M4-T2") — git has it;
   - **attribution** ("/code-review found", "Franco caught", "the live run caught it");
-  - **your mistakes**, lessons learned, or war stories — those go to STATUS.md field notes,
-    which is what that section is for;
+  - **your mistakes**, lessons learned, or war stories — those go to `docs/07-field-notes.md`,
+    which is what that file is for;
   - **essays**. If a rationale needs a paragraph, it needs one *line* here and the paragraph
     in docs/ or field notes.
   Keep: platform facts and gotchas stated flatly, doc pointers (`02 §4`, `ADR-007`),
   invariants behind a force-unwrap, concurrency constraints, and one line on why a
   non-obvious approach beat the obvious one. Delete anything that only restates the code.
 - **Scope** — the diff contains this task only. Unrelated improvements you noticed go to
-  STATUS.md field notes (or a separate `docs:`/follow-up commit), not smuggled in.
+  `docs/07-field-notes.md` (or a separate `docs:`/follow-up commit), not smuggled in.
 
 Fix what the review finds, re-run the task's Verify, then commit. If the harness offers
 a /code-review or /simplify skill, run it on the diff as part of this pass — the
 checklist above still applies on top. Genuine findings that are out of scope for the
-task: record them in STATUS.md field notes rather than fixing silently.
+task: record them in `docs/07-field-notes.md` rather than fixing silently.
 
 ## Plan artifact (mandatory — BEFORE implementing any task)
 
@@ -115,7 +119,9 @@ new feature, MAJOR for a breaking user-facing change. Tag releases (`git tag v1.
 2. Update `STATUS.md` → "Now": current milestone, exact next task ID, blockers.
 3. If a gate was attempted: record pass/fail + evidence in the gate table; add
    human-only leftovers to "Needs Franco".
-4. Append anything surprising to "Field notes" — future agents only know what's written.
+4. Append anything surprising to `docs/07-field-notes.md` — future agents only know what's
+   written. If STATUS.md's "Now" has grown past ~250 lines, rotate the closed entries into
+   `docs/history/` (M15-T5 did this once; it is meant to stay that size).
 
 ## Dev loop (the CI-less verify loop — run after every change)
 

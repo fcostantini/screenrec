@@ -109,10 +109,12 @@ This repo is documentation-first and built to be driven by coding agents:
 | `docs/00-product-brief.md` | Vision, goals, non-goals, v1 acceptance criteria |
 | `docs/01-architecture.md` | Module layout, dataflow, concurrency, state machine |
 | `docs/02-technical-reference.md` | All API knowledge + every bug already hit. Read first. |
-| `docs/03-milestones.md` | M0–M14 task breakdown with IDs, estimates, gates |
+| `docs/03-milestones.md` | M0–M18 task breakdown with IDs, estimates, gates |
 | `docs/04-testing-verification.md` | Concrete pass/fail checks per gate |
 | `docs/05-decisions.md` | ADRs — the "why" behind every non-obvious choice |
 | `docs/06-ui-spec.md` | Menu-bar app UI spec: menu states, notifications, onboarding, settings |
+| `docs/07-field-notes.md` | What SCK/VideoToolbox/AVFoundation actually do, measured and dated |
+| `docs/history/` | Closed session logs, rotated out of STATUS.md. Not maintained |
 | `tools/probe.swift` | Inspect any recording's tracks/codecs/duration |
 | `tools/menudriver.swift` | Drive/inspect the menu-bar menu via Accessibility (testing) |
 
