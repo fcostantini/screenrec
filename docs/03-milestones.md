@@ -1161,7 +1161,7 @@ layering or the seam design.
       **Ruling: ~70 lines is not worth loosening the observation graph.** `AppState` keeps its 17
       properties and its 15-line `persist()`. If the mirror ever needs revisiting, the trigger is a
       *new* reason (e.g. a language-mode move that changes observation semantics), not this one.
-- [ ] M15-T3 **Exports defend themselves like recordings do.** Recordings get `.partial` + an O_EXCL
+- [x] M15-T3 **Exports defend themselves like recordings do.** Recordings get `.partial` + an O_EXCL
       reservation + a vnode sentinel + a launch recovery sweep. MP4/GIF/trim exports write straight
       to the final path, so a quit or crash mid-export leaves a **truncated file at a real name** —
       and since M12-T2 it then appears in **Recent Exports** as a first-class, shareable file with a
@@ -1176,6 +1176,24 @@ layering or the seam design.
       export alongside M13-T2's recording finalize, or just let the partial be swept? **Verify:**
       kill the app mid-export → no stray file in Recent Exports, and the next launch is clean; a
       normal export still lands at the same final name; the source is untouched in both cases.
+      **RESOLVED. Premise confirmed by A/B measurement**, not assumed: `kill -9` mid-export **before**
+      the change left a torn `Take.mp4` **at the real name**; **after**, only `Take.mp4.partial`, with
+      nothing at the final name. Two design changes from the plan:
+      **(1) The discipline went into the three exporters, not `ExportModel.performExport`.** The funnel
+      looked like the one-place win, but `performExport`'s injected spies deliberately never touch the
+      filesystem ("the wiring is tested on a fake"), so a rename there made 5+ pure wiring tests fail
+      and would have forced them to create real files. Putting it at each exporter's public entry point
+      keeps those tests untouched, puts the knowledge where the writing happens — and **closes the CLI
+      gap the plan had written off as acceptable.**
+      **(2) The sweep is three-way, not two.** "Recover `.mov`, delete the rest" would have deleted the
+      CLI's extension-less exact-path partials (`take1.partial`), which `finalizePartial` explicitly
+      supports. Since deletion is irreversible: recover `.mov` **and extension-less**, delete only
+      known export extensions, and **leave anything unrecognized alone** rather than destroy it.
+      `OutputLocation.exportExtensions` is now the single list both the sweep and `RecentRecordings`
+      read, so they can't drift. **Verified:** 429 tests (+4); all three gated encode suites green
+      through the new path; live CLI mp4 + gif + trim all landing at their final names; the A/B kill
+      test above. ⚠️ AVFoundation also leaves its own `<name>.sb-<hex>` temp on a hard kill — invisible
+      to the menu, not swept (field note).
 - [ ] M15-T4 **Stale comments, dead enum cases, one duplicated helper.** Four doc drifts, each one
       measurement out of date: **(1)** `MovieRecorder.makeMicrophoneInput` claims it matches "the
       device-native sample rate/channel count read from its first buffer" — since M8-T1 every mic

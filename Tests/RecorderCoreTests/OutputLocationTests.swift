@@ -157,6 +157,70 @@ import Testing
         #expect(fileManager.fileExists(atPath: live.path))           // live partial left alone
     }
 
+    @Test func recoveryDeletesAbandonedExportPartialsInsteadOfRenamingThem() throws {
+        // A `.mov.partial` is an already-playable fragmented movie, so recovery is a rename. An
+        // export's partial is a torn file with no such property — renaming one would present
+        // unplayable bytes as a rescued recording (M15-T3).
+        let fileManager = FileManager.default
+        let dir = fileManager.temporaryDirectory.appendingPathComponent("exportsweep-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: dir) }
+        let location = OutputLocation(directory: dir)
+        let staleDate = Date(timeIntervalSinceNow: -300)
+
+        let recording = dir.appendingPathComponent("Recording crashed.mov.partial")
+        let mp4 = dir.appendingPathComponent("Clip.mp4.partial")
+        let gif = dir.appendingPathComponent("Clip.gif.partial")
+        for url in [recording, mp4, gif] {
+            try Data("bytes".utf8).write(to: url)
+            try fileManager.setAttributes([.modificationDate: staleDate], ofItemAtPath: url.path)
+        }
+
+        let recovered = location.recoverOrphanedPartials()
+
+        #expect(recovered.map(\.lastPathComponent) == ["Recording crashed.mov"])
+        #expect(!fileManager.fileExists(atPath: mp4.path))    // deleted, not renamed
+        #expect(!fileManager.fileExists(atPath: gif.path))
+        #expect(!fileManager.fileExists(atPath: dir.appendingPathComponent("Clip.mp4").path))
+        #expect(!fileManager.fileExists(atPath: dir.appendingPathComponent("Clip.gif").path))
+    }
+
+    @Test(arguments: [
+        // Recoverable: a fragmented movie, or the CLI's extension-less exact path.
+        ("Recording.mov.partial", true), ("take1.partial", true),
+        // Not: exports are torn share files, not playable fragments.
+        ("Clip.mp4.partial", false), ("Clip.gif.partial", false),
+    ])
+    func onlyRecordingPartialsAreRecoverable(name: String, recoverable: Bool) {
+        #expect(OutputLocation.isRecoverablePartial(name) == recoverable)
+    }
+
+    @Test(arguments: [
+        ("Clip.mp4.partial", true), ("Clip.gif.partial", true),
+        ("Recording.mov.partial", false), ("take1.partial", false), ("notes.txt.partial", false),
+    ])
+    func onlyExportPartialsAreSweptAsLitter(name: String, abandoned: Bool) {
+        #expect(OutputLocation.isAbandonedExportPartial(name) == abandoned)
+    }
+
+    @Test func recoverySparesUnrecognizedPartialsRatherThanDeletingThem() throws {
+        // Deletion is irreversible, so a partial we don't recognize is left where it is.
+        let fileManager = FileManager.default
+        let dir = fileManager.temporaryDirectory.appendingPathComponent("unknown-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: dir) }
+
+        let unknown = dir.appendingPathComponent("notes.txt.partial")
+        try Data("bytes".utf8).write(to: unknown)
+        try fileManager.setAttributes(
+            [.modificationDate: Date(timeIntervalSinceNow: -300)], ofItemAtPath: unknown.path)
+
+        let recovered = OutputLocation(directory: dir).recoverOrphanedPartials()
+
+        #expect(recovered.isEmpty)
+        #expect(fileManager.fileExists(atPath: unknown.path))
+    }
+
     @Test func finalizePartialKeepsExtensionlessNamesIntact() throws {
         let fileManager = FileManager.default
         let dir = fileManager.temporaryDirectory.appendingPathComponent("noext-\(UUID().uuidString)")

@@ -1,4 +1,5 @@
 import Foundation
+import RecorderCore
 
 /// The menu's recent-file rows: the most-recent files in the output directory, newest first. Serves
 /// both the recordings list (docs/06 "Menu — idle state" item 10, `.mov`) and the Recent Exports
@@ -12,7 +13,8 @@ public enum RecentRecordings {
     public static let exportLimit = 3
 
     /// The share-format exports (M12-T2, M10): the sibling files `Export as MP4` / `Save as GIF` write.
-    public static let exportExtensions: Set<String> = ["mp4", "gif"]
+    /// Aliases the writers' own list, so this and the orphan sweep can't drift apart (M15-T3).
+    public static let exportExtensions = OutputLocation.exportExtensions
 
     /// A directory entry, reduced to the two things the choosing depends on.
     struct Entry: Equatable {

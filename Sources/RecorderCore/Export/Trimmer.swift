@@ -60,14 +60,17 @@ public enum Trimmer {
         }
         session.timeRange = CMTimeRange(start: startTime, end: endTime)
 
-        try? FileManager.default.removeItem(at: output)
+        // Write to the `.partial` companion and rename only on success (M15-T3) — see `Exporter`.
+        let scratch = OutputLocation.partialURL(for: output)
+        try? FileManager.default.removeItem(at: scratch)
         do {
-            try await session.export(to: output, as: .mov)
+            try await session.export(to: scratch, as: .mov)
         } catch {
-            try? FileManager.default.removeItem(at: output)  // no torn file on failure
+            try? FileManager.default.removeItem(at: scratch)  // no torn file on failure
             throw TrimError.trimFailed(error.localizedDescription)
         }
 
+        let output = try OutputLocation.finalizePartial(scratch)
         let outputDuration = (try? await AVURLAsset(url: output).load(.duration).seconds) ?? 0
         let bytes = (try? FileManager.default.attributesOfItem(atPath: output.path))
             .flatMap { $0[.size] as? Int } ?? 0

@@ -234,8 +234,32 @@ public struct OutputLocation: Sendable {
         return final
     }
 
-    /// Orphaned `.partial`s are already-playable fragmented movies a crash left behind
-    /// (docs/04 §3.2); recovery is a rename, not a repair. Returns the recovered final URLs.
+    /// The inner extension of a `… .<ext>.partial` name — what the file will be once finalized.
+    private static func intendedExtension(of name: String) -> String {
+        URL(fileURLWithPath: name).deletingPathExtension().pathExtension.lowercased()
+    }
+
+    /// Whether an orphaned `.partial` can be recovered by renaming it. A `.mov.partial` can: it is an
+    /// already-playable fragmented movie (docs/04 §3.2), so recovery is a rename, not a repair. So can
+    /// an extension-less one — that's the CLI writing to an exact path.
+    static func isRecoverablePartial(_ name: String) -> Bool {
+        let inner = intendedExtension(of: name)
+        return inner == "mov" || inner.isEmpty
+    }
+
+    /// The formats `Exporter`/`GifExporter` derive from a recording. One list, so the orphan sweep and
+    /// the menu's Recent Exports can't disagree about what an export is.
+    public static let exportExtensions: Set<String> = ["mp4", "gif"]
+
+    /// Whether an orphaned `.partial` is an abandoned export, and so safe to delete: a torn `.mp4` or
+    /// `.gif` has none of the fragmented-movie property that makes recovery a rename, and renaming one
+    /// would present unplayable bytes as a rescued recording (M15-T3).
+    static func isAbandonedExportPartial(_ name: String) -> Bool {
+        exportExtensions.contains(intendedExtension(of: name))
+    }
+
+    /// Renames orphaned recording `.partial`s back to playable `.mov`s and deletes abandoned export
+    /// partials. Returns the recovered final URLs (never the deleted ones).
     /// `olderThan` keeps hands off anything a live writer may own: a recording's partial is
     /// touched about once a second, so one untouched for a minute has no living owner —
     /// the in-process "no recording running" guarantee can't see other processes (the CLI).
@@ -246,12 +270,15 @@ public struct OutputLocation: Sendable {
             let attributes = try? FileManager.default.attributesOfItem(atPath: partial.path)
             let modified = attributes?[.modificationDate] as? Date ?? .distantPast
             guard Date().timeIntervalSince(modified) > minimumAge else { return nil }
-            // A 0-byte partial is a reservation placeholder that never became a recording —
-            // nothing to recover, just litter.
-            guard let size = attributes?[.size] as? Int, size > 0 else {
+            // A 0-byte partial is a reservation placeholder that never became a recording; an export's
+            // partial is a torn share file. Both are litter, neither is recoverable.
+            guard let size = attributes?[.size] as? Int, size > 0,
+                  !Self.isAbandonedExportPartial(name) else {
                 try? FileManager.default.removeItem(at: partial)
                 return nil
             }
+            // Anything else is a partial we don't recognize: leave it alone rather than destroy it.
+            guard Self.isRecoverablePartial(name) else { return nil }
             return try? Self.finalizePartial(partial)
         }
     }

@@ -128,9 +128,13 @@ public enum Exporter {
             height: Int(naturalSize.height.rounded()),
             configuration: configuration)
 
+        // Write to the `.partial` companion and rename only once the file is complete (M15-T3, the
+        // recording path's discipline): a crash or quit mid-export then leaves nothing at the final
+        // name for the menu's Recent Exports to offer as a finished file.
+        let scratch = OutputLocation.partialURL(for: output)
         let plan = try TranscodePlan(
             asset: asset, videoTrack: videoTrack, audioTracks: audioTracks,
-            output: output, target: target, sessionStart: videoRange.start,
+            output: scratch, target: target, sessionStart: videoRange.start,
             configuration: configuration)
 
         do {
@@ -142,10 +146,11 @@ public enum Exporter {
                 }
             }
         } catch {
-            try? FileManager.default.removeItem(at: output)  // no torn file on failure
+            try? FileManager.default.removeItem(at: scratch)  // no torn file on failure
             throw error
         }
 
+        let output = try OutputLocation.finalizePartial(scratch)
         let bytes = (try? FileManager.default.attributesOfItem(atPath: output.path))
             .flatMap { $0[.size] as? Int } ?? 0
         // The file is rebased to zero from `sessionStart`, so the clip's duration is what remains

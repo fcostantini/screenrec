@@ -5,6 +5,24 @@
 
 ## Now
 
+- **✅ M15-T3 DONE (2026-07-24) — exports get the recording path's `.partial` discipline.** The three
+  exporters (`Exporter`/`GifExporter`/`Trimmer`) write to a `.partial` companion and rename only on
+  success, and the launch sweep learned to tell a recording partial from an export one. **Premise
+  confirmed by A/B, not assumed:** `kill -9` mid-export **before** left a torn `Take.mp4` **at the real
+  name** (which M12-T2 would list in Recent Exports as a finished file); **after**, only
+  `Take.mp4.partial` and nothing at the final name.
+  **Two design changes from the plan, both found by doing it:** **(1)** it went into the **exporters**,
+  not `ExportModel.performExport` — the funnel looked like the one-place win, but its injected spies
+  deliberately never touch the filesystem, so a rename there failed 5+ pure wiring tests and would have
+  forced them to create real files; putting it at each exporter's entry point kept every test untouched
+  **and closed the CLI gap the plan had written off**. **(2)** the sweep is **three-way**: "recover
+  `.mov`, delete the rest" would have deleted the CLI's extension-less exact-path partials
+  (`take1.partial`), which `finalizePartial` explicitly supports — so it recovers `.mov` + extension-less,
+  deletes only known export extensions, and **leaves anything unrecognized alone** (deletion is
+  irreversible). `OutputLocation.exportExtensions` is now the one list the sweep and `RecentRecordings`
+  share. **429 tests (+4)**, three gated encode suites green through the new path, live CLI
+  mp4/gif/trim all landing correctly, dev loop green. **Next: M15-T4.**
+
 - **🚫 M15-T2 DECLINED (Franco, 2026-07-24) — closed "won't do", not deferred.** The settings-mirror
   collapse is off the board; full reasoning in docs/03 under M15-T2. Two planning-pass findings killed
   it: **(1)** the bug it claimed to prevent barely exists — `Settings` uses the memberwise init and
@@ -1515,6 +1533,14 @@ video (deterministic, reproducible).
   - ⚠️ **Don't run `swift test` under a short foreground timeout.** A 2-minute cap SIGTERMs it
     mid-encode — exactly the degrade-the-next-run trap the 2026-07-21 note warns about. Background it,
     or give it minutes. (Learned by doing it.)
+
+- 2026-07-24 (M15-T3): **a hard kill mid-export leaves an AVFoundation temp we don't sweep.** With
+  `shouldOptimizeForNetworkUse = true` (faststart), `AVAssetWriter` writes a companion
+  `<name>.sb-<hex>` beside its output and rewrites the moov at finalize. A `kill -9` strands it. It
+  doesn't end with `.partial`, so `recoverOrphanedPartials` ignores it, and its extension isn't `mov`/
+  `mp4`/`gif`, so nothing lists it — harmless but real litter in the output folder. Deliberately not
+  swept: matching an undocumented Apple naming convention is the kind of guess that breaks on an OS
+  update. Revisit only if a user ever notices one.
 
 - 2026-07-24 (M15-T1, out of scope — for a future task): `ReplayMuxerTests.swift:106` and `:128` call
   `DispatchSemaphore.wait()` from an async context — a warning today, **an error under Swift 6 language

@@ -75,15 +75,18 @@ public enum GifExporter {
         let expectedFrames =
             window.isFinite ? max(1, Int((window * Double(configuration.fps)).rounded())) : 1
 
+        // Write to the `.partial` companion and rename only on success (M15-T3) — see `Exporter`.
+        let scratch = OutputLocation.partialURL(for: output)
         let frameCount = try await withCheckedThrowingContinuation {
             (continuation: CheckedContinuation<Int, Error>) in
             gifQueue.async {
                 continuation.resume(with: Result {
-                    try encode(reader, to: output, expectedFrames: expectedFrames)
+                    try encode(reader, to: scratch, expectedFrames: expectedFrames)
                 })
             }
         }
 
+        let output = try OutputLocation.finalizePartial(scratch)
         let bytes = (try? FileManager.default.attributesOfItem(atPath: output.path))
             .flatMap { $0[.size] as? Int } ?? 0
         return GifResult(
