@@ -1603,4 +1603,6 @@ anything new lands, the same "clear the deck" logic as M9 and M13. **M16 next** 
 review's central thesis and its five tasks are individually small. M17 and M18 are genuinely
 interchangeable; two of their tasks touch the same surface in opposite directions (**M17-T2** adds
 window rows to a menu **M18-T3** is shortening), so whichever runs second inherits the coordination —
-noted in both tasks.
+noted in both tasks. **RESOLVED 2026-07-27: M17 shipped first, and it cost M18-T3 one row, not a
+dozen.** T2 nested the window list inside a single `Window ▸` row rather than listing windows flat in
+`Source ▸` (docs/06 item 5), so M18-T3's diet starts from one extra row.

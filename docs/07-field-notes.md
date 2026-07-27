@@ -7,6 +7,15 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-27 (v1.9.0 cut): ⚠️ **`Scripts/release.sh` and the run-it-in-the-background rule fight each
+  other, and the script silently loses.** It ends with an interactive `Push v1.9.0 to origin? [y/N]`;
+  in the background stdin is not a terminal, so it reads N every time and prints `Not pushed`. The cut
+  itself is fine — gate, tag and signed bundle all complete — but **main and the tag stay local**, and
+  the run otherwise looks like a success. The background rule is not optional (a foreground timeout
+  SIGTERMs it mid-encode — the VT lesson), so **every cut needs `git push origin main && git push
+  origin <tag>` afterwards**, and the tag push runs its own pre-push gate, arriving a few seconds
+  after main's. Check `git ls-remote --tags origin` before believing the tag shipped.
+
 - 2026-07-27 (M17-T2): **A fix can be green in tests, correct in review, and still inert — and the
   only thing that says so is running it.** The idle menu never rendered `lastFailure`, so a Start
   that failed looked like a no-op. Adding the row was necessary and **not sufficient**: `endSession()`

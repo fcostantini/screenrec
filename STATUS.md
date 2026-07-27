@@ -6,6 +6,22 @@
 
 ## Now
 
+- **🎉 v1.9.0 CUT, PUSHED AND INSTALLED (2026-07-27) — M17 (Window capture) earns the MINOR.**
+  `VERSION` + `CoreInfo.version` → 1.9.0 (pin test green), committed (`aec7685`), cut via
+  **`Scripts/release.sh` run in the BACKGROUND** — full gate green (clean tree · version pin · build ·
+  495 tests · encode×3 · release build · bundle-sign), tagged **`v1.9.0`**. MINOR not PATCH (ADR-013):
+  a new user-facing capture mode. **0 unpushed; tag on origin** (`v1.9.0` → `aec7685`).
+  ⚠️ **The background run does NOT push** — the script's `Push? [y/N]` prompt reads N with no terminal,
+  so main + tag went up manually afterwards; the tag push runs its own pre-push gate (docs/07).
+  **DEPLOYED to `/Users/Shared/ScreenRec.app`**, by the field-note recipe (`kill -9` the pid, not
+  `killall`, which does not terminate it and leaves the OLD binary running): **pid 8195 → 10819**,
+  plist `CFBundleShortVersionString` = 1.9.0, the M17 fail-loud copy present in the deployed binary
+  (`strings`), replay re-armed unaided, Source back to Entire Screen, TCC intact across the swap.
+  **Next: M18 (Editing & Menu polish)** — the last milestone on the 2026-07-24 review roadmap. Its T3
+  menu diet inherits exactly one extra row from M17-T2, `Window ▸`, not the dozen a flat list would
+  have cost; and M18-T4's “small honesties” is the natural home for the duplicate-label wrinkle a
+  relaunched app produces (a live row and a `(closed)` row with the same text).
+
 - **✅ M17-T2 DONE (2026-07-27) — you can pick a window from the menu, and a stale pick can never
   bind the wrong one.** `Source ▸` gains **one** row, `Window ▸`, whose submenu lists on-screen
   windows as `<App> — <Title>`. **495 tests (+13)**, full dev loop green, every leg driven on the
