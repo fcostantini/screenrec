@@ -202,6 +202,8 @@ form). Never the word "error" for a fail-stop.
 | Fail-stop (any cause) | `Recording saved · 00:12:34` | `Ended: <cause>. File is playable.` | reveal |
 | Microphone lost mid-recording | `Still recording · microphone disconnected` | `The recording has no microphone until it reconnects.` | — |
 | Microphone recovered mid-recording — **M8-T2** | `Still recording · microphone reconnected` | `The microphone track resumed.` | — |
+| Microphone silent mid-recording — **M16-T4** | `Still recording · microphone is silent` | `No sound has reached it for 10 seconds. Check that it isn't muted.` | — |
+| Microphone audible again — **M16-T4** | `Still recording · microphone is picking up sound` | `The microphone is working again.` | — |
 | Never started | `Couldn't start recording` | the engine's own message, e.g. `No displays available — the screen may be asleep or locked.` | — |
 | Replay saved — **M5** | `Replay saved` | `Replay … .mov — last 60 s. Click to reveal.` | reveal |
 | Replay save failed — **M5** | `Couldn't save replay` | one-line cause + what to do | — |
@@ -213,6 +215,8 @@ form). Never the word "error" for a fail-stop.
 | Recording file deleted — **M6-T7** | via `failed`: | `The recording file was deleted while recording, so the video couldn't be saved.` | — |
 | Recovered interrupted recording — **M6-T7** | `Recovered an interrupted recording` | `Recording … .mov is ready to play.` | reveal |
 | Replay mic lost while armed — **M5, amended M8-T2** | `Replay still armed · microphone disconnected` | `Replays saved while it's away have no microphone.` | — |
+| Replay mic silent while armed — **M16-T4** | `Replay still armed · microphone is silent` | `Replays saved now have no sound from it. Check that it isn't muted.` | — |
+| Replay mic audible again — **M16-T4** | `Replay still armed · microphone is picking up sound` | `Replays saved from now on include it again.` | — |
 | Replay mic recovered while armed — **M8-T2** | `Replay still armed · microphone reconnected` | `Replays saved from now on include the microphone again.` | — |
 
 Fail-stop causes, one per reachable `EndReason`:

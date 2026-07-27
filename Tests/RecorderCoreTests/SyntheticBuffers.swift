@@ -98,8 +98,11 @@ func makeAudioFormat(
 
 /// `frames` of silence in `format`, as a ready `CMSampleBuffer`. Byte size derives from the
 /// format's own bytes-per-frame, so a test's byte math can't disagree with the ASBD.
+/// `amplitude` fills Float32 formats with a constant sample value — the lever the silence
+/// detector's tests need (M16-T4); zero (the default) is the digital silence every other suite
+/// has always used.
 func makeAudioSampleBuffer(
-    format: CMAudioFormatDescription, frames: Int, pts: CMTime
+    format: CMAudioFormatDescription, frames: Int, pts: CMTime, amplitude: Float = 0
 ) -> CMSampleBuffer {
     let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(format)!.pointee
     // Planar layouts carry one plane per channel; `mBytesPerFrame` covers a single plane.
@@ -115,6 +118,16 @@ func makeAudioSampleBuffer(
             blockBufferOut: &blockBuffer) == noErr)
     CMBlockBufferFillDataBytes(
         with: 0, blockBuffer: blockBuffer!, offsetIntoDestination: 0, dataLength: dataSize)
+    let isFloat32 = asbd.mFormatFlags & kAudioFormatFlagIsFloat != 0 && asbd.mBitsPerChannel == 32
+    if amplitude != 0, isFloat32 {
+        var pointer: UnsafeMutablePointer<CChar>?
+        precondition(CMBlockBufferGetDataPointer(
+            blockBuffer!, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: nil,
+            dataPointerOut: &pointer) == noErr)
+        pointer?.withMemoryRebound(to: Float.self, capacity: dataSize / MemoryLayout<Float>.size) {
+            for index in 0..<(dataSize / MemoryLayout<Float>.size) { $0[index] = amplitude }
+        }
+    }
 
     var sampleBuffer: CMSampleBuffer?
     precondition(

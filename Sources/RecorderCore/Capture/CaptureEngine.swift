@@ -45,6 +45,10 @@ public actor CaptureEngine {
     /// Splices a returned mic back in via a mic-only stream (M8-T2); nil when no mic.
     private let microphoneRescue: MicrophoneRescue?
 
+    /// Reports a mic that is connected but delivering nothing (M16-T4); nil when no mic.
+    private let microphoneSilenceWatchdog: MicrophoneSilenceWatchdog?
+    private var microphoneSilenceTask: Task<Void, Never>?
+
     /// Logs a wedged capture — video silent while the user is active (docs/02 §7). Diagnostic
     /// only: v1 never auto-restarts. Nil under an app filter (`attachesStallWatchdog`).
     private let stallWatchdog: StallWatchdog?
@@ -84,9 +88,13 @@ public actor CaptureEngine {
                 onSpliced: { continuation.yield(.microphoneRecovered) })
             microphoneRescue = rescue
             microphoneWatchdog = rescue.watchdog
+            microphoneSilenceWatchdog = MicrophoneSilenceWatchdog(
+                onSilent: { continuation.yield(.microphoneSilent) },
+                onAudible: { continuation.yield(.microphoneAudible) })
         } else {
             microphoneWatchdog = nil
             microphoneRescue = nil
+            microphoneSilenceWatchdog = nil
         }
         if Self.attachesStallWatchdog(to: configuration.content) {
             stallWatchdog = StallWatchdog { seconds in
@@ -101,6 +109,7 @@ public actor CaptureEngine {
         }
         router.attach(StartedDetector(continuation: continuation))
         if let microphoneWatchdog { router.attach(microphoneWatchdog) }
+        if let microphoneSilenceWatchdog { router.attach(microphoneSilenceWatchdog) }
         if let stallWatchdog { router.attach(stallWatchdog) }
     }
 
@@ -239,6 +248,11 @@ public actor CaptureEngine {
         if let stallWatchdog {
             stallWatchdogTask = pollingTask(every: StallWatchdog.checkInterval) { stallWatchdog.check() }
         }
+        if let microphoneSilenceWatchdog {
+            microphoneSilenceTask = pollingTask(every: MicrophoneSilenceWatchdog.checkInterval) {
+                microphoneSilenceWatchdog.check()
+            }
+        }
     }
 
     private func cancelWatchdogs() {
@@ -246,6 +260,8 @@ public actor CaptureEngine {
         microphoneWatchdogTask = nil
         stallWatchdogTask?.cancel()
         stallWatchdogTask = nil
+        microphoneSilenceTask?.cancel()
+        microphoneSilenceTask = nil
         appTerminationWatch?.cancel()
         appTerminationWatch = nil
         microphoneRescue?.cancel()
@@ -256,6 +272,7 @@ public actor CaptureEngine {
     deinit {
         microphoneWatchdogTask?.cancel()
         stallWatchdogTask?.cancel()
+        microphoneSilenceTask?.cancel()
         appTerminationWatch?.cancel()
         microphoneRescue?.cancel()
     }

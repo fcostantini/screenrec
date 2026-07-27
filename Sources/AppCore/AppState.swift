@@ -446,6 +446,12 @@ public final class AppState {
         replay.onMicrophoneRecovered = { [weak self] in
             self?.notifier?(RecordingNotifications.replayMicrophoneReconnected())
         }
+        replay.onMicrophoneSilent = { [weak self] in
+            self?.notifier?(RecordingNotifications.replayMicrophoneSilent())
+        }
+        replay.onMicrophoneAudible = { [weak self] in
+            self?.notifier?(RecordingNotifications.replayMicrophoneAudible())
+        }
         replay.onPipelineFailure = { [weak self] message in
             guard let self else { return }
             // Mirror the controller's self-disarm in the persisted state. The didSet runs
@@ -1189,6 +1195,12 @@ public final class AppState {
             lastFailure = "Microphone disconnected — still recording."
         case .microphoneRecovered:
             // The rescue spliced the mic back (M8-T2); the loss notice would now be a lie.
+            lastFailure = nil
+        case .microphoneSilent:
+            // Connected but carrying nothing (M16-T4). Same shape as a loss: the menu says so and
+            // the recording continues.
+            lastFailure = "Microphone is silent — still recording."
+        case .microphoneAudible:
             lastFailure = nil
         case .microphoneDroppedAtStart:
             // The wanted mic never started (M13-T4); the recording continues without it. Say so in

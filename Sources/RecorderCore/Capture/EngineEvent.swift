@@ -24,6 +24,11 @@ public enum EngineEvent: Sendable, Equatable {
     /// The rescue stream spliced the mic back in (M8-T2): the track/ring resumes after a
     /// silent gap over the loss window.
     case microphoneRecovered
+    /// A selected mic is delivering buffers that contain nothing — muted, gain at zero, or an
+    /// input with nothing on it (M16-T4). A notice, not an ending: recording continues.
+    case microphoneSilent
+    /// Sound reached a mic that had been reported silent.
+    case microphoneAudible
     /// A selected mic resolved to a device but never delivered its first buffer within the
     /// recorder's start grace, so the recording has no mic track (M13-T4). Session-emitted (the
     /// recorder detects it), like `.discarded`; distinct from `.microphoneLost` (which had a track).

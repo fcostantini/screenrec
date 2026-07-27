@@ -6,6 +6,25 @@
 
 ## Now
 
+- **✅ M16-T4 DONE (2026-07-27) — a connected-but-silent mic now says so, and the threshold was
+  measured rather than picked.** The product defended hard against a mic *disappearing* and not at
+  all against the commoner failure: one that is connected, delivering, and carrying nothing.
+  **Measurements first** (full table in docs/07): a **muted** device delivers **exact digital zeros**;
+  the same quiet room reads **−65.5 dBFS median on AirPods (quietest window −78.9)** and **−42.7 on
+  the built-in** — a **23 dB spread between two mics in one room**, which is why no threshold can be
+  eyeballed. Franco's ruling: **−90 dBFS sustained 10 s, paired notices, microphone only** (silent
+  system audio is normal — saying so would train the user to ignore it).
+  ⚠️ **SCK delivers ~1 s of exact zeros while a Bluetooth route spins up** — so the decision judges a
+  *run*, never a buffer; that also made the planned 2 s start grace unnecessary (the 10 s run subsumes
+  it), the one deviation from the plan. **As built:** `MicrophoneSilenceWatchdog` beside
+  `MicrophoneWatchdog` on the router path; `.microphoneSilent`/`.microphoneAudible` folded like
+  `microphoneLost` (recording continues, ADR-012); **armed replay gets the pair too**.
+  **456 tests (+13)** — every measured level is a must-not-fire case. **Live:** muted record →
+  **exactly one** notice at ~10 s, recording ran to completion, file playable with a full-length
+  (silent) mic track; **unmute mid-recording → the paired recovery notice**; control run → **neither
+  notice**. Input volume restored after every leg (71). **Next: M16-T5** (input level in the menu-bar
+  label) — plan artifact first. Two M16 tasks left (T5, T6), then the MINOR bump.
+
 - **✅ M16-T3 DONE (2026-07-27) — system audio has an off switch; ADR-019 amends ADR-004.** Until
   now the only way to record without capturing the music/the call/the video you're narrating was to
   mute the Mac. Now: a checkmark row **`Capture System Audio`** (a boolean doesn't earn a submenu, and

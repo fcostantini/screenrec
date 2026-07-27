@@ -12,6 +12,8 @@ import RecorderCore
     final class ReplaySpy: ReplayControlling {
         var onMicrophoneLost: (@MainActor () -> Void)?
         var onMicrophoneRecovered: (@MainActor () -> Void)?
+        var onMicrophoneSilent: (@MainActor () -> Void)?
+        var onMicrophoneAudible: (@MainActor () -> Void)?
         var onPipelineFailure: (@MainActor (String) -> Void)?
 
         enum Call: Equatable {

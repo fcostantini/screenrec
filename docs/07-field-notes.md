@@ -7,6 +7,28 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-27 (M16-T4): **Microphone levels, measured — two mics in the same quiet room are 23 dB
+  apart, and a muted one is exactly zero.** Peak amplitude per 500 ms window, read through the real
+  SCK mic path (`scratchpad/miclevels.swift`, kept out of the repo — it's a throwaway rig):
+
+  | Source | Peak: median | Peak: quietest window | RMS: median |
+  |---|---|---|---|
+  | AirPods Pro, quiet room | −65.5 dBFS | **−78.9 dBFS** | −82.7 dBFS |
+  | MacBook Pro Microphone, same room | −42.7 dBFS | −45.5 dBFS | −52.9 dBFS |
+  | **Muted** (`set volume input volume 0`) | **−∞** | exactly `0.000000` | −∞ |
+
+  - **A muted device delivers exact digital zeros** — all 16 windows, no dither. So the failure this
+    task exists to catch is unambiguous at the sample level; the whole difficulty is not false-firing.
+  - **The 23 dB spread between devices is why a threshold can't be eyeballed.** Anything tuned to the
+    built-in's floor (−45) calls a live AirPods room silent. `MicrophoneSilence.floorDBFS = -90` sits
+    ~11 dB below the quietest *real* window measured.
+  - ⚠️ **SCK's first ~1 s of mic audio can be exact zeros** — two full 500 ms windows on a Bluetooth
+    route, none at all on the built-in, so it is route-dependent. Any silence detector must judge a
+    *run* (10 s here), never a buffer, or every AirPods recording fires at start.
+  - `AVCaptureDevice.default(for: .audio)` follows the system default, so a measurement rig silently
+    changes device when AirPods connect mid-session. Name the device in the output, or you will
+    compare two rooms and call it noise.
+
 - 2026-07-27 (M16-T3): **An SCK stream with `capturesAudio = false` and no mic opens no audio tap —
   so nothing but our own assertion keeps the Mac awake.** Completes the M16-T1 note below. The tap
   assertions are attributed to `replayd` (pid 510), never to the client that asked for them, so they

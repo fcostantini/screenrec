@@ -175,7 +175,8 @@ public final class RecordingSession: @unchecked Sendable {
                 switch event {
                 case .started:
                     continuation.yield(.started)
-                case .paused, .resumed, .microphoneLost, .microphoneRecovered:
+                case .paused, .resumed, .microphoneLost, .microphoneRecovered,
+                     .microphoneSilent, .microphoneAudible:
                     continuation.yield(event)
                 case .failed(let message):
                     startFailure = message

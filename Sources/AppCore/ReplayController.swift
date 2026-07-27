@@ -8,6 +8,9 @@ public protocol ReplayControlling: AnyObject {
     /// Fired when the armed stream's own mic dies (docs/02 §4: gone for that stream's life).
     var onMicrophoneLost: (@MainActor () -> Void)? { get set }
     var onMicrophoneRecovered: (@MainActor () -> Void)? { get set }
+    /// The armed stream's mic is connected but carrying nothing, and its counterpart (M16-T4).
+    var onMicrophoneSilent: (@MainActor () -> Void)? { get set }
+    var onMicrophoneAudible: (@MainActor () -> Void)? { get set }
     /// Fired when the pipeline itself fails (encoder death); the controller has already
     /// disarmed itself when this runs.
     var onPipelineFailure: (@MainActor (String) -> Void)? { get set }
@@ -46,6 +49,8 @@ public protocol ReplayControlling: AnyObject {
 public final class ReplayController: ReplayControlling {
     public var onMicrophoneLost: (@MainActor () -> Void)?
     public var onMicrophoneRecovered: (@MainActor () -> Void)?
+    public var onMicrophoneSilent: (@MainActor () -> Void)?
+    public var onMicrophoneAudible: (@MainActor () -> Void)?
     public var onPipelineFailure: (@MainActor (String) -> Void)?
 
     private var isArmed = false
@@ -274,6 +279,10 @@ public final class ReplayController: ReplayControlling {
                     onMicrophoneLost?()
                 case .microphoneRecovered:
                     onMicrophoneRecovered?()
+                case .microphoneSilent:
+                    onMicrophoneSilent?()
+                case .microphoneAudible:
+                    onMicrophoneAudible?()
                 case .stopped, .failed:
                     // The stream died under us (display sleep/lock, SCK hiccup). Armed is a
                     // standing intent: wait out the condition and come back — the buffer is a

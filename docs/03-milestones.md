@@ -1359,7 +1359,7 @@ flow past a consumer. Earns a **MINOR** (ADR-013).
       (all off) vs 3 → 4 (system audio on), so that is the only configuration where an armed Mac
       could idle-sleep. ⚠️ **Known, unfixed by ruling:** with no audio at all, `ReplayMuxer` loses the
       continuous clock it anchors saves on — a still screen can yield a stale clip (field note).
-- [ ] M16-T4 **Notice when audio is arriving but silent.** The product defends hard against a mic
+- [x] M16-T4 **Notice when audio is arriving but silent.** The product defends hard against a mic
       *disappearing* and not at all against the far more common failure: a mic connected and
       delivering buffers that are **silent** — hardware mute switch, wrong input selected, gain at
       zero, a conferencing app holding the device. You find out an hour later and the take is
@@ -1378,6 +1378,26 @@ flow past a consumer. Earns a **MINOR** (ADR-013).
       (silent, quiet-room, speech) at the chosen threshold; live — record with the mic muted at the
       hardware switch → exactly one notice, recording continues, file playable with a (silent) mic
       track; unmute → the recovered notice.
+      **RULINGS (Franco, 2026-07-27):** **−90 dBFS sustained 10 s**; **paired** silent/audible
+      notices; **microphone only** — silent system audio is the normal state, and saying so would
+      train the user to ignore the notice.
+      **Thresholds MEASURED, not picked** (full table in docs/07): a muted device delivers **exact
+      digital zeros**, while the same quiet room reads **−65.5 dBFS median on AirPods (quietest
+      window −78.9)** and **−42.7 on the built-in** — a 23 dB spread that makes eyeballing a floor
+      impossible. −90 sits ~11 dB below the quietest real window. ⚠️ **SCK delivers ~1 s of exact
+      zeros while a Bluetooth route spins up**, which is why the decision judges a *run*, never a
+      buffer — and why no separate start grace was needed (the 10 s run subsumes it, a simplification
+      from the plan).
+      **As built:** `MicrophoneSilenceWatchdog`, a sibling of `MicrophoneWatchdog` on the router path
+      (that one asks whether buffers arrive, this whether they carry anything); thresholds on a public
+      `MicrophoneSilence` seam because the notice copy quotes the duration; `.microphoneSilent` /
+      `.microphoneAudible` folded like `microphoneLost` (recording continues, ADR-012). **Armed replay
+      gets the pair too** — a clip saved with a dead mic is the same failure.
+      **Verify (as run):** 456 tests (+13), including every measured level as a must-not-fire case;
+      live — muted record → **exactly one** notice at ~10 s, recording ran to completion, file
+      playable with a full-length (silent) mic track; **unmute mid-recording → the paired recovery
+      notice**; control run with a live mic → **neither notice**. Input volume restored after every
+      leg. Dev loop green.
 - [ ] M16-T5 **Input level in the menu-bar label.** T4 tells you after 30 seconds; this tells you
       before you start. **⚠️ An in-menu level meter is not implementable** — M6-T10 established that
       any publish rebuilds an open `.menu` MenuBarExtra's AppKit rows and garbles hover, which is the

@@ -54,6 +54,23 @@ public enum RecordingNotifications {
                 body: "The microphone track resumed.",
                 fileURL: nil)
 
+        case .microphoneSilent:
+            // Connected, delivering, and carrying nothing (M16-T4). Same not-an-ending family as
+            // the loss above; the body names the fix, since "muted" is the usual cause.
+            return RecordingNotification(
+                title: "Still recording · microphone is silent",
+                body: "No sound has reached it for \(Int(MicrophoneSilence.duration)) "
+                    + "seconds. Check that it isn't muted.",
+                fileURL: nil)
+
+        case .microphoneAudible:
+            // Sound came back; without this the silence notice above stays the last word and the
+            // user can't tell whether their fix worked.
+            return RecordingNotification(
+                title: "Still recording · microphone is picking up sound",
+                body: "The microphone is working again.",
+                fileURL: nil)
+
         case .microphoneDroppedAtStart:
             // A selected mic resolved but never delivered its first buffer in time (M13-T4), so the
             // take has no mic track. M9-T1's start notice only covers a mic that didn't resolve at
@@ -213,6 +230,23 @@ public enum RecordingNotifications {
         RecordingNotification(
             title: "Replay still armed · microphone reconnected",
             body: "Replays saved from now on include the microphone again.",
+            fileURL: nil)
+    }
+
+    /// The armed pipeline's mic is connected but carrying nothing (M16-T4). Armed replay gets the
+    /// pair too: a clip saved now would have a silent mic track, which is the failure this milestone
+    /// exists to stop being discovered afterwards.
+    public static func replayMicrophoneSilent() -> RecordingNotification {
+        RecordingNotification(
+            title: "Replay still armed · microphone is silent",
+            body: "Replays saved now have no sound from it. Check that it isn't muted.",
+            fileURL: nil)
+    }
+
+    public static func replayMicrophoneAudible() -> RecordingNotification {
+        RecordingNotification(
+            title: "Replay still armed · microphone is picking up sound",
+            body: "Replays saved from now on include it again.",
             fileURL: nil)
     }
 

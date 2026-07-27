@@ -154,6 +154,8 @@ func describe(_ event: EngineEvent) -> String {
     case .resumed: return "resumed"
     case .microphoneLost: return "microphoneLost"
     case .microphoneRecovered: return "microphoneRecovered"
+    case .microphoneSilent: return "microphoneSilent"
+    case .microphoneAudible: return "microphoneAudible"
     case .microphoneDroppedAtStart: return "microphoneDroppedAtStart"
     case .recordingFileRestored: return "recordingFileRestored"
     case .stopped(let reason): return "stopped(\(describe(reason)))"
@@ -584,6 +586,12 @@ func performRecording(_ options: RecordOptions) async {
             print("\n  ⚠️  microphone disconnected — still recording (screen + system audio)")
         case .microphoneRecovered:
             print("\n  🎤 microphone reconnected — mic track resumed")
+        case .microphoneSilent:
+            // Connected and delivering, but carrying nothing (M16-T4) — muted, gain at zero, or
+            // the wrong input. Still recording; this is a notice.
+            print("\n  ⚠️  microphone is silent — still recording (check that it isn't muted)")
+        case .microphoneAudible:
+            print("\n  🎤 microphone is picking up sound again")
         case .recordingFileRestored:
             print("\n  ⚠️  recording file was moved — moved it back (recording continues)")
         case .finished(let url, let reason, let dropped):
