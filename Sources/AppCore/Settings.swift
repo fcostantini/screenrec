@@ -71,6 +71,41 @@ public struct RegionSelection: Hashable, Sendable {
     }
 }
 
+/// A persisted window pick (docs/06 item 5, M17-T2).
+///
+/// The only pick this app stores that names nothing durable. A `CGWindowID` does not survive the
+/// owning app relaunching (measured: one TextEdit document window went 1498 → 1512) and ids are
+/// **reused**, so the bundle ID travels with it and capture refuses any window whose owner
+/// doesn't match — a stale pick must fail, never bind whatever inherited the number.
+///
+/// `title` is for the menu label only and is never matched on: a browser window's title changes
+/// on every tab switch, so matching it would discard valid picks constantly.
+public struct WindowSelection: Hashable, Sendable {
+    public var id: CGWindowID
+    public var bundleID: String
+    public var title: String
+
+    public init(id: CGWindowID, bundleID: String, title: String) {
+        self.id = id
+        self.bundleID = bundleID
+        self.title = title
+    }
+
+    /// The pick as it currently exists, or nil when it is gone — including the reused-id case,
+    /// where the id resolves to a window belonging to a different app.
+    public func resolve(in windows: [CapturableWindow]) -> CapturableWindow? {
+        guard let match = windows.first(where: { $0.id == id }), match.bundleID == bundleID
+        else { return nil }
+        return match
+    }
+
+    /// `Firefox — Release Notes`, the menu's label for a window row. Built from a live window so
+    /// a retitled window relabels itself; the stored `title` is the fallback when it is gone.
+    public static func label(appName: String, title: String) -> String {
+        "\(appName) — \(title)"
+    }
+}
+
 /// The app's persisted preferences (docs/06 "Settings window").
 ///
 /// Launch-at-login (M6) arrives with the feature it configures.
@@ -94,6 +129,10 @@ public struct Settings: Sendable, Equatable {
     /// the app pick, not validated against the current displays at load — a start against a vanished
     /// display fails loud (M11-T1).
     public var captureRegion: RegionSelection?
+    /// The Source pick when it's a window (docs/06 item 5, M17-T2). Nil ⇒ not a window pick. Not
+    /// validated at load — the pick survives its window being closed, and capture verifies the
+    /// owning app before binding, so a stale id fails loud instead of recording the wrong window.
+    public var captureWindow: WindowSelection?
     public var replayArmed: Bool
     /// The rolling window, `replaySecondsRange` (5 s – 15 min) since M9-T8; loads clamp into it.
     public var replaySeconds: Int
@@ -166,6 +205,7 @@ public struct Settings: Sendable, Equatable {
             capturesSystemAudio: true,
             captureAppBundleID: nil,
             captureRegion: nil,
+            captureWindow: nil,
             replayArmed: false,
             replaySeconds: 60,
             replayHotkey: .standard,
@@ -204,6 +244,13 @@ public enum SettingsStore {
         public static let regionY = "y"
         public static let regionWidth = "width"
         public static let regionHeight = "height"
+        /// Absent ⇒ not a window pick (M17-T2). A Dict of the inner keys below.
+        public static let captureWindow = "captureWindow"
+        /// Inner keys of `captureWindow`. The bundle id is what makes a restored pick safe:
+        /// window ids are reused, so the id alone could bind another app's window (docs/02 §1c).
+        public static let windowID = "id"
+        public static let windowBundleID = "bundleID"
+        public static let windowTitle = "title"
         public static let replayArmed = "replayArmed"
         public static let replaySeconds = "replaySeconds"
         public static let replayHotkey = "replayHotkey"
@@ -308,6 +355,11 @@ public enum SettingsStore {
             settings.captureRegion = region
         }
 
+        // Like the app and region picks: no validation at load. Capture verifies the owner.
+        if let window = windowSelection(from: defaults.dictionary(forKey: Key.captureWindow)) {
+            settings.captureWindow = window
+        }
+
         settings.replayArmed = defaults.bool(forKey: Key.replayArmed)
 
         // A positive value clamps into the range (M9-T8); absent or garbage (`integer(forKey:)` is 0
@@ -363,6 +415,18 @@ public enum SettingsStore {
 
     /// Validates a persisted region dict: a positive, finite rect; a non-negative display id if
     /// present (else nil ⇒ main). Nil ⇒ absent/malformed — a bad value falls back to no region.
+    /// A stored window pick, or nil if the plist entry is absent or unusable. A pick without a
+    /// bundle id is discarded rather than trusted: it could not be verified at capture, which is
+    /// the whole point of storing one (docs/02 §1c).
+    private static func windowSelection(from dict: [String: Any]?) -> WindowSelection? {
+        guard let dict, let rawID = dict[Key.windowID] as? Int,
+              let id = CGWindowID(exactly: rawID), id > 0,
+              let bundleID = dict[Key.windowBundleID] as? String, !bundleID.isEmpty
+        else { return nil }
+        let title = dict[Key.windowTitle] as? String ?? ""
+        return WindowSelection(id: id, bundleID: bundleID, title: title)
+    }
+
     private static func regionSelection(from dict: [String: Any]?) -> RegionSelection? {
         guard let dict,
               let x = dict[Key.regionX] as? Double, x.isFinite,
@@ -418,6 +482,12 @@ public enum SettingsStore {
             defaults.set(dict, forKey: Key.captureRegion)
         } else {
             defaults.removeObject(forKey: Key.captureRegion)
+        }
+        if let window = settings.captureWindow {
+            defaults.set([Key.windowID: Int(window.id), Key.windowBundleID: window.bundleID,
+                          Key.windowTitle: window.title], forKey: Key.captureWindow)
+        } else {
+            defaults.removeObject(forKey: Key.captureWindow)
         }
         defaults.set(settings.replayArmed, forKey: Key.replayArmed)
         defaults.set(settings.replaySeconds, forKey: Key.replaySeconds)

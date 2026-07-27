@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Observation
 import Testing
@@ -169,6 +170,76 @@ import RecorderCore
         #expect(state.captureConfiguration.content == .display(.main))
         #expect(state.captureConfiguration.microphone == .none)
         #expect(state.captureConfiguration.quality == .balanced)
+    }
+
+    // MARK: - Window pick (M17-T2)
+
+    private func liveWindow(
+        id: CGWindowID, bundleID: String = "com.apple.finder", app: String = "Finder",
+        title: String = "Movies"
+    ) -> CapturableWindow {
+        CapturableWindow(id: id, bundleID: bundleID, appName: app, title: title,
+                         pointSize: CGSize(width: 900, height: 500))
+    }
+
+    @Test func aWindowPickCarriesItsOwnerIntoTheConfiguration() {
+        // The owner travels with the id so capture can refuse a REUSED id (docs/02 §1c) — an id
+        // alone would let a restored pick bind another app's window.
+        let state = makeState()
+        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder", title: "Movies"))
+        #expect(state.captureConfiguration.content
+            == .window(id: 37, ownerBundleID: "com.apple.finder"))
+    }
+
+    @Test func pickingAWindowClearsTheAppAndRegionPicks() {
+        // One Source at a time: a leftover app or region pick would win in `captureConfiguration`.
+        let state = makeState()
+        state.sourceChoice = .app(bundleID: "com.example.app")
+        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder", title: "Movies"))
+        #expect(state.selectedAppBundleID == nil)
+        #expect(state.selectedRegion == nil)
+        state.sourceChoice = .display(nil)
+        #expect(state.selectedWindow == nil)
+    }
+
+    @Test func aGoneWindowIsStillListedAndStillChecked() {
+        // The pick survives absence (the `(not running)` app rule); Start fails loud instead.
+        let state = makeState()
+        let pick = WindowSelection(id: 37, bundleID: "com.apple.finder", title: "Movies")
+        state.sourceChoice = .window(pick)
+        state.refreshWindows([liveWindow(id: 99)], excluding: nil)
+        #expect(state.missingPickedWindow == pick)
+    }
+
+    @Test func aReusedIdCountsAsGoneRatherThanAsThePick() {
+        // Same number, different app: the dangerous case. Treating it as present would record
+        // the wrong window while looking like it worked.
+        let state = makeState()
+        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder", title: "Movies"))
+        state.refreshWindows([liveWindow(id: 37, bundleID: "com.apple.Safari", app: "Safari")],
+                             excluding: nil)
+        #expect(state.missingPickedWindow != nil)
+    }
+
+    @Test func theSourceLabelRelabelsARetitledWindowButKeepsAGoneOne() {
+        // Title is display-only and never matched on, so a retitled window (every browser tab
+        // switch) stays the pick and simply relabels.
+        let state = makeState()
+        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder", title: "Movies"))
+        state.refreshWindows([liveWindow(id: 37, title: "Downloads")], excluding: nil)
+        #expect(state.missingPickedWindow == nil)
+        #expect(state.sourceMenuLabel == "Finder — Downloads")
+        state.refreshWindows([], excluding: nil)
+        #expect(state.sourceMenuLabel.contains("Movies"))   // falls back to the stored title
+    }
+
+    @Test func screenRecNeverOffersItsOwnWindows() {
+        let state = makeState()
+        state.refreshWindows(
+            [liveWindow(id: 1, bundleID: "dev.fcostantini.screenrec.app", app: "ScreenRec"),
+             liveWindow(id: 2)],
+            excluding: "dev.fcostantini.screenrec.app")
+        #expect(state.capturableWindows.map(\.id) == [2])
     }
 
     @Test func pickedSourcesReachTheConfiguration() {
@@ -401,6 +472,38 @@ import RecorderCore
         let state = makeState()
         state.apply(.failed(message: "No displays available"))
         #expect(state.lastFailure == "No displays available")
+    }
+
+    @Test func aFailedStartLeavesTheMessageWhereTheIDLEMenuRendersIt() {
+        // The pair the menu branches on. A start that fails before a session exists is NOT
+        // `isSessionActive`, so it draws the idle menu — which for a long time rendered
+        // `lastFailure` nowhere, and Start looked like a no-op (M17-T2 found it live under a
+        // stale window pick, where notification banners were suppressed by an armed replay).
+        let state = makeState()
+        let gone = "That window isn't on screen any more."
+        state.apply(.failed(message: gone))
+        #expect(!state.isSessionActive)
+        #expect(state.lastFailure == gone)
+    }
+
+    @Test func aStartFailureSurvivesTheTeardownThatFollowsIt() {
+        // The engine yields `.failed` *through* the session and then finishes the stream, so
+        // teardown lands right on top of the message. Clearing it there left the user with a
+        // Start that did nothing and said nothing (found live, M17-T2).
+        let state = makeState()
+        state.apply(.failed(message: "That window isn't on screen any more."))
+        state.endSession()
+        #expect(state.lastFailure == "That window isn't on screen any more.")
+    }
+
+    @Test func aTransientNoticeStillDiesWithItsRecording() {
+        // The other half: a mic-loss notice describes a recording that has now ended, so leaving
+        // it set would squat in the idle menu describing nothing.
+        let state = recordingState()
+        state.apply(.microphoneLost)
+        #expect(state.lastFailure != nil)
+        state.endSession()
+        #expect(state.lastFailure == nil)
     }
 
     @Test func losingTheMicrophoneIsReportedWithoutEndingTheRecording() {

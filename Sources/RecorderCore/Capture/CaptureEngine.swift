@@ -311,10 +311,12 @@ public actor CaptureEngine {
     /// (docs/02 §1a, §1b, §1c).
     private func resolveScope(from content: SCShareableContent) -> ScopeResolution {
         switch configuration.content {
-        case .window(let windowID):
+        case .window(let windowID, let ownerBundleID):
             // Desktop-independent: no display is resolved, and the filter's `contentRect` is the
             // window's rather than a display's.
-            guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
+            guard let window = content.windows.first(where: { $0.windowID == windowID }),
+                  Self.windowOwnerMatches(window.owningApplication?.bundleIdentifier, ownerBundleID)
+            else {
                 return .fail(Self.windowUnavailableMessage)
             }
             Self.connectToWindowServer()
@@ -445,6 +447,15 @@ public actor CaptureEngine {
 
     /// A window id is not stable across a relaunch of its app (docs/02 §1c), so a stale pick is
     /// the failure this path will mostly see — the copy names it. Surface-neutral (M6-T3).
+    /// Whether a resolved window's owner satisfies the pick's expectation. Nil expectation ⇒ the
+    /// caller named a freshly-listed id and there is nothing to check; otherwise the owners must
+    /// match, which is what stops a **reused** window id binding a different app's window to a
+    /// pick restored from disk (docs/02 §1c).
+    static func windowOwnerMatches(_ actual: String?, _ expected: String?) -> Bool {
+        guard let expected else { return true }
+        return actual == expected
+    }
+
     static let windowUnavailableMessage =
         "That window isn't on screen any more. It was closed, or its app was relaunched and "
         + "gave it a new number — choose the window again."

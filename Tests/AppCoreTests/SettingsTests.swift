@@ -558,4 +558,20 @@ import RecorderCore
         #expect(state.captureConfiguration.frameRateCap == 60)
         #expect(state.captureConfiguration.quality == .efficient)
     }
+
+    @Test func aWindowPickRoundTripsWithItsOwner() {
+        let defaults = UserDefaults(suiteName: "settings-window-\(UUID().uuidString)")!
+        var settings = Settings.standard
+        settings.captureWindow = WindowSelection(id: 37, bundleID: "com.apple.finder", title: "Movies")
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).captureWindow == settings.captureWindow)
+    }
+
+    @Test func aStoredWindowPickWithoutAnOwnerIsDiscarded() {
+        // It could never be verified at capture, which is the only reason to store one — keeping
+        // it would mean binding a bare id (docs/02 §1c).
+        let defaults = UserDefaults(suiteName: "settings-window-\(UUID().uuidString)")!
+        defaults.set([SettingsStore.Key.windowID: 37], forKey: SettingsStore.Key.captureWindow)
+        #expect(SettingsStore.load(from: defaults).captureWindow == nil)
+    }
 }

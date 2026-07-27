@@ -6,6 +6,32 @@
 
 ## Now
 
+- **✅ M17-T2 DONE (2026-07-27) — you can pick a window from the menu, and a stale pick can never
+  bind the wrong one.** `Source ▸` gains **one** row, `Window ▸`, whose submenu lists on-screen
+  windows as `<App> — <Title>`. **495 tests (+13)**, full dev loop green, every leg driven on the
+  real menu.
+  **Ruling (a) — persist `{id, bundleID, title}`, verify the owner.** A window id is the only thing
+  this app persists that names nothing durable: **measured, a TextEdit window went 1498 → 1512 across
+  a relaunch**, and ids are *reused* — so a restored bare id could bind another app's window,
+  recording the wrong thing while looking like it worked. `ContentSelection.window` now carries an
+  optional `ownerBundleID` and capture refuses a mismatch. Title is display-only and never matched on
+  (a browser title changes every tab switch). Live: relaunching TextEdit left the new window
+  selectable and the old pick as `✓ (closed)` — no silent re-bind.
+  **Ruling (b) — nested, not flat.** ✅ **The `.menu` bridge DOES carry a `Menu` inside a `Menu` with
+  its own inline `Picker`** (spiked before building on it): checkmark lands two levels deep, Source
+  grew by exactly one row, so **M18-T3's diet doesn't get harder**. **Ruling (c)** — a gone pick reads
+  `<App> — <Title> (closed)`, checkmarked, the `(not running)` precedent.
+  **Verified live:** menu-driven window recording → 1800×1056, 3 tracks, **0.000% same-app bystander
+  green vs 92.6% target magenta** across three frames (the leg per-app capture cannot pass).
+  **🔴 Fixed a pre-existing defect this task exposed (Franco's call to fix here):** a Start that failed
+  said **nothing** — `lastFailure` rendered only in the recording-state menu, and a failed start lands
+  in *idle*. Worse, `endSession()` **cleared it** microseconds later, since a start failure does have a
+  session; the comment claiming otherwise had always been wrong. Both halves fixed and now
+  live-verified (the row renders under Start with the real copy). Applies equally to M7-T2's
+  not-running app pick, which has shipped this way since M7. ⚠️ **Both first-cut unit tests were
+  vacuous** — they drove `apply(.finished)`, which never reaches `endSession()` (docs/07).
+  **Next: M17-T3 doesn't exist — M17 is T1+T2, so GATE G17 is next**, then the MINOR bump. M18 after.
+
 - **✅ M17-T1 DONE (2026-07-27) — `.window` is the fourth `ContentSelection` case; window capture
   records one window and nothing else, including against an overlapping window of the SAME app.**
   `list-windows` + `record --window` + `replay-arm --window`, `EndReason.windowClosed`, all four

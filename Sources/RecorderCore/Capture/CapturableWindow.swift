@@ -5,14 +5,18 @@ import ScreenCaptureKit
 /// ScreenCaptureKit so the CLI and app can list windows without importing it.
 public struct CapturableWindow: Sendable, Equatable {
     public let id: CGWindowID
+    /// The owning app. Carried so a persisted pick can be verified rather than trusted: window ids
+    /// are reused, so an id alone can resolve to a different app's window (docs/02 §1c).
+    public let bundleID: String
     public let appName: String
     public let title: String
     /// `SCWindow.frame`'s size, in display points. The recorded pixel size is this times the
     /// display's backing scale (docs/02 §1c).
     public let pointSize: CGSize
 
-    public init(id: CGWindowID, appName: String, title: String, pointSize: CGSize) {
+    public init(id: CGWindowID, bundleID: String, appName: String, title: String, pointSize: CGSize) {
         self.id = id
+        self.bundleID = bundleID
         self.appName = appName
         self.title = title
         self.pointSize = pointSize
@@ -31,7 +35,8 @@ public enum CapturableWindows {
     public static func available() async throws -> [CapturableWindow] {
         let content = try await SCShareableContent.forCapture()
         return select(content.windows.map {
-            ($0.windowID, $0.windowLayer, $0.owningApplication?.applicationName, $0.title, $0.frame.size)
+            ($0.windowID, $0.windowLayer, $0.owningApplication?.bundleIdentifier,
+             $0.owningApplication?.applicationName, $0.title, $0.frame.size)
         })
     }
 
@@ -41,7 +46,8 @@ public enum CapturableWindows {
     /// extras (layer 25), the desktop and the Dock's wallpaper — 23 of the 32 windows measured
     /// on the dev machine, ScreenRec's own status item among them (docs/02 §1c).
     static func select(
-        _ windows: [(id: CGWindowID, layer: Int, appName: String?, title: String?, pointSize: CGSize)]
+        _ windows: [(id: CGWindowID, layer: Int, bundleID: String?, appName: String?,
+                     title: String?, pointSize: CGSize)]
     ) -> [CapturableWindow] {
         windows
             .compactMap { window -> CapturableWindow? in
@@ -50,7 +56,8 @@ public enum CapturableWindows {
                 let appName = window.appName.flatMap { $0.isEmpty ? nil : $0 } ?? unknownApp
                 let title = window.title.flatMap { $0.isEmpty ? nil : $0 } ?? untitled
                 return CapturableWindow(
-                    id: window.id, appName: appName, title: title, pointSize: window.pointSize)
+                    id: window.id, bundleID: window.bundleID ?? "", appName: appName,
+                    title: title, pointSize: window.pointSize)
             }
             .sorted {
                 let byApp = $0.appName.localizedCaseInsensitiveCompare($1.appName)

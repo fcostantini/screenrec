@@ -29,8 +29,11 @@ public enum ContentSelection: Sendable, Equatable {
     /// fails loud if it doesn't overlap.
     case region(display: DisplaySelection, rect: CGRect)
     /// An `SCWindow.windowID`, resolved against the shareable content at start time. The id is
-    /// not stable across a relaunch of the owning app, so it is never a durable handle.
-    case window(id: CGWindowID)
+    /// not stable across a relaunch of the owning app (measured: one window went 1498 → 1512), and
+    /// ids are **reused** — so `ownerBundleID`, when given, is checked against the resolved
+    /// window's owner and a mismatch fails loud. A stored pick must pass it; a freshly-listed id
+    /// (the CLI, which lists and binds in one breath) passes nil.
+    case window(id: CGWindowID, ownerBundleID: String?)
 }
 
 /// Which device a lost microphone recovers onto (docs/03 M8-T2: honor the pick).

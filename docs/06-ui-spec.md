@@ -38,6 +38,11 @@ Order and grouping (separators between groups):
    receipts (below) sit *under* Start/Arm, never squatting above it. When the opt-in start/stop shortcut
    is enabled (`recordHotkey`), Start advertises the combo in the shortcut column (the `Save Replay Now`
    pattern), and `Stop & Save` does the same while recording.
+   **A Start that fails carries its reason directly under this row (M17-T2).** Such a start produces no
+   session, so the menu stays *idle* — where `lastFailure` used to render nowhere and Start looked like
+   a no-op. The recording-state menu has always shown it; both surfaces now do. ⚠️ The notification is
+   not a substitute: banners can be suppressed while replay is armed (item 3's own caveat), which is
+   exactly when this was found.
 3. **Instant Replay armed** — checkmark toggle; right hint `⌥⌘R saves`. Persisted.
    **M5** (Franco, 2026-07-15): a toggle that arms nothing is a lie for a whole milestone.
    When armed, a dimmed cost row follows it (M16-T2): `4:30 buffer · ≈800 MB · Mac stays awake`
@@ -63,6 +68,17 @@ Order and grouping (separators between groups):
    the mic reads None, one dimmed row follows: **`This recording will have no audio`** — a silent
    recording is legitimate, but it must not be a surprise discovered afterwards. Zero extra rows in
    every other configuration.
+   **Window (M17-T2):** below the app rows, a single **`Window ▸`** row whose submenu lists the
+   on-screen windows as `<App> — <Title>`, app-then-title sorted, ScreenRec's own excluded. It nests
+   deliberately: a dozen-plus windows is normal (12 measured on the dev machine), and Source is the
+   longest submenu already — M18-T3 is shortening it. Verified live that the `.menu` bridge carries a
+   `Menu` inside a `Menu` with its own inline `Picker`, checkmark and all. The pick is
+   **persisted with its owning bundle id** (`captureWindow`), and capture refuses a window whose owner
+   doesn't match: window ids are **reused**, so a restored bare id could bind a different app's window
+   — recording the wrong thing while looking like it worked (docs/02 §1c). The title is display-only
+   and never matched on, so a retitled window (every browser tab switch) stays the pick and simply
+   relabels. A picked window that is gone stays listed and checkmarked as `<App> — <Title> (closed)`,
+   the `(not running)` app rule; Start then fails loud.
    **Region (M11-T2):** below the app rows, when a region is set, a checkmarked `Region <w>×<h>`
    row (point size) shows the current pick — re-selectable, and it survives its display's absence
    like the app pick (a start against a vanished display fails loud, M11-T1). **M12-T4** moved

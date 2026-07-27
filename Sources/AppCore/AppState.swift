@@ -13,6 +13,9 @@ public enum SourceChoice: Hashable, Sendable {
     /// A rectangle of a display (M11-T2). `rect` is SCK `sourceRect` points (top-left, docs/02 §1b);
     /// `display` nil ⇒ main. Chosen via the overlay, not typed — the picker only shows/re-picks it.
     case region(display: CGDirectDisplayID?, rect: CGRect)
+    /// One window (M17-T2). Carries the whole selection, not just the id, so the tag of a picked
+    /// window that has since gone still round-trips through the picker.
+    case window(WindowSelection)
 }
 
 /// Which global shortcut a registration is for (M9-T4). The app maps each to a Carbon hotkey id and
@@ -47,6 +50,9 @@ public final class AppState {
     /// Running apps for the Source picker (docs/06 item 5, M7-T2). Fetched async by the view at
     /// menu open — `SCShareableContent` takes ~a second — through `refreshApps`.
     public private(set) var capturableApps: [CapturableApp] = []
+    /// On-screen windows for the Source picker (docs/06 item 5, M17-T2). Fetched async by the view
+    /// at menu open, like the app list.
+    public private(set) var capturableWindows: [CapturableWindow] = []
 
     /// The user's picks, as the plain identifiers the menu selects by: RecorderCore's
     /// `DisplaySelection`/`MicrophoneSelection` carry associated values and aren't `Hashable`,
@@ -72,6 +78,16 @@ public final class AppState {
     public var selectedRegion: RegionSelection? {
         didSet {
             guard selectedRegion != oldValue, !isRehomingSources else { return }
+            persist()
+            replayConfigurationChanged()
+        }
+    }
+    /// The Source pick when it's a window (docs/06 item 5, M17-T2); nil ⇒ not a window pick.
+    /// Persisted, and like the app and region picks it survives its subject's absence — a start
+    /// against a window that is gone (or whose id now belongs to another app) fails loud.
+    public var selectedWindow: WindowSelection? {
+        didSet {
+            guard selectedWindow != oldValue, !isRehomingSources else { return }
             persist()
             replayConfigurationChanged()
         }
@@ -313,6 +329,11 @@ public final class AppState {
     /// Set when a recording didn't survive its own start, or degraded on the way. ADR-007
     /// forbids the silent version of either.
     public private(set) var lastFailure: String?
+    /// Set by `.failed` so the reason survives the `endSession` that immediately follows it. A
+    /// start failure DOES have a session — the engine yields `.failed` and finishes its stream, so
+    /// teardown runs a moment later — whereas transient in-recording notices (a lost mic) must not
+    /// outlive the recording they described.
+    private var failureOutlivesSession = false
 
     public private(set) var recentRecordings: [URL] = []
 
@@ -424,6 +445,7 @@ public final class AppState {
         capturesSystemAudio = settings.capturesSystemAudio
         selectedAppBundleID = settings.captureAppBundleID
         selectedRegion = settings.captureRegion
+        selectedWindow = settings.captureWindow
         isReplayArmed = settings.replayArmed
         replaySeconds = settings.replaySeconds
         replayHotkey = settings.replayHotkey
@@ -482,6 +504,7 @@ public final class AppState {
                 capturesSystemAudio: capturesSystemAudio,
                 captureAppBundleID: selectedAppBundleID,
                 captureRegion: selectedRegion,
+                captureWindow: selectedWindow,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey, recordHotkey: recordHotkey,
                 pauseHotkey: pauseHotkey, countInEnabled: countInEnabled,
@@ -720,6 +743,35 @@ public final class AppState {
     }
     private var isRefreshingApps = false
 
+    /// Fetches and publishes the Source picker's window list; the view calls this at menu open,
+    /// alongside the app list. Same in-flight guard and same keep-the-last-list-on-failure rule.
+    public func refreshCapturableWindows() async {
+        guard !isRefreshingWindows else { return }
+        isRefreshingWindows = true
+        defer { isRefreshingWindows = false }
+        guard let windows = try? await CapturableWindows.available() else { return }
+        refreshWindows(windows)
+    }
+    private var isRefreshingWindows = false
+
+    /// Membership + publish, assign-on-change only (M6-T10). ScreenRec never lists its own windows,
+    /// for the same reason it never lists itself as an app. `excluding` is injected so tests don't
+    /// depend on the test runner's bundle identity.
+    func refreshWindows(
+        _ windows: [CapturableWindow], excluding ownBundleID: String? = Bundle.main.bundleIdentifier
+    ) {
+        let windows = windows.filter { $0.bundleID != ownBundleID }
+        if capturableWindows != windows { capturableWindows = windows }
+    }
+
+    /// The picked window while it isn't in the live list — closed, or its id now belongs to another
+    /// app. The menu shows it checkmarked and marked gone, so the pick stays visible without lying
+    /// (the `(not running)` app precedent); Start then fails loud.
+    public var missingPickedWindow: WindowSelection? {
+        guard let selectedWindow, selectedWindow.resolve(in: capturableWindows) == nil else { return nil }
+        return selectedWindow
+    }
+
     /// Membership + publish, assign-on-change only (M6-T10). ScreenRec never lists itself —
     /// recording the recorder is noise; `recordableAppsFilter` applies the app layer's policy.
     /// `excluding` is injected so tests don't depend on the test runner's bundle identity.
@@ -751,7 +803,7 @@ public final class AppState {
 
     /// Bundle ID → display name: the live list, then the installed-app resolver, then the ID
     /// itself — the one fallback chain, and it never returns an empty string.
-    private func appName(for bundleID: String) -> String {
+    public func appName(for bundleID: String) -> String {
         capturableApps.first { $0.bundleID == bundleID }?.name
             ?? appDisplayName?(bundleID)
             ?? bundleID
@@ -773,6 +825,14 @@ public final class AppState {
     /// being opened: `Region 1645×721`, an app's name, or the whole screen (named when there's a
     /// choice of display). Mirrors the checkmarked picker row.
     public var sourceMenuLabel: String {
+        if let window = selectedWindow {
+            // Relabel from the live window when it is still there, so a retitled window stays
+            // honest; fall back to the stored title once it is gone.
+            let live = window.resolve(in: capturableWindows)
+            return WindowSelection.label(
+                appName: live?.appName ?? appName(for: window.bundleID),
+                title: live?.title ?? window.title)
+        }
         if let region = selectedRegion { return "Region \(Self.regionLabel(region.rect.size))" }
         if let bundleID = selectedAppBundleID { return appName(for: bundleID) }
         if displays.count > 1,
@@ -1002,7 +1062,10 @@ public final class AppState {
     /// without starting anything.
     public var captureConfiguration: CaptureConfiguration {
         let content: ContentSelection
-        if let region = selectedRegion {
+        if let window = selectedWindow {
+            // The owner travels with the id so capture can refuse a reused one (docs/02 §1c).
+            content = .window(id: window.id, ownerBundleID: window.bundleID)
+        } else if let region = selectedRegion {
             content = .region(display: region.displayID.map(DisplaySelection.id) ?? .main, rect: region.rect)
         } else if let bundleID = selectedAppBundleID {
             content = .app(bundleID: bundleID)
@@ -1025,6 +1088,7 @@ public final class AppState {
     /// The backing writes are batched (`isRehomingSources`) into ONE persist + rebuild.
     public var sourceChoice: SourceChoice {
         get {
+            if let window = selectedWindow { return .window(window) }
             if let region = selectedRegion { return .region(display: region.displayID, rect: region.rect) }
             return selectedAppBundleID.map { .app(bundleID: $0) } ?? .display(selectedDisplayID)
         }
@@ -1035,13 +1099,20 @@ public final class AppState {
             case .display(let id):
                 selectedAppBundleID = nil
                 selectedRegion = nil
+                selectedWindow = nil
                 selectedDisplayID = id
             case .app(let bundleID):
                 selectedAppBundleID = bundleID
                 selectedRegion = nil
+                selectedWindow = nil
             case .region(let displayID, let rect):
                 selectedAppBundleID = nil
+                selectedWindow = nil
                 selectedRegion = RegionSelection(displayID: displayID, rect: rect)
+            case .window(let window):
+                selectedAppBundleID = nil
+                selectedRegion = nil
+                selectedWindow = window
             }
             isRehomingSources = false
             persist()
@@ -1073,6 +1144,7 @@ public final class AppState {
         guard session == nil, !isCountingIn else { return }
 
         lastFailure = nil
+        failureOutlivesSession = false
         // The menu disables Start unless this holds; unreachable from the UI.
         guard readiness == .ready else { return }
 
@@ -1255,6 +1327,7 @@ public final class AppState {
             recordingClock = nil
             statusIcon = .idle
             lastFailure = message
+            failureOutlivesSession = true
         case .microphoneLost:
             // The one mid-recording problem that does not end the session (ADR-012): the
             // recording continues, and the icon must keep saying so. The rescue may clear it.
@@ -1293,7 +1366,9 @@ public final class AppState {
         notifier?(notification)
     }
 
-    private func endSession() {
+    /// Internal, not private, so the failure-lifecycle tests can drive the teardown that
+    /// lands on top of a start failure (the bug M17-T2 found live).
+    func endSession() {
         session = nil
         currentOutputURL = nil
         consumeTask = nil
@@ -1308,11 +1383,14 @@ public final class AppState {
         activeRegion = nil
         elapsedSeconds = 0
         recordedBytes = 0
-        // `lastFailure` belongs to the session that raised it: left set, a transient notice would
-        // outlive the recording it described and squat in the idle header, where docs/06 item 1
-        // wants the readiness status. Start failures survive because they set this after the
-        // session is already over.
-        lastFailure = nil
+        // A transient notice (a lost mic) must not outlive the recording it described. A failure
+        // must: it is the only account the user gets of a Start that produced nothing, and the
+        // engine yields it *through* the session, so teardown lands right on top of it.
+        if failureOutlivesSession {
+            failureOutlivesSession = false
+        } else {
+            lastFailure = nil
+        }
         refreshRecentRecordings()      // the file that just finalized belongs at the top
     }
 

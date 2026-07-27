@@ -7,6 +7,28 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-27 (M17-T2): **A fix can be green in tests, correct in review, and still inert — and the
+  only thing that says so is running it.** The idle menu never rendered `lastFailure`, so a Start
+  that failed looked like a no-op. Adding the row was necessary and **not sufficient**: `endSession()`
+  clears `lastFailure`, and a start failure *does* have a session — the engine yields `.failed`
+  through it and finishes the stream, so teardown lands right on top of the message microseconds
+  later. The code even carried a comment asserting the opposite ("Start failures survive because they
+  set this after the session is already over"); it had been wrong since it was written.
+  - **Both of my new unit tests were vacuous and still passed.** They drove `apply(.finished)`, which
+    never reaches `endSession()` — that only runs after the event stream drains. One passed for the
+    wrong reason and one failed for the wrong reason; the failing one is what exposed it. **A test
+    that cannot reach the code it names is worse than no test**, because it reports safety.
+  - Found live only because **notification banners can be suppressed while replay is armed** — the
+    backup channel for this message was silent at exactly the same time. The menu was literally
+    displaying that caveat while I watched Start do nothing.
+  - ✅ **A positive bridge finding, for once:** the `.menu` MenuBarExtra bridge **does** carry a
+    `Menu` inside a `Menu` with its own inline `Picker`, checkmark and all, two levels deep. Most
+    entries here are the bridge dropping something (a second `Image`, `.disabled` dimming), so this
+    one is worth knowing before anyone assumes nesting is impossible.
+  - ⚠️ **Cosmetic consequence of ruling (a):** after an app relaunches, its new window and the stale
+    pick can render as two identically-labelled rows, one live and one `(closed)`. Honest, since the
+    pick genuinely no longer points at anything, but it reads oddly.
+
 - 2026-07-27 (M17-T1): **Two whole mechanisms were designed, built and deleted because the
   measurement arrived after the design.** Full platform detail is in 02 §1c; what belongs here is the
   process lesson, which cost most of the task:

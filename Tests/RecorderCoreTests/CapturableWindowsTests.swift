@@ -5,10 +5,12 @@ import Testing
 @Suite struct CapturableWindowsTests {
 
     private func window(
-        id: CGWindowID, layer: Int = 0, app: String? = "App", title: String? = "Title",
+        id: CGWindowID, layer: Int = 0, bundleID: String? = "com.example.app",
+        app: String? = "App", title: String? = "Title",
         size: CGSize = CGSize(width: 800, height: 600)
-    ) -> (id: CGWindowID, layer: Int, appName: String?, title: String?, pointSize: CGSize) {
-        (id: id, layer: layer, appName: app, title: title, pointSize: size)
+    ) -> (id: CGWindowID, layer: Int, bundleID: String?, appName: String?,
+          title: String?, pointSize: CGSize) {
+        (id: id, layer: layer, bundleID: bundleID, appName: app, title: title, pointSize: size)
     }
 
     @Test func keepsOnlyLayerZeroWindows() {
@@ -56,6 +58,12 @@ import Testing
         ])
         #expect(windows.allSatisfy { $0.title == CapturableWindows.untitled })
         #expect(windows.allSatisfy { $0.appName == CapturableWindows.unknownApp })
+    }
+
+    @Test func carriesTheOwningBundleIDForPickVerification() {
+        // A persisted pick is verified against this, because window ids are reused (docs/02 §1c).
+        let windows = CapturableWindows.select([window(id: 1, bundleID: "com.apple.Safari")])
+        #expect(windows.first?.bundleID == "com.apple.Safari")
     }
 
     @Test func carriesThePointSizeThroughUnchanged() {

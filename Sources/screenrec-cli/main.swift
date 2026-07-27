@@ -133,7 +133,9 @@ func parseWindowID(_ value: String?) -> CGWindowID {
 /// Builds the capture content from the mutually-exclusive source flags: a window, or a region or
 /// an app on the main display, else the whole main screen. The caller rejects combinations.
 func contentSelection(appBundleID: String?, region: CGRect?, windowID: CGWindowID?) -> ContentSelection {
-    if let windowID { return .window(id: windowID) }
+    // The CLI lists and binds in one breath, so there is no stale-pick hazard to guard
+    // against — the owner check exists for picks restored from disk (docs/02 §1c).
+    if let windowID { return .window(id: windowID, ownerBundleID: nil) }
     if let region { return .region(display: .main, rect: region) }
     if let appBundleID { return .app(bundleID: appBundleID) }
     return .display(.main)

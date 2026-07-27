@@ -267,7 +267,7 @@ import Testing
         // window resolves no display at all, and a substitute one would not contain it.
         #expect(!CaptureEngine.allowsDisplayFallback(
             for: .region(display: .main, rect: CGRect(x: 0, y: 0, width: 10, height: 10))))
-        #expect(!CaptureEngine.allowsDisplayFallback(for: .window(id: 37)))
+        #expect(!CaptureEngine.allowsDisplayFallback(for: .window(id: 37, ownerBundleID: nil)))
         #expect(CaptureEngine.allowsDisplayFallback(for: .display(.main)))
         #expect(CaptureEngine.allowsDisplayFallback(for: .app(bundleID: "com.example.app")))
     }
@@ -279,7 +279,7 @@ import Testing
         // pre-flight decision has nothing to check and must not block on the app list.
         #expect(CaptureEngine.startDecision(
             screenPermission: .granted, availableDisplays: 1,
-            content: .window(id: 37), runningBundleIDs: []) == .proceed)
+            content: .window(id: 37, ownerBundleID: nil), runningBundleIDs: []) == .proceed)
     }
 
     @Test func goneWindowCopyNamesTheRelaunchTrap() {
@@ -295,7 +295,7 @@ import Testing
         // window as a disconnected display would send the user looking at their monitor cable.
         for code in [-3815, -3814] {
             let gone = NSError(domain: SCStreamError.errorDomain, code: code)
-            #expect(CaptureEngine.endReason(forStreamError: gone, content: .window(id: 37))
+            #expect(CaptureEngine.endReason(forStreamError: gone, content: .window(id: 37, ownerBundleID: nil))
                 == .windowClosed)
             #expect(CaptureEngine.endReason(forStreamError: gone, content: .display(.main))
                 == .displayDisconnected)
@@ -308,13 +308,26 @@ import Testing
         // The window-aware branch must not swallow the ordinary stop (-3817) — that would turn
         // the most common stop there is into a fail-stop (ADR-007).
         let stopped = NSError(domain: SCStreamError.errorDomain, code: -3817)
-        #expect(CaptureEngine.endReason(forStreamError: stopped, content: .window(id: 37))
+        #expect(CaptureEngine.endReason(forStreamError: stopped, content: .window(id: 37, ownerBundleID: nil))
             == .userStopped)
+    }
+
+    @Test func aPickIsRefusedWhenTheIdNowBelongsToAnotherApp() {
+        // The hazard ruling A1 exists for: window ids are REUSED, so a pick restored from disk can
+        // resolve to some other app's window. Binding it would record the wrong thing while looking
+        // like it worked — strictly worse than failing.
+        #expect(!CaptureEngine.windowOwnerMatches("com.apple.Safari", "com.apple.TextEdit"))
+        #expect(CaptureEngine.windowOwnerMatches("com.apple.Safari", "com.apple.Safari"))
+        // A window whose owner SCK can't name can't satisfy an expectation either.
+        #expect(!CaptureEngine.windowOwnerMatches(nil, "com.apple.Safari"))
+        // No expectation ⇒ nothing to check: the CLI lists and binds in one breath.
+        #expect(CaptureEngine.windowOwnerMatches("com.apple.Safari", nil))
+        #expect(CaptureEngine.windowOwnerMatches(nil, nil))
     }
 
     @Test func windowContentSkipsTheStallWatchdog() {
         // A window can be minimised or fully occluded while the user works elsewhere, so
         // "user active ⇒ frames expected" fails exactly as it does under an app filter.
-        #expect(!CaptureEngine.attachesStallWatchdog(to: .window(id: 37)))
+        #expect(!CaptureEngine.attachesStallWatchdog(to: .window(id: 37, ownerBundleID: nil)))
     }
 }

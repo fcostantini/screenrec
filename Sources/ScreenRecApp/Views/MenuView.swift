@@ -46,6 +46,12 @@ struct MenuView: View {
         // docs/06 (M12-T3): Start is the first actionable row — the export/replay receipts sit
         // below it, never squatting above the primary action.
         startRecordingRow
+        // A Start that fails before a session exists lands back here, so the reason has to render
+        // in the idle menu too — otherwise Start looks like a no-op and the fail-loud promise is
+        // inaudible. Sits under Start because that is the action it explains.
+        if let failure = state.lastFailure {
+            Text(failure)
+        }
         replayControls
 
         Divider()
@@ -84,6 +90,27 @@ struct MenuView: View {
                 }
             } label: { EmptyView() }
                 .pickerStyle(.inline)
+
+            // Windows nest one level down (M17-T2): there are routinely a dozen or more, and
+            // Source is already the longest submenu — M18-T3 is shortening it, not lengthening it.
+            // Its own inline Picker over the same `sourceChoice` binding keeps the checkmark
+            // wherever the pick actually is.
+            Menu("Window") {
+                Picker(selection: $state.sourceChoice) {
+                    ForEach(state.capturableWindows, id: \.id) { window in
+                        Text(WindowSelection.label(appName: window.appName, title: window.title))
+                            .tag(SourceChoice.window(WindowSelection(
+                                id: window.id, bundleID: window.bundleID, title: window.title)))
+                    }
+                    // A picked window that is gone stays listed and checkmarked — the pick survives
+                    // absence (the `(not running)` app rule); Start then fails loud.
+                    if let missing = state.missingPickedWindow {
+                        Text("\(WindowSelection.label(appName: state.appName(for: missing.bundleID), title: missing.title)) (closed)")
+                            .tag(SourceChoice.window(missing))
+                    }
+                } label: { EmptyView() }
+                    .pickerStyle(.inline)
+            }
             // No explicit Divider here: the inline Picker already renders a trailing separator, so
             // Select Region… is cleanly set apart from the options (a second divider would double up).
 
@@ -339,6 +366,7 @@ struct MenuView: View {
             // Async because SCShareableContent takes ~a second; on the first open the app rows
             // land a beat late, like the recents. Publishes only on a real change.
             Task { await state.refreshCapturableApps() }
+            Task { await state.refreshCapturableWindows() }
         }
         state.refreshProgress()
     }

@@ -1480,7 +1480,7 @@ display filter) this filter has no display to fall back on, so its failure modes
       absent from every checked frame (the M7-T1/M11-T1 method, which is the point: this is what
       `.app` cannot do); dimensions match; closing the window mid-recording finalises a playable file
       with a sensible reason.
-- [ ] M17-T2 **Window picker in `Source ▸`, and the persistence question.** The Source submenu (M7-T2,
+- [x] M17-T2 **Window picker in `Source ▸`, and the persistence question.** The Source submenu (M7-T2,
       regrouped M12-T4) gains the running windows. **The hard part is identity:** an app pick persists
       by bundle ID and survives the app being closed (the mic rule); an `SCWindow.windowID` is **not
       stable across a relaunch of the owning app**, so a persisted window pick can go stale in a way
