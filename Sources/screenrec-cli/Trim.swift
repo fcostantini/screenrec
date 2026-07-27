@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import RecorderCore
 
@@ -19,11 +20,6 @@ private func parseTimecode(_ text: String) -> Double? {
     return value >= 0 ? value : nil
 }
 
-private func timecode(_ seconds: Double) -> String {
-    let whole = Int(seconds.rounded())
-    return String(format: "%d:%02d", whole / 60, whole % 60)
-}
-
 private func trimErrorMessage(_ error: Error) -> String {
     switch error {
     case TrimError.unreadable(let message), TrimError.trimFailed(let message):
@@ -39,12 +35,14 @@ private func trimErrorMessage(_ error: Error) -> String {
     }
 }
 
-/// `trim <in> --from <t> --to <t> [<out>]` — losslessly trim a recording to `[from, to]` by copying
-/// the streams (M10-T4). Default `<out>` is the input's ` trimmed` sibling; the source is read-only.
+/// `trim <in> --from <t> --to <t> [--precise] [<out>]` — trim a recording to `[from, to]`, by
+/// copying the streams (M10-T4) or, with `--precise`, by re-encoding so the file holds only that
+/// range (M18-T1). Default `<out>` is the input's ` trimmed` sibling; the source is read-only.
 func runTrim(_ args: [String]) async {
     var positionals: [String] = []
     var from: Double?
     var to: Double?
+    var mode = TrimMode.lossless
 
     var index = 0
     func value(after flag: String) -> String {
@@ -64,6 +62,8 @@ func runTrim(_ args: [String]) async {
                 die("--to must be M:SS or seconds (≥ 0)")
             }
             to = parsed
+        case "--precise":
+            mode = .precise
         case let flag where flag.hasPrefix("--"): die("Unknown trim option: \(flag)")
         default: positionals.append(args[index])
         }
@@ -83,13 +83,24 @@ func runTrim(_ args: [String]) async {
         ? URL(fileURLWithPath: (positionals[1] as NSString).expandingTildeInPath)
         : Exporter.availableURL(basedOn: Trimmer.trimmedSibling(of: input))
 
-    print("Trimming  \(input.lastPathComponent)  [\(timecode(from)) – \(timecode(to))]")
+    print("Trimming  \(input.lastPathComponent)  [\(KeyframeIndex.timecode(from)) – \(KeyframeIndex.timecode(to))]")
+    // A lossless trim keeps the frames back to the preceding sync sample (M18-T1) — state it
+    // before the trim runs, the same sentence the Trim window shows.
+    if mode == .lossless,
+       let leadIn = await KeyframeIndex.leadInStart(for: AVURLAsset(url: input), trimmingFrom: from),
+       let description = KeyframeIndex.leadInDescription(requested: from, start: leadIn) {
+        print("          \(description)")
+    }
     do {
-        let result = try await Trimmer.trim(from: input, to: output, start: from, end: to)
+        let result = try await Trimmer.trim(from: input, to: output, start: from, end: to, mode: mode)
+        let how = mode == .lossless
+            ? "passthrough, no re-encode"
+            : "re-encoded; the file holds only \(KeyframeIndex.timecode(from)) – \(KeyframeIndex.timecode(to))"
         print(
             String(
-                format: "Wrote     %@  (%.2fs, %.1f MB) — passthrough, no re-encode. In snaps to a keyframe.",
-                result.url.lastPathComponent, result.duration, Double(result.byteCount) / 1_000_000))
+                format: "Wrote     %@  (%.2fs, %.1f MB) — %@.",
+                result.url.lastPathComponent, result.duration,
+                Double(result.byteCount) / 1_000_000, how))
     } catch {
         die(trimErrorMessage(error), code: 70)
     }

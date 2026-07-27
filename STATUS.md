@@ -6,30 +6,41 @@
 
 ## Now
 
-- **🚧 M18-T1 IN PROGRESS (2026-07-27) — measurements done, `KeyframeIndex` landed, the UI and
-  the precise path are NOT built.** Plan artifact approved (A1 + measure ruling (b) first):
-  `claude.ai/code/artifact/1e5f06a1-027c-4133-aa83-fa8b4e6e99ea`.
-  **What is done:** `KeyframeIndex` (RecorderCore/Export) — the `AVSampleCursor` lookup plus the pure
-  `cutDescription` seam, silent when the in-point already sits on a keyframe, tolerant of sub-frame
-  gaps. **500 tests (+5)**, dev loop green. ⚠️ **`cutPoint` has never executed** — nothing calls it
-  yet; the mechanism is proven by the spike, not by the shipped function.
-  **What the measurements changed (full detail in docs/07, and 02 §3 is corrected):**
-  **(1)** the keyframe gap is **unbounded, not 2 s** — measured **3.37 s** back from a 61 s in-point,
-  because frame-on-change capture emits nothing during a static stretch. Worst at the start of a take,
-  which is where people trim. **(2)** the lookup is **0.0–0.9 ms** on a 23-minute file, so it can run
-  live while dragging. **(3)** docs/03's "route precise mode through `Exporter`" is the **wrong
-  mechanism** (it downscales to 1920 and mixes audio), but the right one is *smaller* than feared:
-  **`AVAssetExportPresetHEVCHighestQuality` with a `timeRange` preserves 4112×2570, hvc1 and BOTH
-  audio tracks, cutting frame-exactly** — a preset choice, not a reader/writer pipeline.
-  **🔴 One open question blocks shipping precise mode:** the re-encode makes `probe` warn
-  **`non-monotonic timestamps: 2 of 130`** where the source is clean (likely B-frames). Every prior
-  gate recorded "probe monotonic-clean" — settle it before precise mode ships.
-  **Next, in order:** (a) settle the non-monotonic warning; (b) add the precise branch to `Trimmer`
-  (preset swap + `timeRange`) and `--precise` to the CLI so the verify is headless; (c) wire
-  `TrimView` — the delta line from `cutDescription`, the Precise toggle, `I`/`O` shortcuts, Play
-  range; (d) fix the **"up to two seconds" copy still wrong in `TrimView.swift:82` and
-  `main.swift:24`**; (e) live legs (needs an app swap — 1.9.0 is installed and armed, so it costs
-  the ring) and commit.
+- **✅ M18-T1 DONE (2026-07-27) — the defect the task was filed on did not exist; the real one does,
+  and the window now states it.** Revised plan artifact (rulings A1 + B1, approved mid-task):
+  `claude.ai/code/artifact/0fc6e6c3-2d4b-4e14-a8f2-c97218ce6ab4`. **502 tests (+2)**, full dev loop
+  green, deployed to `/Users/Shared/ScreenRec.app` and re-armed.
+  **🔴 The premise was false and only opening a trimmed file said so.** A passthrough trim writes an
+  **edit list**: playback starts *exactly* at the in-point — the first presented frame is
+  **byte-identical** to the source frame there (md5), and ffmpeg agrees independently. "Up to two
+  seconds early" was inferred from "passthrough cuts at a sync sample" and had been in docs, copy and
+  a review finding for two milestones. **What is true: the cut frames stay inside the file**
+  (`ffprobe -ignore_editlist 1` → **13.56 s inside a 10.00 s clip**, decoding 3.43 s before the
+  in-point; video only — audio packets are all sync samples). Mechanism now in **docs/02 §6a**.
+  **🔴 Yesterday's precise path was a no-op.** `AVAssetExportPresetHEVCHighestQuality` + `timeRange`
+  **passes an HEVC source straight through** — **23,578,074 bytes both ways**, 0.1 s. It "preserved"
+  size, codec and both audio tracks because it never touched them; `--precise` would have written the
+  lossless file while printing "precise re-encode". `AVVideoComposition(propertiesOf:)` forces the
+  real encode, and the new unit test **fails without that one line** (verified by removing it).
+  **✅ The `non-monotonic timestamps` blocker was `probe`'s bug**, not the encoder's, and never
+  precise-specific — every trim triggered it, lossless included. Our capture emits B-frames (459 of
+  923 samples step back in PTS; DTS clean) and probe fell back to PTS for the four boundary samples
+  with no DTS, mixing two clocks. It now judges one clock per track; eight files re-probe clean.
+  **As built:** `TrimMode.lossless/.precise` on `Trimmer` (one exhaustive `switch`, so a preset can't
+  drift from its composition), `--precise` on the CLI, and in the window the lead-in line, a
+  **Re-encode** checkbox, <kbd>I</kbd>/<kbd>O</kbd> and **Play Range**.
+  **Live legs (deployed build, driven by AX):** `I`/`O` set In/Out by real key event; the lead-in
+  line reads **`Starts exactly at 0:02 · keeps 0.8 s before it inside the file`**; the toggle's label
+  tracks the range; Play Range starts at the in-point and advances; an app-driven precise Trim & Save
+  produced **hvc1 4112×2570 + 2ch + 1ch, no lead-in, probe clean**.
+  **🔴 Fixed a bug Franco hit mid-session:** closing the Trim window left the preview **playing**
+  (measured 72.22 s → 85.51 s across a 10 s closed window — a `Window` scene keeps its `@State`, and
+  reopening the same clip reused the running player). `.onDisappear` now unloads it; after: reopen
+  reads `pos 0, playing 0`.
+  **Next: M18-T2** (MP4 export options) — plan artifact first. ⚠️ **Also reported by Franco and NOT
+  fixed here (scope):** an export receipt whose file is deleted mid-session keeps its menu row, and
+  every action in it silently does nothing — the receipt is existence-checked only at launch. Same
+  class as M18-T4 item (4); fold it in there or take it as a one-commit fix first.
 
 - **🎉 v1.9.0 CUT, PUSHED AND INSTALLED (2026-07-27) — M17 (Window capture) earns the MINOR.**
   `VERSION` + `CoreInfo.version` → 1.9.0 (pin test green), committed (`aec7685`), cut via

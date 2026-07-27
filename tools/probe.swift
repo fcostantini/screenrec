@@ -12,12 +12,25 @@ func fourCC(_ subtype: FourCharCode) -> String {
 }
 
 /// Reads every track's samples in one pass (passthrough — no decode) and warns, per track, if a
-/// timestamp steps backward. Uses DTS, not PTS: HEVC B-frames make PTS legitimately non-monotonic
-/// in storage. Audio carries no DTS, so it falls back to PTS. Only strictly backward steps are
-/// flagged — encoders emit a benign equal-timestamp priming edit and an invalid trailing packet.
+/// timestamp steps backward. Judges on DTS: HEVC B-frames make PTS legitimately non-monotonic in
+/// storage, and our own capture emits them. The two clocks are never mixed — a track's first and
+/// last few samples carry no DTS, and falling back to their PTS reads as a backward step on any
+/// B-frame file. A track with no DTS at all is judged on PTS. Only strictly backward steps are
+/// flagged: encoders emit a benign equal-timestamp priming edit.
 func monotonicWarnings(asset: AVAsset, tracks: [AVAssetTrack]) -> [CMPersistentTrackID: String] {
     guard let reader = try? AVAssetReader(asset: asset) else { return [:] }
-    struct State { var last = CMTime.negativeInfinity; var samples = 0; var violations = 0 }
+    struct Clock {
+        var last = CMTime.negativeInfinity
+        var samples = 0
+        var violations = 0
+
+        mutating func step(_ stamp: CMTime) {
+            samples += 1
+            if CMTimeCompare(stamp, last) < 0 { violations += 1 }
+            last = stamp
+        }
+    }
+    struct State { var decode = Clock(); var presentation = Clock() }
 
     var outputs: [(id: CMPersistentTrackID, output: AVAssetReaderTrackOutput)] = []
     var state: [CMPersistentTrackID: State] = [:]
@@ -35,20 +48,20 @@ func monotonicWarnings(asset: AVAsset, tracks: [AVAssetTrack]) -> [CMPersistentT
     while !active.isEmpty {
         for (id, output) in outputs where active.contains(id) {
             guard let sample = output.copyNextSampleBuffer() else { active.remove(id); continue }
+            guard var entry = state[id] else { continue }
             let dts = CMSampleBufferGetDecodeTimeStamp(sample)
-            let stamp = dts.isNumeric ? dts : CMSampleBufferGetPresentationTimeStamp(sample)
-            guard stamp.isNumeric, var entry = state[id] else { continue }
-            entry.samples += 1
-            if CMTimeCompare(stamp, entry.last) < 0 { entry.violations += 1 }
-            entry.last = stamp
+            let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+            if dts.isNumeric { entry.decode.step(dts) }
+            if pts.isNumeric { entry.presentation.step(pts) }
             state[id] = entry
         }
     }
     reader.cancelReading()
 
     return state.compactMapValues { entry in
-        entry.violations > 0
-            ? "non-monotonic timestamps: \(entry.violations) of \(entry.samples) samples step backward"
+        let clock = entry.decode.samples > 0 ? entry.decode : entry.presentation
+        return clock.violations > 0
+            ? "non-monotonic timestamps: \(clock.violations) of \(clock.samples) samples step backward"
             : nil
     }
 }

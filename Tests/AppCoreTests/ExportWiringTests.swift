@@ -9,9 +9,9 @@ private final class ConfigBox: @unchecked Sendable {
     var value: GifConfiguration?
 }
 
-/// Records the range an injected trim was handed.
+/// Records the range and mode an injected trim was handed.
 private final class RangeBox: @unchecked Sendable {
-    var value: (start: Double, end: Double)?
+    var value: (start: Double, end: Double, mode: TrimMode)?
 }
 
 /// AppState → Exporter wiring, with the transcode injected — the real `Exporter` runs the
@@ -161,8 +161,8 @@ private final class RangeBox: @unchecked Sendable {
         state.notifier = { posted.append($0) }
         let written = URL(fileURLWithPath: "/tmp/Clip trimmed.mov")
         let range = RangeBox()
-        state.exports.trimFunction = { _, _, start, end in
-            range.value = (start, end)
+        state.exports.trimFunction = { _, _, start, end, mode in
+            range.value = (start, end, mode)
             return written
         }
 
@@ -172,10 +172,27 @@ private final class RangeBox: @unchecked Sendable {
 
         #expect(range.value?.start == 2)
         #expect(range.value?.end == 8)
+        #expect(range.value?.mode == .lossless)  // the default stays lossless (ADR-015)
         #expect(state.lastExport?.url == written)
         #expect(state.lastExport?.menuTitle == "Trimmed · Clip trimmed.mov")  // .mov ⇒ "Trimmed"
         #expect(posted.first?.title == "Trimmed")
         #expect(posted.first?.fileURL == written)
+    }
+
+    @Test func theTrimWindowsReencodeToggleReachesTheTrim() async {
+        // The window's checkbox is the only way to ask for a re-encode; if it stopped arriving,
+        // the trim would quietly stay lossless and keep the lead-in it promised to drop (M18-T1).
+        let state = makeState()
+        let range = RangeBox()
+        state.exports.trimFunction = { _, _, start, end, mode in
+            range.value = (start, end, mode)
+            return URL(fileURLWithPath: "/tmp/Clip trimmed.mov")
+        }
+
+        state.trim(URL(fileURLWithPath: "/tmp/Clip.mov"), from: 2, to: 8, mode: .precise)
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(range.value?.mode == .precise)
     }
 
     @Test func trimNotificationCopy() {

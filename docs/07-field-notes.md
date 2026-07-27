@@ -7,7 +7,54 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
-- 2026-07-27 (M18-T1, measured before building):
+- 2026-07-27 (M18-T1, the second half — three of these correct the entry below, written hours
+  earlier by the same task):
+  - 🔴 **The defect the task was filed on does not exist. A lossless trim already cuts exactly where
+    you ask.** `AVAssetExportSession` in passthrough writes an **edit list**: it stores from the
+    preceding sync sample and maps presentation to start at the requested time. The trimmed file's
+    first presented frame is **byte-identical** to the source frame at the in-point (md5, and ffmpeg
+    agrees independently). Two milestones of copy, docs and a review finding said the in-point lands
+    "up to two seconds early" — all of it inferred from "passthrough can only cut at a sync sample",
+    and **nobody had opened a trimmed file and looked**. The real cost is that the cut frames stay
+    *inside* the file (`ffprobe -ignore_editlist 1` → 13.56 s in a 10.00 s clip). Mechanism in 02 §6a.
+  - 🔴 **`AVAssetExportPresetHEVCHighestQuality` + `timeRange` does not re-encode an HEVC source —
+    it passes it through.** Same range, passthrough vs "highest quality": **23,578,074 bytes both
+    ways**, 0.1 s, same 510 samples. Yesterday's entry below read that as "the preset *preserves*
+    4112×2570, hvc1 and both audio tracks" — it preserved them because it never touched them, and
+    `--precise` built on it would have written the lossless file while printing "precise re-encode".
+    **Nothing about the output looked wrong; only a byte count said so.** Setting
+    `session.videoComposition = AVVideoComposition(propertiesOf:)` forces the real encode, and a
+    unit test now fails without that one line.
+  - ✅ **The `non-monotonic timestamps` blocker was `probe`'s own bug, and never
+    precise-mode-specific — every trim triggered it, lossless included.** Our capture emits B-frames
+    (459 of 923 samples step back in PTS on a 20 s recording; DTS clean), and `probe` fell back to
+    PTS for the four boundary samples that carry no DTS — comparing a PTS against neighbouring DTS.
+    It now judges a track on one clock or the other, never both. The DTS pass still examines 919 of
+    923 samples, so the check didn't go quiet; eight files re-probe clean.
+  - ⚠️ **A re-encode is often the *larger* file.** Capture is frame-on-change; a re-encode emits
+    constant frame rate. On a quiet 10 s range: lossless 2.2 MB / 0.6 s, precise **3.3 MB / 7.8 s**.
+    "Re-encode = smaller" is a habit from camera footage and doesn't hold for screen recordings.
+  - 🔴 **Closing a SwiftUI `Window` does not tear down its `@State`, so the Trim preview kept
+    playing with no window to stop it** (Franco hit this in the deployed build; measured: playhead
+    72.22 s → 85.51 s across a 10 s closed window). The only escape was opening the window on a
+    *different* clip, because `load()` early-returns when the target is unchanged. `.onDisappear`
+    **does** fire for a `Window` scene, so pausing and dropping the player there fixes it — verified
+    after: play → close → 10 s → reopen reads `pos 0, playing 0`.
+  - ⚠️ **Driving the Trim window needs one long-lived process: it closes when the app loses
+    focus**, like the setup window (M16-T6). Each short-lived AX call activates the app, exits, and
+    the window is gone before the next one runs. Also, an app with `LSUIElement` lists **no AX
+    windows at all** until it is active — activate, then poll `kAXWindowsAttribute`.
+  - ⚠️ **A seek from the player's scrubber lands on a keyframe**, so an in-point set by scrubbing has
+    *no* lead-in and the window correctly says nothing. It cost a wrong conclusion here (the line
+    looked broken); setting the in-point mid-playback, where the playhead is at an arbitrary time,
+    showed it immediately. Users will see the line mostly when they set In while playing.
+  - ⚠️ **An export receipt is validated only at launch.** `SettingsStore.loadLastExport` checks
+    `fileExists`, but `expireStaleReceipt()` — the one that runs at every menu open — only checks
+    *age*. Delete an exported file mid-session and the row stays, with every action in its submenu
+    silently doing nothing (Franco, 2026-07-27). Same class as M18-T4 item (4), one row up.
+
+- 2026-07-27 (M18-T1, measured before building — ⚠️ two of the four entries below are corrected
+  above; kept unedited, because the correction is the lesson):
   - 🔴 **The lossless-trim keyframe gap is UNBOUNDED, not 2 s.** `AVVideoMaxKeyFrameIntervalDurationKey: 2`
     caps encoded frames; capture is frame-on-change, so a quiet stretch emits none and no keyframe
     lands. Measured on a 23-minute recording: in-point 61 s → real cut **57.63 s (3.37 s back)**;

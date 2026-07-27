@@ -18,10 +18,19 @@ public struct TrimResult: Sendable {
     public let byteCount: Int
 }
 
-/// Losslessly trims a recording to `[start, end]` by COPYING the streams — no decode, no
-/// re-encode (M10-T4). `AVAssetExportSession` in passthrough is exactly this: it can only cut at a
-/// sync sample, so the start snaps to the keyframe at/before it (docs/02 §9, ADR-015). The original
-/// is only read; a new file is written.
+/// What a trim writes (M18-T1). Both modes start playback exactly at the in-point; they differ in
+/// what the file holds.
+public enum TrimMode: Sendable {
+    /// Copies the streams. The file also keeps the frames between the preceding sync sample and
+    /// the in-point, hidden behind an edit list (`KeyframeIndex`, docs/02 §6a).
+    case lossless
+    /// Re-encodes, so the file holds only the kept range — at the source's own dimensions and
+    /// codec, with both audio tracks separate (ADR-004). Slower, and on quiet content larger.
+    case precise
+}
+
+/// Trims a recording to `[start, end]` (M10-T4; precise mode M18-T1). The original is only read; a
+/// new file is written. Both modes are `AVAssetExportSession` with a `timeRange`.
 public enum Trimmer {
     /// `<stem> trimmed.mov` beside the input — always `.mov`, because the passthrough export writes
     /// a QuickTime container regardless of the input's extension. Pure.
@@ -33,7 +42,7 @@ public enum Trimmer {
     }
 
     public static func trim(
-        from input: URL, to output: URL, start: Double, end: Double
+        from input: URL, to output: URL, start: Double, end: Double, mode: TrimMode = .lossless
     ) async throws -> TrimResult {
         guard !Exporter.sameFile(output, input) else { throw TrimError.outputCollidesWithInput }
         guard start >= 0, end > start else { throw TrimError.emptyRange }
@@ -54,10 +63,7 @@ public enum Trimmer {
         let endTime = CMTimeMinimum(CMTime(seconds: end, preferredTimescale: 600), duration)
         guard CMTimeCompare(endTime, startTime) > 0 else { throw TrimError.emptyRange }
 
-        guard let session = AVAssetExportSession(
-            asset: asset, presetName: AVAssetExportPresetPassthrough) else {
-            throw TrimError.trimFailed("Couldn't set up the trim.")
-        }
+        let session = try await makeSession(for: mode, asset: asset)
         session.timeRange = CMTimeRange(start: startTime, end: endTime)
 
         // Write to the `.partial` companion and rename only on success (M15-T3) — see `Exporter`.
@@ -77,5 +83,33 @@ public enum Trimmer {
         return TrimResult(
             url: output, duration: outputDuration.isFinite ? max(0, outputDuration) : 0,
             byteCount: bytes)
+    }
+
+    /// One place per mode, exhaustively: a preset and its composition must not drift apart.
+    /// `AVAssetExportPresetHEVCHighestQuality` alone passes an HEVC source straight through
+    /// (measured: byte-identical output), so precise mode needs the composition to encode at all.
+    private static func makeSession(
+        for mode: TrimMode, asset: AVAsset
+    ) async throws -> AVAssetExportSession {
+        func session(preset: String) throws -> AVAssetExportSession {
+            guard let session = AVAssetExportSession(asset: asset, presetName: preset) else {
+                throw TrimError.trimFailed("Couldn't set up the trim.")
+            }
+            return session
+        }
+        switch mode {
+        case .lossless:
+            return try session(preset: AVAssetExportPresetPassthrough)
+        case .precise:
+            let session = try session(preset: AVAssetExportPresetHEVCHighestQuality)
+            do {
+                session.videoComposition = try await AVVideoComposition.videoComposition(
+                    withPropertiesOf: asset)
+            } catch {
+                throw TrimError.trimFailed(
+                    "Couldn't set up a precise trim. \(error.localizedDescription)")
+            }
+            return session
+        }
     }
 }

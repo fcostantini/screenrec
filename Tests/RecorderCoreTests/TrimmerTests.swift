@@ -72,9 +72,49 @@ import Testing
         }
     }
 
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["SCREENREC_HW_ENCODE_TESTS"] == "1"))
+    func aPreciseTrimKeepsOnlyTheRangeAndBothAudioTracks() async throws {
+        let source = try await Self.makeClip(seconds: 2, withMicrophone: true)
+        defer { try? FileManager.default.removeItem(at: source) }
+        func output(_ label: String) -> URL {
+            FileManager.default.temporaryDirectory
+                .appendingPathComponent("trim-\(label)-\(UUID().uuidString).mov")
+        }
+        let lossless = output("lossless"), precise = output("precise")
+        defer {
+            try? FileManager.default.removeItem(at: lossless)
+            try? FileManager.default.removeItem(at: precise)
+        }
+
+        _ = try await Trimmer.trim(from: source, to: lossless, start: 0.5, end: 1.5)
+        _ = try await Trimmer.trim(from: source, to: precise, start: 0.5, end: 1.5, mode: .precise)
+
+        // The difference the mode makes: a lossless trim keeps the frames back to the previous
+        // keyframe inside the file (the edit list starts past them), a precise one holds only the
+        // range. Both present the same 1 s.
+        #expect(try await Self.editedLeadIn(of: lossless) > 0.1)
+        #expect(try await Self.editedLeadIn(of: precise) < 0.05)
+        for url in [lossless, precise] {
+            let asset = AVURLAsset(url: url)
+            #expect(try await asset.load(.isPlayable))
+            #expect(abs(try await asset.load(.duration).seconds - 1.0) < 0.2)
+        }
+
+        // Re-encoding must not flatten the two audio tracks into one (ADR-004) or resize the video.
+        let tracks = try await AVURLAsset(url: precise).load(.tracks)
+        let audio = tracks.filter { $0.mediaType == .audio }
+        #expect(audio.count == 2)
+        var channelCounts: Set<Int> = []
+        for track in audio { channelCounts.insert(try await Self.channels(of: track)) }
+        #expect(channelCounts == [1, 2])
+        let video = try #require(tracks.first { $0.mediaType == .video })
+        #expect(try await Self.subtype(of: video) == kCMVideoCodecType_HEVC)
+        #expect(try await video.load(.naturalSize) == CGSize(width: 640, height: 360))
+    }
+
     // MARK: - Fixtures
 
-    private static func makeClip(seconds: Int) async throws -> URL {
+    private static func makeClip(seconds: Int, withMicrophone: Bool = false) async throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("trim-src-\(UUID().uuidString).mov")
         try? FileManager.default.removeItem(at: url)
@@ -82,8 +122,9 @@ import Testing
         let fps = 30
         let recorder = try MovieRecorder(
             outputURL: url, frameRate: fps, preset: .balanced,
-            includesMicrophone: false, includesSystemAudio: true)
+            includesMicrophone: withMicrophone, includesSystemAudio: true)
         let systemFormat = makeAudioFormat(sampleRate: 48_000, channels: 2)
+        let micFormat = makeAudioFormat(sampleRate: 48_000, channels: 1)
         for index in 0..<(fps * seconds) {
             let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(fps))
             recorder.consume(
@@ -95,9 +136,29 @@ import Testing
             recorder.consume(
                 makeAudioSampleBuffer(format: systemFormat, frames: 48_000 / fps, pts: pts),
                 type: .systemAudio)
+            if withMicrophone {
+                recorder.consume(
+                    makeAudioSampleBuffer(format: micFormat, frames: 48_000 / fps, pts: pts),
+                    type: .microphone)
+            }
             usleep(8_000)  // pace the feed so frames survive encoder warmup (a ~2 s clip)
         }
         return try await recorder.finish()
+    }
+
+    /// How much of the video track the file stores but never presents — the edit list's offset into
+    /// the stored timeline.
+    private static func editedLeadIn(of url: URL) async throws -> Double {
+        let asset = AVURLAsset(url: url)
+        let track = try #require(try await asset.load(.tracks).first { $0.mediaType == .video })
+        let segment = try #require(try await track.load(.segments).first)
+        return segment.timeMapping.source.start.seconds
+    }
+
+    private static func channels(of track: AVAssetTrack) async throws -> Int {
+        let descriptions = try await track.load(.formatDescriptions)
+        return Int(CMAudioFormatDescriptionGetStreamBasicDescription(descriptions[0])?
+            .pointee.mChannelsPerFrame ?? 0)
     }
 
     private static func subtype(of track: AVAssetTrack) async throws -> FourCharCode {

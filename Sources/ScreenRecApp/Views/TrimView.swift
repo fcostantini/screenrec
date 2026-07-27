@@ -1,5 +1,6 @@
 import AVKit
 import AppCore
+import RecorderCore
 import SwiftUI
 
 /// AppKit's concrete `AVPlayerView`, wrapped — SwiftUI's generic `VideoPlayer` fatal-errors
@@ -19,9 +20,15 @@ private struct PlayerView: NSViewRepresentable {
     }
 }
 
+/// Holds the Play Range boundary observer. A reference so the observer's own closure can capture
+/// it without capturing the view — which would reach the player through `@State` and retain it.
+private final class RangeObserver {
+    var token: Any?
+}
+
 /// The Trim window (M10-T4, docs/06 "Trim window" — the first editing surface): a preview to find
-/// the moment, Set In/Set Out from the playhead, and Trim & Save. The trim itself is a lossless
-/// passthrough copy (`AppState.trim`); this view only picks the range.
+/// the moment, Set In/Set Out from the playhead, and Trim & Save. The trim itself runs through
+/// `AppState.trim`; this view picks the range and the mode (M18-T1).
 struct TrimView: View {
     @Bindable var state: AppState
     @Environment(\.dismiss) private var dismiss
@@ -31,6 +38,13 @@ struct TrimView: View {
     @State private var inSeconds = 0.0
     @State private var outSeconds = 0.0
     @State private var durationSeconds = 0.0
+    @State private var reencodes = false
+    /// What a lossless trim would keep before the in-point, or nil when nothing would be hidden.
+    @State private var leadInText: String?
+    @State private var rangeObserver = RangeObserver()
+
+    /// A range worth acting on; below this, Trim & Save and Play Range are meaningless.
+    private var hasRange: Bool { outSeconds - inSeconds >= 0.1 }
 
     var body: some View {
         Group {
@@ -44,6 +58,7 @@ struct TrimView: View {
         }
         .onAppear { load(state.trimTarget) }
         .onChange(of: state.trimTarget) { load(state.trimTarget) }
+        .onDisappear { unload() }
     }
 
     @ViewBuilder private func content(_ url: URL) -> some View {
@@ -60,27 +75,46 @@ struct TrimView: View {
             }
 
             HStack {
-                Button("Set In") { inSeconds = min(currentTime(), outSeconds) }
-                Text("In \(timecode(inSeconds))").monospacedDigit().foregroundStyle(.secondary)
+                Button("Set In") { setIn() }
+                    .keyboardShortcut("i", modifiers: [])
+                Text("In \(KeyframeIndex.timecode(inSeconds))").monospacedDigit().foregroundStyle(.secondary)
                 Spacer()
-                Text("Out \(timecode(outSeconds))").monospacedDigit().foregroundStyle(.secondary)
+                Text("Out \(KeyframeIndex.timecode(outSeconds))").monospacedDigit().foregroundStyle(.secondary)
                 Button("Set Out") { outSeconds = max(currentTime(), inSeconds) }
+                    .keyboardShortcut("o", modifiers: [])
+            }
+
+            // Absent on most short clips: only a lossless trim hides anything, and only when the
+            // in-point isn't already on a keyframe (M18-T1).
+            if let leadInText, !reencodes {
+                Text(leadInText)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack {
-                Text("Trimmed length ≈ \(timecode(max(0, outSeconds - inSeconds)))")
+                Text("Trimmed length ≈ \(KeyframeIndex.timecode(max(0, outSeconds - inSeconds)))")
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button("Play Range") { playRange() }
+                    .disabled(!hasRange)
                 Button("Trim & Save") {
-                    state.trim(url, from: inSeconds, to: outSeconds)
+                    state.trim(url, from: inSeconds, to: outSeconds,
+                               mode: reencodes ? .precise : .lossless)
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(outSeconds - inSeconds < 0.1 || state.exportInProgress != nil)
+                .disabled(!hasRange || state.exportInProgress != nil)
             }
 
-            Text("Lossless — the streams are copied, so the in-point snaps to the nearest keyframe. "
-                + "The original is kept; this saves a new “ trimmed” file.")
+            Toggle("Re-encode — the clip will contain only \(KeyframeIndex.timecode(inSeconds)) – "
+                + "\(KeyframeIndex.timecode(outSeconds))", isOn: $reencodes)
+
+            Text("Both start exactly where you set them. Lossless copies the streams, so the clip "
+                + "also keeps the frames back to the previous keyframe inside the file; re-encoding "
+                + "drops them, takes longer and can produce a larger file. The original is kept "
+                + "either way; this saves a new “ trimmed” file.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -94,9 +128,70 @@ struct TrimView: View {
         max(0, min(player?.currentTime().seconds ?? 0, durationSeconds))
     }
 
+    private func setIn() {
+        inSeconds = min(currentTime(), outSeconds)
+        refreshLeadIn()
+    }
+
+    /// Plays only `[in, out]`: seeks to the in-point and pauses again on the way past the out-point.
+    /// The seek is zero-tolerance — the preview must start where the trim will, not at a keyframe
+    /// up to seconds earlier.
+    private func playRange() {
+        guard let player else { return }
+        stopRangePlayback()
+        let observer = rangeObserver
+        let out = CMTime(seconds: outSeconds, preferredTimescale: 600)
+        observer.token = player.addBoundaryTimeObserver(
+            forTimes: [NSValue(time: out)], queue: .main
+        ) { [weak player] in
+            player?.pause()
+            if let token = observer.token { player?.removeTimeObserver(token) }
+            observer.token = nil
+        }
+        player.seek(
+            to: CMTime(seconds: inSeconds, preferredTimescale: 600),
+            toleranceBefore: .zero, toleranceAfter: .zero
+        ) { _ in player.play() }
+    }
+
+    /// Ends a range playback in flight. An out-point at the very end of the clip may never be
+    /// traversed, so the observer can outlive the playback that installed it.
+    private func stopRangePlayback() {
+        guard let token = rangeObserver.token else { return }
+        player?.removeTimeObserver(token)
+        player?.pause()
+        rangeObserver.token = nil
+    }
+
+    /// Asks the asset where a lossless trim from the in-point would really start keeping frames.
+    /// Measured at 0.0–0.9 ms on a 23-minute recording, so it runs on every Set In.
+    private func refreshLeadIn() {
+        guard let asset = player?.currentItem?.asset, let url = loadedURL else { return }
+        let requested = inSeconds
+        Task {
+            let start = await KeyframeIndex.leadInStart(for: asset, trimmingFrom: requested)
+            guard loadedURL == url, inSeconds == requested else { return }  // superseded
+            leadInText = start.flatMap {
+                KeyframeIndex.leadInDescription(requested: requested, start: $0)
+            }
+        }
+    }
+
+    /// Closing the window does not tear down a `Window` scene's state, so the player would go on
+    /// playing — audible, with nothing on screen to stop it (measured: 13 s of playback across a
+    /// 10 s closed window). Dropping it here also frees the decode pipeline of a multi-GB source;
+    /// `loadedURL` goes with it so reopening the same recording rebuilds instead of resuming.
+    private func unload() {
+        stopRangePlayback()
+        player?.pause()
+        player = nil
+        loadedURL = nil
+    }
+
     /// Rebuilds the player and range for a new target; a superseded async duration load is ignored.
     private func load(_ url: URL?) {
         guard url != loadedURL else { return }
+        stopRangePlayback()
         loadedURL = url
         player?.pause()
         guard let url else { player = nil; return }
@@ -106,16 +201,13 @@ struct TrimView: View {
         inSeconds = 0
         outSeconds = 0
         durationSeconds = 0
+        leadInText = nil
+        reencodes = false
         Task {
             let duration = (try? await item.asset.load(.duration).seconds) ?? 0
             guard loadedURL == url else { return }
             durationSeconds = duration.isFinite ? max(0, duration) : 0
             outSeconds = durationSeconds
         }
-    }
-
-    private func timecode(_ seconds: Double) -> String {
-        let whole = Int(seconds.rounded())
-        return String(format: "%d:%02d", whole / 60, whole % 60)
     }
 }

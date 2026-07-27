@@ -585,8 +585,8 @@ public final class AppState {
     // owns the gif caps (persisted config), so it builds the `GifConfiguration` and passes it in.
     public func exportToMP4(_ source: URL) { exports.exportToMP4(source) }
     public func exportToGIF(_ source: URL) { exports.exportToGIF(source, configuration: gifConfiguration) }
-    public func trim(_ source: URL, from start: Double, to end: Double) {
-        exports.trim(source, from: start, to: end)
+    public func trim(_ source: URL, from start: Double, to end: Double, mode: TrimMode = .lossless) {
+        exports.trim(source, from: start, to: end, mode: mode)
     }
 
     /// The `Save as GIF` caps as a `GifConfiguration` (M10-T3 follow-up), built from the persisted

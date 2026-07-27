@@ -19,9 +19,13 @@ func printUsage() {
                                        (default 480 wide, 15 fps, first 30 s). Override with
                                        --fps <n> --width <px> --seconds <n>. Default <out> is the
                                        input's .gif sibling. The source is read-only.
-      screenrec-cli trim <in> --from <t> --to <t> [<out>]  Losslessly trim a recording to
-                                       [from, to] by copying the streams (no re-encode); times are
-                                       M:SS or seconds. The in-point snaps to the nearest keyframe.
+      screenrec-cli trim <in> --from <t> --to <t> [--precise] [<out>]  Trim a recording to
+                                       [from, to]; times are M:SS or seconds. Both modes start at
+                                       [from] exactly. Lossless (default) copies the streams, so
+                                       the file also keeps the frames back to the preceding
+                                       keyframe (the run prints how many). --precise re-encodes at
+                                       the source's size and codec, so the file holds only
+                                       [from, to] — slower, and larger on quiet content.
                                        Default <out> is the input's " trimmed" sibling; read-only.
       screenrec-cli list-mics          List audio input devices
       screenrec-cli list-apps          List running apps capturable with record --app

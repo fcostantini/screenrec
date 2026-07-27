@@ -41,8 +41,8 @@ public final class ExportModel {
     public var gifExportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: GifConfiguration) async throws -> URL = {
         try await GifExporter.exportGIF(from: $0, to: $1, configuration: $2).url
     }
-    public var trimFunction: @Sendable (_ source: URL, _ output: URL, _ start: Double, _ end: Double) async throws -> URL = {
-        try await Trimmer.trim(from: $0, to: $1, start: $2, end: $3).url
+    public var trimFunction: @Sendable (_ source: URL, _ output: URL, _ start: Double, _ end: Double, _ mode: TrimMode) async throws -> URL = {
+        try await Trimmer.trim(from: $0, to: $1, start: $2, end: $3, mode: $4).url
     }
 
     /// The recording the Trim window is editing (M10-T4), or nil. Set when `Trim…` opens the window;
@@ -79,12 +79,13 @@ public final class ExportModel {
             failure: RecordingNotifications.gifExportFailed)
     }
 
-    /// Losslessly trims `source` to `[start, end]` (M10-T4), the same off-main, one-at-a-time path.
-    public func trim(_ source: URL, from start: Double, to end: Double) {
+    /// Trims `source` to `[start, end]` (M10-T4; `mode` M18-T1), the same off-main, one-at-a-time
+    /// path.
+    public func trim(_ source: URL, from start: Double, to end: Double, mode: TrimMode) {
         let trim = trimFunction  // snapshot; the closure captures no `self`
         performExport(
             source, to: Exporter.availableURL(basedOn: Trimmer.trimmedSibling(of: source)),
-            using: { try await trim($0, $1, start, end) },
+            using: { try await trim($0, $1, start, end, mode) },
             success: { RecordingNotifications.trimmed(url: $0) },
             failure: RecordingNotifications.trimFailed)
     }

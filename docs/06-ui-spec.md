@@ -451,11 +451,22 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
 - An **`AVPlayerView`** preview (AppKit via `NSViewRepresentable` — SwiftUI's generic `VideoPlayer`
   fatal-errors in the Command-Line-Tools SPM build; field note).
 - **Set In** / **Set Out** grab the playhead; `In M:SS` / `Out M:SS` readouts; `Trimmed length ≈`.
-- **Trim & Save** runs the lossless passthrough copy (`AppState.trim`, off-main via `performExport`,
-  the one-at-a-time/receipt/notification path) and dismisses. Disabled for a <0.1 s range or while
-  an export runs.
-- Copy states the ruling: *"Lossless — the streams are copied, so the in-point snaps to the nearest
-  keyframe. The original is kept; this saves a new ' trimmed' file."*
+  <kbd>I</kbd> and <kbd>O</kbd> are their shortcuts (M18-T1).
+- **▶ Play range** plays `[in, out]` and pauses at the out-point (a boundary time observer, removed
+  when it fires — the player retains the closure).
+- **Trim & Save** runs the trim (`AppState.trim`, off-main via `performExport`, the
+  one-at-a-time/receipt/notification path) and dismisses. Disabled for a <0.1 s range or while an
+  export runs.
+- **Re-encode** (M18-T1, unchecked by default — ADR-015 keeps lossless the default): *"Re-encode —
+  the clip will contain only M:SS – M:SS"*. Both modes start exactly at the in-point; lossless also
+  keeps the frames back to the previous keyframe inside the file (docs/02 §6a), which the window
+  states above the buttons when there are any: *"Starts exactly at 1:01 · keeps 3.4 s before it
+  inside the file"*. That line is absent when the in-point already sits on a keyframe — a caveat
+  with nothing to warn about is noise.
+- Copy states the ruling: *"Both start exactly where you set them. Lossless copies the streams, so
+  the clip also keeps the frames back to the previous keyframe inside the file; re-encoding drops
+  them, takes longer and can produce a larger file. The original is kept either way; this saves a
+  new ' trimmed' file."*
 
 ## Copy rules
 

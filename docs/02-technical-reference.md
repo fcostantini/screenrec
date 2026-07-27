@@ -318,10 +318,13 @@ one has no display at all, so `CaptureEngine.resolveScope` resolves no `SCDispla
   AVVideoMaxKeyFrameIntervalDurationKey: 2]`.
   ⚠️ **This caps ENCODED FRAMES, not wall clock — the real keyframe gap is unbounded**
   (measured 2026-07-27, M18-T1). Capture is frame-on-change, so a static stretch emits no
-  frames and therefore no keyframes: on a 23-minute recording a 61 s in-point snapped back
-  **3.37 s**, well past the 2 s the setting implies. Anything reasoning about "the in-point
-  moves by at most 2 s" — a lossless trim especially — is wrong, and it is worst when the
-  screen was quiet, which is the start of most takes.
+  frames and therefore no keyframes: on a 23-minute recording the sync sample before a 61 s
+  point sat **3.43 s** back, well past the 2 s the setting implies, and it is worst when the
+  screen was quiet. What that gap costs is in §6a — not a moved in-point.
+- **The encoder emits B-frames**, so PTS is legitimately non-monotonic in storage (measured:
+  459 of 923 samples step back on a 20 s recording; DTS is clean). Anything checking timestamp
+  order must judge DTS and PTS separately and never compare one against the other — the first
+  and last few samples of a track carry no DTS at all.
 - `expectsMediaDataInRealTime = true` on **all** inputs. If `isReadyForMoreMediaData`
   is false, **drop the buffer** — never block the SCK callback queue.
 - Hardware encode is automatic (Media Engine). Do not touch VideoToolbox directly for
@@ -441,6 +444,31 @@ Consequences for anyone designing mic recovery:
   (§2). User-configurable dir must pass the `opendir` preflight at selection time AND at
   record time. Name collision (two recordings started the same second): append ` 2`,
   ` 3`, … before the extension.
+
+## 6a. Trimming (`Trimmer`) — measured 2026-07-27, M18-T1
+
+- **A passthrough trim already starts exactly at the in-point.** `AVAssetExportSession` writes an
+  **edit list**: it stores from the preceding sync sample but maps presentation to begin at the
+  requested time. Measured — the trim's first presented frame is byte-identical to the source at
+  the in-point, in AVFoundation *and* in ffmpeg. "The in-point snaps back to a keyframe" describes
+  what is stored, not what plays; it was in our copy and docs for two milestones as if it were the
+  latter.
+- **What it does cost: the file keeps the lead-in.** Everything between the sync sample and the
+  in-point stays inside the file, hidden — `ffprobe -ignore_editlist 1` reports 13.56 s for a
+  10.00 s clip and decodes the frame 3.43 s before the in-point. Video only: every audio packet is
+  a sync sample, so audio's lead-in is ~0.02 s. `KeyframeIndex.leadInStart` finds it in 0.0–0.9 ms
+  on a 23-minute file (an `AVSampleCursor` stepped back in decode order; the walk is bounded by
+  keyframe spacing, not file length). ⚠️ `sampleIsFullSync` is an `ObjCBool` — `.boolValue`.
+- **A re-encoding preset alone does NOT re-encode.** `AVAssetExportPresetHEVCHighestQuality` +
+  `timeRange` on an HEVC source passes it straight through: byte-identical output (23,578,074
+  bytes both ways), 0.1 s. Setting `session.videoComposition =
+  AVVideoComposition(propertiesOf: asset)` forces the real encode — that is what `.precise` does.
+  ⚠️ Plain `AVAssetExportPresetHighestQuality` re-encodes but **downscales 4112×2570 → 3840×2400
+  and converts hvc1 → avc1**; the HEVC preset preserves size, codec and both audio tracks (ADR-004
+  holds through the re-encode).
+- **Precise is slower and often larger.** A re-encode emits constant-frame-rate video where
+  capture emitted almost nothing: on a quiet 10 s range, lossless = 2.2 MB / 0.6 s, precise =
+  3.3 MB / 7.8 s. It buys one thing — a file that contains only the kept range.
 
 ## 7. Long-recording robustness
 

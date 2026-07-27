@@ -1511,20 +1511,26 @@ row per feature since M10. Nothing here is structural — it is the accumulated 
 that already ship. Earns a **MINOR** for T1/T2 (real new capability); the rest is polish that could
 ride the same bump.
 
-- [ ] M18-T1 **Trim tells the truth, and can be exact.** Capture writes a keyframe every 2 s
-      (`AVVideoMaxKeyFrameIntervalDurationKey: 2`) and the trim is a passthrough copy, so the
-      in-point can land **up to two seconds early** — a sixth of a 12-second clip — and the user only
-      discovers it after saving. The copy admits it in the abstract ("snaps to the nearest keyframe")
-      but the window never shows the real in-point. **Seams:** read the source's keyframe positions
-      (the `Trimmer`/`VideoFrameReader` side already opens the asset) and show the snapped point
-      live — `In 0:04 → cuts at 0:03`; add a **Precise (re-encode)** option routing through
-      `Exporter` with a time range, which is frame-exact and reuses a shipped path. While in there,
-      the window's ergonomics: <kbd>I</kbd>/<kbd>O</kbd> shortcuts for Set In/Set Out and a "play the
-      trimmed range" button — both near-free and badly wanted. **Rulings:** lossless stays the
-      default (ADR-015's "trim and transcode = yes" covers both); what precise mode does to quality
-      and whether it says so in the copy. **Verify:** a lossless trim's stated cut point matches
-      `probe`'s actual first-frame PTS; a precise trim starts **exactly** at the requested second;
-      the original is untouched by both.
+- [x] M18-T1 **Trim tells the truth, and can be exact.** ⚠️ **The filed premise was false and the
+      measurement killed it (2026-07-27):** a passthrough trim does **not** cut early. The export
+      writes an edit list, so playback starts exactly at the in-point — measured byte-identical to
+      the source frame there, in AVFoundation and ffmpeg alike. What is true: the file **keeps** the
+      frames back to the previous sync sample, hidden (`ffprobe -ignore_editlist 1` → 13.56 s inside
+      a 10.00 s clip, decoding 3.43 s before the in-point). docs/02 §6a has the mechanism. So the
+      task became: state the hidden lead-in where the range is chosen, and offer a mode whose file
+      holds only the kept range. **Rulings (Franco, 2026-07-27):** (a) ship the re-encode mode, named
+      for what it does — the clip will contain only the kept range — not for a precision the trim
+      already has; (b) the window says `Starts exactly at 1:01 · keeps 3.4 s before it inside the
+      file`, and says nothing when the in-point is already a keyframe. **As built:** `KeyframeIndex`
+      (the `AVSampleCursor` lookup + the pure sentence), `TrimMode.lossless/.precise` on `Trimmer`,
+      `--precise` on the CLI, and the window's lead-in line, Re-encode checkbox,
+      <kbd>I</kbd>/<kbd>O</kbd> shortcuts and Play range. ⚠️ **`AVAssetExportPresetHEVCHighestQuality`
+      alone does not re-encode an HEVC source** (byte-identical passthrough) — `.precise` forces it
+      with an `AVVideoComposition`, and a unit test fails without that line. **Verified:** both modes'
+      first frame is the requested second (lossless byte-identical, precise 41.8 dB vs 30.8 dB
+      against a second earlier); lossless stores a lead-in and precise stores none (edit-list
+      segments); the re-encode preserves 4112×2570, hvc1 and both audio tracks (ADR-004); the
+      original is byte-identical after both.
 - [ ] M18-T2 **MP4 export gets the options GIF already has.** `Export as MP4` is hardcoded to 1920
       wide / 6 Mbps / H.264 High while `Save as GIF` gets fps, width and max-length pickers — so a
       4112×2570 demo comes out at ~1080p whether the user wanted full resolution or a small

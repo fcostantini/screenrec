@@ -2,23 +2,25 @@ import AVFoundation
 import CoreMedia
 import Foundation
 
-/// Where a lossless trim will actually cut.
+/// What a lossless trim keeps that the user didn't ask for.
 ///
-/// A passthrough trim copies streams, so the in-point must land on a sync sample and snaps
-/// *backwards*. The gap is NOT bounded by `AVVideoMaxKeyFrameIntervalDurationKey` (2 s, docs/02 §3):
-/// that caps encoded frames, and capture is frame-on-change — a static stretch emits no frames, so
-/// no keyframes either. Measured on a real recording: **3.37 s back from a 61 s in-point** on a
-/// 23-minute file. The gap is effectively unbounded, and worst when the screen was quiet, which is
-/// exactly where people trim.
+/// A passthrough trim copies streams, so the file must start at a sync sample — but the export
+/// writes an edit list, so playback still begins exactly at the in-point (measured: the first
+/// presented frame is byte-identical to the source there, in AVFoundation and ffmpeg alike). The
+/// frames between the sync sample and the in-point stay *in the file*, hidden: `ffprobe
+/// -ignore_editlist 1` decodes them (docs/02 §6a). The gap is NOT bounded by
+/// `AVVideoMaxKeyFrameIntervalDurationKey` (2 s, docs/02 §3): that caps encoded frames, and capture
+/// is frame-on-change, so a static stretch emits none. Measured 3.43 s on a 23-minute recording.
 public enum KeyframeIndex {
 
-    /// The presentation time a lossless trim starting at `seconds` will really begin at, or nil if
-    /// the asset has no readable video track.
+    /// The presentation time of the earliest frame a lossless trim from `seconds` keeps in the
+    /// file — the sync sample at or before the in-point — or nil if the asset has no readable
+    /// video track.
     ///
-    /// Walks back in decode order from the requested point to the nearest full sync sample. The walk
-    /// is bounded by the keyframe spacing, not the file length: measured **0.0–0.9 ms** across a
-    /// 23-minute recording, so this is safe to call live while the user drags.
-    public static func cutPoint(for asset: AVAsset, startingAt seconds: Double) async -> Double? {
+    /// Walks back in decode order from the requested point. The walk is bounded by the keyframe
+    /// spacing, not the file length: measured **0.0–0.9 ms** across a 23-minute recording, so this
+    /// is safe to call live while the user drags.
+    public static func leadInStart(for asset: AVAsset, trimmingFrom seconds: Double) async -> Double? {
         guard let track = try? await asset.loadTracks(withMediaType: .video).first,
               let cursor = track.makeSampleCursor(
                 presentationTimeStamp: CMTime(seconds: seconds, preferredTimescale: 600))
@@ -33,20 +35,23 @@ public enum KeyframeIndex {
         return cursor.presentationTimeStamp.seconds
     }
 
-    /// How the trim window states the cut. Nil when the requested point already lands on a keyframe:
-    /// a caveat with nothing to warn about is noise, and the old copy warned unconditionally while
-    /// never giving the number.
-    ///
-    /// Pure, so the sentence the user acts on is unit-tested away from AVFoundation.
-    public static func cutDescription(
-        requested: Double, actual: Double, tolerance: Double = 0.05
-    ) -> String? {
-        guard requested - actual > tolerance else { return nil }
-        return "In \(timecode(requested)) → cuts at \(timecode(actual))"
+    /// Sync samples don't land on whole seconds, so a lead-in this short is a rounding artefact,
+    /// not something to tell the user about.
+    private static let subFrameTolerance = 0.05
+
+    /// How the trim window states it. Nil when the in-point already sits on a sync sample: nothing
+    /// is hidden, and a caveat with nothing to warn about is noise.
+    public static func leadInDescription(requested: Double, start: Double) -> String? {
+        let leadIn = requested - start
+        guard leadIn > subFrameTolerance else { return nil }
+        return String(
+            format: "Starts exactly at %@ · keeps %.1f s before it inside the file",
+            timecode(requested), leadIn)
     }
 
-    /// `M:SS`, matching the trim window's existing timecodes.
-    static func timecode(_ seconds: Double) -> String {
+    /// `M:SS`, floored — the one timecode the trim window and the CLI both render, so a lead-in
+    /// sentence can't disagree with the `In`/`Out` readouts beside it.
+    public static func timecode(_ seconds: Double) -> String {
         let whole = Int(seconds.rounded(.down))
         return String(format: "%d:%02d", whole / 60, whole % 60)
     }
