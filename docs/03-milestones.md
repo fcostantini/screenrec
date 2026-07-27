@@ -1285,7 +1285,7 @@ flow past a consumer. Earns a **MINOR** (ADR-013).
       `probe-stream` and `engine-smoke` → `"Capturing the screen"`, and no assertion surviving any
       exit; 430 tests (+1: the purpose→reason mapping, including that no two purposes share a string);
       full dev loop green. The sleep/wake leg the original task called for is moot under the ruling.
-- [ ] M16-T2 **Armed replay states its cost.** Two captions, one number. The Settings slider (M9-T8)
+- [x] M16-T2 **Armed replay states its cost.** Two captions, one number. The Settings slider (M9-T8)
       runs to 15 minutes with the RAM cost "explicitly accepted" but shows only `M:SS` — at Balanced
       / 60 fps a 15-minute ring is ≈2.6 GB resident, and the slider is the exact moment the user is
       making that trade. **Seams:** a pure `Settings`/`BitrateModel` helper turning (seconds, quality,
@@ -1295,7 +1295,27 @@ flow past a consumer. Earns a **MINOR** (ADR-013).
       (`Armed · 60 s · ≈180 MB`) beside the existing banner-suppression line. **ADR-018 sends the
       second cost here too:** arming holds the Mac awake deliberately, so the Settings caption says
       so in the user's words (`… · keeps your Mac awake`) — T1 fixed what `pmset` reports, this is
-      where the person choosing the setting finds out. **Rulings:** the menu
+      where the person choosing the setting finds out.
+      **As built:** `ReplayFootprint` (RecorderCore, beside `BitrateModel`) is the estimator;
+      `RingBuffer`'s 2 s slack became `ReplayWindow.slackSeconds` so the ring and the estimate can't
+      drift. **Quality is deliberately NOT an input — `ReplayEncoder` hardcodes `.balanced` (docs/04
+      §6.1's 2026-07-16 amendment), so the preset doesn't change the ring**; billing a High user for
+      1.6× would have been the obvious bug. The mic counts only when `presentMicrophonePreference`
+      says a device will actually be captured (an away pick attaches no ring). Pixel size arrives
+      through `DisplayOption` (`pointSize` + `pointPixelScale` from `NSScreen`, the no-AppKit seam
+      that already existed) and goes through `CaptureConfiguration.pixelDimensions`; a region is
+      billed for its own rect, an app-scoped pick for the display (02 §1a). No geometry ⇒ the figure
+      is withheld, never guessed. Copy: `A 4:30 buffer holds about 800 MB in memory. While armed,
+      ScreenRec keeps your Mac awake.` / menu `4:30 buffer · ≈800 MB · Mac stays awake` (Franco
+      picked the full-sentence variant, 2026-07-27); rounded to two significant figures so an
+      estimate doesn't read as a measurement.
+      **Verify (as run):** 442 tests (+12) — the estimator restated against docs/04 §6.1's formula
+      across 5 s/60 s/5 min/15 min × 30/60 fps × mic on/off, the region case, the withheld-figure
+      case, and the phrase table; then **live on the deployed build**: `menudriver dump` shows
+      `4:30 buffer · ≈800 MB · Mac stays awake` (before/after dumps recorded), and a Settings
+      screenshot shows the caption under the slider carrying Franco's real 4:30 → 800 MB. Full dev
+      loop green. ⚠️ **Slider-drag tracking is proven by unit test, not on screen** — driving the
+      live slider would have restarted his armed ring, and `settingsdriver` can only shoot/toggle. **Rulings:** the menu
       row must **stamp at open, never tick** (M6-T10 — a publish rebuilds the open menu's AppKit rows
       and garbles hover). **Verify:** unit — the estimator against the docs/04 §6.1 formula at three
       window lengths and both fps caps; `menudriver dump` shows the figure in the armed row;

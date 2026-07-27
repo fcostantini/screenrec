@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import AppCore
@@ -105,5 +106,104 @@ import Testing
         let freshState = AppState(defaults: freshDefaults)
         freshState.expireStaleExportReceipt()
         #expect(freshState.lastExport?.url == file)
+    }
+
+    // MARK: - What an armed buffer costs (M16-T2)
+
+    /// The measured geometry of this machine's display: 2056×1285 pt at 2× ⇒ the 4112×2570 frames
+    /// SCK delivers.
+    private func retinaDisplay(id: CGDirectDisplayID = 1) -> DisplayOption {
+        DisplayOption(
+            id: id, name: "Built-in Retina Display", isMain: true,
+            pointSize: CGSize(width: 2056, height: 1285), pointPixelScale: 2)
+    }
+
+    @Test func bufferCostNamesMemoryThenWakefulness() {
+        let state = makeState()
+        state.refreshSources(displays: [retinaDisplay()])
+        state.replaySeconds = 60
+        state.frameRateCap = 60
+        state.microphonePreference = .automatic
+
+        #expect(state.replayBufferCaption(seconds: 60)
+            == "A 1-minute buffer holds about 180 MB in memory. "
+                + "While armed, ScreenRec keeps your Mac awake.")
+        #expect(state.replayBufferMenuLabel == "1 min buffer · ≈180 MB · Mac stays awake")
+    }
+
+    @Test func aMicrophoneThatWontBeCapturedIsntBilledFor() {
+        let state = makeState()
+        state.refreshSources(displays: [retinaDisplay()])
+        state.replaySeconds = 60
+        state.frameRateCap = 60
+        // Default pick is None — no mic ring, so the quote drops the mic's share.
+        #expect(state.replayBufferMenuLabel == "1 min buffer · ≈170 MB · Mac stays awake")
+
+        // An away device reads None in the menu and must read None here too (M8-T2's checkmark truth).
+        state.microphonePreference = .device(id: "absent-device")
+        #expect(state.replayBufferMenuLabel == "1 min buffer · ≈170 MB · Mac stays awake")
+    }
+
+    @Test func bufferCostWithholdsTheFigureUntilTheScreenListArrives() {
+        // No geometry ⇒ no number invented; the standing fact still gets said.
+        let state = makeState()
+        #expect(state.replayBufferBytes(seconds: 60) == nil)
+        #expect(state.replayBufferCaption(seconds: 60)
+            == "While armed, ScreenRec keeps your Mac awake.")
+        #expect(state.replayBufferMenuLabel == "Mac stays awake while armed")
+    }
+
+    @Test func theCaptionQuotesTheWindowItIsAskedAbout() {
+        let state = makeState()
+        state.refreshSources(displays: [retinaDisplay()])
+        state.replaySeconds = 60
+        // The slider passes its in-progress value, so the caption moves with the drag.
+        #expect(state.replayBufferCaption(seconds: 900).contains("A 15-minute buffer"))
+        #expect(state.replayBufferCaption(seconds: 900) != state.replayBufferCaption(seconds: 60))
+    }
+
+    @Test func aRegionPickIsBilledForItsOwnPixels() {
+        let state = makeState()
+        state.refreshSources(displays: [retinaDisplay()])
+        let whole = state.replayBufferBytes(seconds: 60)
+        state.sourceChoice = .region(display: 1, rect: CGRect(x: 0, y: 0, width: 800, height: 600))
+        let region = state.replayBufferBytes(seconds: 60)
+        #expect(region != nil && whole != nil)
+        #expect(region! < whole!)
+    }
+
+    @Test func anAppScopedPickIsBilledForTheMainDisplayItCompositesOn() {
+        // 02 §1a: an app filter composites on the MAIN display, whichever display the pickers
+        // remember — so picking a small second screen then an app must not shrink the quote.
+        let state = makeState()
+        state.refreshSources(displays: [
+            retinaDisplay(),
+            DisplayOption(
+                id: 2, name: "Sidecar", isMain: false,
+                pointSize: CGSize(width: 1024, height: 768), pointPixelScale: 1),
+        ])
+        state.sourceChoice = .display(2)
+        let sidecarQuote = state.replayBufferBytes(seconds: 60)
+
+        state.appDisplayName = { _ in "Acme" }
+        state.sourceChoice = .app(bundleID: "com.acme.app")
+        let appQuote = state.replayBufferBytes(seconds: 60)
+
+        state.sourceChoice = .display(1)
+        let mainQuote = state.replayBufferBytes(seconds: 60)
+
+        #expect(appQuote == mainQuote)          // composites on main…
+        #expect(appQuote != sidecarQuote)       // …not the display the pickers remember
+    }
+
+    @Test func bufferPhrasesReadNaturallyAcrossTheSliderRange() {
+        #expect(AppState.bufferPhrase(45) == "45-second")
+        #expect(AppState.bufferPhrase(60) == "1-minute")
+        #expect(AppState.bufferPhrase(105) == "1:45")
+        #expect(AppState.bufferPhrase(900) == "15-minute")
+        #expect(AppState.shortBufferPhrase(45) == "45 s")
+        #expect(AppState.shortBufferPhrase(60) == "1 min")
+        #expect(AppState.shortBufferPhrase(105) == "1:45")
+        #expect(AppState.shortBufferPhrase(900) == "15 min")
     }
 }

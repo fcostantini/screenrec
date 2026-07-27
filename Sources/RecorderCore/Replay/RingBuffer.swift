@@ -11,6 +11,11 @@ struct RingEntry<Element> {
 /// The one statement of the replay-window contract: every ring capacity and resize goes through
 /// here, so validation and the pts timescale can't drift between the video and audio rings.
 enum ReplayWindow {
+    /// Retained beyond the requested window so a keyframe at or before the N-second mark survives
+    /// until a clip is taken. `ReplayFootprint` bills for it too — the rings really do hold it.
+    static let slackSeconds: Double = 2
+    static let slack = CMTime(seconds: slackSeconds, preferredTimescale: 600)
+
     static func capacity(_ seconds: Double) -> CMTime {
         // A non-finite or non-positive window silently breaks ring retention (eviction limit
         // ≤ 0 evicts everything); callers validate their inputs (M4-T4 pattern), so this is a
@@ -40,7 +45,7 @@ final class RingBuffer<Element>: @unchecked Sendable {
 
     /// `capacity` is the target window (e.g. 60 s); `slack` (default 2 s, docs/01) keeps a little
     /// more so a keyframe at or before the N-second mark is still present when a clip is taken.
-    init(capacity: CMTime, slack: CMTime = CMTime(seconds: 2, preferredTimescale: 600)) {
+    init(capacity: CMTime, slack: CMTime = ReplayWindow.slack) {
         self.slack = slack
         limit = CMTimeAdd(capacity, slack)
     }

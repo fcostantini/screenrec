@@ -7,6 +7,17 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-27 (M16-T2): **`CGDisplayPixelsWide/High` return POINTS, not pixels** — 2056×1285 on this
+  display, where SCK captures 4112×2570. `CGDisplayCopyDisplayMode(id)` gives both honestly
+  (`width`/`height` points, `pixelWidth`/`pixelHeight` pixels) and its pixel size is the one that
+  matches the frames. Anything sizing a buffer or a bitrate off the `PixelsWide` name is off by the
+  backing scale — 4× the pixel count on a Retina Mac. (`NSScreen.frame × backingScaleFactor` agrees
+  with the mode's pixel size; that's the seam `DisplayOption` carries into AppCore.)
+  - Related, same task: **replay always encodes Balanced** (`ReplayEncoder` hardcodes
+    `preset: .balanced`, per docs/04 §6.1's 2026-07-16 amendment), so the Quality setting does
+    **not** change what an armed ring costs. Any footprint math that takes the user's preset as an
+    input is wrong — it would quote a High user ~1.6× the truth.
+
 - 2026-07-27 (M16-T1): **An SCK stream keeps the Mac awake even if you release your own power
   assertion — `coreaudiod` holds one for the audio tap, on `replayd`'s behalf.** M16-T1 was filed as
   "drop `SleepGuard` while armed and the Mac idle-sleeps again"; that premise is false, and one

@@ -39,6 +39,9 @@ Order and grouping (separators between groups):
    pattern), and `Stop & Save` does the same while recording.
 3. **Instant Replay armed** — checkmark toggle; right hint `⌥⌘R saves`. Persisted.
    **M5** (Franco, 2026-07-15): a toggle that arms nothing is a lie for a whole milestone.
+   When armed, a dimmed cost row follows it (M16-T2): `4:30 buffer · ≈800 MB · Mac stays awake`
+   — the Settings caption's short form, **stamped at open, never ticking** (M6-T10). Without
+   screen geometry it degrades to `Mac stays awake while armed`.
 4. — separator —
 5. `Source ▸` submenu (M7-T2; was `Display ▸`): what gets captured. **Entire Screen** (one row
    per `NSScreen` when several — "Entire Screen (<name>)"), a divider, then the **running apps**
@@ -343,6 +346,13 @@ the old line is simply false above three green ticks.
   - Changing the length while armed resizes the buffer **in place** (M6-T6): grow keeps
     everything and fills to the new length; shrink drops the excess immediately. Quality/
     fps/source changes still restart the armed stream (SCK binds sources per stream, 02 §4).
+  - **What it costs, under the slider (M16-T2):** `A 4:30 buffer holds about 800 MB in memory.
+    While armed, ScreenRec keeps your Mac awake.` Memory first — it's what the slider changes;
+    the second sentence is ADR-018's deliberate wakefulness. The figure tracks the **in-progress**
+    drag, not the commit-on-release, and is rounded to two significant figures (`≈`-grade, not a
+    measurement). With no screen geometry yet, only the wakefulness sentence shows — **never
+    quote a number that can't be computed**. Quality is absent on purpose: replay always encodes
+    Balanced (`ReplayEncoder`), so the preset doesn't change the ring.
 - Launch at login (`SMAppService`) — **M6 ✅ shipped M6-T5.** A top-level toggle between
   Frame rate and Instant Replay. `SMAppService.mainApp.register()`/`unregister()`; its
   `.status` is the source of truth (self-persisting), seeded into the toggle at launch. The

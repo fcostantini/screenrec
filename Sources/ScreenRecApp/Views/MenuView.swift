@@ -257,6 +257,8 @@ struct MenuView: View {
         Toggle("Arm Instant Replay", isOn: $state.isReplayArmed)
             .disabled(state.readiness != .ready && !state.isReplayArmed)
         if state.isReplayArmed {
+            // What arming costs (M16-T2): the ring's memory, and ADR-018's deliberate wakefulness.
+            Text(state.replayBufferMenuLabel)
             // docs/06 §Notifications (M12-T5): while armed the screen is captured, so macOS hides
             // every app's banners — unless the user allowed them when sharing (not readable via API,
             // so "may"). A standing, dimmed reminder of why they might have gone quiet.

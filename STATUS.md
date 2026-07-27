@@ -6,6 +6,23 @@
 
 ## Now
 
+- **✅ M16-T2 DONE (2026-07-27) — an armed buffer now says what it costs, and 1.7.2+T1+T2 is
+  DEPLOYED.** Settings gained a caption under the slider and the armed menu a dimmed row; measured
+  on Franco's own live settings (4:30 buffer, 60 fps, mic Automatic): **`A 4:30 buffer holds about
+  800 MB in memory. While armed, ScreenRec keeps your Mac awake.`** and **`4:30 buffer · ≈800 MB ·
+  Mac stays awake`**. He had been holding 800 MB with nothing on screen saying so. **Two things the
+  code review / measurement caught before they shipped: (1) `ReplayEncoder` hardcodes `.balanced`,
+  so Quality must NOT be an estimator input** — billing his High preset would have quoted ~1.6× the
+  truth; **(2) an app-scoped pick composites on the MAIN display** (02 §1a), not the remembered
+  `selectedDisplayID`, which would have mis-billed on a two-display Mac. Also measured:
+  `CGDisplayPixelsWide` returns **points**, not pixels (4× error waiting to happen — field note).
+  **442 tests (+12)**, full dev loop green, before/after `menudriver` dumps + Settings screenshots
+  recorded. **⚠️ Slider-drag tracking is proven by unit test only** — driving the live slider would
+  have restarted his armed ring. **DEPLOY: `/Users/Shared/ScreenRec.app` is now the current build
+  (pid changed, `ditto` per the field-note recipe, TCC intact, assertion reads `Instant replay is
+  armed`).** It reports **1.7.2** — M16's MINOR bump comes when the milestone closes (ADR-013).
+  **Next: M16-T3** (system audio becomes optional) — plan artifact first.
+
 - **✅ M16-T1 DONE (2026-07-27) — the sleep assertion stops lying; ADR-018 rules that arming keeps the
   Mac awake on purpose.** Measured before planning: the running 1.7.1 held `PreventUserIdleSystemSleep
   named: "Recording the screen"` while merely **armed** (no `.partial` on disk), and `pmset -g` listed

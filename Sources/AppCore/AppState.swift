@@ -767,6 +767,75 @@ public final class AppState {
         }
     }
 
+    /// What the armed rings would hold for a `seconds` window at the current sources and settings,
+    /// or nil before the screen list arrives — a surface withholds the figure rather than guess.
+    /// Takes the window as an argument so the Settings slider can quote its in-progress value.
+    public func replayBufferBytes(seconds: Int) -> Int64? {
+        guard let pixels = replayCapturePixelSize else { return nil }
+        // `present…`, not the raw pick: an away device attaches no mic ring, so billing for one
+        // would quote a buffer the armed stream isn't going to hold.
+        return ReplayFootprint.estimatedBytes(
+            width: pixels.width, height: pixels.height, frameRateCap: frameRateCap,
+            seconds: Double(seconds), includesMicrophone: presentMicrophonePreference != .none)
+    }
+
+    /// docs/06: the Settings caption under the buffer slider. Both costs of arming, memory first —
+    /// that's the one the slider changes.
+    public func replayBufferCaption(seconds: Int) -> String {
+        let awake = "While armed, ScreenRec keeps your Mac awake."
+        guard let bytes = replayBufferBytes(seconds: seconds) else { return awake }
+        return "A \(Self.bufferPhrase(seconds)) buffer holds about "
+            + "\(ReplayFootprint.formatted(bytes)) in memory. \(awake)"
+    }
+
+    /// docs/06: the armed menu's dimmed cost row. Stamped at open, never ticking (M6-T10).
+    public var replayBufferMenuLabel: String {
+        guard let bytes = replayBufferBytes(seconds: replaySeconds) else {
+            return "Mac stays awake while armed"
+        }
+        return "\(Self.shortBufferPhrase(replaySeconds)) buffer · "
+            + "≈\(ReplayFootprint.formatted(bytes)) · Mac stays awake"
+    }
+
+    /// Pixels the armed stream encodes, mirroring `CaptureEngine`'s own resolution: a region's rect
+    /// on its display; an app filter composites **on the main display** whatever display the pickers
+    /// remember, and its frames stay display-sized (02 §1a); a whole-screen pick follows the
+    /// selection. Nil when that display's geometry is unknown.
+    private var replayCapturePixelSize: (width: Int, height: Int)? {
+        let region = selectedRegion
+        let displayID = region?.displayID ?? (selectedAppBundleID == nil ? selectedDisplayID : nil)
+        guard let screen = displayOption(for: displayID),
+              screen.pointPixelScale > 0, screen.pointSize != .zero else { return nil }
+        return CaptureConfiguration.pixelDimensions(
+            pointSize: region?.rect.size ?? screen.pointSize,
+            pointPixelScale: screen.pointPixelScale)
+    }
+
+    /// A display id as its option; a nil id means the main display, matching the engine's `.main`.
+    private func displayOption(for id: CGDirectDisplayID?) -> DisplayOption? {
+        guard let id else { return displays.first(where: \.isMain) ?? displays.first }
+        return displays.first { $0.id == id }
+    }
+
+    /// `45-second` / `1-minute` / `1:45` — whole minutes read better than `1:00`, and the slider's
+    /// 15 s step makes the mixed case common enough to spell.
+    static func bufferPhrase(_ seconds: Int) -> String {
+        if seconds < 60 { return "\(seconds)-second" }
+        if seconds % 60 == 0 { return "\(seconds / 60)-minute" }
+        return clockPhrase(seconds)
+    }
+
+    /// The menu's tighter column: `45 s` / `1 min` / `1:45`.
+    static func shortBufferPhrase(_ seconds: Int) -> String {
+        if seconds < 60 { return "\(seconds) s" }
+        if seconds % 60 == 0 { return "\(seconds / 60) min" }
+        return clockPhrase(seconds)
+    }
+
+    private static func clockPhrase(_ seconds: Int) -> String {
+        String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+
     public func refreshRecentRecordings() {
         let recents = RecentRecordings.inDirectory(outputDirectory)
         if recentRecordings != recents { recentRecordings = recents }

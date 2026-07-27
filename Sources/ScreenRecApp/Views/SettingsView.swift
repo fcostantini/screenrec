@@ -124,6 +124,13 @@ struct SettingsView: View {
                             .onSubmit(commitTypedReplayBuffer)
                     }
                 }
+                // The cost of the window the slider just set (M16-T2) — memory, and ADR-018's
+                // deliberate wakefulness. Reads `draftReplaySeconds` so it tracks the drag, not
+                // the commit-on-release.
+                Text(state.replayBufferCaption(seconds: Int(draftReplaySeconds)))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 LabeledContent("Save replay shortcut") {
                     HotkeyRecorderButton(
                         hotkey: $state.replayHotkey,

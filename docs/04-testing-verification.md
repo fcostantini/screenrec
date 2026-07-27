@@ -106,7 +106,8 @@ Pass criteria:
 
 1. `replay-arm --seconds 60` for 3 min: ring occupancy stabilizes at ~60 s; CPU < 10%
    average (cumulative cpu-time / wall-time, not spot samples). Memory: ring payload ≈
-   Balanced bitrate × (window + 2 s slack) — ~145 MB busy at 4112×2570 — so the RSS
+   Balanced bitrate × (window + 2 s slack) — **shipped as `ReplayFootprint` (M16-T2), which is
+   what the UI quotes**; its tests restate this formula, so a change here must change both — — ~145 MB busy at 4112×2570 — so the RSS
    plateau bound is **≲ 400 MB busy** (AMENDED 2026-07-16, Franco: replay keeps Balanced
    parity with recordings, no dedicated cap; the original ≲ 200 MB assumed ~10 Mbps).
    ⚠️ Task-level RSS attribution of VT/CM buffer memory varies run-to-run on identical

@@ -18,7 +18,8 @@ extension DisplayOption {
                 NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { return nil }
             return DisplayOption(
                 id: number.uint32Value, name: screen.localizedName,
-                isMain: number.uint32Value == mainID)
+                isMain: number.uint32Value == mainID,
+                pointSize: screen.frame.size, pointPixelScale: screen.backingScaleFactor)
         }
     }
 }
