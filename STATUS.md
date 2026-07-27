@@ -6,6 +6,35 @@
 
 ## Now
 
+- **✅ M17-T1 DONE (2026-07-27) — `.window` is the fourth `ContentSelection` case; window capture
+  records one window and nothing else, including against an overlapping window of the SAME app.**
+  `list-windows` + `record --window` + `replay-arm --window`, `EndReason.windowClosed`, all four
+  docs/03 rulings measured into **docs/02 §1c**. **482 tests (+12)**, full dev loop green.
+  **Proven, with a positive control:** a window-scoped recording of an animated TARGET while a green
+  same-app BYSTANDER overlapped it in front → **0.000% bystander pixels across four frames**, while a
+  whole-screen capture of the same moment reads **10.7%**. That control is load-bearing: the first
+  run "passed" at 0.000% only because the detector was looking for the nominal `NSColor` and the
+  display profile shifts it by 93 counts (02 §1c).
+  **⚠️ Two mechanisms were built and then deleted by measurement — the task's real story (docs/07):**
+  **(1)** `WindowPresenceWatch` (poll SCK for the window) was designed on the `.app` precedent that
+  SCK stays silent when its subject vanishes. **A window filter is the opposite: it ends the stream**,
+  immediately, for both a close (TextEdit closing a document, app alive) and an app quit. Watch
+  deleted, poll cost gone, and the reason is now deterministic instead of a race.
+  **(2)** The real bug it hid: `noCaptureSource` is the **same code a disconnected display uses**, so
+  killing the recorded app reported **`finished (displayDisconnected)`** — a lie that sends the user
+  to check a monitor cable. `endReason(forStreamError:content:)` now disambiguates by filter.
+  **🔴 Also fixed a crash on the shipped path:** `SCContentFilter(desktopIndependentWindow:)` **traps
+  with `CGS_REQUIRE_INIT`** in a plain CLI binary — `record --window` died on it. One CoreGraphics
+  display call fixes it, no AppKit (which RecorderCore may not import).
+  Rulings: **(a)** a mid-recording resize does **not** change output size — SCK scales into the pinned
+  buffer; **(b)** a minimised window delivers nothing and recovers unaided → no StallWatchdog;
+  **(c)** system audio **is** scoped to the owning app (other app −inf dBFS, own app −8.9, control
+  −8.9) — but to the *app*, not the window; **(d)** output = `SCWindow.frame` × scale, titlebar in,
+  no shadow gutter, corners opaque black. Window capture is **frame-on-change**, unlike `.app`.
+  Regressions clean: whole-screen 4112×2570, `--app` 4112×2570, `--region` 1600×1200.
+  **Next: M17-T2** (window picker in `Source ▸`, and the persistence ruling) — plan artifact first.
+  T2 inherits the M18-T3 menu-length coordination.
+
 - **🎉 v1.8.0 CUT AND INSTALLED (2026-07-27) — M16 (Honest State) earns the MINOR.** `VERSION` +
   `CoreInfo.version` → 1.8.0 (pin test green), committed (`7f074c4`), cut via **`Scripts/release.sh`
   run in the BACKGROUND** — full gate green (clean tree · version pin · build · 470 tests · encode×3 ·

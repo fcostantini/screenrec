@@ -12,7 +12,7 @@ import RecorderCore
 
     /// Every reason a recording can end for, other than the user asking.
     private static let failStops: [EndReason] = [
-        .displayDisconnected, .appQuit, .diskAlmostFull, .streamError("-3818"),
+        .displayDisconnected, .appQuit, .windowClosed, .diskAlmostFull, .streamError("-3818"),
     ]
 
     private func notification(_ event: EngineEvent, duration: TimeInterval = 754) -> RecordingNotification? {
@@ -65,6 +65,12 @@ import RecorderCore
     @Test func appQuitNamesTheCausePlainly() {
         // M7-T1: app-scoped capture ends when its app quits — approved copy (plan review).
         #expect(finished(.appQuit)?.body == "Ended: the recorded app quit. File is playable.")
+    }
+
+    @Test func windowClosedNamesTheCausePlainly() {
+        // M17-T1: window scope's own fail-stop. `.appQuit` stays app-scope's, so the two surfaces
+        // can't drift into one vague "the thing you were recording is gone".
+        #expect(finished(.windowClosed)?.body == "Ended: the recorded window closed. File is playable.")
     }
 
     @Test func anUnclassifiedStreamErrorSaysWhatHappenedNotWhatSCKSaid() {

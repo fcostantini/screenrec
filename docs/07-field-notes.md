@@ -7,6 +7,28 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-27 (M17-T1): **Two whole mechanisms were designed, built and deleted because the
+  measurement arrived after the design.** Full platform detail is in 02 §1c; what belongs here is the
+  process lesson, which cost most of the task:
+  - The plan said "a window closing needs a presence watch, because `.app` proved SCK stays silent
+    when its subject goes away" (§1a). Reasonable, precedent-backed, and **wrong**: a *window* filter
+    ends the stream, immediately, for both a close and an app quit. `WindowPresenceWatch` — plus its
+    46 ms poll, its interval justification, and a second `SCShareableContent` accessor — went in and
+    came back out. **The `.app` precedent did not transfer, and nothing but a live run would have
+    said so.**
+  - Before that, the poll *interval* was tuned on a measurement (46 ms/probe ⇒ 5 s not 1 s) — good
+    discipline spent on a mechanism that shouldn't have existed. **Measuring a design's parameters
+    is not the same as measuring whether the design is needed**, and the cheap version of the second
+    question (start a capture, close the window, see what happens) was available the whole time.
+  - **A rig that cannot reach the state you need will happily report a wrong answer instead of an
+    error.** Three attempts to destroy an AppKit window from the stimulus app left it in SCK's
+    enumeration; each one looked like the platform saying "closes are undetectable". Driving a real
+    app (TextEdit closing a document) took two minutes and gave the opposite answer.
+  - **The positive control is not optional.** The same-app bystander assertion returned "0 matching
+    pixels" — a clean pass — while the detector was simply looking for the wrong colour (see 02 §1c
+    on the display-profile shift). Only running the same check against a capture that *should* match
+    exposed it. Every content assertion needs its negative *and* its positive case.
+
 - 2026-07-27 (M16-T5): **A `MenuBarExtra` label renders only its FIRST `Image`. A second one
   contributes nothing — not even width.** `Text` is fine; images are not. Measured on the live app by
   reading the status item's AX frame while swapping one view:

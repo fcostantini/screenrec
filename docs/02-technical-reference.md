@@ -128,6 +128,115 @@ sized to the region (not the display). `resolveRegion` (CaptureEngine) is the pu
   the flip's assumption. Live-verified end-to-end (a centered drag → a centered SCK rect that records
   exactly that screen region); the direction is unit-tested against the menu-bar-at-top case.
 
+## 1c. Window capture (`SCContentFilter(desktopIndependentWindow:)`) — measured 2026-07-27, M17-T1
+
+Record one window, and follow it as it moves. Mechanism: a **desktop-independent** filter built from
+an `SCWindow` — unlike `.app` (which composites an app's windows onto a *display* filter, §1a) this
+one has no display at all, so `CaptureEngine.resolveScope` resolves no `SCDisplay` for it and
+`filter.contentRect` is the **window's** rect rather than a display's.
+
+- **Listing must use the on-screen enumeration.** `SCShareableContent.forCapture()`
+  (`onScreenWindowsOnly: true`) returned **32 windows, 9 of them at `windowLayer == 0`**; the full
+  enumeration (`onScreenWindowsOnly: false`) returned **97 windows, 52 at layer 0**. The extra 43
+  layer-0 entries are invisible untitled helper windows — Discord, Slack, Firefox and Spotify each
+  carry several, plus service processes (`CursorUIViewService`, `ThemeWidgetControlViewService`).
+  So `CapturableWindows.available()` reads the on-screen list, keeping *listed ⇒ bindable*
+  structural exactly as `CapturableApps` does (§1a).
+- **`windowLayer == 0` is the "real user window" filter**, and it is load-bearing: of the 32
+  on-screen windows, **23 are chrome** — menu-bar extras (layer 25), the Desktop and the Dock's
+  wallpaper (large negatives), the screen-recording status indicator (large positive) — and one of
+  them is ScreenRec's own status item. This is the analogue of M7-T2's `activationPolicy == .regular`
+  app filter, except `windowLayer` is on `SCWindow`, so it stays a pure function in RecorderCore
+  instead of needing the view layer.
+- ✅ **A window going away ENDS THE STREAM — no watch needed.** This is the opposite of `.app`,
+  where the included app quitting fires no error at all and needs `AppTerminationWatch` (§1a).
+  Measured both routes, each ending a live recording at the second it happened:
+
+  | What happened | SCK stream | Reported |
+  |---|---|---|
+  | TextEdit closed its document window, app still running | **errors** | `.windowClosed` |
+  | The owning app was killed outright | **errors** | `.windowClosed` |
+  | Window minimised, then restored | keeps running | — (frames stop and resume) |
+
+  So window scope arms **no** `AppTerminationWatch` and **no** presence poll: SCK is immediate,
+  free, and beats any watch. Both routes report `.windowClosed`, deterministically — racing a
+  process watch against the stream error would make the reported reason a coin toss, and "the
+  recorded window closed" is true either way.
+- 🔴 **The error code is the SAME one a disconnected display uses**, so `endReason` must be told
+  what was being captured: `noCaptureSource` means *the display* went away under a display filter
+  and *the window* went away under a window filter. Mapping it blind reports a closed window as a
+  disconnected display — which sends the user to check their monitor cable. Measured: before the
+  fix, killing the recorded app produced `finished (displayDisconnected)`.
+- ⚠️ **Do not try to detect "window gone" by polling — it cannot work.** Measured, against a
+  minimised window and a closed-but-retained one:
+
+  | Probe | Live | Minimised | Closed, app retains it | App killed | Cost (median) |
+  |---|---|---|---|---|---|
+  | `CGWindowListCopyWindowInfo([.optionIncludingWindow], id)` | found | **gone** | **gone** | gone | 0.077 ms |
+  | `CGWindowListCreateDescriptionFromArray([id])` | **not found** | — | — | — | 0.061 ms |
+  | `SCShareableContent` full enumeration | found | **found** | **found** | gone | **46.3 ms** |
+
+  `CGWindowListCreateDescriptionFromArray` can't even find a live window. The cheap
+  `CGWindowListCopyWindowInfo` reports minimised as gone — a poll on it would end a recording every
+  time the user minimised. And the full enumeration keeps listing a window the app has closed but
+  not deallocated, so it cannot see a close either — besides costing 46 ms a poll (a 1 s poll is
+  ~4.6% of a core for the whole recording, more than the entire app at rest in the G6 soak, §7).
+- **Window output is snapped down to even pixels.** A window can be an odd number of points wide,
+  and at scale 1 that yields an odd pixel width an encoder's 4:2:0 chroma can't take. Displays are
+  even already and regions floor in `resolveRegion` (§1b), so the snap is window-only.
+- **A window id is not a durable handle** — it does not survive a relaunch of the owning app (stated
+  in docs/03 M17; whether a pick persists at all is **M17-T2's ruling (a)**, not settled here).
+
+### The four rulings docs/03 M17-T1 asked for
+
+- **(a) A mid-recording resize does NOT change the output size.** The window grew 900×528 → 1200×728
+  pt at t+4.5 of a live capture; frames kept arriving at 20/s and the output stayed **pinned at
+  1800×1056 px for the whole run** — one dimension line, never a second. SCK scales the window into
+  the size `SCStreamConfiguration` was given. So pinning `width`/`height` from `filter.contentRect`
+  at start is correct and sufficient, and the writer's welded video input never sees a change
+  (§3). ⚠️ The consequence for the user is that a window resized mid-take is **scaled**, not
+  re-framed — the recording keeps the aspect and pixel size it started with.
+- **(b) A minimised window delivers nothing, and recovers by itself.** Frames stopped within the
+  same second as `miniaturize` and resumed within the same second as `deminiaturize` — exactly 8
+  seconds of zero frames against an 8.4 s minimise, with no stream error. So `.window` attaches
+  **no StallWatchdog**: "user active ⇒ frames expected" is false for a window the user has put
+  away, exactly as it is under an app filter (§7).
+- **(c) System audio IS scoped to the window's owning application** — the `.app` behaviour (§1a),
+  not the `.region` behaviour (§1b). Measured three ways through one code path: a tone from
+  *another* app read **0.0000 (−inf dBFS)** — exact digital silence; the same tone played *by the
+  window's own app* read **0.3589 (−8.9 dBFS)**; the whole-screen control read the same **0.3589
+  (−8.9 dBFS)**. ⚠️ Note it is scoped to the **app, not the window**: a second window of the same
+  app making noise is still recorded, because SCK has no per-window audio.
+- **(d) The frame is the window's `frame`, titlebar included, with no shadow gutter.** A window
+  asked for a 900×**500** content size reports `SCWindow.frame` 900×**528** pt — the 28 pt titlebar
+  — and `filter.contentRect` equals `frame` exactly. Output was 1800×1056 px = frame × 2. In the
+  captured frame the titlebar renders as a grey strip above the content, and the **corners are
+  opaque black** (the rounded-corner fill), not transparent — there is no alpha to preserve and no
+  margin to subtract.
+
+### Rig traps that cost real time (2026-07-27)
+
+- ⚠️ **`SCContentFilter(desktopIndependentWindow:)` traps with `CGS_REQUIRE_INIT`** in a process
+  that has never talked to the window server — i.e. a plain CLI binary, which is exactly the
+  headless verify surface (ADR-011). `screenrec-cli record --window` died on it. Enumeration and
+  `SCWindow.frame` are fine; only filter construction trips it. Any CoreGraphics display call fixes
+  it (`CaptureEngine.connectToWindowServer`); AppKit is not needed, which matters because
+  RecorderCore may never import it. A GUI host already has the connection.
+- ⚠️ **Captured colours are NOT the colours you asked `NSColor` for.** The display profile transform
+  shifted a pure magenta fill to rgb(232,51,244) and an `NSColor(red:0, green:0.85, blue:0.2)` green
+  to **rgb(93,213,76)** — 93 counts off in the red channel alone. A content assertion written
+  against the nominal colour finds **0 matching pixels and looks like a pass**. Always sample the
+  recorded colour first, and always run the positive control (the same check against a capture that
+  *should* contain it) — here that control was what caught the error.
+- ⚠️ **A stimulus window must be animating.** Window capture is frame-on-change, so a static window
+  delivers ~nothing: a first pass at ruling (b) measured 16 s of zero frames across both a resize
+  and a minimise and could not tell which caused it, because the window was a static fill.
+- ⚠️ **An AppKit window is hard to genuinely destroy from a test rig** — with `isReleasedWhenClosed`
+  either way, `close()` left the window in SCK's full enumeration while the app lived. Three
+  attempts failed; the answer came from driving a **real** app (TextEdit closing a document window)
+  instead. When a rig can't reach a state, reach for a real app before concluding anything about
+  the platform.
+
 ## 2. TCC / permissions (both PoC field bugs lived here)
 
 - **Screen & System Audio Recording** (`kTCCServiceScreenCapture`): covers system audio

@@ -19,7 +19,8 @@ public enum DisplaySelection: Sendable, Equatable {
 /// What the stream captures. `.app` composites one app's windows (and scopes system audio to
 /// that app — measured, docs/02 §1a) on the main display; frames stay display-sized, so
 /// bitrate/timing math is content-independent. `.region` crops one display to a fixed screen
-/// rectangle (docs/02 §1b); frames are the region's size, so the output is smaller.
+/// rectangle (docs/02 §1b); frames are the region's size, so the output is smaller. `.window`
+/// captures one window independently of any display (docs/02 §1c); frames are the window's size.
 public enum ContentSelection: Sendable, Equatable {
     case display(DisplaySelection)
     case app(bundleID: String)
@@ -27,6 +28,9 @@ public enum ContentSelection: Sendable, Equatable {
     /// §1b) — not AppKit's bottom-left screen points. The engine clamps it to the display and
     /// fails loud if it doesn't overlap.
     case region(display: DisplaySelection, rect: CGRect)
+    /// An `SCWindow.windowID`, resolved against the shareable content at start time. The id is
+    /// not stable across a relaunch of the owning app, so it is never a durable handle.
+    case window(id: CGWindowID)
 }
 
 /// Which device a lost microphone recovers onto (docs/03 M8-T2: honor the pick).

@@ -302,6 +302,7 @@ public enum RecordingNotifications {
         switch reason {
         case .displayDisconnected: "display disconnected"
         case .appQuit: "the recorded app quit"
+        case .windowClosed: "the recorded window closed"
         case .diskAlmostFull: "disk almost full — free up space before recording again"
         case .streamError: "screen capture stopped unexpectedly"
         // Not a cause — `.userStopped` takes the manual-stop branch above.

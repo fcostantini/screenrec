@@ -55,7 +55,8 @@ public actor CaptureEngine {
     private var stallWatchdogTask: Task<Void, Never>?
 
     /// App-scoped capture only: ends the session when the recorded app quits, since SCK keeps
-    /// the stream alive and silent instead of erroring (docs/02 §1a).
+    /// the stream alive and silent instead of erroring (docs/02 §1a). A window filter needs no
+    /// equivalent — it *does* error when its window goes away (docs/02 §1c).
     private var appTerminationWatch: AppTerminationWatch?
 
     private static let log = Logger(subsystem: "dev.fcostantini.screenrec", category: "capture")
@@ -136,21 +137,22 @@ public actor CaptureEngine {
                 break
             }
 
-            guard let display = resolveDisplay(from: content) else {
-                return failToStart("No display matched the requested selection.")
-            }
-            var includedApp: SCRunningApplication?
-            if case .app(let bundleID) = configuration.content {
-                guard let app = content.applications.first(where: { $0.bundleIdentifier == bundleID }) else {
-                    return failToStart(Self.appUnavailableMessage(bundleID: bundleID))
-                }
-                includedApp = app
+            let scope: CaptureScope
+            switch resolveScope(from: content) {
+            case .fail(let message): return failToStart(message)
+            case .ok(let resolved): scope = resolved
             }
 
+            // Hoisted: the handler is `@Sendable` and runs off the actor, so it can't read
+            // `configuration` when a stream error arrives.
+            let capturedContent = configuration.content
             let handler = StreamHandler(router: router) { [weak self] error in
-                Task { await self?.terminate(Self.endReason(forStreamError: error)) }
+                Task {
+                    await self?.terminate(
+                        Self.endReason(forStreamError: error, content: capturedContent))
+                }
             }
-            let filter = Self.makeFilter(for: display, including: includedApp)
+            let filter = scope.filter
             let regionRender: RegionRender?
             if case .region(_, let rect) = configuration.content {
                 switch Self.resolveRegion(
@@ -187,8 +189,8 @@ public actor CaptureEngine {
             state = .running
             sleepGuard.begin(reason: purpose.assertionReason)
             startWatchdogs()
-            if let includedApp {
-                appTerminationWatch = AppTerminationWatch(processID: includedApp.processID) { [weak self] in
+            if let owningApp = scope.owningApp {
+                appTerminationWatch = AppTerminationWatch(processID: owningApp.processID) { [weak self] in
                     Task { await self?.stop(reason: .appQuit) }
                 }
             }
@@ -292,18 +294,66 @@ public actor CaptureEngine {
         handler = nil
     }
 
-    /// An `.app` filter still needs a display to composite on; it takes the `.main` default.
-    /// `.region` names its own display.
-    private var displaySelection: DisplaySelection {
+    /// A resolved `ContentSelection`: the SCK filter, plus the app whose termination ends the
+    /// session (`.app` only — nil everywhere else).
+    private struct CaptureScope {
+        let filter: SCContentFilter
+        let owningApp: SCRunningApplication?
+    }
+
+    private enum ScopeResolution {
+        case ok(CaptureScope)
+        case fail(String)
+    }
+
+    /// Binds the configured content against the live shareable content. Every failure here is
+    /// loud: a missing app, window or display never falls back to capturing something else
+    /// (docs/02 §1a, §1b, §1c).
+    private func resolveScope(from content: SCShareableContent) -> ScopeResolution {
         switch configuration.content {
-        case .display(let selection): selection
-        case .app: .main
-        case .region(let display, _): display
+        case .window(let windowID):
+            // Desktop-independent: no display is resolved, and the filter's `contentRect` is the
+            // window's rather than a display's.
+            guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
+                return .fail(Self.windowUnavailableMessage)
+            }
+            Self.connectToWindowServer()
+            // No `AppTerminationWatch`: SCK ends a window stream itself when the window goes —
+            // whether it was closed or its app quit — and always beats a process watch.
+            return .ok(CaptureScope(
+                filter: SCContentFilter(desktopIndependentWindow: window), owningApp: nil))
+        case .app(let bundleID):
+            guard let display = resolveDisplay(.main, from: content) else {
+                return .fail(Self.noDisplayMatchedMessage)
+            }
+            guard let app = content.applications.first(where: { $0.bundleIdentifier == bundleID }) else {
+                return .fail(Self.appUnavailableMessage(bundleID: bundleID))
+            }
+            return .ok(CaptureScope(
+                filter: SCContentFilter(display: display, including: [app], exceptingWindows: []),
+                owningApp: app))
+        case .display(let selection), .region(let selection, _):
+            guard let display = resolveDisplay(selection, from: content) else {
+                return .fail(Self.noDisplayMatchedMessage)
+            }
+            return .ok(CaptureScope(
+                filter: SCContentFilter(display: display, excludingWindows: []), owningApp: nil))
         }
     }
 
-    private func resolveDisplay(from content: SCShareableContent) -> SCDisplay? {
-        switch displaySelection {
+    /// ⚠️ `SCContentFilter(desktopIndependentWindow:)` **traps** with `CGS_REQUIRE_INIT` in a
+    /// process that has never talked to the window server — a plain CLI binary, which is exactly
+    /// the headless verify surface (docs/02 §1c). Any CoreGraphics display call establishes the
+    /// connection; a GUI host already has it, so this is a no-op there. Enumeration and
+    /// `SCWindow.frame` do *not* need it, so the trap only appears at filter construction.
+    private static func connectToWindowServer() {
+        _ = CGMainDisplayID()
+    }
+
+    private func resolveDisplay(
+        _ selection: DisplaySelection, from content: SCShareableContent
+    ) -> SCDisplay? {
+        switch selection {
         case .main:
             let main = content.displays.first { $0.displayID == CGMainDisplayID() }
             // A region's rect is tied to one display's geometry; never fall back to another display
@@ -317,21 +367,13 @@ public actor CaptureEngine {
 
     /// Whether a missing `.main` display may fall back to any available display. Whole-screen and
     /// app capture can (record whatever's there); a region cannot — a wrong display would crop the
-    /// wrong content, so it fails loud instead ("No display matched").
+    /// wrong content, so it fails loud instead ("No display matched"). A window resolves no
+    /// display at all, and a substitute one would not contain it.
     static func allowsDisplayFallback(for content: ContentSelection) -> Bool {
         switch content {
         case .display, .app: true
-        case .region: false
+        case .region, .window: false
         }
-    }
-
-    private static func makeFilter(
-        for display: SCDisplay, including app: SCRunningApplication?
-    ) -> SCContentFilter {
-        if let app {
-            return SCContentFilter(display: display, including: [app], exceptingWindows: [])
-        }
-        return SCContentFilter(display: display, excludingWindows: [])
     }
 
     private func makeStreamConfiguration(
@@ -349,8 +391,12 @@ public actor CaptureEngine {
                 pointSize: filter.contentRect.size,
                 pointPixelScale: CGFloat(filter.pointPixelScale)
             )
-            config.width = width
-            config.height = height
+            // A window can be an odd number of points wide and encoders want even chroma
+            // dimensions (docs/02 §1c). Displays are even already; regions floor in `resolveRegion`.
+            let snapped: Bool
+            if case .window = configuration.content { snapped = true } else { snapped = false }
+            config.width = snapped ? Self.evenFloor(width) : width
+            config.height = snapped ? Self.evenFloor(height) : height
         }
         // Clamp the public, unvalidated fps: 0/negative yields a CMTime SCK rejects, and a
         // value above Int32.max traps the CMTimeScale initializer.
@@ -397,14 +443,24 @@ public actor CaptureEngine {
             + "Open the app, then try again."
     }
 
+    /// A window id is not stable across a relaunch of its app (docs/02 §1c), so a stale pick is
+    /// the failure this path will mostly see — the copy names it. Surface-neutral (M6-T3).
+    static let windowUnavailableMessage =
+        "That window isn't on screen any more. It was closed, or its app was relaunched and "
+        + "gave it a new number — choose the window again."
+
+    static let noDisplayMatchedMessage = "No display matched the requested selection."
+
     /// The stall watchdog's premise — user active ⇒ frames expected — only holds for
     /// whole-display capture: under an app filter the user can be active all day in an app
     /// that isn't being recorded (docs/02 §7). A `.region` is a display-filter capture
     /// (frame-on-change from the whole display), so it inherits the display path's behavior.
+    /// A `.window` can be minimised or fully occluded while the user works elsewhere, so it
+    /// follows `.app`.
     static func attachesStallWatchdog(to content: ContentSelection) -> Bool {
         switch content {
         case .display, .region: true
-        case .app: false
+        case .app, .window: false
         }
     }
 
@@ -496,16 +552,22 @@ public actor CaptureEngine {
     /// monitor-unplug are unobserved and may use other codes — unmapped errors keep their raw
     /// code in the message so it can be identified rather than guessed. Display sleep, screen lock
     /// and lid-close all arrive as the same code, so none of them gets its own reason (docs/02 §7).
-    static func endReason(forStreamError error: Error) -> EndReason {
+    ///
+    /// `content` disambiguates: the same "no capture source" code means the *display* went away
+    /// under a display filter and the *window* went away under a window filter (docs/02 §1c) —
+    /// measured both ways. Reporting a closed window as a disconnected display would be a lie.
+    static func endReason(forStreamError error: Error, content: ContentSelection) -> EndReason {
         let nsError = error as NSError
         guard nsError.domain == SCStreamError.errorDomain else {
             return .streamError(error.localizedDescription)
         }
+        let sourceGone: EndReason
+        if case .window = content { sourceGone = .windowClosed } else { sourceGone = .displayDisconnected }
         switch nsError.code {
-        case SCStreamError.Code.noCaptureSource.rawValue:  // measured: the display went away
-            return .displayDisconnected
+        case SCStreamError.Code.noCaptureSource.rawValue:  // measured: the source went away
+            return sourceGone
         case SCStreamError.Code.noDisplayList.rawValue:    // same family; unobserved, by kinship
-            return .displayDisconnected
+            return sourceGone
         case SCStreamError.Code.userStopped.rawValue:
             // Stopped from the system's screen-recording indicator: an ordinary stop, not a
             // fail-stop (ADR-007).

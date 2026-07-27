@@ -8,6 +8,7 @@ struct ReplayArmOptions {
     var duration: Double?
     var appBundleID: String?
     var region: CGRect?
+    var windowID: CGWindowID?
     var micID: String?
     var micEnabled = true
     var systemAudioEnabled = true
@@ -30,6 +31,8 @@ func parseReplayArmOptions(_ args: [String]) -> ReplayArmOptions {
             options.appBundleID = value
         case "--region":
             options.region = parseRegion(iterator.next())
+        case "--window":
+            options.windowID = parseWindowID(iterator.next())
         case "--mic":
             guard let value = iterator.next() else { die("--mic needs a device id") }
             options.micID = value
@@ -43,10 +46,8 @@ func parseReplayArmOptions(_ args: [String]) -> ReplayArmOptions {
             die("Unknown option: \(arg)")
         }
     }
-    if options.region != nil, options.appBundleID != nil {
-        die("--region and --app can't be combined "
-            + "(a region captures the screen; an app captures its windows)")
-    }
+    rejectConflictingSources(
+        appBundleID: options.appBundleID, region: options.region, windowID: options.windowID)
     return options
 }
 
@@ -134,7 +135,8 @@ func runReplayArm(_ args: [String]) async {
 
     let mic = resolveMicrophone(micEnabled: options.micEnabled, preferredID: options.micID)
     if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
-    let content = contentSelection(appBundleID: options.appBundleID, region: options.region)
+    let content = contentSelection(
+        appBundleID: options.appBundleID, region: options.region, windowID: options.windowID)
     let configuration = CaptureConfiguration(
         content: content, microphone: mic.selection, microphoneRecovery: mic.recovery,
         capturesSystemAudio: options.systemAudioEnabled)
@@ -196,6 +198,7 @@ func runReplayArm(_ args: [String]) async {
     print("replay-arm: balanced HEVC → \(Int(options.seconds)) s ring  (\(stopHints.joined(separator: " · ")))")
     if let bundleID = options.appBundleID { print("  capturing app: \(bundleID)") }
     if let region = options.region { print("  capturing region: \(describeRegion(region)) on the main display") }
+    if let windowID = options.windowID { print("  capturing window: \(await describeWindow(windowID))") }
     let pid = ProcessInfo.processInfo.processIdentifier
     print("  pid \(pid) — save from another shell:  kill -USR1 \(pid)")
 

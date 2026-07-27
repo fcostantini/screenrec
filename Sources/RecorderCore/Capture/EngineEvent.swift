@@ -8,6 +8,10 @@ public enum EndReason: Sendable, Equatable {
     /// App-scoped capture only: the recorded app quit. SCK fires no stream error for this
     /// (measured, docs/02 §1a) — `AppTerminationWatch` detects it.
     case appQuit
+    /// Window-scoped capture only: the recorded window went away — closed, or taken with its app
+    /// when it quit. Unlike `.app`, SCK ends a window stream itself, so both routes arrive as the
+    /// same stream error and report this one reason (measured, docs/02 §1c).
+    case windowClosed
     case diskAlmostFull
     case streamError(String)
 }

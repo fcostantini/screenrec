@@ -25,11 +25,12 @@ func printUsage() {
                                        Default <out> is the input's " trimmed" sibling; read-only.
       screenrec-cli list-mics          List audio input devices
       screenrec-cli list-apps          List running apps capturable with record --app
+      screenrec-cli list-windows       List on-screen windows capturable with record --window
       screenrec-cli engine-smoke [--duration N]   Start/stop the capture engine (default 2s)
       screenrec-cli probe-stream [--duration N] [--mic <id>] [--no-mic]
                                        Capture and report per-source buffers/formats/PTS
       screenrec-cli replay-arm [--seconds N] [--duration N] [--app <bundle-id>]
-                               [--region <x,y,w,h>] [--mic <id>] [--no-mic]
+                               [--region <x,y,w,h>] [--window <id>] [--mic <id>] [--no-mic]
                                [--no-system-audio] [--output <dir>]
                                        Arm instant replay: screen + system audio + mic into
                                        rolling N-second rings (default 60). Prints occupancy
@@ -37,7 +38,9 @@ func printUsage() {
                                        app (see list-apps); if that app quits, the armed
                                        stream ends (no auto-retry — that's the GUI's job).
                                        --region records a rectangle of the main display
-                                       (display points; mutually exclusive with --app).
+                                       (display points). --window records one window, which
+                                       the capture follows as it moves (see list-windows).
+                                       --app, --region and --window are mutually exclusive.
                                        Save the last N seconds anytime with 's'+Return or
                                        `kill -USR1 <pid>` → "Replay <date>.mov" in --output
                                        (default ~/Movies); any other line (or Return) stops.
@@ -49,7 +52,10 @@ func printUsage() {
       --app <bundle-id>  Record one app instead of the whole screen — its windows and
                          its audio only (see list-apps)
       --region <x,y,w,h> Record a rectangle of the main display (display points, top-left
-                         origin). Mutually exclusive with --app; off-screen/empty fails.
+                         origin). Off-screen/empty fails.
+      --window <id>      Record one window and nothing else — the capture follows it as it
+                         moves (see list-windows). --app, --region and --window are
+                         mutually exclusive.
       --mic <id>         Use a specific microphone (see list-mics)
       --no-mic           Record without a microphone
       --no-system-audio  Record without capturing what the Mac is playing
@@ -115,18 +121,69 @@ func parseRegion(_ value: String?) -> CGRect {
     return CGRect(x: x, y: y, width: w, height: h)
 }
 
-/// Builds the capture content from the mutually-exclusive source flags: a region or an app on
-/// the main display, else the whole main screen. The caller rejects region + app together.
-func contentSelection(appBundleID: String?, region: CGRect?) -> ContentSelection {
+/// Parses `--window <id>` into an `SCWindow.windowID`. `UInt32` rejects negatives and overflow;
+/// 0 is never a real window. Shared by record and replay-arm so the two harnesses can't drift.
+func parseWindowID(_ value: String?) -> CGWindowID {
+    guard let value, let parsed = UInt32(value), parsed > 0 else {
+        die("--window needs a window number (see list-windows)")
+    }
+    return CGWindowID(parsed)
+}
+
+/// Builds the capture content from the mutually-exclusive source flags: a window, or a region or
+/// an app on the main display, else the whole main screen. The caller rejects combinations.
+func contentSelection(appBundleID: String?, region: CGRect?, windowID: CGWindowID?) -> ContentSelection {
+    if let windowID { return .window(id: windowID) }
     if let region { return .region(display: .main, rect: region) }
     if let appBundleID { return .app(bundleID: appBundleID) }
     return .display(.main)
 }
 
+/// Rejects two source flags given together — one message shape for all three pairs.
+func rejectConflictingSources(appBundleID: String?, region: CGRect?, windowID: CGWindowID?) {
+    if windowID != nil, appBundleID != nil {
+        die("--window and --app can't be combined "
+            + "(a window captures one window; an app captures all of its windows)")
+    }
+    if windowID != nil, region != nil {
+        die("--window and --region can't be combined "
+            + "(a window captures one window; a region captures a rectangle of the screen)")
+    }
+    if region != nil, appBundleID != nil {
+        die("--region and --app can't be combined "
+            + "(a region captures the screen; an app captures its windows)")
+    }
+}
+
+/// Formats a coordinate without a trailing `.0` for whole values.
+func pointValue(_ value: CGFloat) -> String {
+    value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
+}
+
 /// Human-readable "x,y w×h pt" for the CLI's region echo/dry-run.
 func describeRegion(_ rect: CGRect) -> String {
-    func n(_ v: CGFloat) -> String { v == v.rounded() ? String(Int(v)) : String(format: "%.1f", v) }
-    return "\(n(rect.origin.x)),\(n(rect.origin.y)) \(n(rect.width))×\(n(rect.height)) pt"
+    "\(pointValue(rect.origin.x)),\(pointValue(rect.origin.y)) "
+        + "\(pointValue(rect.width))×\(pointValue(rect.height)) pt"
+}
+
+/// "920×436 pt" — a window's point size, the column in `list-windows` and part of its echo.
+func describeSize(_ size: CGSize) -> String {
+    "\(pointValue(size.width))×\(pointValue(size.height)) pt"
+}
+
+/// `37 — Finder “Movies” (920×436 pt)` for the CLI's window echo/dry-run, or the bare id when it
+/// can't be resolved — the engine reports a gone window properly at start.
+func describeWindow(_ id: CGWindowID) async -> String {
+    guard let window = try? await CapturableWindows.available().first(where: { $0.id == id }) else {
+        return String(id)
+    }
+    return "\(id) — \(window.appName) “\(window.title)” (\(describeSize(window.pointSize)))"
+}
+
+/// Trims a window title so one long title can't break `list-windows`' columns.
+func truncated(_ text: String, to limit: Int) -> String {
+    guard text.count > limit else { return text }
+    return text.prefix(limit - 1) + "…"
 }
 
 func describe(_ state: PermissionState) -> String {
@@ -142,6 +199,7 @@ func describe(_ reason: EndReason) -> String {
     case .userStopped: return "userStopped"
     case .displayDisconnected: return "displayDisconnected"
     case .appQuit: return "appQuit"
+    case .windowClosed: return "windowClosed"
     case .diskAlmostFull: return "diskAlmostFull"
     case .streamError(let message): return "streamError(\(message))"
     }
@@ -241,6 +299,31 @@ func listApps() async {
     }
 }
 
+func listWindows() async {
+    let windows: [CapturableWindow]
+    do {
+        windows = try await CapturableWindows.available()
+    } catch {
+        die("Couldn't list windows: \(error.localizedDescription)", code: 1)
+    }
+    guard !windows.isEmpty else {
+        print("No capturable windows found.")
+        return
+    }
+    // App and title get their own columns rather than "App — Title": real titles contain em
+    // dashes, so a separator that appears inside the data isn't one.
+    let titles = windows.map { truncated($0.title, to: 44) }
+    let idWidth = windows.map { String($0.id).count }.max() ?? 0
+    let appWidth = windows.map(\.appName.count).max() ?? 0
+    let titleWidth = titles.map(\.count).max() ?? 0
+    for (window, title) in zip(windows, titles) {
+        let id = String(window.id).padding(toLength: idWidth, withPad: " ", startingAt: 0)
+        let app = window.appName.padding(toLength: appWidth, withPad: " ", startingAt: 0)
+        print("\(id)  \(app)  \(title.padding(toLength: titleWidth, withPad: " ", startingAt: 0))"
+            + "  \(describeSize(window.pointSize))")
+    }
+}
+
 /// One step of a `--script` timeline (04 §4.1): record for N seconds, or pause for N seconds.
 enum ScriptStep {
     case record(Double)
@@ -252,6 +335,7 @@ struct RecordOptions {
     var preset: QualityPreset = .balanced
     var appBundleID: String?
     var region: CGRect?
+    var windowID: CGWindowID?
     var micID: String?
     var micEnabled = true
     var systemAudioEnabled = true
@@ -297,6 +381,8 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
             options.appBundleID = value
         case "--region":
             options.region = parseRegion(iterator.next())
+        case "--window":
+            options.windowID = parseWindowID(iterator.next())
         case "--mic":
             guard let value = iterator.next() else { die("--mic needs a device id") }
             options.micID = value
@@ -327,10 +413,8 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
     if options.script != nil, options.duration != nil {
         die("--script and --duration can't be combined (the script controls timing)")
     }
-    if options.region != nil, options.appBundleID != nil {
-        die("--region and --app can't be combined "
-            + "(a region captures the screen; an app captures its windows)")
-    }
+    rejectConflictingSources(
+        appBundleID: options.appBundleID, region: options.region, windowID: options.windowID)
     return options
 }
 
@@ -385,12 +469,14 @@ func resolveMicrophone(
     }
 }
 
-func printRecordDryRun(_ options: RecordOptions) {
+func printRecordDryRun(_ options: RecordOptions) async {
     print("Recording configuration (dry-run — no capture):")
     print("  Screen recording permission: \(describe(Permissions.screenRecordingState()))")
     print("  Preset:   \(options.preset.rawValue)")
     let captureDescription: String
-    if let region = options.region {
+    if let windowID = options.windowID {
+        captureDescription = "window \(await describeWindow(windowID))"
+    } else if let region = options.region {
         captureDescription = "region \(describeRegion(region)) on the main display"
     } else if let bundleID = options.appBundleID {
         captureDescription = "app \(bundleID)"
@@ -528,7 +614,8 @@ func performRecording(_ options: RecordOptions) async {
 
     let mic = resolveMicrophone(micEnabled: options.micEnabled, preferredID: options.micID)
     if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
-    let content = contentSelection(appBundleID: options.appBundleID, region: options.region)
+    let content = contentSelection(
+        appBundleID: options.appBundleID, region: options.region, windowID: options.windowID)
     let configuration = CaptureConfiguration(
         content: content, microphone: mic.selection,
         microphoneRecovery: mic.recovery, capturesSystemAudio: options.systemAudioEnabled,
@@ -556,6 +643,7 @@ func performRecording(_ options: RecordOptions) async {
     print("record: \(options.preset.rawValue) → \(outputURL.path)  (\(stopHint))")
     if let bundleID = options.appBundleID { print("  capturing app: \(bundleID)") }
     if let region = options.region { print("  capturing region: \(describeRegion(region)) on the main display") }
+    if let windowID = options.windowID { print("  capturing window: \(await describeWindow(windowID))") }
 
     await session.start()
     let ticker = Task { await runProgressTicker(session, outputURL: outputURL) }
@@ -623,7 +711,7 @@ switch command {
 case "record":
     let options = parseRecordOptions(Array(arguments.dropFirst()))
     if options.dryRun {
-        printRecordDryRun(options)
+        await printRecordDryRun(options)
     } else {
         await performRecording(options)
     }
@@ -631,6 +719,8 @@ case "list-mics", "--list-mics":
     listMics()
 case "list-apps":
     await listApps()
+case "list-windows":
+    await listWindows()
 case "engine-smoke":
     await runEngineSmoke(Array(arguments.dropFirst()))
 case "probe-stream":

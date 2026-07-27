@@ -221,9 +221,9 @@ form). Never the word "error" for a fail-stop.
 | Replay mic recovered while armed — **M8-T2** | `Replay still armed · microphone reconnected` | `Replays saved from now on include the microphone again.` | — |
 
 Fail-stop causes, one per reachable `EndReason`:
-`display disconnected` · `the recorded app quit` · `disk almost full` ·
-`screen capture stopped unexpectedly` (an unclassified `streamError` — say what happened, never
-the raw SCK string, never the word "error")
+`display disconnected` · `the recorded app quit` · `the recorded window closed` ·
+`disk almost full` · `screen capture stopped unexpectedly` (an unclassified `streamError` — say
+what happened, never the raw SCK string, never the word "error")
 
 ⚠️ **AMENDED 2026-07-15 (M4-T5): the table didn't cover what the engine emits.** Four fixes:
 - **`streamError` had no copy** and is reachable — SCK can die for a reason we don't classify.

@@ -86,9 +86,9 @@ import Testing
 
     @Test func streamErrorMapsLostDisplayToDisplayDisconnected() {
         let lost = NSError(domain: SCStreamError.errorDomain, code: -3815)  // measured
-        #expect(CaptureEngine.endReason(forStreamError: lost) == .displayDisconnected)
+        #expect(CaptureEngine.endReason(forStreamError: lost, content: .display(.main)) == .displayDisconnected)
         let noList = NSError(domain: SCStreamError.errorDomain, code: -3814)  // by kinship
-        #expect(CaptureEngine.endReason(forStreamError: noList) == .displayDisconnected)
+        #expect(CaptureEngine.endReason(forStreamError: noList, content: .display(.main)) == .displayDisconnected)
     }
 
     @Test func streamErrorMapsSystemIndicatorStopToUserStopped() {
@@ -96,20 +96,20 @@ import Testing
         // as -3817. Anything but `.userStopped` makes ADR-007 read the most ordinary stop there
         // is as a fail-stop, and M4 would fire an "ended unexpectedly" notification for it.
         let stopped = NSError(domain: SCStreamError.errorDomain, code: -3817)
-        #expect(CaptureEngine.endReason(forStreamError: stopped) == .userStopped)
+        #expect(CaptureEngine.endReason(forStreamError: stopped, content: .display(.main)) == .userStopped)
     }
 
     @Test func streamErrorKeepsTheCodeForUnmappedSCKErrors() {
         // SCK errors are opaque (02 §2); carrying the code is how -3815 was identified at all.
         let unknown = NSError(domain: SCStreamError.errorDomain, code: -3811,
             userInfo: [NSLocalizedDescriptionKey: "internal error"])
-        #expect(CaptureEngine.endReason(forStreamError: unknown)
+        #expect(CaptureEngine.endReason(forStreamError: unknown, content: .display(.main))
             == .streamError("internal error [SCStreamError -3811]"))
     }
 
     @Test func streamErrorPassesThroughNonSCKErrors() {
         let other = NSError(domain: "Foo", code: 7, userInfo: [NSLocalizedDescriptionKey: "kaboom"])
-        #expect(CaptureEngine.endReason(forStreamError: other) == .streamError("kaboom"))
+        #expect(CaptureEngine.endReason(forStreamError: other, content: .display(.main)) == .streamError("kaboom"))
     }
 
     // MARK: per-app content (M7-T1)
@@ -261,12 +261,60 @@ import Testing
         #expect(Set(reasons).count == reasons.count)
     }
 
-    @Test func onlyRegionForbidsTheDisplayFallback() {
+    @Test func onlyRegionAndWindowForbidTheDisplayFallback() {
         // A region's rect is tied to one display's geometry, so a missing main display must fail
-        // loud, not crop against `displays.first` (M13-T4). Whole-screen/app may fall back.
+        // loud, not crop against `displays.first` (M13-T4). Whole-screen/app may fall back. A
+        // window resolves no display at all, and a substitute one would not contain it.
         #expect(!CaptureEngine.allowsDisplayFallback(
             for: .region(display: .main, rect: CGRect(x: 0, y: 0, width: 10, height: 10))))
+        #expect(!CaptureEngine.allowsDisplayFallback(for: .window(id: 37)))
         #expect(CaptureEngine.allowsDisplayFallback(for: .display(.main)))
         #expect(CaptureEngine.allowsDisplayFallback(for: .app(bundleID: "com.example.app")))
+    }
+
+    // MARK: window content (M17-T1)
+
+    @Test func windowContentNeedsNoRunningAppMatch() {
+        // A window is resolved by id against `content.windows`, not by bundle id — so the
+        // pre-flight decision has nothing to check and must not block on the app list.
+        #expect(CaptureEngine.startDecision(
+            screenPermission: .granted, availableDisplays: 1,
+            content: .window(id: 37), runningBundleIDs: []) == .proceed)
+    }
+
+    @Test func goneWindowCopyNamesTheRelaunchTrap() {
+        // A window id is not stable across a relaunch of its app (docs/02 §1c), which is the
+        // failure this path mostly sees — the copy has to say so and what to do (M6-T3 bar).
+        #expect(CaptureEngine.windowUnavailableMessage.contains("relaunched"))
+        #expect(CaptureEngine.windowUnavailableMessage.contains("choose the window again"))
+    }
+
+    @Test func aGoneSourceIsReportedAsWhicheverSourceWasBeingCaptured() {
+        // Measured both ways (docs/02 §1c): the same code means the display went away under a
+        // display filter and the window went away under a window filter. Reporting a closed
+        // window as a disconnected display would send the user looking at their monitor cable.
+        for code in [-3815, -3814] {
+            let gone = NSError(domain: SCStreamError.errorDomain, code: code)
+            #expect(CaptureEngine.endReason(forStreamError: gone, content: .window(id: 37))
+                == .windowClosed)
+            #expect(CaptureEngine.endReason(forStreamError: gone, content: .display(.main))
+                == .displayDisconnected)
+            #expect(CaptureEngine.endReason(forStreamError: gone, content: .app(bundleID: "com.x"))
+                == .displayDisconnected)
+        }
+    }
+
+    @Test func theSystemIndicatorStopIsStillAUserStopUnderAWindowFilter() {
+        // The window-aware branch must not swallow the ordinary stop (-3817) — that would turn
+        // the most common stop there is into a fail-stop (ADR-007).
+        let stopped = NSError(domain: SCStreamError.errorDomain, code: -3817)
+        #expect(CaptureEngine.endReason(forStreamError: stopped, content: .window(id: 37))
+            == .userStopped)
+    }
+
+    @Test func windowContentSkipsTheStallWatchdog() {
+        // A window can be minimised or fully occluded while the user works elsewhere, so
+        // "user active ⇒ frames expected" fails exactly as it does under an app filter.
+        #expect(!CaptureEngine.attachesStallWatchdog(to: .window(id: 37)))
     }
 }

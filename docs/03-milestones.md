@@ -1462,7 +1462,7 @@ Earns a **MINOR**.
 to the window rather than the display. Unlike `.app` (which composites an app's windows onto a
 display filter) this filter has no display to fall back on, so its failure modes are its own.
 
-- [ ] M17-T1 **Window capture core + CLI, and the platform facts.** Add `.window(id:)` to
+- [x] M17-T1 **Window capture core + CLI, and the platform facts.** Add `.window(id:)` to
       `ContentSelection`; `CaptureEngine` resolves it against `SCShareableContent.windows` and builds
       the desktop-independent filter. A vanished/closed window **fails loud** (the M7 `.app`-gone and
       M11 region precedents — never a silent whole-screen fallback), and a window that closes
