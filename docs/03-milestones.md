@@ -1398,7 +1398,7 @@ flow past a consumer. Earns a **MINOR** (ADR-013).
       playable with a full-length (silent) mic track; **unmute mid-recording → the paired recovery
       notice**; control run with a live mic → **neither notice**. Input volume restored after every
       leg. Dev loop green.
-- [ ] M16-T5 **Input level in the menu-bar label.** T4 tells you after 30 seconds; this tells you
+- [x] M16-T5 **Input level in the menu-bar label.** T4 tells you after 30 seconds; this tells you
       before you start. **⚠️ An in-menu level meter is not implementable** — M6-T10 established that
       any publish rebuilds an open `.menu` MenuBarExtra's AppKit rows and garbles hover, which is the
       same constraint that froze the in-menu clock. The **status-item label is not bridged** (M9-T3

@@ -162,7 +162,8 @@ private struct StatusIconLabel: View {
             isReplayArmed: state.isReplayArmed,
             recordingClock: state.recordingClock,
             showsTimer: state.showsMenuBarTimer,
-            replaySavedFlash: state.replaySavedFlash)
+            replaySavedFlash: state.replaySavedFlash,
+            microphoneLevel: state.showsMicrophoneLevel ? { state.takeMicrophoneLevel() } : nil)
             .task {
                 // A persisted armed state resumes at launch; `init` never arms (tests
                 // construct AppState freely and must not spin capture).

@@ -7,6 +7,30 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-27 (M16-T5): **A `MenuBarExtra` label renders only its FIRST `Image`. A second one
+  contributes nothing — not even width.** `Text` is fine; images are not. Measured on the live app by
+  reading the status item's AX frame while swapping one view:
+
+  | Label content | Status-item frame |
+  |---|---|
+  | icon only (baseline) | `27×24` |
+  | icon + `Text("XX")` | **`51×24`** — text renders |
+  | icon + `Image(systemName: "waveform")` | `27×24` — **second image dropped** |
+  | icon + meter **composited into the same NSImage** | **`39×24`** ✅ |
+
+  - This is why the armed badge was always drawn *into* the icon; M16-T5's meter had to follow. If a
+    label needs a second glyph, composite it — an `HStack` will not do it.
+  - ⚠️ **The same shape sits in `StatusIconView` for the replay-saved checkmark**
+    (`if replaySavedFlash { Image(systemName: "checkmark.circle.fill") }`) — by this measurement it
+    has **never rendered**. Not fixed here (out of M16-T5's scope); it wants the same compositing.
+  - Locating the item for a screenshot: AppleScript's `position of menu bar item 1` returns `0,24`
+    (useless), but the raw AX API on `kAXExtrasMenuBarAttribute` gives the real frame — see
+    `scratchpad/itemframe.swift`. Without it you cannot crop a menu bar full of live third-party
+    items, and diffing a wide strip is meaningless (CPU% and network counters change every second).
+  - ⚠️ **`md5` of two `screencapture` PNGs is NOT a pixel comparison** — identical pixels can encode
+    to different bytes. A first pass "measured" three distinct states that way; decoding and
+    comparing pixels showed two. Compare decoded pixels (`scratchpad/pixdiff.swift`).
+
 - 2026-07-27 (M16-T4): **Microphone levels, measured — two mics in the same quiet room are 23 dB
   apart, and a muted one is exactly zero.** Peak amplitude per 500 ms window, read through the real
   SCK mic path (`scratchpad/miclevels.swift`, kept out of the repo — it's a throwaway rig):

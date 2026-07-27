@@ -113,6 +113,10 @@ public actor CaptureEngine {
         if let stallWatchdog { router.attach(stallWatchdog) }
     }
 
+    /// The live mic level for a UI meter (M16-T5); nil when no mic is selected. `nonisolated` so a
+    /// menu-bar frame never awaits the actor to draw.
+    public nonisolated var microphoneLevel: MicrophoneLevelSource? { microphoneSilenceWatchdog }
+
     public func start() async {
         guard state == .idle else { return }
         state = .starting

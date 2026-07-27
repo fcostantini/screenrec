@@ -14,6 +14,8 @@ import RecorderCore
         var onMicrophoneRecovered: (@MainActor () -> Void)?
         var onMicrophoneSilent: (@MainActor () -> Void)?
         var onMicrophoneAudible: (@MainActor () -> Void)?
+        /// The spy never spins a capture engine, so it has no live level to report.
+        var microphoneLevelSource: MicrophoneLevelSource? { nil }
         var onPipelineFailure: (@MainActor (String) -> Void)?
 
         enum Call: Equatable {

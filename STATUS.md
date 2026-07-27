@@ -6,6 +6,29 @@
 
 ## Now
 
+- **✅ M16-T5 DONE (2026-07-27) — the menu-bar label shows the input level; DEPLOYED.** Three bars
+  beside the icon while recording **or armed** (Franco's ruling — that's what makes it useful
+  *before* a take), opt-out `showsMenuBarLevel`.
+  **⚠️ THE FINDING: a `MenuBarExtra` label renders only its FIRST `Image`.** The planned
+  bars-beside-the-icon `HStack` drew **nothing** — measured live via the status item's AX frame:
+  icon only `27×24`, icon + `Text("XX")` → `51×24` (text renders), icon + a second `Image` → still
+  `27×24`. So the meter is **composited into the icon image**, the trick the armed badge already
+  used; the item now measures `39×24`. **The same latent bug sits in the replay-saved checkmark** —
+  by this measurement it has never rendered (filed in docs/07, not fixed here).
+  **Scale set by M16-T4's measurements:** first bar at **−35 dBFS**, above the loudest measured room
+  tone (−42.7, built-in), so an unlit meter means "nothing is reaching this mic", not "quiet room".
+  No amber top bar — the idle icon is a template, where only alpha survives.
+  **No new cost on the sample path or in the observation graph:** the peak reuses T4's existing scan
+  (read-and-clear), `AppState` offers it as a **method** not a published property, and the view
+  writes state **only when the bucket changes** — a silent room is zero redraws (M6-T10 restated).
+  **463 tests (+7)**; **pixel-measured, not eyeballed:** forcing the four buckets gave **four
+  distinct rendered states** (0/89/153/189 differing px, all inside the meter's columns), and a live
+  capture with real audio lit it and returned to the silent bitmap exactly. ⚠️ **`md5` of two
+  screencaptures is NOT a pixel comparison** (identical pixels, different bytes) — it fooled a first
+  pass; `scratchpad/pixdiff.swift` decodes and compares properly.
+  **Next: M16-T6** (onboarding capability self-test + version string) — the last M16 task, then the
+  MINOR bump.
+
 - **✅ M16-T4 DONE (2026-07-27) — a connected-but-silent mic now says so, and the threshold was
   measured rather than picked.** The product defended hard against a mic *disappearing* and not at
   all against the commoner failure: one that is connected, delivering, and carrying nothing.

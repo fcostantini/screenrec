@@ -18,6 +18,7 @@ missing permissions only).
 | idle | outline record circle (`record.circle`) | template image, adapts to menu bar |
 | recording | filled red circle | subtle pulse; respect Reduce Motion (static red) |
 | paused | half-filled circle, amber | |
+| input level (M16-T5) | three rising bars right of the glyph, lit by peak level | **composited into the icon image** — a MenuBarExtra label renders only its first `Image` (measured, docs/07). Shown while recording or armed with a mic; opt-out `showsMenuBarLevel`. Lit/unlit by opacity, not colour: the idle icon is a template, where only alpha survives |
 | replay armed (idle) | outline circle + small dot badge | armed is orthogonal to recording. **M5** — see the Settings amendment: the badge ships with the feature that can be armed, not before (it had been re-homed T1→T2→T4 before Franco ruled) |
 
 ## Menu — idle state
@@ -404,6 +405,7 @@ moved):
 | `pauseHotkey` | Dict: keyCode Int, modifiers Int; **absent ⇒ off** (M12-T6, opt-in global pause/resume) | M12-T6 |
 | `countInEnabled` | Bool; **absent ⇒ off** (M12-T6). Start runs a 3-2-1 count-in before capture | M12-T6 |
 | `showsMenuBarTimer` | Bool; **absent ⇒ on** (opt-out). The status-item label's live elapsed clock while recording (M9-T3) | M9-T3 |
+| `showsMenuBarLevel` | Bool; **absent ⇒ on** (opt-out). The status-item input meter while recording or armed (M16-T5) | M16-T5 |
 | `seenReplayBannerWarning` | Bool; **absent ⇒ false** (not seen). Once true the first-arm banner-suppression alert never fires again (M12-T5) | M12-T5 |
 | `gifFPS` · `gifWidth` · `gifMaxSeconds` | Int; each snaps to its nearest picker choice on load, absent ⇒ 15 / 480 / 30. The `Save as GIF` caps (M10-T3 follow-up) | M10-T3 follow-up |
 | `lastExportPath` · `lastExportDate` | String path + Date (M12-T2/T3); **absent ⇒ no receipt**. The last export, so its menu receipt survives relaunch — dropped on load if the file is gone (moved/trashed) **or has no date** (a pre-T3 entry), and expired at menu open once the date is **older than one hour** (M12-T3). Not part of `Settings` — a transient pointer, not user config; its own load/save | M12-T2/T3 |

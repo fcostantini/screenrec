@@ -30,6 +30,9 @@ public protocol ReplayControlling: AnyObject {
     func configurationChanged(configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL)
     /// The buffer length changed: resize the rings in place — the buffer survives. Grow fills
     /// to the new length over time; shrink evicts the excess immediately.
+    /// The armed stream's live mic level (M16-T5); nil while riding a recording (that stream's
+    /// session owns it) or with the pipeline down.
+    var microphoneLevelSource: MicrophoneLevelSource? { get }
     func windowChanged(seconds: Double)
     /// Output folder changes rebuild only the muxer — the buffer survives.
     func setOutputDirectory(_ url: URL)
@@ -93,6 +96,8 @@ public final class ReplayController: ReplayControlling {
         }
         return .retry
     }
+
+    public var microphoneLevelSource: MicrophoneLevelSource? { ownEngine?.microphoneLevel }
 
     public init() {}
 

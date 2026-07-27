@@ -132,6 +132,12 @@ public final class AppState {
         didSet { if showsMenuBarTimer != oldValue { persist() } }
     }
 
+    /// Whether the label shows the live input meter while recording or armed (M16-T5). Its twin
+    /// above: a display pref, persisted, opt-out.
+    public var showsMenuBarLevel: Bool {
+        didSet { if showsMenuBarLevel != oldValue { persist() } }
+    }
+
     /// The GIF export caps (M10-T3 follow-up), each a `Settings.allowedGif…` choice. Steer
     /// `Save as GIF`; a pure export pref, persisted.
     public var gifFPS: Int {
@@ -425,6 +431,7 @@ public final class AppState {
         pauseHotkey = settings.pauseHotkey
         countInEnabled = settings.countInEnabled
         showsMenuBarTimer = settings.showsMenuBarTimer
+        showsMenuBarLevel = settings.showsMenuBarLevel
         gifFPS = settings.gifFPS
         gifWidth = settings.gifWidth
         gifMaxSeconds = settings.gifMaxSeconds
@@ -478,7 +485,7 @@ public final class AppState {
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey, recordHotkey: recordHotkey,
                 pauseHotkey: pauseHotkey, countInEnabled: countInEnabled,
-                showsMenuBarTimer: showsMenuBarTimer,
+                showsMenuBarTimer: showsMenuBarTimer, showsMenuBarLevel: showsMenuBarLevel,
                 gifFPS: gifFPS, gifWidth: gifWidth, gifMaxSeconds: gifMaxSeconds,
                 seenReplayBannerWarning: hasSeenReplayBannerWarning),
             to: defaults)
@@ -795,6 +802,20 @@ public final class AppState {
         return ReplayFootprint.estimatedBytes(
             width: pixels.width, height: pixels.height, frameRateCap: frameRateCap,
             seconds: Double(seconds), includesMicrophone: presentMicrophonePreference != .none)
+    }
+
+    /// Loudest mic sample since the last call, for the menu-bar meter (M16-T5) — a recording's
+    /// stream when one runs, else the armed stream's. A **method**, not a published property: the
+    /// meter polls it off a timer, and a per-frame publish is exactly what M6-T10 forbids.
+    public func takeMicrophoneLevel() -> Float {
+        let source = session?.microphoneLevel ?? replay.microphoneLevelSource
+        return source?.takePeakLevel() ?? 0
+    }
+
+    /// Whether the label should draw the meter at all: only when a stream with a mic exists.
+    public var showsMicrophoneLevel: Bool {
+        guard showsMenuBarLevel, presentMicrophonePreference != .none else { return false }
+        return session != nil || isReplayArmed
     }
 
     /// docs/06: says so when both audio sources are off, so a silent take isn't discovered

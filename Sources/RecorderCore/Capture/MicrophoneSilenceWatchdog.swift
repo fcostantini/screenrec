@@ -15,6 +15,15 @@ public enum MicrophoneSilence {
     public static let duration: TimeInterval = 10
 }
 
+/// Read-only access to the live microphone level, for a UI meter (M16-T5). Deliberately a *pull*:
+/// a per-buffer push would put ~40 publishes a second into the observation graph, which M6-T10
+/// forbids anywhere near the menu.
+public protocol MicrophoneLevelSource: AnyObject, Sendable {
+    /// Loudest sample since the last call, then resets — poll it at the meter's frame rate and
+    /// this is exactly "the peak over the last frame". 0 when nothing arrived.
+    func takePeakLevel() -> Float
+}
+
 /// Detects a microphone that is connected and delivering buffers which contain nothing — muted at
 /// the switch, gain at zero, or an input with nothing on it. `MicrophoneWatchdog`'s sibling: that
 /// one asks whether buffers arrive, this one whether they carry anything. Firing is a notice, never
@@ -27,7 +36,7 @@ public enum MicrophoneSilence {
 ///
 /// `consume` runs on the mic capture queue: state is lock-guarded (docs/01) and handlers fire
 /// outside the lock.
-final class MicrophoneSilenceWatchdog: SampleConsumer, @unchecked Sendable {
+final class MicrophoneSilenceWatchdog: SampleConsumer, MicrophoneLevelSource, @unchecked Sendable {
     /// Suggested `check()` cadence; notice latency is bounded by the run length + this.
     static let checkInterval: TimeInterval = 1
 
@@ -40,6 +49,9 @@ final class MicrophoneSilenceWatchdog: SampleConsumer, @unchecked Sendable {
     /// When the current unbroken run of sub-floor buffers began; nil once anything audible lands.
     private var quietSince: TimeInterval?
     private var hasReportedSilence = false
+    /// Loudest sample since the meter last read; the same scan that feeds the silence decision, so
+    /// the level costs no second pass over the samples.
+    private var peakSinceRead: Float = 0
 
     /// `systemUptime` is monotonic and does not advance during system sleep, so a machine that
     /// slept mid-recording doesn't wake and call the mic silent for the nap.
@@ -61,6 +73,7 @@ final class MicrophoneSilenceWatchdog: SampleConsumer, @unchecked Sendable {
         guard type == .microphone, let peak = Self.peakAmplitude(of: buffer) else { return }
         lock.lock()
         var announceAudible = false
+        peakSinceRead = max(peakSinceRead, peak)
         if peak >= MicrophoneSilence.floor {
             quietSince = nil
             if hasReportedSilence {
@@ -72,6 +85,12 @@ final class MicrophoneSilenceWatchdog: SampleConsumer, @unchecked Sendable {
         }
         lock.unlock()
         if announceAudible { onAudible() }   // outside the lock — it is non-reentrant
+    }
+
+    func takePeakLevel() -> Float {
+        lock.lock()
+        defer { peakSinceRead = 0; lock.unlock() }
+        return peakSinceRead
     }
 
     /// Fire `onSilent` once per run of quiet. Silent until the run passes `duration`, so the

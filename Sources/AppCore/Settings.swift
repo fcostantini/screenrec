@@ -107,6 +107,8 @@ public struct Settings: Sendable, Equatable {
     public var countInEnabled: Bool
     /// Whether the menu-bar label shows the live elapsed clock while recording (M9-T3). Default on.
     public var showsMenuBarTimer: Bool
+    /// Whether the label shows the live input meter while recording or armed (M16-T5). Default on.
+    public var showsMenuBarLevel: Bool
     /// The GIF export caps (M10-T3 follow-up): each is one of its `allowedGif…` list. Width also
     /// caps height (aspect preserved). Steer `Save as GIF`; the CLI takes its own flags.
     public var gifFPS: Int
@@ -171,6 +173,7 @@ public struct Settings: Sendable, Equatable {
             pauseHotkey: nil,
             countInEnabled: false,
             showsMenuBarTimer: true,
+            showsMenuBarLevel: true,
             gifFPS: 15,
             gifWidth: 480,
             gifMaxSeconds: 30,
@@ -215,6 +218,8 @@ public enum SettingsStore {
         public static let hotkeyModifiers = "modifiers"
         /// Absent ⇒ on (M9-T3): the menu-bar clock is opt-out, not opt-in.
         public static let showsMenuBarTimer = "showsMenuBarTimer"
+        /// Absent ⇒ on (M16-T5): the input meter is opt-out, like the clock.
+        public static let showsMenuBarLevel = "showsMenuBarLevel"
         /// Absent ⇒ on (M16-T3): system audio is opt-out, so existing installs keep capturing it.
         public static let capturesSystemAudio = "capturesSystemAudio"
         /// Absent ⇒ the first-arm banner-suppression alert hasn't been shown (M12-T5).
@@ -330,6 +335,9 @@ public enum SettingsStore {
         if defaults.object(forKey: Key.showsMenuBarTimer) != nil {
             settings.showsMenuBarTimer = defaults.bool(forKey: Key.showsMenuBarTimer)
         }
+        if defaults.object(forKey: Key.showsMenuBarLevel) != nil {
+            settings.showsMenuBarLevel = defaults.bool(forKey: Key.showsMenuBarLevel)
+        }
         if defaults.object(forKey: Key.capturesSystemAudio) != nil {
             settings.capturesSystemAudio = defaults.bool(forKey: Key.capturesSystemAudio)
         }
@@ -435,6 +443,7 @@ public enum SettingsStore {
         defaults.set(settings.countInEnabled, forKey: Key.countInEnabled)
         defaults.set(settings.showsMenuBarTimer, forKey: Key.showsMenuBarTimer)
         defaults.set(settings.capturesSystemAudio, forKey: Key.capturesSystemAudio)
+        defaults.set(settings.showsMenuBarLevel, forKey: Key.showsMenuBarLevel)
         defaults.set(settings.seenReplayBannerWarning, forKey: Key.seenReplayBannerWarning)
         defaults.set(settings.gifFPS, forKey: Key.gifFPS)
         defaults.set(settings.gifWidth, forKey: Key.gifWidth)

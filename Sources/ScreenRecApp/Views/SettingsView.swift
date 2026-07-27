@@ -54,6 +54,10 @@ struct SettingsView: View {
 
             Toggle("Show recording time in the menu bar", isOn: $state.showsMenuBarTimer)
 
+            // M16-T5: the meter's twin opt-out. Shown while recording or armed, so a dead mic is
+            // visible before a take.
+            Toggle("Show input level in the menu bar", isOn: $state.showsMenuBarLevel)
+
             // M9-T4: opt-in, because a start/stop combo is always live (unlike replay's, which fires
             // only while armed). Enabling seeds ⌥⌘S; the recorder pill changes it.
             Toggle("Global start/stop shortcut", isOn: Binding(

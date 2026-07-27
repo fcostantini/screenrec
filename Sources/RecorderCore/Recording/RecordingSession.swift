@@ -107,6 +107,9 @@ public final class RecordingSession: @unchecked Sendable {
     /// deinit (the caller holds us).
     private var diskTask: Task<Void, Never>?
 
+    /// The recording's live mic level, for the menu-bar meter (M16-T5).
+    public nonisolated var microphoneLevel: MicrophoneLevelSource? { engine.microphoneLevel }
+
     /// `diskFloorBytes` overrides the 2 GB free-space floor (docs/02 §7) — the CLI's
     /// `--test-disk-floor` passes an absurd value to trip the guard on demand.
     public init(
