@@ -1318,3 +1318,355 @@ video (deterministic, reproducible).
 
 - 2026-07-13 — Research + Tier-1 PoC completed in ~/code/screenrec-poc. Tier-2 planning
   docs authored (docs/00–05, CLAUDE.md, this file). No Tier-2 code exists yet.
+
+## Rotated from STATUS.md 2026-07-27 (M18-T2 session) — M15 through M17, and the
+v1.7.1 / v1.7.2 / v1.8.0 cuts
+
+Closed entries, moved verbatim to keep STATUS.md's "Now" readable. Unmaintained.
+
+- **✅ M17-T2 DONE (2026-07-27) — you can pick a window from the menu, and a stale pick can never
+  bind the wrong one.** `Source ▸` gains **one** row, `Window ▸`, whose submenu lists on-screen
+  windows as `<App> — <Title>`. **495 tests (+13)**, full dev loop green, every leg driven on the
+  real menu.
+  **Ruling (a) — persist `{id, bundleID, title}`, verify the owner.** A window id is the only thing
+  this app persists that names nothing durable: **measured, a TextEdit window went 1498 → 1512 across
+  a relaunch**, and ids are *reused* — so a restored bare id could bind another app's window,
+  recording the wrong thing while looking like it worked. `ContentSelection.window` now carries an
+  optional `ownerBundleID` and capture refuses a mismatch. Title is display-only and never matched on
+  (a browser title changes every tab switch). Live: relaunching TextEdit left the new window
+  selectable and the old pick as `✓ (closed)` — no silent re-bind.
+  **Ruling (b) — nested, not flat.** ✅ **The `.menu` bridge DOES carry a `Menu` inside a `Menu` with
+  its own inline `Picker`** (spiked before building on it): checkmark lands two levels deep, Source
+  grew by exactly one row, so **M18-T3's diet doesn't get harder**. **Ruling (c)** — a gone pick reads
+  `<App> — <Title> (closed)`, checkmarked, the `(not running)` precedent.
+  **Verified live:** menu-driven window recording → 1800×1056, 3 tracks, **0.000% same-app bystander
+  green vs 92.6% target magenta** across three frames (the leg per-app capture cannot pass).
+  **🔴 Fixed a pre-existing defect this task exposed (Franco's call to fix here):** a Start that failed
+  said **nothing** — `lastFailure` rendered only in the recording-state menu, and a failed start lands
+  in *idle*. Worse, `endSession()` **cleared it** microseconds later, since a start failure does have a
+  session; the comment claiming otherwise had always been wrong. Both halves fixed and now
+  live-verified (the row renders under Start with the real copy). Applies equally to M7-T2's
+  not-running app pick, which has shipped this way since M7. ⚠️ **Both first-cut unit tests were
+  vacuous** — they drove `apply(.finished)`, which never reaches `endSession()` (docs/07).
+  **🎉 M17 COMPLETE — GATE G17 PASSED (2026-07-27).** M17 is T1+T2; both shipped, gate
+  evidence in the table below. **M17 adds a user-facing capture mode → MINOR (ADR-013): 1.9.0,
+  Franco's call to cut** (bump `VERSION` + `CoreInfo.version`, then `Scripts/release.sh` **in the
+  background**, never under a short foreground timeout or it gets SIGTERM'd mid-encode).
+  **Next after that: M18** (Editing & Menu polish) — its T3 menu diet now has exactly one extra
+  row to account for, `Window ▸`.
+
+- **✅ M17-T1 DONE (2026-07-27) — `.window` is the fourth `ContentSelection` case; window capture
+  records one window and nothing else, including against an overlapping window of the SAME app.**
+  `list-windows` + `record --window` + `replay-arm --window`, `EndReason.windowClosed`, all four
+  docs/03 rulings measured into **docs/02 §1c**. **482 tests (+12)**, full dev loop green.
+  **Proven, with a positive control:** a window-scoped recording of an animated TARGET while a green
+  same-app BYSTANDER overlapped it in front → **0.000% bystander pixels across four frames**, while a
+  whole-screen capture of the same moment reads **10.7%**. That control is load-bearing: the first
+  run "passed" at 0.000% only because the detector was looking for the nominal `NSColor` and the
+  display profile shifts it by 93 counts (02 §1c).
+  **⚠️ Two mechanisms were built and then deleted by measurement — the task's real story (docs/07):**
+  **(1)** `WindowPresenceWatch` (poll SCK for the window) was designed on the `.app` precedent that
+  SCK stays silent when its subject vanishes. **A window filter is the opposite: it ends the stream**,
+  immediately, for both a close (TextEdit closing a document, app alive) and an app quit. Watch
+  deleted, poll cost gone, and the reason is now deterministic instead of a race.
+  **(2)** The real bug it hid: `noCaptureSource` is the **same code a disconnected display uses**, so
+  killing the recorded app reported **`finished (displayDisconnected)`** — a lie that sends the user
+  to check a monitor cable. `endReason(forStreamError:content:)` now disambiguates by filter.
+  **🔴 Also fixed a crash on the shipped path:** `SCContentFilter(desktopIndependentWindow:)` **traps
+  with `CGS_REQUIRE_INIT`** in a plain CLI binary — `record --window` died on it. One CoreGraphics
+  display call fixes it, no AppKit (which RecorderCore may not import).
+  Rulings: **(a)** a mid-recording resize does **not** change output size — SCK scales into the pinned
+  buffer; **(b)** a minimised window delivers nothing and recovers unaided → no StallWatchdog;
+  **(c)** system audio **is** scoped to the owning app (other app −inf dBFS, own app −8.9, control
+  −8.9) — but to the *app*, not the window; **(d)** output = `SCWindow.frame` × scale, titlebar in,
+  no shadow gutter, corners opaque black. Window capture is **frame-on-change**, unlike `.app`.
+  Regressions clean: whole-screen 4112×2570, `--app` 4112×2570, `--region` 1600×1200.
+  **Next: M17-T2** (window picker in `Source ▸`, and the persistence ruling) — plan artifact first.
+  T2 inherits the M18-T3 menu-length coordination.
+
+- **🎉 v1.8.0 CUT AND INSTALLED (2026-07-27) — M16 (Honest State) earns the MINOR.** `VERSION` +
+  `CoreInfo.version` → 1.8.0 (pin test green), committed (`7f074c4`), cut via **`Scripts/release.sh`
+  run in the BACKGROUND** — full gate green (clean tree · version pin · build · 470 tests · encode×3 ·
+  release build · bundle-sign), tagged **`v1.8.0`**, pushed main + tag. **0 unpushed; tag on origin.**
+  **DEPLOYED to `/Users/Shared/ScreenRec.app`** (pid changed; plist `CFBundleShortVersionString` =
+  1.8.0, and the app now says so itself: onboarding + Settings footers read `ScreenRec 1.8.0` — the
+  first release where that question is answerable from inside the app, which is T6's point).
+  MINOR not PATCH (ADR-013): six user-facing features. VT stayed healthy — the release ran to
+  completion in the background and was never killed mid-encode.
+  **Next: Franco's call — dogfood 1.8.0, or start M17 (Window capture) / M18 (Editing & Menu polish).**
+  Note **M17-T2 adds menu rows that M18-T3 is removing** — whichever runs second inherits the
+  coordination (flagged in both tasks).
+
+- **✅ M16-T6 DONE (2026-07-27) — onboarding proves capture works, and the app finally names its
+  build. M16 IS COMPLETE (T1–T6); the MINOR bump to 1.8.0 is Franco's call.** `Run a test` records
+  5 s into scratch, reads the finished file's tracks, deletes it, and reports one line per source.
+  **Four outcome states on purpose** — "you turned it off" must not read like "it's broken" — and
+  the mic verdict reuses **T4's measured −90 dBFS floor**, so *silent* means the same thing
+  everywhere. Audio tracks are told apart by **channel count** (system stereo, mic normalized mono).
+  It runs its **own** session, so an armed replay keeps its ring.
+  **Verified live on the deployed app, driven through the AX API** (System Events can't see these
+  windows, and the setup window closes when unfocused — `scratchpad/windrive.swift`):
+  `✓ screen · 4112 × 2570` / `✓ system audio` / `✓ microphone · AirPods Pro`; **muted** →
+  `! microphone · silent — check that it isn't muted`; **mic None** → `— microphone · not selected`;
+  scratch directory gone afterwards; both footers read `ScreenRec 1.7.2`, matching `VERSION`.
+  Franco's mic pick and input volume restored after every leg. **470 tests (+7)**, dev loop green,
+  deployed. **Next: cut 1.8.0** (bump `VERSION` + `CoreInfo.version`, record G16, `Scripts/release.sh`
+  **in the background** — never under a short foreground timeout, or it gets SIGTERM'd mid-encode).
+
+- **✅ M16-T5 DONE (2026-07-27) — the menu-bar label shows the input level; DEPLOYED.** Three bars
+  beside the icon while recording **or armed** (Franco's ruling — that's what makes it useful
+  *before* a take), opt-out `showsMenuBarLevel`.
+  **⚠️ THE FINDING: a `MenuBarExtra` label renders only its FIRST `Image`.** The planned
+  bars-beside-the-icon `HStack` drew **nothing** — measured live via the status item's AX frame:
+  icon only `27×24`, icon + `Text("XX")` → `51×24` (text renders), icon + a second `Image` → still
+  `27×24`. So the meter is **composited into the icon image**, the trick the armed badge already
+  used; the item now measures `39×24`. **The same latent bug sits in the replay-saved checkmark** —
+  by this measurement it has never rendered (filed in docs/07, not fixed here).
+  **Scale set by M16-T4's measurements:** first bar at **−35 dBFS**, above the loudest measured room
+  tone (−42.7, built-in), so an unlit meter means "nothing is reaching this mic", not "quiet room".
+  No amber top bar — the idle icon is a template, where only alpha survives.
+  **No new cost on the sample path or in the observation graph:** the peak reuses T4's existing scan
+  (read-and-clear), `AppState` offers it as a **method** not a published property, and the view
+  writes state **only when the bucket changes** — a silent room is zero redraws (M6-T10 restated).
+  **463 tests (+7)**; **pixel-measured, not eyeballed:** forcing the four buckets gave **four
+  distinct rendered states** (0/89/153/189 differing px, all inside the meter's columns), and a live
+  capture with real audio lit it and returned to the silent bitmap exactly. ⚠️ **`md5` of two
+  screencaptures is NOT a pixel comparison** (identical pixels, different bytes) — it fooled a first
+  pass; `scratchpad/pixdiff.swift` decodes and compares properly.
+  **Next: M16-T6** (onboarding capability self-test + version string) — the last M16 task, then the
+  MINOR bump.
+
+- **✅ M16-T4 DONE (2026-07-27) — a connected-but-silent mic now says so, and the threshold was
+  measured rather than picked.** The product defended hard against a mic *disappearing* and not at
+  all against the commoner failure: one that is connected, delivering, and carrying nothing.
+  **Measurements first** (full table in docs/07): a **muted** device delivers **exact digital zeros**;
+  the same quiet room reads **−65.5 dBFS median on AirPods (quietest window −78.9)** and **−42.7 on
+  the built-in** — a **23 dB spread between two mics in one room**, which is why no threshold can be
+  eyeballed. Franco's ruling: **−90 dBFS sustained 10 s, paired notices, microphone only** (silent
+  system audio is normal — saying so would train the user to ignore it).
+  ⚠️ **SCK delivers ~1 s of exact zeros while a Bluetooth route spins up** — so the decision judges a
+  *run*, never a buffer; that also made the planned 2 s start grace unnecessary (the 10 s run subsumes
+  it), the one deviation from the plan. **As built:** `MicrophoneSilenceWatchdog` beside
+  `MicrophoneWatchdog` on the router path; `.microphoneSilent`/`.microphoneAudible` folded like
+  `microphoneLost` (recording continues, ADR-012); **armed replay gets the pair too**.
+  **456 tests (+13)** — every measured level is a must-not-fire case. **Live:** muted record →
+  **exactly one** notice at ~10 s, recording ran to completion, file playable with a full-length
+  (silent) mic track; **unmute mid-recording → the paired recovery notice**; control run → **neither
+  notice**. Input volume restored after every leg (71). **Next: M16-T5** (input level in the menu-bar
+  label) — plan artifact first. Two M16 tasks left (T5, T6), then the MINOR bump.
+
+- **✅ M16-T3 DONE (2026-07-27) — system audio has an off switch; ADR-019 amends ADR-004.** Until
+  now the only way to record without capturing the music/the call/the video you're narrating was to
+  mute the Mac. Now: a checkmark row **`Capture System Audio`** (a boolean doesn't earn a submenu, and
+  M18-T3 is cutting rows), persisted `capturesSystemAudio` **absent ⇒ on**, plus `--no-system-audio`
+  on `record` and `replay-arm`. **ADR-019: "never mixed" survives ADR-004, "always two tracks" does
+  not** — a recording may carry two, one or no audio tracks, and never an empty one. When both
+  sources are off the menu says **`This recording will have no audio`** *before* you start.
+  **Measured, three probes:** control **3 tracks** · `--no-system-audio` → **video + 1ch mic, no
+  empty track** · both off → **video only, playable**. An armed save with system audio off → mic
+  track, no system track (system ring 0.0 s throughout). **The replay path needed no change** —
+  `makeAACInput` already returns nil for an empty ring. **449 tests (+7)**, dev loop green.
+  **Bonus, closing M16-T1's loop: with all audio off, SCK opens NO audio tap** — assertion count
+  3→3 (all off) vs 3→4 (system audio on), so that's the only configuration where an armed Mac could
+  idle-sleep (ADR-018 keeps it awake there anyway, deliberately). ⚠️ **Known, unfixed by ruling:**
+  with no audio at all, `ReplayMuxer` loses the continuous clock it anchors saves on, so a still
+  screen can yield a stale clip (field note). **DEPLOYED and verified live on the menu:** the row
+  renders checked between `Microphone ▸` and `Quality ▸`; `menudriver click` → unchecked +
+  `capturesSystemAudio = 0` persisted; click again → checked + `= 1` (Franco's setting restored),
+  and the sleep assertion's age reset to 00:00:01 each time — incidental proof that a capture-
+  affecting change really does rebuild the armed stream.
+  **Next: M16-T4** (notice when audio is arriving but silent) — plan artifact first.
+
+- **✅ M16-T2 DONE (2026-07-27) — an armed buffer now says what it costs, and 1.7.2+T1+T2 is
+  DEPLOYED.** Settings gained a caption under the slider and the armed menu a dimmed row; measured
+  on Franco's own live settings (4:30 buffer, 60 fps, mic Automatic): **`A 4:30 buffer holds about
+  800 MB in memory. While armed, ScreenRec keeps your Mac awake.`** and **`4:30 buffer · ≈800 MB ·
+  Mac stays awake`**. He had been holding 800 MB with nothing on screen saying so. **Two things the
+  code review / measurement caught before they shipped: (1) `ReplayEncoder` hardcodes `.balanced`,
+  so Quality must NOT be an estimator input** — billing his High preset would have quoted ~1.6× the
+  truth; **(2) an app-scoped pick composites on the MAIN display** (02 §1a), not the remembered
+  `selectedDisplayID`, which would have mis-billed on a two-display Mac. Also measured:
+  `CGDisplayPixelsWide` returns **points**, not pixels (4× error waiting to happen — field note).
+  **442 tests (+12)**, full dev loop green, before/after `menudriver` dumps + Settings screenshots
+  recorded. **⚠️ Slider-drag tracking is proven by unit test only** — driving the live slider would
+  have restarted his armed ring. **DEPLOY: `/Users/Shared/ScreenRec.app` is now the current build
+  (pid changed, `ditto` per the field-note recipe, TCC intact, assertion reads `Instant replay is
+  armed`).** It reports **1.7.2** — M16's MINOR bump comes when the milestone closes (ADR-013).
+  **Next: M16-T3** (system audio becomes optional) — plan artifact first.
+
+- **✅ M16-T1 DONE (2026-07-27) — the sleep assertion stops lying; ADR-018 rules that arming keeps the
+  Mac awake on purpose.** Measured before planning: the running 1.7.1 held `PreventUserIdleSystemSleep
+  named: "Recording the screen"` while merely **armed** (no `.partial` on disk), and `pmset -g` listed
+  `ScreenRec` under "sleep prevented by". **The filed task's premise was false, and the measurement
+  killed it before any code was written:** dropping our assertion would *not* let an armed Mac sleep —
+  any SCK stream capturing audio also carries one held by `coreaudiod` for `/usr/libexec/replayd`,
+  present with `--no-mic` too, released only at stream teardown (field note + 02 §7). Only tearing the
+  armed stream down would deliver sleep. **Franco's ruling: keep the assertion, fix the reason, put the
+  cost on screen in T2** — the idle stand-down alternative declined with it. Built as
+  `CaptureEngine.Purpose` (`.recording` / `.replayBuffer` / `.diagnostic`), a **required** init
+  argument, with `assertionReason` the only place the strings live. **Verified live on all four CLI
+  entry points** — `record` → `Recording the screen`, `replay-arm` → `Instant replay is armed`,
+  `probe-stream`/`engine-smoke` → `Capturing the screen`, nothing surviving exit. **430 tests (+1)**,
+  full dev loop green. G16's first criterion was rewritten to match the ruling; **T2 inherits the
+  "keeps your Mac awake" caption**. ⚠️ `dist/ScreenRec.app` is now **1.7.2 + this task**, not the
+  pristine v1.7.2 tag build (step 4 of the dev loop rebuilt it). **Next: M16-T2** (armed replay states
+  its cost) — plan artifact first.
+
+- **🎉 v1.7.2 CUT (2026-07-24) — M15 (Gate & Debt) earns the PATCH.** `VERSION` +
+  `CoreInfo.version` → 1.7.2 (pin test green), committed (`b01772f`), cut via **`Scripts/release.sh` run
+  in the BACKGROUND** — full gate green (clean tree · version pin · build · test · encode×3 · release
+  build · bundle-sign), tagged `v1.7.2`, pushed main + tag; the pre-push hook's gate passed too.
+  **0 unpushed; tag on origin; `dist/ScreenRec.app` reports 1.7.2.** PATCH not MINOR (ADR-013): M15 is
+  reliability + process, no new user-facing feature. VT stayed healthy — the release ran to completion
+  and was never killed mid-encode.
+  **⚠️ NOT INSTALLED: `/Users/Shared/ScreenRec.app` is still 1.7.1 and running (pid 72381).** Deploying
+  means quitting the live menu-bar app, so it's left for Franco — the built bundle is at
+  `dist/ScreenRec.app`. **Next: Franco's call — deploy 1.7.2, or start M16 (Honest State).**
+
+- **🎉 M15 COMPLETE — GATE G15 PASSED (2026-07-24). Roadmap: M16 → M17 → M18 remain.** Four tasks
+  shipped (T1 test determinism, T3 export partials, T4 drift/dead-code, T5 this rotation); **T2 closed
+  "won't do"**. G15's four criteria all met: `swift test` green **20×** with no run over 10 s (was 8/10
+  failing at ~123 s); a killed mid-export leaves **nothing at the final name** (A/B measured); no stale
+  comment or dead enum arm remains; STATUS.md is **237 lines** (was 2,769) and the reading order works
+  cold. **M15 is reliability + process with no new user-facing feature → PATCH-worthy (1.7.2), Franco's
+  call to cut** (bump `VERSION` + `CoreInfo.version`, then `Scripts/release.sh` — run it in the
+  **background**, never under a short foreground timeout, or it gets SIGTERM'd mid-encode).
+  **4 commits unpushed.** **Next: Franco's call — cut 1.7.2, or start M16 (Honest State).**
+
+- **✅ M15-T5 DONE (2026-07-24) — STATUS.md 2,769 → 237 lines.** Field notes → their own
+  **`docs/07-field-notes.md`** (1,236 lines), now **#4 in CLAUDE.md's reading order**: they were the
+  most valuable artefact in the repo and the least findable, buried 1,400 lines into a file every
+  session must read. Closed session logs + the v1 status write-up + the M2-T6 calibration table →
+  **`docs/history/2026-07-sessions.md`** (1,320 lines), explicitly unmaintained. **Rotation verified
+  lossless** — every original non-blank line accounted for across the three files except the two
+  headings deliberately rewritten. CLAUDE.md's five "STATUS.md field notes" pointers and README's doc
+  map now resolve to the new homes, and the session-end checklist gained a standing "re-rotate past
+  ~250 lines" instruction so this can't silently regrow.
+
+- **✅ M15-T4 DONE (2026-07-24) — stale comments, two dead `EndReason` cases, one duplicated helper.**
+  `EndReason.microphoneChanged` (unreachable since M8-T1 normalized every mic buffer) and `.systemSleep`
+  (never reachable — SCK reports sleep, lock and lid-close as one code) are **deleted**, per M14-T3's
+  precedent, rippling through the CLI's `describe`, the notification `cause` switch, two test fixtures
+  and docs 01/02/05/06. Three stale doc comments corrected (`makeMicrophoneInput` claimed device-native
+  audio format; `Settings.replaySeconds` and `AppState.replaySeconds` both still said "30/60/120" after
+  M9-T8 made it a range). `isSameFile` is now one `URL` extension (`FileIdentity.swift`), kept distinct
+  from `Exporter.sameFile` on purpose — that one resolves symlinks and file identity, this one answers
+  "does this receipt point at that row" and must still work once the file is gone.
+  **A fifth drift surfaced while fixing the fourth:** docs/06's fail-stop cause list was wrong in *both*
+  directions — it named `microphone changed` **and** omitted `the recorded app quit` (M7). Now matches
+  the `cause` switch exactly. **429 tests unchanged, full dev loop green, CLI verified by hand.**
+  **Next: M15-T5** (rotate this file) — the last M15 task.
+
+- **✅ M15-T3 DONE (2026-07-24) — exports get the recording path's `.partial` discipline.** The three
+  exporters (`Exporter`/`GifExporter`/`Trimmer`) write to a `.partial` companion and rename only on
+  success, and the launch sweep learned to tell a recording partial from an export one. **Premise
+  confirmed by A/B, not assumed:** `kill -9` mid-export **before** left a torn `Take.mp4` **at the real
+  name** (which M12-T2 would list in Recent Exports as a finished file); **after**, only
+  `Take.mp4.partial` and nothing at the final name.
+  **Two design changes from the plan, both found by doing it:** **(1)** it went into the **exporters**,
+  not `ExportModel.performExport` — the funnel looked like the one-place win, but its injected spies
+  deliberately never touch the filesystem, so a rename there failed 5+ pure wiring tests and would have
+  forced them to create real files; putting it at each exporter's entry point kept every test untouched
+  **and closed the CLI gap the plan had written off**. **(2)** the sweep is **three-way**: "recover
+  `.mov`, delete the rest" would have deleted the CLI's extension-less exact-path partials
+  (`take1.partial`), which `finalizePartial` explicitly supports — so it recovers `.mov` + extension-less,
+  deletes only known export extensions, and **leaves anything unrecognized alone** (deletion is
+  irreversible). `OutputLocation.exportExtensions` is now the one list the sweep and `RecentRecordings`
+  share. **429 tests (+4)**, three gated encode suites green through the new path, live CLI
+  mp4/gif/trim all landing correctly, dev loop green. **Next: M15-T4.**
+
+- **🚫 M15-T2 DECLINED (Franco, 2026-07-24) — closed "won't do", not deferred.** The settings-mirror
+  collapse is off the board; full reasoning in docs/03 under M15-T2. Two planning-pass findings killed
+  it: **(1)** the bug it claimed to prevent barely exists — `Settings` uses the memberwise init and
+  `persist()` passes all 17 args, so a new field **breaks the build**; only a field declared *with a
+  default* slips through silently. **(2)** `@Observable` tracks **stored** properties, so one backing
+  `settings` struct would coarsen granularity **17 → 1** — every preference write notifying every
+  preference reader, on a codebase where M6-T10 makes spurious publishes actively harmful. The
+  `PermissionsModel`/`ExportModel` precedent doesn't transfer (those are `let` refs to `@Observable`
+  **classes** with individually-tracked properties; a struct has none), and the class-backed variant
+  preserves granularity while **not doing the task** — it relocates the mirror, the exact shape M9-T7
+  rejected. **Ruling: ~70 lines isn't worth loosening the observation graph.** **Next: M15-T3**
+  (export partial-file discipline) — plan artifact first.
+
+- **✅ M15-T1 DONE (2026-07-24) — `swift test` is deterministic again: 8/10 failing → 0/20, slowest 3 s.**
+  Two changes, both in `Tests/`, **no production code touched**: `@Suite(.serialized)` on
+  `ReplayEncoderTests` + `ReplayMuxerTests`, and the `SyntheticBuffers.swift` readiness `precondition`
+  replaced with `Issue.record` + early return. **Option (a) from the plan — gating the two suites behind
+  `SCREENREC_HW_ENCODE_TESTS=1` — proved unnecessary, so replay-encoder coverage stays in the default
+  loop.** Evidence:
+
+  | Stage | Runs | Failed | Wall clock |
+  |---|---|---|---|
+  | Baseline (unmodified) | 10 | **8** | 2–3 s green / 122–124 s failing |
+  | `Issue.record` only | 10 | **7** | unchanged — *no improvement* |
+  | `+ @Suite(.serialized)` | 20 | **0** | slowest **3 s** |
+
+  Also: the three gated encode suites green in isolation (Exporter 12, Trimmer 4, GifExporter 4); full
+  dev loop green (build · **425 tests / 3 s** · release · signed bundle).
+  **⚠️ Two premises I asserted in the review were wrong; the measurement corrected them —**
+  **(1)** the `precondition` was never the common failure (it fired **0 times in 10 real runs**), and
+  removing it alone changed nothing (7/10). It is worth keeping — forced to fire it now records **13
+  issues with 0 aborts and all 425 tests still reporting**, where before one flake killed the run — but
+  it is robustness, not the cure. **(2)** The ~120 s is not a prior run's abort poisoning the next; it
+  is spent *inside* each test, which then mostly **passes** at ~122 s. See the field note for the real
+  mechanism. **Next: M15-T2** (collapse the settings mirror) — plan artifact first.
+
+- **✅ RESOLVED by M15-T1 — the "`swift test` failed 3× in a row" entry below overstated it.** The
+  correct characterisation is **flaky, with strong autocorrelation**: a 10-run baseline measured 8
+  failures in the pattern `pass, fail×6, pass, fail, fail` — so it recovers on its own and re-trips,
+  rather than staying broken. Everything else in that entry stands; the *cause* it named (VT
+  oversubscription) was right, the *amplifier* it named (the `precondition` poisoning the next run) was
+  not. Kept below unedited as the original observation.
+
+- **🗺️ ROADMAP REFILLED (2026-07-24) — a full-repo review produced M15–M18; nothing implemented yet.**
+  A code/architecture + product review of v1.7.1 (clean tree at `6c6dd0e`) produced **18 findings — 6
+  code (A1–A6), 12 product (B1–B12)** — now encoded as four milestones in docs/03. **Next: M15-T1**
+  (plan artifact first, per the working contract). Order and rationale:
+  - **M15 — Gate & Debt** (A1–A6, **PATCH**). Do first. **The headline is that `swift test` is not
+    reliably green** — see the finding below; the rest is the settings mirror (A2), export partial-file
+    discipline (A3), stale comments + dead `EndReason` cases (A4/A6) and rotating this file (A5).
+  - **M16 — Honest State** (B1–B4, B8, B9, **MINOR**). The review's thesis: extend ADR-007 from "never
+    a broken file" to "never a lying state" — armed replay's sleep assertion (B1) and its cost (B8),
+    optional system audio (B2), silent-audio detection + a level indicator (B3), an onboarding
+    capability self-test (B4), and showing the version (B9).
+  - **M17 — Window capture** (B5, **MINOR**). The last missing scoping mode; M11's shape exactly.
+  - **M18 — Editing & Menu polish** (B6, B7, B10–B12, **MINOR**). Trim honesty + precise mode, MP4
+    export options, menu row-count, and five small papercuts.
+  M17/M18 are interchangeable; **M17-T2 adds menu rows that M18-T3 is removing** — whichever runs
+  second inherits the coordination (flagged in both tasks). Review artifact:
+  `claude.ai/code/artifact/b5915b92-c083-4e2e-8cc9-f590901d8e8c`.
+  **⚠️ Two things the review changed about how to read this repo:** (1) the running app was **not**
+  driven during it — no menus opened, no screenshots — so every UI finding is read from view source
+  and docs/06, i.e. inference, not measurement; (2) B4 was **missing** from the artifact's bundle
+  table (Franco caught it) and is now M16-T6.
+
+- **🔴 FIELD NOTE / OPEN — `swift test` failed 3× in a row on a clean tree (2026-07-24), no source
+  changes.** This is M15-T1 and the most urgent item on the board, because with no CI this suite *is*
+  the gate and it fronts the pre-push hook. Measured at v1.7.1, `6c6dd0e`:
+  - **Run 1 — aborted.** `Precondition failed: encoder session never became ready`
+    (`SyntheticBuffers.swift:24`). It's a `precondition` in a *shared helper*, so the process dies and
+    the other 424 tests never report — one flake costs the whole run's signal.
+  - **Run 2 — 6 issues, 121.7 s** (`ReplayEncoderTests` 5, `ReplayMuxerTests` 1).
+  - **Run 3 — 4 issues, 121.6 s**, one carrying `The replay encoder failed on a frame (VT error
+    -12912)` — VideoToolbox encoder malfunction / resource exhaustion. Each failing test burns a 120 s
+    timeout first; the suite historically runs in ~2 s.
+  **The mechanism was already known** (field note 2026-07-21: swift-testing parallelises suites,
+  several hold a live `VTCompressionSession`, Apple Silicon allows only a handful) — **but the
+  mitigation only ever reached the three env-gated encode suites.** The pre-push hook runs those one
+  at a time with `--filter` and its comment says exactly why; `ReplayEncoderTests`/`ReplayMuxerTests`
+  are always-on, carry no `.serialized` trait, and run concurrently with everything else. Candidate
+  fixes and the trade-offs are in M15-T1's Rulings; the recommendation is to gate the two VT suites
+  the same way the other three already are, plus replacing that `precondition` with a recorded
+  failure. **Until this lands, treat a red `swift test` as unproven rather than as a regression, and
+  re-run the encoder suites in isolation to tell the two apart.**
+
+- **🎉 v1.7.1 CUT (2026-07-23) — M14 (Cleanup) earns the PATCH; roadmap empty.** `VERSION` +
+  `CoreInfo.version` → 1.7.1 (pin green), committed (`3581e3d`), cut via **`Scripts/release.sh` run in the
+  BACKGROUND** (VT-wedge lesson) — full gate green (build · test · encode×3 · release · bundle-sign),
+  tagged `v1.7.1`, pushed main + tag. **0 unpushed; tag on origin; installed 1.7.1** (/Users/Shared).
+  PATCH not MINOR: M14 is behaviour-preserving refactors (ExportModel extraction · WriterDrain dedup ·
+  hygiene), no new user-facing feature (ADR-013). VT stayed healthy — background run never killed
+  mid-encode. **🏁 The v1.6.0-review roadmap (M12 Share&Surface · M13 Hardening · M14 Cleanup) is fully
+  SHIPPED.** Tags this arc: v1.6.1 (M13), v1.7.0 (M12), v1.7.1 (M14). **Next: Franco's call — dogfood, or
+  scope new work (no planned milestones remain; webcam DECLINED ADR-017, studio/compositing parked
+  ADR-015).**
