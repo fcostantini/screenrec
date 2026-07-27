@@ -6,6 +6,22 @@
 
 ## Now
 
+- **✅ M16-T6 DONE (2026-07-27) — onboarding proves capture works, and the app finally names its
+  build. M16 IS COMPLETE (T1–T6); the MINOR bump to 1.8.0 is Franco's call.** `Run a test` records
+  5 s into scratch, reads the finished file's tracks, deletes it, and reports one line per source.
+  **Four outcome states on purpose** — "you turned it off" must not read like "it's broken" — and
+  the mic verdict reuses **T4's measured −90 dBFS floor**, so *silent* means the same thing
+  everywhere. Audio tracks are told apart by **channel count** (system stereo, mic normalized mono).
+  It runs its **own** session, so an armed replay keeps its ring.
+  **Verified live on the deployed app, driven through the AX API** (System Events can't see these
+  windows, and the setup window closes when unfocused — `scratchpad/windrive.swift`):
+  `✓ screen · 4112 × 2570` / `✓ system audio` / `✓ microphone · AirPods Pro`; **muted** →
+  `! microphone · silent — check that it isn't muted`; **mic None** → `— microphone · not selected`;
+  scratch directory gone afterwards; both footers read `ScreenRec 1.7.2`, matching `VERSION`.
+  Franco's mic pick and input volume restored after every leg. **470 tests (+7)**, dev loop green,
+  deployed. **Next: cut 1.8.0** (bump `VERSION` + `CoreInfo.version`, record G16, `Scripts/release.sh`
+  **in the background** — never under a short foreground timeout, or it gets SIGTERM'd mid-encode).
+
 - **✅ M16-T5 DONE (2026-07-27) — the menu-bar label shows the input level; DEPLOYED.** Three bars
   beside the icon while recording **or armed** (Franco's ruling — that's what makes it useful
   *before* a take), opt-out `showsMenuBarLevel`.

@@ -1,4 +1,5 @@
 import AppCore
+import RecorderCore
 import AppKit
 import SwiftUI
 import UserNotifications
@@ -29,15 +30,70 @@ struct OnboardingView: View {
 
             ForEach(state.onboardingRows) { row in
                 PermissionRowView(row: row, act: { act(on: row) })
-                if row.id != .notifications { Divider() }
+                Divider()
             }
+
+            // M16-T6: green ticks only mean TCC said yes. This is the claim that matters —
+            // a recording comes out, with the sources the pickers name.
+            SelfTestSection(state: state)
+
+            Divider().padding(.top, 14)
+            Text(state.versionLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 8)
         }
         .padding(22)
         .frame(width: 460)
         .task { await pollUntilSatisfied() }
     }
 
-    /// One button, whatever the row says it should do.
+    /// The five-second capability test and its verdict (M16-T6).
+private struct SelfTestSection: View {
+    let state: AppState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Check that recording works").fontWeight(.semibold)
+                    Text("Records five seconds and throws it away.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(state.selfTestState == .running ? "Testing…" : "Run a test") {
+                    Task { await state.runCaptureSelfTest() }
+                }
+                .disabled(state.selfTestState == .running)
+            }
+            if case .done(let result) = state.selfTestState {
+                VStack(alignment: .leading, spacing: 3) {
+                    line("screen", result.screen)
+                    line("system audio", result.systemAudio)
+                    line("microphone", result.microphone)
+                }
+                .font(.caption.monospaced())
+                .padding(.top, 2)
+            }
+        }
+        .padding(.top, 14)
+    }
+
+    /// `✓ microphone · MacBook Pro Microphone` — symbol, source, then whatever the outcome adds.
+    private func line(_ label: String, _ outcome: SelfTestOutcome) -> some View {
+        let (symbol, detail, colour): (String, String?, Color) = switch outcome {
+        case .ok(let detail): ("✓", detail, .green)
+        case .skipped(let reason): ("—", reason, .secondary)
+        case .warning(let message): ("!", message, .orange)
+        case .failed(let message): ("✗", message, .red)
+        }
+        return Text("\(symbol) \(label)").foregroundStyle(colour)
+            + Text(detail.map { " · \($0)" } ?? "").foregroundStyle(.secondary)
+    }
+}
+
+/// One button, whatever the row says it should do.
     private func act(on row: OnboardingRow) {
         switch row.action {
         case .openSettings(let pane), .review(let pane):

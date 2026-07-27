@@ -102,18 +102,24 @@ Pass criteria:
 4. Settings: change output dir to Desktop WITHOUT granting → immediate friendly error
    at selection (preflight), not at record time.
 
+**Capability self-test (M16-T6)** — the same judgement as `Scripts/smoke.sh`, from the UI:
+onboarding's `Run a test` records 5 s into scratch, reports per-source outcomes and deletes the file.
+`CaptureSelfTest.verdict` is pure, so every partial-pass case is unit-tested; the live legs are
+mic-None, muted, and a normal run.
+
 ## §6 — G5: Instant replay
 
 1. `replay-arm --seconds 60` for 3 min: ring occupancy stabilizes at ~60 s; CPU < 10%
    average (cumulative cpu-time / wall-time, not spot samples). Memory: ring payload ≈
-   Balanced bitrate × (window + 2 s slack) — **shipped as `ReplayFootprint` (M16-T2), which is
-   what the UI quotes**; its tests restate this formula, so a change here must change both — — ~145 MB busy at 4112×2570 — so the RSS
+   Balanced bitrate × (window + 2 s slack) — ~145 MB busy at 4112×2570 — so the RSS
    plateau bound is **≲ 400 MB busy** (AMENDED 2026-07-16, Franco: replay keeps Balanced
    parity with recordings, no dedicated cap; the original ≲ 200 MB assumed ~10 Mbps).
    ⚠️ Task-level RSS attribution of VT/CM buffer memory varies run-to-run on identical
    binaries (02 §9 / STATUS field notes) — **flatness over minutes 5→30 is the leak
    check; the absolute number is advisory.** VT `DataRateLimits` on the replay session
    remains the lever if the uncapped ring ever matters (we drive VT directly).
+   **The formula ships as `ReplayFootprint` (M16-T2) — it is what the UI quotes, and its tests
+   restate this line, so changing one means changing both.**
 2. Save timing: with `replay-arm` running, `kill -USR1 $PID`, then poll for the output
    file — signal-to-file-exists < 1 s. Probe: hvc1 + 2 AAC; duration 60 + ≤ 1 s; starts
    on a keyframe; content is genuinely the LAST minute (human check: on-screen clock

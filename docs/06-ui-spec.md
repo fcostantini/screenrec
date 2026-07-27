@@ -296,6 +296,18 @@ one button:
    we'll relaunch automatically." (Relaunch helper: spawn detached
    `/usr/bin/open -n` on self after grant detected.)
 2. **Microphone** — button `Grant…` → standard prompt; instant, no relaunch.
+3. **Check that recording works (M16-T6)** — below the rows, a `Run a test` button:
+   *"Records five seconds and throws it away."* It records into a **scratch directory — never the
+   output folder** — reads the finished file's tracks and deletes it, then reports one line per
+   source. Four states, because "you turned it off" and "it's broken" must not read alike:
+   `✓ screen · 4112 × 2570` / `— system audio · turned off` / `! microphone · silent — check that
+   it isn't muted` (**M16-T4's words and its measured floor — one vocabulary per condition**) /
+   `✗ screen · nothing was recorded`. Green ticks above only prove TCC said yes; this proves capture.
+   It runs its own session, so an armed replay keeps its ring. Re-runnable; the menu header already
+   opens this window, so it needs no menu row of its own.
+4. **Version footer (M16-T6)** — `ScreenRec <CoreInfo.version>`, here and in the Settings footer.
+   ADR-014 hands people a signed `.app` directly, so *"am I on the build with the fix?"* has to be
+   answerable from inside the app.
 
 ⚠️ **AMENDED 2026-07-15 (M4-T3 spike): a `Grant…` button alone is not enough, and shipping only
 one would strand exactly the users who need help.** macOS prompts **once, ever** — after a

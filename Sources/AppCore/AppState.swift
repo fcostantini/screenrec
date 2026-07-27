@@ -804,6 +804,51 @@ public final class AppState {
             seconds: Double(seconds), includesMicrophone: presentMicrophonePreference != .none)
     }
 
+    // MARK: - Capability self-test (M16-T6)
+
+    /// Where the onboarding self-test has got to. `nil` result ⇒ never run this launch.
+    public enum SelfTestState: Sendable, Equatable {
+        case idle
+        case running
+        case done(CaptureSelfTestResult)
+    }
+    public private(set) var selfTestState: SelfTestState = .idle
+
+    /// The app's version, for the two footers (M16-T6). ADR-014 hands people a signed `.app`
+    /// directly, so "am I on the build with the fix?" has to be answerable from inside it.
+    public var versionLabel: String { "ScreenRec \(CoreInfo.version)" }
+
+    /// Records five seconds, reports what came out, and deletes it — proof that capture works, as
+    /// opposed to proof that TCC said yes. Writes to a scratch directory, never the output folder.
+    public func runCaptureSelfTest() async {
+        guard selfTestState != .running else { return }
+        selfTestState = .running
+        let resolution = microphoneResolution()
+        var configuration = captureConfiguration
+        configuration.microphone = micSelection(resolution)
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("screenrec-selftest", isDirectory: true)
+        try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        let result = await CaptureSelfTest.run(
+            configuration: configuration, microphone: selfTestMicrophone(resolution), in: scratch)
+        try? FileManager.default.removeItem(at: scratch)
+        selfTestState = .done(result)
+    }
+
+    /// What the test should say about the mic: the user's pick as it actually resolved.
+    private func selfTestMicrophone(_ resolution: MicrophoneResolution) -> MicrophoneExpectation {
+        guard microphonePreference != .none else { return .notSelected }
+        guard case .explicit(let id) = resolution else {
+            let name = if case .device(let picked) = microphonePreference {
+                microphones.first { $0.uniqueID == picked }?.name ?? "The selected microphone"
+            } else {
+                "No microphone"
+            }
+            return .unavailable(name: name)
+        }
+        return .expected(name: microphones.first { $0.uniqueID == id }?.name ?? "Microphone")
+    }
+
     /// Loudest mic sample since the last call, for the menu-bar meter (M16-T5) — a recording's
     /// stream when one runs, else the armed stream's. A **method**, not a published property: the
     /// meter polls it off a timer, and a per-frame publish is exactly what M6-T10 forbids.

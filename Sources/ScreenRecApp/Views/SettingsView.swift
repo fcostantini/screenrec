@@ -111,6 +111,12 @@ struct SettingsView: View {
             // isn't in the recording.
             Toggle("Count in before recording (3-2-1)", isOn: $state.countInEnabled)
 
+            // M16-T6: ADR-014 hands people a signed .app directly — the version has to be
+            // answerable from inside the app.
+            Text(state.versionLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             Section("Instant Replay") {
                 LabeledContent("Replay buffer") {
                     HStack(spacing: 10) {

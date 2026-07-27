@@ -1411,7 +1411,7 @@ flow past a consumer. Earns a **MINOR** (ADR-013).
       three or four discrete segments probably beat a continuous bar. **Verify:** screenshot the
       label across ≥3 ticks with audio playing and assert the drawn level changes — **MEASURE, don't
       eyeball** (the M4-T1 rule); the opt-out shows nothing.
-- [ ] M16-T6 **Onboarding proves capability, and names the build.** *(Review findings B4 + B9 — B4
+- [x] M16-T6 **Onboarding proves capability, and names the build.** *(Review findings B4 + B9 — B4
       was missing from the review artifact's bundle table; Franco caught it, it belongs here beside
       T4/T5.)* The setup checklist goes green when **TCC says yes**. It never proves the thing that
       actually matters: that a recording comes out with picture *and* both audio tracks, from the
