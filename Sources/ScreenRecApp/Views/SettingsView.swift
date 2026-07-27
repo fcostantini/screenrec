@@ -171,6 +171,20 @@ struct SettingsView: View {
                     .font(.caption)
             }
 
+            Section("MP4") {
+                Picker("Size", selection: $state.mp4Width) {
+                    ForEach(Settings.allowedMP4Widths, id: \.self) {
+                        Text(state.mp4SizeLabel(forWidth: $0)).tag($0)
+                    }
+                }
+                Text("Applies to Export as MP4. Height follows the source's aspect, and a bigger "
+                    + "pick means a bigger file. Sizes stop where H.264 does on phones, so the clip "
+                    + "still plays where you send it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Section("GIF") {
                 Picker("Frames per second", selection: $state.gifFPS) {
                     ForEach(Settings.allowedGifFPS, id: \.self) { Text("\($0) fps").tag($0) }

@@ -1531,14 +1531,22 @@ ride the same bump.
       against a second earlier); lossless stores a lead-in and precise stores none (edit-list
       segments); the re-encode preserves 4112×2570, hvc1 and both audio tracks (ADR-004); the
       original is byte-identical after both.
-- [ ] M18-T2 **MP4 export gets the options GIF already has.** `Export as MP4` is hardcoded to 1920
-      wide / 6 Mbps / H.264 High while `Save as GIF` gets fps, width and max-length pickers — so a
-      4112×2570 demo comes out at ~1080p whether the user wanted full resolution or a small
-      attachment. The asymmetry reads as an oversight, not a decision. **Seams:** `ExportConfiguration`
-      already carries every knob; this is plumbing — either a `Share ▸` submenu (Original / 1080p /
-      720p) or an **MP4** Settings section mirroring GIF's, with the same snap-on-load discipline and
-      the same "the CLI keeps its own flags" split. **Verify:** settings round-trip + snap unit tests;
-      a persisted 720p pick → real app export → a 720p `.mp4`, still h264/yuv420p/faststart.
+- [x] M18-T2 **MP4 export gets the options GIF already has.** `Export as MP4` was hardcoded to 1920
+      wide / 6 Mbps / H.264 High while `Save as GIF` got three pickers. **Rulings (Franco,
+      2026-07-27):** (a) a **Settings section** mirroring GIF, not a `Share ▸` submenu — M18-T3 is
+      cutting menu rows; (b) the ceiling row names what it will really produce, `Largest
+      (3686 × 2304)`; (c) bitrate **rises with the output's pixel count** from 6 Mbps at 1920×1200 and never
+      falls below it, no second picker — today's default export is unchanged and no smaller output
+      gets softer.
+      ⚠️ **The measurement that bounded it:** docs/02 §3's "AVAssetWriter's H.264 path caps at
+      4096×2304" is **false** — the writer encodes 4112×2570 fine, but at **Level 6.0**, which most
+      phone decoders refuse. 4096×2304 is exactly **Level 5.2's** frame size, so the ceiling is a
+      compatibility one and there is **no honest "Original"** for a 4112×2570 recording. 02 §3
+      corrected. **Verified:** 508 tests (+6) incl. round-trip/snap and the settings→config wiring;
+      four CLI exports measured — 1280×800 L3.2 / 1920×1200 L5.0 / 2560×1600 L5.0 / 3686×2304 L5.2,
+      all yuv420p + faststart, bitrate at or above the 6 Mbps reference, up to 19.6; and a persisted `Largest` pick driven
+      through the real Settings picker → menu export → **3686 × 2304, High, Level 5.2** (setting
+      restored to 1920 afterwards).
 - [ ] M18-T3 **The menu earns its rows back.** The idle menu is 20–26 rows: header, Start, Arm,
       banner caveat, Save Replay, export receipt, replay receipt, three submenu titles, folder, five
       recents, a "Recent Exports" label, three exports, Settings, Quit — file lists are two-thirds of

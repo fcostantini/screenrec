@@ -44,7 +44,7 @@ func runExport(_ args: [String]) async {
     var toGIF = false
     var positionals: [String] = []
     var gifFPS: Int?
-    var gifWidth: Int?
+    var width: Int?
     var gifSeconds: Double?
 
     var index = 0
@@ -62,7 +62,7 @@ func runExport(_ args: [String]) async {
         case "--fps":
             gifFPS = max(1, Int(parsePositive(value(after: "--fps"), flag: "--fps", unit: "fps", max: 120).rounded()))
         case "--width":
-            gifWidth = max(1, Int(parsePositive(value(after: "--width"), flag: "--width", unit: "pixels", max: 4096).rounded()))
+            width = max(1, Int(parsePositive(value(after: "--width"), flag: "--width", unit: "pixels", max: 4096).rounded()))
         case "--seconds": gifSeconds = parsePositive(value(after: "--seconds"), flag: "--seconds", max: 900)
         case let flag where flag.hasPrefix("--"): die("Unknown export option: \(flag)")
         default: positionals.append(args[index])
@@ -70,8 +70,8 @@ func runExport(_ args: [String]) async {
         index += 1
     }
     guard toMP4 != toGIF else { die("export needs exactly one of --to-mp4 or --to-gif") }
-    guard !toMP4 || (gifFPS == nil && gifWidth == nil && gifSeconds == nil) else {
-        die("--fps/--width/--seconds only apply to --to-gif")
+    guard !toMP4 || (gifFPS == nil && gifSeconds == nil) else {
+        die("--fps/--seconds only apply to --to-gif")
     }
     guard let inputPath = positionals.first else { die("export needs an input path") }
     guard positionals.count <= 2 else { die("Unexpected extra argument: \(positionals[2])") }
@@ -89,20 +89,21 @@ func runExport(_ args: [String]) async {
         if toGIF {
             try await runGIF(
                 input: input, explicitOutput: explicitOutput,
-                fps: gifFPS, width: gifWidth, seconds: gifSeconds)
+                fps: gifFPS, width: width, seconds: gifSeconds)
         } else {
-            try await runMP4(input: input, explicitOutput: explicitOutput)
+            try await runMP4(input: input, explicitOutput: explicitOutput, width: width)
         }
     } catch {
         die(exportErrorMessage(error), code: 70)
     }
 }
 
-private func runMP4(input: URL, explicitOutput: URL?) async throws {
+private func runMP4(input: URL, explicitOutput: URL?, width: Int?) async throws {
     let output = explicitOutput ?? Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: input))
     let progress = ProgressPrinter()
+    let configuration = width.map { ExportConfiguration(maxWidth: $0) } ?? ExportConfiguration()
     let result = try await Exporter.exportToMP4(
-        from: input, to: output, progress: { progress.report($0) })
+        from: input, to: output, configuration: configuration, progress: { progress.report($0) })
     progress.finish()
     print(
         String(

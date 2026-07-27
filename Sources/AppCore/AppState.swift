@@ -166,6 +166,11 @@ public final class AppState {
         didSet { if gifMaxSeconds != oldValue { persist() } }
     }
 
+    /// The `Export as MP4` width cap (M18-T2), a `Settings.allowedMP4Widths` choice.
+    public var mp4Width: Int {
+        didSet { if mp4Width != oldValue { persist() } }
+    }
+
     // MARK: - Instant replay (docs/06 idle item 3, Settings "Instant Replay")
 
     /// Arming starts the rolling buffer (its own capture stream while idle; a recording's
@@ -457,6 +462,7 @@ public final class AppState {
         gifFPS = settings.gifFPS
         gifWidth = settings.gifWidth
         gifMaxSeconds = settings.gifMaxSeconds
+        mp4Width = settings.mp4Width
         hasSeenReplayBannerWarning = settings.seenReplayBannerWarning
         // The export cluster (M14-T1): it seeds its own persisted receipt from `defaults`.
         exports = ExportModel(defaults: defaults)
@@ -510,6 +516,7 @@ public final class AppState {
                 pauseHotkey: pauseHotkey, countInEnabled: countInEnabled,
                 showsMenuBarTimer: showsMenuBarTimer, showsMenuBarLevel: showsMenuBarLevel,
                 gifFPS: gifFPS, gifWidth: gifWidth, gifMaxSeconds: gifMaxSeconds,
+                mp4Width: mp4Width,
                 seenReplayBannerWarning: hasSeenReplayBannerWarning),
             to: defaults)
     }
@@ -581,9 +588,11 @@ public final class AppState {
         }
     }
 
-    // Export/trim actions forward to `exports` (M14-T1). GIF is the one that carries state: AppState
-    // owns the gif caps (persisted config), so it builds the `GifConfiguration` and passes it in.
-    public func exportToMP4(_ source: URL) { exports.exportToMP4(source) }
+    // Export/trim actions forward to `exports` (M14-T1). AppState owns the persisted export prefs,
+    // so it builds each configuration and passes it in.
+    public func exportToMP4(_ source: URL) {
+        exports.exportToMP4(source, configuration: exportConfiguration)
+    }
     public func exportToGIF(_ source: URL) { exports.exportToGIF(source, configuration: gifConfiguration) }
     public func trim(_ source: URL, from start: Double, to end: Double, mode: TrimMode = .lossless) {
         exports.trim(source, from: start, to: end, mode: mode)
@@ -593,6 +602,24 @@ public final class AppState {
     /// settings AppState owns. Pure, so the settings→config mapping is testable on its own.
     var gifConfiguration: GifConfiguration {
         GifConfiguration(maxWidth: gifWidth, maxHeight: gifWidth, fps: gifFPS, maxSeconds: Double(gifMaxSeconds))
+    }
+
+    /// The `Export as MP4` size as an `ExportConfiguration` (M18-T2). Only the width is a setting —
+    /// the height ceiling is a decoder limit, not a taste (`ExportConfiguration.maxHeight`).
+    var exportConfiguration: ExportConfiguration {
+        ExportConfiguration(maxWidth: mp4Width)
+    }
+
+    /// The Size picker's label for `width`: a plain number, except the ceiling row, which states
+    /// what it would really produce for the current source — "largest" is a fit, not a number, and
+    /// on a window pick it can be far smaller than the ceiling.
+    public func mp4SizeLabel(forWidth width: Int) -> String {
+        guard width == Settings.mp4CeilingWidth else { return "\(width) px" }
+        guard let pixels = displayPixelSize else { return "Largest" }
+        let fitted = Exporter.fittedSize(
+            width: pixels.width, height: pixels.height,
+            configuration: ExportConfiguration(maxWidth: width))
+        return "Largest (\(fitted.width) × \(fitted.height))"
     }
 
     private func syncReplayArming() {
@@ -856,7 +883,7 @@ public final class AppState {
     /// or nil before the screen list arrives — a surface withholds the figure rather than guess.
     /// Takes the window as an argument so the Settings slider can quote its in-progress value.
     public func replayBufferBytes(seconds: Int) -> Int64? {
-        guard let pixels = replayCapturePixelSize else { return nil }
+        guard let pixels = capturePixelSize else { return nil }
         // `present…`, not the raw pick: an away device attaches no mic ring, so billing for one
         // would quote a buffer the armed stream isn't going to hold.
         return ReplayFootprint.estimatedBytes(
@@ -952,14 +979,29 @@ public final class AppState {
     /// on its display; an app filter composites **on the main display** whatever display the pickers
     /// remember, and its frames stay display-sized (02 §1a); a whole-screen pick follows the
     /// selection. Nil when that display's geometry is unknown.
-    private var replayCapturePixelSize: (width: Int, height: Int)? {
-        let region = selectedRegion
-        let displayID = region?.displayID ?? (selectedAppBundleID == nil ? selectedDisplayID : nil)
-        guard let screen = displayOption(for: displayID),
+    private var capturePixelSize: (width: Int, height: Int)? {
+        guard let screen = displayForCurrentSelection,
               screen.pointPixelScale > 0, screen.pointSize != .zero else { return nil }
         return CaptureConfiguration.pixelDimensions(
-            pointSize: region?.rect.size ?? screen.pointSize,
+            pointSize: selectedRegion?.rect.size ?? screen.pointSize,
             pointPixelScale: screen.pointPixelScale)
+    }
+
+    /// The whole display a capture would land on, ignoring any region narrowing — what a
+    /// full-screen recording of the current pick measures. The export Size picker quotes this and
+    /// not `capturePixelSize`: a region pick says nothing about the size of the *file* being
+    /// exported, which may be an older full-screen take.
+    private var displayPixelSize: (width: Int, height: Int)? {
+        guard let screen = displayForCurrentSelection,
+              screen.pointPixelScale > 0, screen.pointSize != .zero else { return nil }
+        return CaptureConfiguration.pixelDimensions(
+            pointSize: screen.pointSize, pointPixelScale: screen.pointPixelScale)
+    }
+
+    private var displayForCurrentSelection: DisplayOption? {
+        let displayID = selectedRegion?.displayID
+            ?? (selectedAppBundleID == nil ? selectedDisplayID : nil)
+        return displayOption(for: displayID)
     }
 
     /// A display id as its option; a nil id means the main display, matching the engine's `.main`.

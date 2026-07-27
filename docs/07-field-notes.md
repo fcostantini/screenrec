@@ -7,6 +7,24 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-27 (M18-T2):
+  - 🔴 **"AVAssetWriter's H.264 path caps at 4096×2304" is false, and it had been load-bearing since
+    M2.** The writer encodes 4112×2570 H.264 without complaint — it just moves to **Level 6.0**.
+    Measured levels: 1280×800 → 3.2, 1920×1200 → 5.0, 2560×1600 → 5.0, 3686×2304 → **5.2**,
+    4112×2570 → **6.0**. 4096×2304 is exactly Level 5.2's maximum frame size (36 864 macroblocks),
+    so the number in docs was right for the wrong reason: it is a **decoder compatibility** ceiling,
+    not an API limit, and nothing in the encode path tells you when you cross it. A "share" export
+    that silently becomes Level 6.0 is the worst kind of regression — it writes, plays on the
+    machine that made it, and fails on the phone you sent it to.
+  - ⚠️ **"Scale the bitrate with the size" is only half a rule.** A symmetric scale looks obviously
+    right and would have **softened every existing small export**: region and window recordings are
+    usually below the 1920×1200 reference, so a 1280×800 clip would have gone 6 Mbps → 2.7 at the
+    untouched default setting. Caught in review, not by the tests, which asserted the clamp I had
+    written rather than the behaviour users had. Floored at the reference: rates rise, never fall.
+  - ⚠️ **A re-encode's cost is not linear in pixels.** Same 14 s source: 1280 wide took 2.7 s,
+    1920 → 2.1 s, 2560 → 2.6 s, but 3686 → **12.4 s** (5× the 2560 run for 2× the pixels). Worth
+    knowing before quoting a progress estimate.
+
 - 2026-07-27 (M18-T1, the second half — three of these correct the entry below, written hours
   earlier by the same task):
   - 🔴 **The defect the task was filed on does not exist. A lossless trim already cuts exactly where

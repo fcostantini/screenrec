@@ -161,7 +161,8 @@ import RecorderCore
         #expect(Set(written.keys) == [
             "outputDirectory", "qualityPreset", "fpsCap", "capturesSystemAudio",
             "replayArmed", "replaySeconds", "replayHotkey", "showsMenuBarTimer", "showsMenuBarLevel",
-            "gifFPS", "gifWidth", "gifMaxSeconds", "seenReplayBannerWarning", "countInEnabled",
+            "gifFPS", "gifWidth", "gifMaxSeconds", "mp4Width", "seenReplayBannerWarning",
+            "countInEnabled",
         ])
     }
 
@@ -456,6 +457,24 @@ import RecorderCore
         #expect(snapped.gifFPS == 20)
         #expect(snapped.gifWidth == 480)
         #expect(snapped.gifMaxSeconds == 30)
+    }
+
+    @Test func theMP4WidthDefaultsRoundTripsAndSnaps() {
+        let (defaults, _) = makeDefaults()
+        // Absent ⇒ 1920, the size every export produced before this was a setting (M18-T2).
+        #expect(SettingsStore.load(from: defaults).mp4Width == 1920)
+
+        var settings = Settings.standard
+        settings.mp4Width = Settings.mp4CeilingWidth
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).mp4Width == Settings.mp4CeilingWidth)
+
+        defaults.set(2000, forKey: "mp4Width")   // → 1920
+        #expect(SettingsStore.load(from: defaults).mp4Width == 1920)
+        defaults.set(99_999, forKey: "mp4Width")  // above the list → the ceiling
+        #expect(SettingsStore.load(from: defaults).mp4Width == Settings.mp4CeilingWidth)
+        defaults.set(0, forKey: "mp4Width")       // absent/garbage keeps the default
+        #expect(SettingsStore.load(from: defaults).mp4Width == 1920)
     }
 
     @Test(arguments: [0, -1])

@@ -16,26 +16,43 @@ public enum ExportError: Error, Equatable {
 /// AAC `.mp4`, downscaled, `+faststart` — the ffmpeg recipe this replaces.
 public struct ExportConfiguration: Sendable {
     /// The output is scaled to fit within `maxWidth × maxHeight`, aspect preserved; a smaller
-    /// source is never upscaled. 1920 wide is the recipe's value; the height ceiling keeps us
-    /// under AVAssetWriter's 4096×2304 H.264 cap (02 §3), which capture (4112×2570) exceeds.
+    /// source is never upscaled. `maxHeight` is the compatibility ceiling, not an API limit: the
+    /// writer will encode 4112×2570 H.264 quite happily, but only by moving to Level 6.0, which
+    /// most phone decoders refuse. 4096×2304 is exactly Level 5.2's frame size (02 §3).
     public var maxWidth: Int
     public var maxHeight: Int
-    public var videoBitRate: Int
+    /// The video rate at `referenceSize`; the real rate scales with the output's pixel count
+    /// (M18-T2), so a 3686-wide export isn't encoded at a 1920-wide budget.
+    public var referenceVideoBitRate: Int
     public var audioBitRate: Int
     public var keyFrameIntervalSeconds: Double
+
+    /// The size `referenceVideoBitRate` is quoted at.
+    static let referenceSize = (width: 1920, height: 1200)
+    static let maximumVideoBitRate = 24_000_000
 
     public init(
         maxWidth: Int = 1920,
         maxHeight: Int = 2304,
-        videoBitRate: Int = 6_000_000,
+        referenceVideoBitRate: Int = 6_000_000,
         audioBitRate: Int = 160_000,
         keyFrameIntervalSeconds: Double = 2
     ) {
         self.maxWidth = maxWidth
         self.maxHeight = maxHeight
-        self.videoBitRate = videoBitRate
+        self.referenceVideoBitRate = referenceVideoBitRate
         self.audioBitRate = audioBitRate
         self.keyFrameIntervalSeconds = keyFrameIntervalSeconds
+    }
+
+    /// The rate for a `width × height` output: the reference scaled by pixel count, but never
+    /// *below* the reference — a smaller output than 1920×1200 keeps the rate it has always had,
+    /// so no existing export gets softer (region and window recordings are mostly smaller).
+    func videoBitRate(forWidth width: Int, height: Int) -> Int {
+        guard width > 0, height > 0 else { return referenceVideoBitRate }
+        let referencePixels = Self.referenceSize.width * Self.referenceSize.height
+        let scaled = Double(referenceVideoBitRate) * Double(width * height) / Double(referencePixels)
+        return min(max(Int(scaled.rounded()), referenceVideoBitRate), Self.maximumVideoBitRate)
     }
 }
 
@@ -86,13 +103,22 @@ public enum Exporter {
         return (even(Double(width) * scale), even(Double(height) * scale))
     }
 
-    static func fittedSize(
+    /// The share export's fit, clamped to `levelSafeBox` — no configuration can opt out of the
+    /// ceiling, because exceeding it is silent (the encoder just emits Level 6.0) and only shows up
+    /// on someone else's phone. Public so a surface can state the size a pick will really produce:
+    /// the Size picker's "Largest" row is a fit, not a number (M18-T2).
+    public static func fittedSize(
         width: Int, height: Int, configuration: ExportConfiguration
     ) -> (width: Int, height: Int) {
         fittedSize(
             width: width, height: height,
-            maxWidth: configuration.maxWidth, maxHeight: configuration.maxHeight)
+            maxWidth: min(configuration.maxWidth, levelSafeBox.width),
+            maxHeight: min(configuration.maxHeight, levelSafeBox.height))
     }
+
+    /// The largest frame H.264 Level 5.2 allows — 36 864 macroblocks (docs/02 §3). One definition,
+    /// so the CLI flag, the Settings list and the encode can't drift apart.
+    public static let levelSafeBox = (width: 4096, height: 2304)
 
     /// Transcodes `input` to `output`. `progress` (0…1, on a background queue) tracks the video
     /// pass. Blocking work runs off the cooperative pool. Throws before writing on a bad input,
@@ -249,7 +275,8 @@ private struct TranscodePlan {
                 AVVideoWidthKey: target.width,
                 AVVideoHeightKey: target.height,
                 AVVideoCompressionPropertiesKey: [
-                    AVVideoAverageBitRateKey: configuration.videoBitRate,
+                    AVVideoAverageBitRateKey: configuration.videoBitRate(
+                        forWidth: target.width, height: target.height),
                     AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
                     AVVideoMaxKeyFrameIntervalDurationKey: configuration.keyFrameIntervalSeconds,
                     // No B-frames: a share clip is bitrate-capped (they barely help size) and

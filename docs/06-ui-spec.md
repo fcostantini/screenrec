@@ -399,7 +399,14 @@ the old line is simply false above three green ticks.
   `.requiresApproval` status (user disabled it in System Settings) counts as on, with a
   notification pointing them there; a failed register reverts the toggle and notifies.
   **Works for the self-signed dev build — no notarization needed (measured M6-T5).**
-- **GIF** (M10-T3 follow-up) — a section below Instant Replay, three Pickers steering `Save as GIF`:
+- **MP4** (M18-T2) — a section above GIF (the menu orders them that way), one Picker steering
+  `Export as MP4`: **Size** — 1280 / 1920 / 2560 px, plus a ceiling row that names what it would
+  really produce for the current source, `Largest (3686 × 2304)`. Default 1920, i.e. every export
+  before this was a setting. Sizes stop at H.264 Level 5.2's frame size, because past it the
+  encoder moves to Level 6.0 and phones stop decoding (docs/02 §3) — "Original" is deliberately not
+  offered. Bitrate is not a picker: it rises with the output's pixel count from 6 Mbps at
+  1920×1200 and never falls below it, so a smaller output is never softer than it used to be. The CLI (`export --to-mp4 --width`) has its own flag and does not read these prefs.
+- **GIF** (M10-T3 follow-up) — a section below it, three Pickers steering `Save as GIF`:
   **Frames per second** (12/15/20/24) · **Width** (320/480/640/800 px; caps height too) · **Maximum
   length** (10/15/30/60 s). Defaults 15 / 480 / 30. The CLI (`export --to-gif`) has its own
   `--fps/--width/--seconds` flags and does not read these prefs.
@@ -436,6 +443,7 @@ moved):
 | `showsMenuBarLevel` | Bool; **absent ⇒ on** (opt-out). The status-item input meter while recording or armed (M16-T5) | M16-T5 |
 | `seenReplayBannerWarning` | Bool; **absent ⇒ false** (not seen). Once true the first-arm banner-suppression alert never fires again (M12-T5) | M12-T5 |
 | `gifFPS` · `gifWidth` · `gifMaxSeconds` | Int; each snaps to its nearest picker choice on load, absent ⇒ 15 / 480 / 30. The `Save as GIF` caps (M10-T3 follow-up) | M10-T3 follow-up |
+| `mp4Width` | Int; snaps to its nearest picker choice on load, absent ⇒ 1920. The `Export as MP4` width cap; 4096 means "largest the source allows inside Level 5.2" (M18-T2) | M18-T2 |
 | `lastExportPath` · `lastExportDate` | String path + Date (M12-T2/T3); **absent ⇒ no receipt**. The last export, so its menu receipt survives relaunch — dropped on load if the file is gone (moved/trashed) **or has no date** (a pre-T3 entry), and expired at menu open once the date is **older than one hour** (M12-T3). Not part of `Settings` — a transient pointer, not user config; its own load/save | M12-T2/T3 |
 
 ⚠️ **`launchAtLogin` is NOT a UserDefaults key (amended M6-T5).** The spec originally listed

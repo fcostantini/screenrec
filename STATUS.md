@@ -6,6 +6,33 @@
 
 ## Now
 
+- **✅ M18-T2 DONE (2026-07-27) — `Export as MP4` has a Size, and the ceiling is a decoder's, not
+  an API's.** Plan artifact (rulings A1/B1/C1 approved):
+  `claude.ai/code/artifact/6ded5178-712a-4862-990d-547be5f1a39d`. **508 tests (+6)**, dev loop green,
+  deployed.
+  **🔴 The measurement that bounded the task: docs/02 §3's "AVAssetWriter's H.264 path caps at
+  4096×2304" is false.** The writer encodes **4112×2570** H.264 fine — at **Level 6.0**, which most
+  phone decoders refuse. 4096×2304 is exactly **Level 5.2's** frame size, so the ceiling is a
+  *compatibility* one and **there is no honest "Original"** for a full-screen recording; the largest
+  safe output is **3686 × 2304**. 02 §3 corrected.
+  **As built:** an **MP4** Settings section above GIF with one **Size** picker — `1280 px · 1920 px ·
+  2560 px · Largest (3686 × 2304)`, the ceiling row naming what it would really produce for the
+  current source. Persisted `mp4Width` (absent ⇒ 1920, snap-on-load, the GIF pattern). Bitrate is not
+  a picker: it rises with the output's pixel count from 6 Mbps at 1920×1200 and **never falls below
+  it** — so no existing export gets softer, only larger picks get more. `export --to-mp4 --width` on the CLI.
+  **Verified:** four CLI exports — 1280×800 **L3.2** / 1920×1200 **L5.0** / 2560×1600 **L5.0** /
+  3686×2304 **L5.2**, every one yuv420p + faststart, bitrate up to 19.6 Mbps, 4.9 → 34.5 MB; and
+  live, the real picker set to `Largest (3686 × 2304)` → persisted `mp4Width = 4096` → menu export →
+  **3686 × 2304, High, Level 5.2**. Franco's setting restored to 1920 and the test files deleted.
+  ⚠️ **The review caught a real regression before it shipped:** my first cut scaled *symmetrically*,
+  so a 1280×800 region or window export would have dropped from 6 Mbps to 2.7 — every small share
+  clip quietly softer, at the untouched default setting. Floored at the reference and re-measured
+  (1280×800 → 5.94 Mbps). Also from the review: the Level 5.2 box is now enforced inside
+  `Exporter.fittedSize`, so no configuration can opt out of it, and the ceiling has one definition
+  instead of three literals across three modules.
+  **Next: M18-T3** (the menu diet) — plan artifact first. ⚠️ **Franco flagged the Settings window
+  itself is now too tall** (this task added a section): filed as **M18-T6**, tabs recommended.
+
 - **✅ M18-T1 DONE (2026-07-27) — the defect the task was filed on did not exist; the real one does,
   and the window now states it.** Revised plan artifact (rulings A1 + B1, approved mid-task):
   `claude.ai/code/artifact/0fc6e6c3-2d4b-4e14-a8f2-c97218ce6ab4`. **502 tests (+2)**, full dev loop

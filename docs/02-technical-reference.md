@@ -301,10 +301,15 @@ one has no display at all, so `CaptureEngine.resolveScope` resolves no `SCDispla
 
 ## 3. Video encoding (MovieRecorder)
 
-- **HEVC (`hvc1`) is the default codec.** Hard constraint: AVAssetWriter's H.264 path
-  caps at 4096×2304 — the dev display (4112×2570) already exceeds it. Offer H.264 only
-  with a downscale, or not at all in v1. (M10-T1's share export takes the downscale route:
-  `Exporter` re-encodes to H.264 High/AAC `.mp4` fitted to ≤1920 wide, so the cap is never hit.)
+- **HEVC (`hvc1`) is the default codec.** H.264 is only used by the share export (M10-T1), fitted
+  to a width cap.
+  ⚠️ **The "AVAssetWriter's H.264 path caps at 4096×2304" claim was wrong** (measured 2026-07-27,
+  M18-T2): the writer encodes 4112×2570 H.264 without complaint. What changes is the **level** —
+  1280×800 → 3.2, 1920×1200 → 5.0, 2560×1600 → 5.0, **3686×2304 → 5.2**, **4112×2570 → 6.0**.
+  4096×2304 is exactly **Level 5.2's** maximum frame size (36 864 macroblocks), and Level 6.0 is a
+  2016 addition for 8K that most phone decoders refuse. So the ceiling is real but it is a
+  *compatibility* ceiling: a share export must stay at or below 4096×2304, and there is no honest
+  "original size" MP4 of a 4112×2570 recording — the largest safe output is 3686×2304.
 - Bitrate model (`BitrateModel`): `bits = width × height × fps × BPP`, with H.264-class
   BPP ≈ 0.05 and an HEVC discount ≈ 0.6. Presets (CLI literals: `efficient` |
   `balanced` | `high`, lowercase):

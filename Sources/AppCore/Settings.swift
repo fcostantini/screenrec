@@ -153,6 +153,10 @@ public struct Settings: Sendable, Equatable {
     public var gifFPS: Int
     public var gifWidth: Int
     public var gifMaxSeconds: Int
+    /// The `Export as MP4` width cap (M18-T2), one of `allowedMP4Widths`; `mp4CeilingWidth` means
+    /// "as large as the source allows" (see `ExportConfiguration.maxHeight`). The CLI takes its
+    /// own flag.
+    public var mp4Width: Int
     /// Whether the one-time "banners are hidden while armed" alert has been shown (M12-T5). Absent
     /// ⇒ false (not yet seen); once true the alert never fires again — the dimmed menu row is the
     /// ongoing reminder.
@@ -162,6 +166,10 @@ public struct Settings: Sendable, Equatable {
     public static let allowedGifFPS = [12, 15, 20, 24]
     public static let allowedGifWidths = [320, 480, 640, 800]
     public static let allowedGifMaxSeconds = [10, 15, 30, 60]
+    /// The "Largest" pick: fit the source inside `Exporter.levelSafeBox` rather than promise a
+    /// number (M18-T2).
+    public static let mp4CeilingWidth = Exporter.levelSafeBox.width
+    public static let allowedMP4Widths = [1280, 1920, 2560, mp4CeilingWidth]
 
     /// The list member closest to `value` (ties → the lower), so a hand-edited or future-version
     /// plist value snaps to a real picker choice instead of leaving the Picker blank.
@@ -217,6 +225,7 @@ public struct Settings: Sendable, Equatable {
             gifFPS: 15,
             gifWidth: 480,
             gifMaxSeconds: 30,
+            mp4Width: 1920,
             seenReplayBannerWarning: false)
     }
 }
@@ -275,6 +284,7 @@ public enum SettingsStore {
         public static let gifFPS = "gifFPS"
         public static let gifWidth = "gifWidth"
         public static let gifMaxSeconds = "gifMaxSeconds"
+        public static let mp4Width = "mp4Width"
         /// The last export's path, for the receipt that survives relaunch (M12-T2). Absent ⇒ no
         /// receipt. Not part of `Settings` (it's a transient pointer, not user config) — its own
         /// load/save below. Dropped on load if the file is gone (moved/trashed).
@@ -409,6 +419,10 @@ public enum SettingsStore {
            let seconds = Settings.nearest(rawGifMaxSeconds, in: Settings.allowedGifMaxSeconds) {
             settings.gifMaxSeconds = seconds
         }
+        let rawMP4Width = defaults.integer(forKey: Key.mp4Width)
+        if rawMP4Width > 0, let width = Settings.nearest(rawMP4Width, in: Settings.allowedMP4Widths) {
+            settings.mp4Width = width
+        }
 
         return settings
     }
@@ -518,5 +532,6 @@ public enum SettingsStore {
         defaults.set(settings.gifFPS, forKey: Key.gifFPS)
         defaults.set(settings.gifWidth, forKey: Key.gifWidth)
         defaults.set(settings.gifMaxSeconds, forKey: Key.gifMaxSeconds)
+        defaults.set(settings.mp4Width, forKey: Key.mp4Width)
     }
 }

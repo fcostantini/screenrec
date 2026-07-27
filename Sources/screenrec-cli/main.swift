@@ -11,10 +11,13 @@ func printUsage() {
 
     USAGE:
       screenrec-cli record [options] [path]   Record screen + audio to a .mov
-      screenrec-cli export --to-mp4 <in> [<out>]  Transcode a recording to a shareable
-                                       H.264 + AAC .mp4 (yuv420p, faststart): downscaled to
-                                       1920 wide, the two audio tracks mixed to one. Default
-                                       <out> is the input's .mp4 sibling. The source is read-only.
+      screenrec-cli export --to-mp4 <in> [--width <px>] [<out>]  Transcode a recording to a
+                                       shareable H.264 + AAC .mp4 (yuv420p, faststart): 1920 wide
+                                       by default, the two audio tracks mixed to one. --width sets
+                                       the cap (height follows the aspect, capped at 2304 so the
+                                       output stays inside H.264 Level 5.2); bitrate scales with
+                                       the output size. Default <out> is the input's .mp4 sibling.
+                                       The source is read-only.
       screenrec-cli export --to-gif <in> [<out>]  Save a clip as a looping animated .gif
                                        (default 480 wide, 15 fps, first 30 s). Override with
                                        --fps <n> --width <px> --seconds <n>. Default <out> is the

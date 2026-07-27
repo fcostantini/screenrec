@@ -4,14 +4,9 @@ import Testing
 @testable import AppCore
 import RecorderCore
 
-/// Records the config an injected GIF export was handed (the closure is `@Sendable`).
-private final class ConfigBox: @unchecked Sendable {
-    var value: GifConfiguration?
-}
-
-/// Records the range and mode an injected trim was handed.
-private final class RangeBox: @unchecked Sendable {
-    var value: (start: Double, end: Double, mode: TrimMode)?
+/// Records what an injected export/trim was handed (the closures are `@Sendable`).
+private final class Box<Value>: @unchecked Sendable {
+    var value: Value?
 }
 
 /// AppState → Exporter wiring, with the transcode injected — the real `Exporter` runs the
@@ -28,7 +23,7 @@ private final class RangeBox: @unchecked Sendable {
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
         let written = URL(fileURLWithPath: "/tmp/Clip.mp4")
-        state.exports.exportFunction = { _, _ in written }
+        state.exports.exportFunction = { _, _, _ in written }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
         #expect(state.exportInProgress == "Clip.mov")   // set before the background task runs
@@ -47,7 +42,7 @@ private final class RangeBox: @unchecked Sendable {
         let state = makeState()
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
-        state.exports.exportFunction = { _, _ in throw ExportError.writerFailed("nope") }
+        state.exports.exportFunction = { _, _, _ in throw ExportError.writerFailed("nope") }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
         while state.exportInProgress != nil { await Task.yield() }
@@ -62,13 +57,13 @@ private final class RangeBox: @unchecked Sendable {
         let state = makeState()
         state.notifier = { _ in }
         let firstURL = URL(fileURLWithPath: "/tmp/A.mp4")
-        state.exports.exportFunction = { _, _ in firstURL }
+        state.exports.exportFunction = { _, _, _ in firstURL }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/A.mov"))
         while state.exportInProgress != nil { await Task.yield() }
         #expect(state.lastExport?.url == firstURL)
 
-        state.exports.exportFunction = { _, _ in throw ExportError.writerFailed("nope") }
+        state.exports.exportFunction = { _, _, _ in throw ExportError.writerFailed("nope") }
         state.exportToMP4(URL(fileURLWithPath: "/tmp/B.mov"))
         while state.exportInProgress != nil { await Task.yield() }
         #expect(state.lastExport?.url == firstURL)   // A's pointer isn't erased by B's failure
@@ -78,7 +73,7 @@ private final class RangeBox: @unchecked Sendable {
         let state = makeState()
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
-        state.exports.exportFunction = { _, output in output }
+        state.exports.exportFunction = { _, output, _ in output }
 
         // No suspension point between the two calls, so the first export's task hasn't run yet —
         // the guard sees `exportInProgress` set and drops the second.
@@ -113,7 +108,7 @@ private final class RangeBox: @unchecked Sendable {
         state.gifFPS = 20
         state.gifWidth = 640
         state.gifMaxSeconds = 15
-        let recorded = ConfigBox()
+        let recorded = Box<GifConfiguration>()
         state.exports.gifExportFunction = { _, output, configuration in
             recorded.value = configuration
             return output
@@ -128,10 +123,39 @@ private final class RangeBox: @unchecked Sendable {
         #expect(recorded.value?.maxSeconds == 15)
     }
 
+    @Test func mp4ExportUsesTheSettingsSize() async {
+        // The Size picker is the only thing steering the export; if it stopped arriving, every
+        // clip would silently go back to 1920 wide (M18-T2).
+        let state = makeState()
+        state.notifier = { _ in }
+        state.mp4Width = 2560
+        let recorded = Box<ExportConfiguration>()
+        state.exports.exportFunction = { _, output, configuration in
+            recorded.value = configuration
+            return output
+        }
+
+        state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(recorded.value?.maxWidth == 2560)
+        // The height ceiling is not a preference: it is what keeps the output inside H.264
+        // Level 5.2 (docs/02 §3), so every pick carries it.
+        #expect(recorded.value?.maxHeight == 2304)
+    }
+
+    @Test func theSizePickerNamesWhatTheLargestPickWouldProduce() {
+        // "Largest" is a fit, not a number — the row has to say what it means for this source.
+        let state = makeState()
+        #expect(state.mp4SizeLabel(forWidth: 1920) == "1920 px")
+        let largest = state.mp4SizeLabel(forWidth: Settings.mp4CeilingWidth)
+        #expect(largest.hasPrefix("Largest"))
+    }
+
     @Test func oneExportAtATimeAcrossFormats() async {
         let state = makeState()
         state.notifier = { _ in }
-        state.exports.exportFunction = { _, output in output }
+        state.exports.exportFunction = { _, output, _ in output }
         state.exports.gifExportFunction = { _, output, _ in output }
 
         // An MP4 in flight blocks a GIF (they share one guard); no await between, so the MP4
@@ -160,7 +184,7 @@ private final class RangeBox: @unchecked Sendable {
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
         let written = URL(fileURLWithPath: "/tmp/Clip trimmed.mov")
-        let range = RangeBox()
+        let range = Box<(start: Double, end: Double, mode: TrimMode)>()
         state.exports.trimFunction = { _, _, start, end, mode in
             range.value = (start, end, mode)
             return written
@@ -183,7 +207,7 @@ private final class RangeBox: @unchecked Sendable {
         // The window's checkbox is the only way to ask for a re-encode; if it stopped arriving,
         // the trim would quietly stay lossless and keep the lead-in it promised to drop (M18-T1).
         let state = makeState()
-        let range = RangeBox()
+        let range = Box<(start: Double, end: Double, mode: TrimMode)>()
         state.exports.trimFunction = { _, _, start, end, mode in
             range.value = (start, end, mode)
             return URL(fileURLWithPath: "/tmp/Clip trimmed.mov")

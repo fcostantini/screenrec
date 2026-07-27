@@ -10,11 +10,48 @@ import Testing
     // MARK: - Sizing (pure)
 
     @Test func fittedSizeDownscalesCaptureToTargetWidth() {
-        // 4112×2570 (the dev display) → 1920 wide, aspect preserved. Also clears the H.264
-        // 4096×2304 cap (02 §3) that a native-size encode would hit.
+        // 4112×2570 (the dev display) → 1920 wide, aspect preserved.
         let size = Exporter.fittedSize(width: 4112, height: 2570, configuration: ExportConfiguration())
         #expect(size.width == 1920)
         #expect(size.height == 1200)
+    }
+
+    @Test func theLargestPickStaysInsideLevel52() {
+        // Measured: the writer will encode 4112×2570 H.264, but only at Level 6.0, which most phone
+        // decoders refuse; 4096×2304 is Level 5.2's frame size (02 §3). The ceiling pick must fit
+        // the source inside that box, never hand back the source size.
+        let size = Exporter.fittedSize(
+            width: 4112, height: 2570,
+            configuration: ExportConfiguration(maxWidth: 4096))
+        #expect(size.width == 3686)
+        #expect(size.height == 2304)
+        #expect(size.width * size.height <= 4096 * 2304)
+    }
+
+    @Test func theBitRateRisesWithTheOutputButNeverFalls() {
+        let config = ExportConfiguration()
+        // 6 Mbps is quoted at 1920×1200, so the default export is unchanged (M18-T2)…
+        #expect(config.videoBitRate(forWidth: 1920, height: 1200) == 6_000_000)
+        // …a larger pick isn't encoded at a 1920-wide budget…
+        #expect(config.videoBitRate(forWidth: 3686, height: 2304) > 20_000_000)
+        // …but a *smaller* output keeps the rate it has always had. Region and window recordings
+        // are usually smaller than the reference, and scaling down would have quietly softened
+        // every one of them on upgrade.
+        #expect(config.videoBitRate(forWidth: 1280, height: 800) == 6_000_000)
+        #expect(config.videoBitRate(forWidth: 320, height: 200) == 6_000_000)
+        // The top is capped so no source can ask for an absurd rate.
+        #expect(config.videoBitRate(forWidth: 7680, height: 4320) == 24_000_000)
+    }
+
+    @Test func noConfigurationCanExceedTheLevelSafeBox() {
+        // The ceiling is silent when crossed — the encoder just emits Level 6.0 and the file fails
+        // on someone else's phone — so a caller must not be able to opt out of it (02 §3).
+        let reckless = ExportConfiguration(maxWidth: 8000, maxHeight: 8000)
+        let size = Exporter.fittedSize(width: 5120, height: 2160, configuration: reckless)
+        #expect(size.width <= Exporter.levelSafeBox.width)
+        #expect(size.height <= Exporter.levelSafeBox.height)
+        #expect(size.width * size.height
+            <= Exporter.levelSafeBox.width * Exporter.levelSafeBox.height)
     }
 
     @Test func fittedSizeNeverUpscalesAndRoundsEven() {
