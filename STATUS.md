@@ -6,6 +6,19 @@
 
 ## Now
 
+- **🎉 v1.8.0 CUT AND INSTALLED (2026-07-27) — M16 (Honest State) earns the MINOR.** `VERSION` +
+  `CoreInfo.version` → 1.8.0 (pin test green), committed (`7f074c4`), cut via **`Scripts/release.sh`
+  run in the BACKGROUND** — full gate green (clean tree · version pin · build · 470 tests · encode×3 ·
+  release build · bundle-sign), tagged **`v1.8.0`**, pushed main + tag. **0 unpushed; tag on origin.**
+  **DEPLOYED to `/Users/Shared/ScreenRec.app`** (pid changed; plist `CFBundleShortVersionString` =
+  1.8.0, and the app now says so itself: onboarding + Settings footers read `ScreenRec 1.8.0` — the
+  first release where that question is answerable from inside the app, which is T6's point).
+  MINOR not PATCH (ADR-013): six user-facing features. VT stayed healthy — the release ran to
+  completion in the background and was never killed mid-encode.
+  **Next: Franco's call — dogfood 1.8.0, or start M17 (Window capture) / M18 (Editing & Menu polish).**
+  Note **M17-T2 adds menu rows that M18-T3 is removing** — whichever runs second inherits the
+  coordination (flagged in both tasks).
+
 - **✅ M16-T6 DONE (2026-07-27) — onboarding proves capture works, and the app finally names its
   build. M16 IS COMPLETE (T1–T6); the MINOR bump to 1.8.0 is Franco's call.** `Run a test` records
   5 s into scratch, reads the finished file's tracks, deletes it, and reports one line per source.
