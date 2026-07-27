@@ -6,6 +6,31 @@
 
 ## Now
 
+- **🚧 M18-T1 IN PROGRESS (2026-07-27) — measurements done, `KeyframeIndex` landed, the UI and
+  the precise path are NOT built.** Plan artifact approved (A1 + measure ruling (b) first):
+  `claude.ai/code/artifact/1e5f06a1-027c-4133-aa83-fa8b4e6e99ea`.
+  **What is done:** `KeyframeIndex` (RecorderCore/Export) — the `AVSampleCursor` lookup plus the pure
+  `cutDescription` seam, silent when the in-point already sits on a keyframe, tolerant of sub-frame
+  gaps. **500 tests (+5)**, dev loop green. ⚠️ **`cutPoint` has never executed** — nothing calls it
+  yet; the mechanism is proven by the spike, not by the shipped function.
+  **What the measurements changed (full detail in docs/07, and 02 §3 is corrected):**
+  **(1)** the keyframe gap is **unbounded, not 2 s** — measured **3.37 s** back from a 61 s in-point,
+  because frame-on-change capture emits nothing during a static stretch. Worst at the start of a take,
+  which is where people trim. **(2)** the lookup is **0.0–0.9 ms** on a 23-minute file, so it can run
+  live while dragging. **(3)** docs/03's "route precise mode through `Exporter`" is the **wrong
+  mechanism** (it downscales to 1920 and mixes audio), but the right one is *smaller* than feared:
+  **`AVAssetExportPresetHEVCHighestQuality` with a `timeRange` preserves 4112×2570, hvc1 and BOTH
+  audio tracks, cutting frame-exactly** — a preset choice, not a reader/writer pipeline.
+  **🔴 One open question blocks shipping precise mode:** the re-encode makes `probe` warn
+  **`non-monotonic timestamps: 2 of 130`** where the source is clean (likely B-frames). Every prior
+  gate recorded "probe monotonic-clean" — settle it before precise mode ships.
+  **Next, in order:** (a) settle the non-monotonic warning; (b) add the precise branch to `Trimmer`
+  (preset swap + `timeRange`) and `--precise` to the CLI so the verify is headless; (c) wire
+  `TrimView` — the delta line from `cutDescription`, the Precise toggle, `I`/`O` shortcuts, Play
+  range; (d) fix the **"up to two seconds" copy still wrong in `TrimView.swift:82` and
+  `main.swift:24`**; (e) live legs (needs an app swap — 1.9.0 is installed and armed, so it costs
+  the ring) and commit.
+
 - **🎉 v1.9.0 CUT, PUSHED AND INSTALLED (2026-07-27) — M17 (Window capture) earns the MINOR.**
   `VERSION` + `CoreInfo.version` → 1.9.0 (pin test green), committed (`aec7685`), cut via
   **`Scripts/release.sh` run in the BACKGROUND** — full gate green (clean tree · version pin · build ·

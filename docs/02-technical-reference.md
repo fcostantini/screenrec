@@ -316,6 +316,12 @@ one has no display at all, so `CaptureEngine.resolveScope` resolves no `SCDispla
 - Writer settings: `AVVideoCodecKey: .hevc`, width/height, `AVVideoCompressionPropertiesKey:
   [AVVideoAverageBitRateKey: n, AVVideoExpectedSourceFrameRateKey: fps,
   AVVideoMaxKeyFrameIntervalDurationKey: 2]`.
+  ⚠️ **This caps ENCODED FRAMES, not wall clock — the real keyframe gap is unbounded**
+  (measured 2026-07-27, M18-T1). Capture is frame-on-change, so a static stretch emits no
+  frames and therefore no keyframes: on a 23-minute recording a 61 s in-point snapped back
+  **3.37 s**, well past the 2 s the setting implies. Anything reasoning about "the in-point
+  moves by at most 2 s" — a lossless trim especially — is wrong, and it is worst when the
+  screen was quiet, which is the start of most takes.
 - `expectsMediaDataInRealTime = true` on **all** inputs. If `isReadyForMoreMediaData`
   is false, **drop the buffer** — never block the SCK callback queue.
 - Hardware encode is automatic (Media Engine). Do not touch VideoToolbox directly for

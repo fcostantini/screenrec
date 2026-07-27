@@ -7,6 +7,29 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-27 (M18-T1, measured before building):
+  - 🔴 **The lossless-trim keyframe gap is UNBOUNDED, not 2 s.** `AVVideoMaxKeyFrameIntervalDurationKey: 2`
+    caps encoded frames; capture is frame-on-change, so a quiet stretch emits none and no keyframe
+    lands. Measured on a 23-minute recording: in-point 61 s → real cut **57.63 s (3.37 s back)**;
+    other probes gave 0.37–1.29 s. docs/03, docs/02 §3 and the trim window's caption all said
+    "up to two seconds"; 02 §3 is corrected, the UI copy is M18-T1's job.
+  - ✅ **Finding the real cut point is cheap.** `AVAssetTrack.makeSampleCursor(presentationTimeStamp:)`
+    then `stepInDecodeOrder(byCount: -1)` until `currentSampleSyncInfo.sampleIsFullSync` — the walk is
+    bounded by keyframe spacing, not file length: **0.0–0.9 ms, 20–116 steps** across a 23-minute file.
+    Safe to call live while the user drags. ⚠️ `sampleIsFullSync` is an `ObjCBool` — `.boolValue`.
+  - ⚠️ **Two assumptions of mine about `AVAssetExportSession` presets were wrong.** They do **not**
+    flatten audio: a time-ranged export of a 3-track recording kept **both audio tracks separate**
+    (2ch + 1ch) and cut frame-exactly (2→5 s requested, 3.00 s out). And `HighestQuality` is not the
+    high-fidelity option — it **downscaled 4112×2570 → 3840×2400 and re-encoded hvc1 → avc1**.
+    **`AVAssetExportPresetHEVCHighestQuality` preserves all of it**: 4112×2570, hvc1, both audio
+    tracks, exact duration. So a precise trim is a **preset choice, not a reader/writer pipeline** —
+    docs/03's "reuse `Exporter`" was the wrong mechanism (that path downscales to 1920 and mixes
+    audio), but the right one is smaller than a pipeline, not bigger.
+  - 🔴 **OPEN:** the re-encoded output makes `tools/probe.swift` warn **`non-monotonic timestamps:
+    2 of 130 samples step backward`**, where the source is clean. Almost certainly B-frame reordering
+    that `MovieRecorder` never emits, and harmless in a player — but every prior gate recorded
+    "probe monotonic-clean", so it must be settled before precise mode ships.
+
 - 2026-07-27 (v1.9.0 cut): ⚠️ **`Scripts/release.sh` and the run-it-in-the-background rule fight each
   other, and the script silently loses.** It ends with an interactive `Push v1.9.0 to origin? [y/N]`;
   in the background stdin is not a terminal, so it reads N every time and prints `Not pushed`. The cut
