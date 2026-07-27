@@ -114,7 +114,7 @@ public final class RecordingSession: @unchecked Sendable {
         outputURL: URL,
         diskFloorBytes: Int64? = nil
     ) throws {
-        let engine = CaptureEngine(configuration: configuration)
+        let engine = CaptureEngine(configuration: configuration, purpose: .recording)
         self.engine = engine
         finalURL = outputURL
         recorder = try MovieRecorder(

@@ -7,6 +7,30 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-27 (M16-T1): **An SCK stream keeps the Mac awake even if you release your own power
+  assertion — `coreaudiod` holds one for the audio tap, on `replayd`'s behalf.** M16-T1 was filed as
+  "drop `SleepGuard` while armed and the Mac idle-sleeps again"; that premise is false, and one
+  `pmset` snapshot during a `replay-arm` run is all it takes to see it:
+  - Alongside our own `PreventUserIdleSystemSleep` there is a second one — owner `pid 184(coreaudiod)`,
+    named `com.apple.audio.AudioTap-<uuid>.context.preventuseridlesleep`, with `Created for PID: 510`.
+    **Pid 510 is `/usr/libexec/replayd`, the ScreenCaptureKit daemon** — so it is attributed to SCK,
+    not to us, and it will not appear in any search for your own bundle ID.
+  - **`--no-mic` does not remove it**: the system-audio tap alone is enough, and `capturesAudio = true`
+    is unconditional today (M16-T3's finding). It appears at the same age as our own assertion and
+    disappears when the process exits, so it is per-stream and released at teardown — **the only lever
+    that releases it is tearing the stream down**, not any flag on our side.
+  - Consequence for anything power-related: `SleepGuard` controls what `pmset` *blames*, not whether
+    the Mac sleeps. Decide power behaviour at the stream-lifetime level (ADR-018 chose not to).
+  - Read the assertion picture with `pmset -g assertions` (per-process, with the `Created for PID`
+    attribution) and `pmset -g` (one "sleep prevented by …" line, process names only). The latter is
+    the fast check; the former tells you who really holds it.
+  - **UNMEASURED, worth one run when a display-sleep lever is allowed** (out of scope for M16-T1, and
+    invisible on this machine, which is set to `displaysleep 0`): nothing prevents *display* sleep
+    while armed, and 02 §11 records that starting a capture against a slept display **wakes it**. If
+    those compose, `ReplayController`'s 5 s retry loop would bounce the display back on every five
+    seconds after it sleeps — louder than the assertion ever was. Two facts, no measurement joining
+    them yet.
+
 - 2026-07-24 (M15-T1): **`VTCompressionSessionCreate` BLOCKS — it does not fail — once the hardware
   encoder pool is exhausted, and the block is ~120 s.** This is the whole story behind the flaky
   suite, and it is not what the 2026-07-21 note assumed. Measured mechanics:

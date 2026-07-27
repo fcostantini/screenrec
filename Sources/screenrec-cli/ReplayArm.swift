@@ -134,7 +134,7 @@ func runReplayArm(_ args: [String]) async {
     let content = contentSelection(appBundleID: options.appBundleID, region: options.region)
     let configuration = CaptureConfiguration(
         content: content, microphone: mic.selection, microphoneRecovery: mic.recovery)
-    let engine = CaptureEngine(configuration: configuration)
+    let engine = CaptureEngine(configuration: configuration, purpose: .replayBuffer)
     // Route encoder failure through the engine's stop seam so the event loop prints it and the
     // process exits once from the main flow — never exit() from a VT/capture thread. `weak`
     // breaks the engine → router → encoder → engine cycle.

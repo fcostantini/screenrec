@@ -6,6 +6,24 @@ import os
 
 /// Owns the single `SCStream`'s lifecycle and publishes `EngineEvent`s.
 public actor CaptureEngine {
+    /// What this engine is for. Only reaches the sleep assertion's reason string, which is
+    /// user-visible in `pmset -g assertions` — every stream holds one (ADR-018), so it has to
+    /// name the right one.
+    public enum Purpose: CaseIterable, Sendable {
+        case recording
+        case replayBuffer
+        /// The CLI's `engine-smoke` / `probe-stream`.
+        case diagnostic
+
+        var assertionReason: String {
+            switch self {
+            case .recording: "Recording the screen"
+            case .replayBuffer: "Instant replay is armed"
+            case .diagnostic: "Capturing the screen"
+            }
+        }
+    }
+
     /// Event stream. Unbounded-buffered, so events emitted before the caller iterates are
     /// still delivered; `nonisolated` so SCK callbacks yield without hopping onto the actor.
     public nonisolated let events: AsyncStream<EngineEvent>
@@ -15,6 +33,7 @@ public actor CaptureEngine {
     public nonisolated let router: SampleRouter
 
     private let configuration: CaptureConfiguration
+    private let purpose: Purpose
     private let sleepGuard = SleepGuard()
     private var stream: SCStream?
     private var handler: StreamHandler?
@@ -52,8 +71,9 @@ public actor CaptureEngine {
     private let audioQueue = DispatchQueue(label: "dev.fcostantini.screenrec.capture.audio")
     private let microphoneQueue = DispatchQueue(label: "dev.fcostantini.screenrec.capture.microphone")
 
-    public init(configuration: CaptureConfiguration) {
+    public init(configuration: CaptureConfiguration, purpose: Purpose) {
         self.configuration = configuration
+        self.purpose = purpose
         (self.events, self.continuation) = AsyncStream.makeStream(of: EngineEvent.self)
         self.router = SampleRouter()
         if case .device(let deviceID) = configuration.microphone {
@@ -152,7 +172,7 @@ public actor CaptureEngine {
             self.stream = stream
             self.handler = handler
             state = .running
-            sleepGuard.begin(reason: "Recording the screen")
+            sleepGuard.begin(reason: purpose.assertionReason)
             startWatchdogs()
             if let includedApp {
                 appTerminationWatch = AppTerminationWatch(processID: includedApp.processID) { [weak self] in

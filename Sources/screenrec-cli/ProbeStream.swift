@@ -100,7 +100,8 @@ func runProbeStream(_ args: [String]) async {
         }
     }
 
-    let engine = CaptureEngine(configuration: CaptureConfiguration(microphone: microphone))
+    let engine = CaptureEngine(
+        configuration: CaptureConfiguration(microphone: microphone), purpose: .diagnostic)
     let probe = ProbeConsumer()
     engine.router.attach(probe)
 

@@ -1264,25 +1264,27 @@ what makes it a milestone rather than a list is the single thesis. Zero-dep thro
 **no capture-path redesign** — T3 adds one flag to an existing config, T4/T5 read buffers that already
 flow past a consumer. Earns a **MINOR** (ADR-013).
 
-- [ ] M16-T1 **Armed replay stops holding the Mac awake.** `CaptureEngine.start()` unconditionally
-      takes a `SleepGuard` assertion (`.idleSystemSleepDisabled`) with the reason string *"Recording
-      the screen"*, and `ReplayController` starts a full `CaptureEngine` for its own armed stream —
-      so **arming takes the assertion too**. Armed is persisted, restored at launch and retried
-      forever on stream death by design, so arm once and forget and the machine **never idle-sleeps
-      again**, across days, on battery, with an encoder running. The only cue is a small dot on the
-      menu-bar icon, and `pmset -g assertions` reports a recording that isn't happening.
-      **Seams:** the assertion has to become conditional on there being a *recording*, not merely a
-      stream — the cleanest seam is a flag on `CaptureConfiguration` (or an explicit
-      `beginSleepGuard` on the engine that `RecordingSession` calls and `ReplayController` doesn't),
-      plus an accurate reason string either way. **Rulings:** confirm the consequence is the one we
-      want — with the assertion gone, an armed Mac idle-sleeps, SCK kills the stream, and the
-      existing infinitely-patient retry loop re-arms on wake (docs/02 §7 + `ReplayController`'s
-      restart path already handle exactly this, and G6's soak proved display sleep finalises
-      cleanly). If Franco wants armed-through-sleep instead, the alternative is an **auto-disarm
-      after N idle minutes** setting — decide before building. **Verify:** headless — arm replay,
-      confirm no ScreenRec assertion in `pmset -g assertions` (and that a *recording* still shows
-      one with a truthful reason); then `pmset displaysleepnow` while armed → the Mac sleeps, and on
-      wake (`caffeinate -u -t 3`) the ring refills unaided and a save produces a clean clip.
+- [x] M16-T1 **Every stream's sleep assertion says what it is actually doing.** `CaptureEngine.start()`
+      took a `SleepGuard` assertion reading *"Recording the screen"* for **every** stream, and
+      `ReplayController` starts a full `CaptureEngine` for its armed stream — so a merely-armed Mac
+      reported a recording that wasn't happening. Measured 2026-07-27 on the running 1.7.1: `pmset -g`
+      listed `ScreenRec` under "sleep prevented by" with no `.partial` anywhere on disk.
+      **The task as filed proposed making the assertion conditional on a recording, so an armed Mac
+      would idle-sleep. Measurement killed that premise before any code was written:** any SCK stream
+      capturing audio *also* carries a `PreventUserIdleSystemSleep` held by `coreaudiod` on behalf of
+      `/usr/libexec/replayd` — present with the mic off too, so the system-audio tap alone does it —
+      and released only at stream teardown. Dropping `SleepGuard` would have bought honesty and no
+      sleep; only an idle stand-down (tear the armed stream down after N idle minutes) would have
+      delivered sleep, at the cost of the buffer being there when you reach for it.
+      **RULING (Franco, 2026-07-27): arming is MEANT to keep the Mac awake — keep the assertion, fix
+      the reason, state the cost in the UI (ADR-018).** The stand-down alternative was declined with it.
+      **As built:** `CaptureEngine.Purpose` (`.recording` / `.replayBuffer` / `.diagnostic`) is a
+      required init argument on every engine, and its `assertionReason` is the only place the strings
+      live. **Verify (as run):** all four CLI entry points live, snapshotting `pmset -g assertions` 6 s
+      in — `record` → `"Recording the screen"`, `replay-arm` → `"Instant replay is armed"`,
+      `probe-stream` and `engine-smoke` → `"Capturing the screen"`, and no assertion surviving any
+      exit; 430 tests (+1: the purpose→reason mapping, including that no two purposes share a string);
+      full dev loop green. The sleep/wake leg the original task called for is moot under the ruling.
 - [ ] M16-T2 **Armed replay states its cost.** Two captions, one number. The Settings slider (M9-T8)
       runs to 15 minutes with the RAM cost "explicitly accepted" but shows only `M:SS` — at Balanced
       / 60 fps a 15-minute ring is ≈2.6 GB resident, and the slider is the exact moment the user is
@@ -1290,7 +1292,10 @@ flow past a consumer. Earns a **MINOR** (ADR-013).
       fps, capture pixel size) into an estimated ring footprint — `BitrateModel` already has the
       math and docs/04 §6.1 already states the formula (bitrate × (window + 2 s slack), plus the two
       PCM rings); a caption under the slider; and the armed menu row gaining the same figure
-      (`Armed · 60 s · ≈180 MB`) beside the existing banner-suppression line. **Rulings:** the menu
+      (`Armed · 60 s · ≈180 MB`) beside the existing banner-suppression line. **ADR-018 sends the
+      second cost here too:** arming holds the Mac awake deliberately, so the Settings caption says
+      so in the user's words (`… · keeps your Mac awake`) — T1 fixed what `pmset` reports, this is
+      where the person choosing the setting finds out. **Rulings:** the menu
       row must **stamp at open, never tick** (M6-T10 — a publish rebuilds the open menu's AppKit rows
       and garbles hover). **Verify:** unit — the estimator against the docs/04 §6.1 formula at three
       window lengths and both fps caps; `menudriver dump` shows the figure in the armed row;
@@ -1367,7 +1372,9 @@ flow past a consumer. Earns a **MINOR** (ADR-013).
       calling it a failure; run it muted → the mic line reflects T4's silence check; no file survives;
       the version string matches `VERSION`.
 
-**Gate G16**: an armed Mac idle-sleeps and re-arms on wake; a recording can be made with system audio
+**Gate G16**: no stream misreports itself to the system — `pmset -g assertions` never shows a recording
+while merely armed — and the armed cost (RAM, and the Mac staying awake) is stated where the user picks
+the setting (ADR-018 replaced this criterion's original "an armed Mac idle-sleeps"); a recording can be made with system audio
 off (`probe`: no empty track) and with it on (no regression); a muted mic produces exactly one
 outcome-first notice while the recording continues; the menu-bar label shows a level that measurably
 tracks real audio; the setup window can prove a working capture end-to-end and names the build. Every

@@ -175,7 +175,7 @@ func runEngineSmoke(_ args: [String]) async {
         }
     }
 
-    let engine = CaptureEngine(configuration: CaptureConfiguration())
+    let engine = CaptureEngine(configuration: CaptureConfiguration(), purpose: .diagnostic)
     print("engine-smoke: starting (\(Int(duration))s)…")
 
     // OK requires a captured video frame (.started) and a clean user stop.

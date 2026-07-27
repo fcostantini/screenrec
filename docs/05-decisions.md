@@ -161,3 +161,17 @@ intention. Recorded as an ADR so it isn't re-litigated one convenience feature a
 reversal is a deliberate new ADR, and the ADR-consistent path if it ever happened is a **separate
 webcam track** (no compositing), never PiP (which needs the parked render stage, ADR-015). The review's
 "webcam fork" is closed; click/cursor-emphasis remains parked behind ADR-015's render-stage decision.
+
+## ADR-018 ✅ Armed replay keeps the Mac awake, deliberately — and the assertion says so (Franco, 2026-07-27)
+The 2026-07-24 review filed armed replay's sleep assertion as a bug (M16-T1): arm once and the machine
+never idle-sleeps again, while `pmset` blames a recording that isn't happening. Two things settled it.
+**Measured:** releasing our assertion would not have let an armed Mac sleep anyway — any SCK stream
+capturing audio also carries a `PreventUserIdleSystemSleep` held by `coreaudiod` for
+`/usr/libexec/replayd`, released only at stream teardown (02 §7). Only tearing the armed stream down
+after N idle minutes would have delivered sleep, and that trades away the feature's whole promise: a
+buffer that is there when you reach for it. **Decided:** an armed stream holds the assertion on purpose
+— the honest fix is the reason string, not the behaviour. `CaptureEngine.Purpose` gives each stream its
+own (`Recording the screen` / `Instant replay is armed` / `Capturing the screen`), and the cost is
+stated where the user chooses it (M16-T2's caption). This is M16's thesis applied to itself: the state
+stops lying without the product quietly doing less than the user asked for. A future reversal is a new
+ADR, and it needs a stream teardown, not just `SleepGuard`.

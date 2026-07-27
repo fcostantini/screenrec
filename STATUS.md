@@ -6,6 +6,24 @@
 
 ## Now
 
+- **✅ M16-T1 DONE (2026-07-27) — the sleep assertion stops lying; ADR-018 rules that arming keeps the
+  Mac awake on purpose.** Measured before planning: the running 1.7.1 held `PreventUserIdleSystemSleep
+  named: "Recording the screen"` while merely **armed** (no `.partial` on disk), and `pmset -g` listed
+  `ScreenRec` under "sleep prevented by". **The filed task's premise was false, and the measurement
+  killed it before any code was written:** dropping our assertion would *not* let an armed Mac sleep —
+  any SCK stream capturing audio also carries one held by `coreaudiod` for `/usr/libexec/replayd`,
+  present with `--no-mic` too, released only at stream teardown (field note + 02 §7). Only tearing the
+  armed stream down would deliver sleep. **Franco's ruling: keep the assertion, fix the reason, put the
+  cost on screen in T2** — the idle stand-down alternative declined with it. Built as
+  `CaptureEngine.Purpose` (`.recording` / `.replayBuffer` / `.diagnostic`), a **required** init
+  argument, with `assertionReason` the only place the strings live. **Verified live on all four CLI
+  entry points** — `record` → `Recording the screen`, `replay-arm` → `Instant replay is armed`,
+  `probe-stream`/`engine-smoke` → `Capturing the screen`, nothing surviving exit. **430 tests (+1)**,
+  full dev loop green. G16's first criterion was rewritten to match the ruling; **T2 inherits the
+  "keeps your Mac awake" caption**. ⚠️ `dist/ScreenRec.app` is now **1.7.2 + this task**, not the
+  pristine v1.7.2 tag build (step 4 of the dev loop rebuilt it). **Next: M16-T2** (armed replay states
+  its cost) — plan artifact first.
+
 - **🎉 v1.7.2 CUT (2026-07-24) — M15 (Gate & Debt) earns the PATCH.** `VERSION` +
   `CoreInfo.version` → 1.7.2 (pin test green), committed (`b01772f`), cut via **`Scripts/release.sh` run
   in the BACKGROUND** — full gate green (clean tree · version pin · build · test · encode×3 · release
@@ -171,6 +189,11 @@
 - [x] **M6-T1 C2 ruling — RESOLVED 2026-07-17 (Franco): amend the criterion** ("I'm not
       that concerned about the size of the video"). Brief updated; the 2.59 GB/h Balanced
       measurement stands on record; evidence file deleted after the ruling.
+- [ ] **Display-sleep lever (declined for now, 2026-07-27 — "headless legs only").** Two open questions
+      need `pmset displaysleepnow` while armed, which blanks the screen mid-session: does
+      `ReplayController`'s 5 s retry loop **wake the display back up** (02 §11 says SCK wakes a slept
+      display to capture it — the two facts have never been measured together), and does the ring
+      refill unaided after a real sleep/wake. Recorded as UNMEASURED in docs/07 under M16-T1.
 - [ ] **M6-T2 — the 2-h battery soak (physical unplug + 2 h mixed real usage, AirPods,
       replay armed):** needs Franco to pick the block; agent preps and instruments it.
 - [x] ~~G4 §5.4 fresh-account re-run~~ — **DISCARDED by Franco 2026-07-16** ("let's discard it,

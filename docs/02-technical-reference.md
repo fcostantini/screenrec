@@ -327,8 +327,15 @@ Consequences for anyone designing mic recovery:
 ## 7. Long-recording robustness
 
 - `SleepGuard`: `ProcessInfo.processInfo.beginActivity(options: [.idleSystemSleepDisabled,
-  .userInitiated], reason: "Recording")` while recording or replay-armed; end it after.
-  Display sleep still ends the stream — that's a clean finalize, acceptable.
+  .userInitiated], reason:)` for the life of **any** stream — recording, armed replay, or a CLI
+  diagnostic (ADR-018) — ended at teardown. The reason comes from `CaptureEngine.Purpose` and is
+  user-visible in `pmset -g assertions`, so each purpose states its own: an armed stream must not
+  claim to be recording. Display sleep still ends the stream — that's a clean finalize, acceptable.
+- ⚠️ **Releasing our assertion would not let an armed Mac idle-sleep anyway.** Measured 2026-07-27:
+  any SCK stream that captures audio also carries a `PreventUserIdleSystemSleep` held by
+  `coreaudiod` on behalf of `/usr/libexec/replayd`, for the audio tap — present with the mic off
+  too (the system-audio tap alone does it), and released only when the stream is torn down. Don't
+  plan power behaviour around dropping `SleepGuard` alone (docs/07, M16-T1).
 - Display unplug / resolution change / user lock → `didStopWithError` → finalize + notify.
   Never attempt hot re-attach in v1 (ADR-007).
 - **The display-gone error is `SCStreamErrorNoCaptureSource` (-3815)**, "Failed to find any

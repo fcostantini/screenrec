@@ -260,7 +260,7 @@ public final class ReplayController: ReplayControlling {
     private func startOwnStream(
         configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL
     ) {
-        let engine = CaptureEngine(configuration: configuration)
+        let engine = CaptureEngine(configuration: configuration, purpose: .replayBuffer)
         buildPipeline(
             on: engine.router, configuration: configuration, seconds: seconds,
             outputDirectory: outputDirectory)

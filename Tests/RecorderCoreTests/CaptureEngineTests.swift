@@ -251,6 +251,16 @@ import Testing
             != .region(display: .main, rect: CGRect(x: 0, y: 0, width: 20, height: 10)))
     }
 
+    @Test func eachPurposeAssertsItsOwnReason() {
+        // The reason is what `pmset -g assertions` shows the user, so an armed stream must never
+        // report a recording (ADR-018) — and no two purposes may share a string.
+        #expect(CaptureEngine.Purpose.recording.assertionReason == "Recording the screen")
+        #expect(CaptureEngine.Purpose.replayBuffer.assertionReason == "Instant replay is armed")
+        #expect(CaptureEngine.Purpose.diagnostic.assertionReason == "Capturing the screen")
+        let reasons = CaptureEngine.Purpose.allCases.map(\.assertionReason)
+        #expect(Set(reasons).count == reasons.count)
+    }
+
     @Test func onlyRegionForbidsTheDisplayFallback() {
         // A region's rect is tied to one display's geometry, so a missing main display must fail
         // loud, not crop against `displays.first` (M13-T4). Whole-screen/app may fall back.
