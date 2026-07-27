@@ -1582,6 +1582,18 @@ ride the same bump.
       → the previous rect is drawn and adjustable; the confirmed rect still round-trips through
       persistence and records the right pixels (M11 gate unaffected).
 
+- [ ] M18-T6 **The Settings window is too tall to fit.** (Franco, 2026-07-27, on seeing M18-T2's new
+      section.) It is one `Form` with `.fixedSize()`, so it grows without bound — General + Instant
+      Replay + MP4 + GIF now runs past a laptop screen, and every future preference makes it worse.
+      **Seams:** a `TabView` splitting it into **General · Recording · Instant Replay · Sharing**
+      (MP4 + GIF), the standard Mac pattern and the smallest change with the largest effect; the
+      window then sizes to its tallest tab. **Cheaper alternatives if tabs are unwanted:** collapse
+      the long captions (the replay/notifications explainer is six lines), or move that explainer
+      into onboarding, where it is first relevant. **Rulings:** tabs vs sidebar vs collapse-only, and
+      whether the version footer follows General or stays global. **Verify:** the window fits a
+      1440-point-tall screen with every section reachable; each preference still round-trips (the
+      persistence tests are unaffected — this is layout only).
+
 **Gate G18**: a trim states the cut point it will actually make and a precise trim hits the requested
 second exactly; an MP4 export honours a chosen size; the idle menu is materially shorter with every
 action still reachable and no slower to open; the count-in is cancellable; a region pick can be
