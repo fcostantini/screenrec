@@ -55,6 +55,13 @@ Order and grouping (separators between groups):
    app returns (measured: quit → relaunch re-arms unaided). ⚠️ `.disabled(true)` on a Picker row
    does not survive the `.menu` bridge (measured M7-T2) — the not-running row renders undimmed;
    accepted. Hidden while recording (see recording item 7).
+   **System audio (M16-T3, ADR-019):** below `Microphone ▸`, a checkmark row **`Capture System
+   Audio`** — a boolean gets a checkmark, not a submenu, and the menu is already under M18-T3's
+   diet. Persisted (`capturesSystemAudio`, absent ⇒ on). Changing it while armed restarts the armed
+   stream, like the mic and source picks (SCK binds audio sources per stream). When it is off **and**
+   the mic reads None, one dimmed row follows: **`This recording will have no audio`** — a silent
+   recording is legitimate, but it must not be a surprise discovered afterwards. Zero extra rows in
+   every other configuration.
    **Region (M11-T2):** below the app rows, when a region is set, a checkmarked `Region <w>×<h>`
    row (point size) shows the current pick — re-selectable, and it survives its display's absence
    like the app pick (a start against a vanished display fails loud, M11-T1). **M12-T4** moved
@@ -385,6 +392,7 @@ moved):
 | `microphoneID` | String uniqueID; absent ⇒ None (or Automatic — see below). **Never cleared by device absence** — the pick survives the AirPods sitting in their case; the menu's checkmark sits on None while the device is away (Franco, 2026-07-16). A specific pick resolves device-or-nothing (no default fallback, or the menu would lie) | M5 follow-up |
 | `microphoneAutomatic` | Bool; true ⇒ **Automatic (System Default)**, and it wins over any `microphoneID` in the plist. Resolution follows the system default at capture start (M6-T13) | M6-T13 |
 | `captureAppBundleID` | String bundle ID; absent ⇒ entire screen. **Never cleared by the app not running** — the pick survives (mic rule); a start while it's away fails loud, armed replay retries until it returns | M7-T2 |
+| `capturesSystemAudio` | Bool; **absent ⇒ on** (M16-T3, ADR-019) — system audio is opt-out, so existing installs keep capturing it. Off ⇒ no system-audio track is written at all (never an empty one) | M16-T3 |
 | `replayArmed` | Bool | **M5** |
 | `replaySeconds` | Int seconds; **M9-T8 slider range 5–900** (clamped on load — a positive out-of-range value snaps to the nearest bound, absent/≤0 ⇒ 60). Was 30\|60\|120 | **M5** |
 | `replayHotkey` | Dict: keyCode Int, modifiers Int | **M5** |

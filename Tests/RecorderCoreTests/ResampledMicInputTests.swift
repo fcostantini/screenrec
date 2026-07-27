@@ -95,7 +95,8 @@ import Testing
 
         let input = ResampledMicInput()
         let recorder = try MovieRecorder(
-            outputURL: url, frameRate: 10, preset: .efficient, includesMicrophone: true)
+            outputURL: url, frameRate: 10, preset: .efficient,
+            includesMicrophone: true, includesSystemAudio: true)
         let systemFormat = makeAudioFormat(sampleRate: 48_000, channels: 2)
         let airPods = makeAudioFormat(sampleRate: 24_000, channels: 1, planarFloat32: true)
         let builtIn = makeAudioFormat(sampleRate: 48_000, channels: 1, planarFloat32: true)

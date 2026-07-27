@@ -10,6 +10,7 @@ struct ReplayArmOptions {
     var region: CGRect?
     var micID: String?
     var micEnabled = true
+    var systemAudioEnabled = true
     var outputDir = OutputLocation.defaultDirectory()
 }
 
@@ -34,6 +35,8 @@ func parseReplayArmOptions(_ args: [String]) -> ReplayArmOptions {
             options.micID = value
         case "--no-mic":
             options.micEnabled = false
+        case "--no-system-audio":
+            options.systemAudioEnabled = false
         case "--output":
             options.outputDir = parseOutputDirectory(iterator.next())
         default:
@@ -133,7 +136,8 @@ func runReplayArm(_ args: [String]) async {
     if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
     let content = contentSelection(appBundleID: options.appBundleID, region: options.region)
     let configuration = CaptureConfiguration(
-        content: content, microphone: mic.selection, microphoneRecovery: mic.recovery)
+        content: content, microphone: mic.selection, microphoneRecovery: mic.recovery,
+        capturesSystemAudio: options.systemAudioEnabled)
     let engine = CaptureEngine(configuration: configuration, purpose: .replayBuffer)
     // Route encoder failure through the engine's stop seam so the event loop prints it and the
     // process exits once from the main flow — never exit() from a VT/capture thread. `weak`

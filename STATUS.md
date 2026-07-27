@@ -6,6 +6,24 @@
 
 ## Now
 
+- **✅ M16-T3 DONE (2026-07-27) — system audio has an off switch; ADR-019 amends ADR-004.** Until
+  now the only way to record without capturing the music/the call/the video you're narrating was to
+  mute the Mac. Now: a checkmark row **`Capture System Audio`** (a boolean doesn't earn a submenu, and
+  M18-T3 is cutting rows), persisted `capturesSystemAudio` **absent ⇒ on**, plus `--no-system-audio`
+  on `record` and `replay-arm`. **ADR-019: "never mixed" survives ADR-004, "always two tracks" does
+  not** — a recording may carry two, one or no audio tracks, and never an empty one. When both
+  sources are off the menu says **`This recording will have no audio`** *before* you start.
+  **Measured, three probes:** control **3 tracks** · `--no-system-audio` → **video + 1ch mic, no
+  empty track** · both off → **video only, playable**. An armed save with system audio off → mic
+  track, no system track (system ring 0.0 s throughout). **The replay path needed no change** —
+  `makeAACInput` already returns nil for an empty ring. **449 tests (+7)**, dev loop green.
+  **Bonus, closing M16-T1's loop: with all audio off, SCK opens NO audio tap** — assertion count
+  3→3 (all off) vs 3→4 (system audio on), so that's the only configuration where an armed Mac could
+  idle-sleep (ADR-018 keeps it awake there anyway, deliberately). ⚠️ **Known, unfixed by ruling:**
+  with no audio at all, `ReplayMuxer` loses the continuous clock it anchors saves on, so a still
+  screen can yield a stale clip (field note). **Deployed app is one commit behind — redeploy to see
+  the new menu row. Next: M16-T4** (notice when audio is arriving but silent) — plan artifact first.
+
 - **✅ M16-T2 DONE (2026-07-27) — an armed buffer now says what it costs, and 1.7.2+T1+T2 is
   DEPLOYED.** Settings gained a caption under the slider and the armed menu a dimmed row; measured
   on Franco's own live settings (4:30 buffer, 60 fps, mic Automatic): **`A 4:30 buffer holds about

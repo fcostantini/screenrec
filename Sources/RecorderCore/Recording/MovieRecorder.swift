@@ -42,7 +42,10 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
 
     private let lock = NSLock()
     private let writer: AVAssetWriter
-    private let systemAudioInput: AVAssetWriterInput
+    /// Nil when system audio is off (ADR-019): an input that never receives a buffer would still
+    /// write an empty AAC track. Built eagerly when on — its format is fixed by the audio contract
+    /// (02 §1), unlike video and mic, which need their first buffer.
+    private let systemAudioInput: AVAssetWriterInput?
     /// Built from the first buffer of each kind. Inputs can't be added after `startWriting()`,
     /// so writing is deferred until every expected input exists.
     private var videoInput: AVAssetWriterInput?
@@ -76,6 +79,7 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         frameRate: Int,
         preset: QualityPreset,
         includesMicrophone: Bool,
+        includesSystemAudio: Bool,
         onWriteFailure: (@Sendable () -> Void)? = nil
     ) throws {
         self.outputURL = outputURL
@@ -90,12 +94,18 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         // leaves anything killed before the first flush unparseable. Set before startWriting.
         writer.movieFragmentInterval = CMTime(seconds: 1, preferredTimescale: 600)
 
-        systemAudioInput = AVAssetWriterInput(
-            mediaType: .audio,
-            outputSettings: AudioEncodingSettings.aac(sampleRate: 48_000, channels: 2, bitRate: 192_000))
-        systemAudioInput.expectsMediaDataInRealTime = true
-        guard writer.canAdd(systemAudioInput) else { throw MovieRecorderError.cannotAddInput(.systemAudio) }
-        writer.add(systemAudioInput)
+        if includesSystemAudio {
+            let input = AVAssetWriterInput(
+                mediaType: .audio,
+                outputSettings: AudioEncodingSettings.aac(
+                    sampleRate: 48_000, channels: 2, bitRate: 192_000))
+            input.expectsMediaDataInRealTime = true
+            guard writer.canAdd(input) else { throw MovieRecorderError.cannotAddInput(.systemAudio) }
+            writer.add(input)
+            systemAudioInput = input
+        } else {
+            systemAudioInput = nil
+        }
     }
 
     /// Video frames dropped because the encoder wasn't ready — reported at stop (docs/01).
@@ -309,7 +319,7 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         }
 
         videoInput?.markAsFinished()
-        systemAudioInput.markAsFinished()
+        systemAudioInput?.markAsFinished()
         microphoneInput?.markAsFinished()
         return true
     }

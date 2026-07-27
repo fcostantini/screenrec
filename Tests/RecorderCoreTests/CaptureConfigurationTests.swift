@@ -1,4 +1,5 @@
 import CoreGraphics
+import ScreenCaptureKit
 import Testing
 @testable import RecorderCore
 
@@ -60,5 +61,29 @@ import Testing
         #expect(QualityPreset(rawValue: "high") == .high)
         #expect(QualityPreset(rawValue: "ultra") == nil)
         #expect(QualityPreset.allCases.count == 3)
+    }
+
+    // MARK: system audio (ADR-019)
+
+    @Test func systemAudioIsCapturedUnlessTurnedOff() {
+        // The stream-level switch: `capturesAudio` is what decides whether SCK opens an audio
+        // tap at all, so the flag has to reach it — not just the writer.
+        let on = SCStreamConfiguration()
+        on.applyAudioCapture(systemAudio: true, microphoneID: nil)
+        #expect(on.capturesAudio)
+        #expect(on.sampleRate == 48_000 && on.channelCount == 2)
+        #expect(on.excludesCurrentProcessAudio)
+
+        let off = SCStreamConfiguration()
+        off.applyAudioCapture(systemAudio: false, microphoneID: "device-id")
+        #expect(!off.capturesAudio)
+        // The mic is independent: system audio off must not disturb it.
+        #expect(off.captureMicrophone)
+        #expect(off.microphoneCaptureDeviceID == "device-id")
+    }
+
+    @Test func configurationDefaultsToCapturingSystemAudio() {
+        #expect(CaptureConfiguration().capturesSystemAudio)
+        #expect(!CaptureConfiguration(capturesSystemAudio: false).capturesSystemAudio)
     }
 }

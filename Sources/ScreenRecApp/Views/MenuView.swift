@@ -106,6 +106,12 @@ struct MenuView: View {
             }
         }
 
+        // ADR-019: the other half of the audio picture, beside the mic it pairs with.
+        Toggle("Capture System Audio", isOn: $state.capturesSystemAudio)
+        if let warning = state.silentRecordingWarning {
+            Text(warning)
+        }
+
         Picker("Quality: \(state.quality.menuTitle)", selection: $state.quality) {
             ForEach(QualityPreset.allCases, id: \.self) { preset in
                 Text(preset.menuTitle).tag(preset)

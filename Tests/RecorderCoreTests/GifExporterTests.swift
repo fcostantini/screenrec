@@ -75,7 +75,8 @@ import UniformTypeIdentifiers
         try? FileManager.default.removeItem(at: url)
 
         let recorder = try MovieRecorder(
-            outputURL: url, frameRate: fps, preset: .balanced, includesMicrophone: false)
+            outputURL: url, frameRate: fps, preset: .balanced,
+            includesMicrophone: false, includesSystemAudio: true)
         let systemFormat = makeAudioFormat(sampleRate: 48_000, channels: 2)
         for index in 0..<frames {
             let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(fps))

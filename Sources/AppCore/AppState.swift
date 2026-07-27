@@ -87,6 +87,16 @@ public final class AppState {
         }
     }
 
+    /// Whether recordings and replays capture what the Mac is playing (ADR-019). Like the mic pick,
+    /// changing it while armed restarts the armed stream — SCK binds audio sources per stream.
+    public var capturesSystemAudio: Bool {
+        didSet {
+            guard capturesSystemAudio != oldValue else { return }
+            persist()
+            replayConfigurationChanged()
+        }
+    }
+
     /// The specific device UID when one is picked; nil for `.none`/`.automatic` (both resolve at
     /// start). Lets `captureConfiguration` stay a plain translation.
     private var pickedMicrophoneID: String? {
@@ -405,6 +415,7 @@ public final class AppState {
         quality = settings.quality
         frameRateCap = settings.frameRateCap
         microphonePreference = settings.microphonePreference
+        capturesSystemAudio = settings.capturesSystemAudio
         selectedAppBundleID = settings.captureAppBundleID
         selectedRegion = settings.captureRegion
         isReplayArmed = settings.replayArmed
@@ -455,6 +466,7 @@ public final class AppState {
             Settings(
                 outputDirectory: outputDirectory, quality: quality, frameRateCap: frameRateCap,
                 microphonePreference: microphonePreference,
+                capturesSystemAudio: capturesSystemAudio,
                 captureAppBundleID: selectedAppBundleID,
                 captureRegion: selectedRegion,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
@@ -779,6 +791,13 @@ public final class AppState {
             seconds: Double(seconds), includesMicrophone: presentMicrophonePreference != .none)
     }
 
+    /// docs/06: says so when both audio sources are off, so a silent take isn't discovered
+    /// afterwards (ADR-019). Nil whenever any audio is being captured — no row in the common case.
+    public var silentRecordingWarning: String? {
+        guard !capturesSystemAudio, presentMicrophonePreference == .none else { return nil }
+        return "This recording will have no audio"
+    }
+
     /// docs/06: the Settings caption under the buffer slider. Both costs of arming, memory first —
     /// that's the one the slider changes.
     public func replayBufferCaption(seconds: Int) -> String {
@@ -924,6 +943,7 @@ public final class AppState {
             // Honor the pick (M8-T2): a specific device recovers only onto itself; Automatic
             // follows the current system default at return time.
             microphoneRecovery: microphonePreference == .automatic ? .systemDefault : .sameDevice,
+            capturesSystemAudio: capturesSystemAudio,
             frameRateCap: frameRateCap,
             quality: quality)
     }

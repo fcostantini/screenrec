@@ -11,8 +11,11 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   (mic type is macOS 15+).
 - Pixel-true dimensions: `SCContentFilter.contentRect` is in **points**; multiply by
   `filter.pointPixelScale`. On the dev machine that yields 4112×2570. Never hardcode.
-- `capturesAudio = true`, `sampleRate = 48_000`, `channelCount = 2`,
-  `excludesCurrentProcessAudio = true`.
+- `capturesAudio` (**the user's choice since M16-T3/ADR-019, default on**), `sampleRate = 48_000`,
+  `channelCount = 2`, `excludesCurrentProcessAudio = true`. `capturesAudio` and the mic are
+  independent switches: either, both, or neither. **With both off, SCK opens no audio tap at all** —
+  measured 2026-07-27 by assertion count (see docs/07), which matters because that tap is what keeps
+  the Mac awake regardless of our own `SleepGuard` (§7).
 - **`microphoneCaptureDeviceID`: pass an explicit id.** Resolve
   `AVCaptureDevice.default(for: .audio)?.uniqueID` and pass it.
   ⚠️ **Correction (2026-07-15, M3-T7):** the old claim here — "on 15.6 nil makes `startCapture`

@@ -339,7 +339,8 @@ public actor CaptureEngine {
         config.showsCursor = true
         var microphoneID: String?
         if case .device(let id) = configuration.microphone { microphoneID = id }
-        config.applyAudioCapture(microphoneID: microphoneID)
+        config.applyAudioCapture(
+            systemAudio: configuration.capturesSystemAudio, microphoneID: microphoneID)
         return config
     }
 

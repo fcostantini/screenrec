@@ -168,7 +168,10 @@ final class MicrophoneRescue: @unchecked Sendable {
             configuration.height = 360
             configuration.minimumFrameInterval = CMTime(value: 1, timescale: 5)
             configuration.queueDepth = 5
-            configuration.applyAudioCapture(microphoneID: deviceID)
+            // Left on regardless of the user's system-audio pick: this stream adds only the
+            // microphone output, so nothing reads it, and M8-T2's rescue is not worth re-proving
+            // (its verify needs a device that physically leaves and returns).
+            configuration.applyAudioCapture(systemAudio: true, microphoneID: deviceID)
             let stream = SCStream(
                 filter: SCContentFilter(display: display, excludingWindows: []),
                 configuration: configuration, delegate: handler)

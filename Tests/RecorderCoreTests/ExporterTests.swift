@@ -149,7 +149,8 @@ import Testing
         try? FileManager.default.removeItem(at: url)
 
         let recorder = try MovieRecorder(
-            outputURL: url, frameRate: fps, preset: .balanced, includesMicrophone: true)
+            outputURL: url, frameRate: fps, preset: .balanced,
+            includesMicrophone: true, includesSystemAudio: true)
         let systemFormat = makeAudioFormat(sampleRate: 48_000, channels: 2)
         let micFormat = makeAudioFormat(sampleRate: 24_000, channels: 1)
         // Prime the lazy mic input pre-epoch (dropped), as the recorder suite does.

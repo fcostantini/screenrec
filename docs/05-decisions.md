@@ -162,6 +162,18 @@ reversal is a deliberate new ADR, and the ADR-consistent path if it ever happene
 webcam track** (no compositing), never PiP (which needs the parked render stage, ADR-015). The review's
 "webcam fork" is closed; click/cursor-emphasis remains parked behind ADR-015's render-stage decision.
 
+## ADR-019 ✅ System audio is optional (amends ADR-004; Franco, 2026-07-27)
+ADR-004 made "two AAC audio tracks" a product requirement — written when the only live question was
+whether to **mix** them. The requirement that survives is **never mixed**: whatever audio is captured
+lands on its own track, because separate inputs are mandatory anyway (DTS). *Which* sources are
+captured is the user's choice. The mic always was; M16-T3 makes system audio one too, because "just my
+voice over the screen" is routine for demos, bug reports and meeting notes, and the answer before this
+was to mute the Mac. So a recording may carry **two, one, or no** audio tracks — and a track is never
+present-but-empty: system audio off means `MovieRecorder` never adds the input, since an input that
+receives no buffer still writes an empty AAC track. Default on (`capturesSystemAudio` absent ⇒ on), so
+existing installs are unchanged. A silent recording (both sources off) is legitimate, and the menu says
+so before you start rather than after.
+
 ## ADR-018 ✅ Armed replay keeps the Mac awake, deliberately — and the assertion says so (Franco, 2026-07-27)
 The 2026-07-24 review filed armed replay's sleep assertion as a bug (M16-T1): arm once and the machine
 never idle-sleeps again, while `pmset` blames a recording that isn't happening. Two things settled it.

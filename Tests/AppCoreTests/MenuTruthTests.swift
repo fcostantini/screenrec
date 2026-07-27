@@ -108,6 +108,30 @@ import Testing
         #expect(freshState.lastExport?.url == file)
     }
 
+    // MARK: - System audio (M16-T3, ADR-019)
+
+    @Test func systemAudioIsOnUntilTurnedOffAndSurvivesRelaunch() {
+        let defaults = UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!
+        // Absent ⇒ on, so existing installs keep capturing it (the showsMenuBarTimer idiom).
+        #expect(AppState(defaults: defaults).capturesSystemAudio)
+
+        let state = AppState(defaults: defaults)
+        state.capturesSystemAudio = false
+        #expect(!state.captureConfiguration.capturesSystemAudio)
+        #expect(!AppState(defaults: defaults).capturesSystemAudio)   // round-trips
+    }
+
+    @Test func onlyASilentConfigurationSaysItWillBeSilent() {
+        let state = makeState()
+        #expect(state.silentRecordingWarning == nil)          // system audio on, mic None
+
+        state.capturesSystemAudio = false
+        #expect(state.silentRecordingWarning == "This recording will have no audio")
+
+        state.microphonePreference = .automatic
+        #expect(state.silentRecordingWarning == nil)          // a mic is still audio
+    }
+
     // MARK: - What an armed buffer costs (M16-T2)
 
     /// The measured geometry of this machine's display: 2056×1285 pt at 2× ⇒ the 4112×2570 frames

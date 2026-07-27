@@ -51,6 +51,9 @@ public struct CaptureConfiguration: Sendable, Equatable {
     public var content: ContentSelection
     public var microphone: MicrophoneSelection
     public var microphoneRecovery: MicrophoneRecovery
+    /// Whether the stream captures what the Mac is playing (ADR-019). Off records screen + mic
+    /// only; off with `.none` mic is a legitimate silent recording.
+    public var capturesSystemAudio: Bool
     public var frameRateCap: Int
     public var quality: QualityPreset
 
@@ -58,12 +61,14 @@ public struct CaptureConfiguration: Sendable, Equatable {
         content: ContentSelection = .display(.main),
         microphone: MicrophoneSelection = .none,
         microphoneRecovery: MicrophoneRecovery = .sameDevice,
+        capturesSystemAudio: Bool = true,
         frameRateCap: Int = 60,
         quality: QualityPreset = .balanced
     ) {
         self.content = content
         self.microphone = microphone
         self.microphoneRecovery = microphoneRecovery
+        self.capturesSystemAudio = capturesSystemAudio
         self.frameRateCap = frameRateCap
         self.quality = quality
     }

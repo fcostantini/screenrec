@@ -10,11 +10,12 @@ extension SCShareableContent {
 }
 
 extension SCStreamConfiguration {
-    /// The one home of the audio-capture contract (docs/02 §1): 48 kHz stereo system audio,
-    /// own audio excluded, and — when given — an explicit mic device (a nil/default sentinel
-    /// pins silently, docs/02 §1). Shared by the engine's primary stream and the mic rescue.
-    func applyAudioCapture(microphoneID: String?) {
-        capturesAudio = true
+    /// The one home of the audio-capture contract (docs/02 §1): 48 kHz stereo system audio when
+    /// asked for (optional since M16-T3, ADR-019), own audio excluded, and — when given — an
+    /// explicit mic device (a nil/default sentinel pins silently, docs/02 §1). Shared by the
+    /// engine's primary stream and the mic rescue.
+    func applyAudioCapture(systemAudio: Bool, microphoneID: String?) {
+        capturesAudio = systemAudio
         sampleRate = 48_000
         channelCount = 2
         excludesCurrentProcessAudio = true

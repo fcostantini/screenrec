@@ -1320,7 +1320,7 @@ flow past a consumer. Earns a **MINOR** (ADR-013).
       and garbles hover). **Verify:** unit — the estimator against the docs/04 §6.1 formula at three
       window lengths and both fps caps; `menudriver dump` shows the figure in the armed row;
       `settingsdriver` shows the caption tracking the slider.
-- [ ] M16-T3 **System audio becomes optional.** `ShareableContent.applyAudioCapture` sets
+- [x] M16-T3 **System audio becomes optional.** `ShareableContent.applyAudioCapture` sets
       `capturesAudio = true` unconditionally. The mic has None / Automatic / device; **system audio
       has no control anywhere in the product** — not the menu, not Settings, not the CLI. So there is
       no way to record screen + mic without also capturing whatever is playing: music, a call's other
@@ -1337,6 +1337,28 @@ flow past a consumer. Earns a **MINOR** (ADR-013).
       does (silent video is legitimate — allow it). **Verify:** CLI record with `--no-system-audio`
       → `probe` shows video + mic only, no empty second track; the pick round-trips; a normal record
       still shows three tracks (no regression against G2 §3.1).
+      **Rulings (Franco, 2026-07-27):** (a) **ADR-019** written, amending ADR-004 — "never mixed"
+      survives, "always two tracks" does not; (b) a **checkmark row** `Capture System Audio`, not a
+      submenu — a boolean doesn't earn one, and M18-T3 is cutting rows; (c) an all-off recording is
+      legitimate **and says so first**: one dimmed row `This recording will have no audio`, shown
+      only in that configuration.
+      **As built:** one `Bool` on `CaptureConfiguration` → `applyAudioCapture(systemAudio:…)`;
+      `MovieRecorder.systemAudioInput` became optional (the eager non-optional `let` was the one real
+      code change the task predicted — an input that never receives a buffer still writes an empty
+      AAC track); `capturesSystemAudio` persisted **absent ⇒ on** via the `showsMenuBarTimer` idiom;
+      `--no-system-audio` on `record` and `replay-arm`. **The mic-rescue stream keeps
+      `systemAudio: true`** — it adds only the microphone output so nothing reads it, and M8-T2's
+      rescue can't be re-proven without a device that physically leaves and returns.
+      **The replay path needed no change:** `ReplayMuxer.makeAACInput` already returns nil for an
+      empty ring, so a silent system ring yields a clip with no system track.
+      **Verify (as run):** 449 tests (+7); live `probe` of three recordings — control **3 tracks**
+      (2ch system + 1ch mic), `--no-system-audio` → **video + 1ch mic, no empty track**, both off →
+      **video only, playable**; an armed save with system audio off → clip with a mic track and no
+      system track (system ring measured 0.0 s / 0.0 MB throughout); dev loop green. **Bonus, and it
+      closes M16-T1's loop:** with all audio off SCK opens **no audio tap** — assertion count 3 → 3
+      (all off) vs 3 → 4 (system audio on), so that is the only configuration where an armed Mac
+      could idle-sleep. ⚠️ **Known, unfixed by ruling:** with no audio at all, `ReplayMuxer` loses the
+      continuous clock it anchors saves on — a still screen can yield a stale clip (field note).
 - [ ] M16-T4 **Notice when audio is arriving but silent.** The product defends hard against a mic
       *disappearing* and not at all against the far more common failure: a mic connected and
       delivering buffers that are **silent** — hardware mute switch, wrong input selected, gain at

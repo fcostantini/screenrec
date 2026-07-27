@@ -122,6 +122,7 @@ public final class RecordingSession: @unchecked Sendable {
             frameRate: configuration.frameRateCap,
             preset: configuration.quality,
             includesMicrophone: configuration.microphone != .none,
+            includesSystemAudio: configuration.capturesSystemAudio,
             // The writer can never begin (unwritable output folder, 02 §2). Stop capture so the
             // event loop below ends and fails the session — nothing playable exists, so this is
             // `.failed`, not a `.finished` reason.

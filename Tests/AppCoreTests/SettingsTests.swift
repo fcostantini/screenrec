@@ -159,7 +159,7 @@ import RecorderCore
         SettingsStore.save(.standard, to: defaults)
         let written = defaults.persistentDomain(forName: suite) ?? [:]
         #expect(Set(written.keys) == [
-            "outputDirectory", "qualityPreset", "fpsCap",
+            "outputDirectory", "qualityPreset", "fpsCap", "capturesSystemAudio",
             "replayArmed", "replaySeconds", "replayHotkey", "showsMenuBarTimer",
             "gifFPS", "gifWidth", "gifMaxSeconds", "seenReplayBannerWarning", "countInEnabled",
         ])

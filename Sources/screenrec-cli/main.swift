@@ -29,7 +29,8 @@ func printUsage() {
       screenrec-cli probe-stream [--duration N] [--mic <id>] [--no-mic]
                                        Capture and report per-source buffers/formats/PTS
       screenrec-cli replay-arm [--seconds N] [--duration N] [--app <bundle-id>]
-                               [--region <x,y,w,h>] [--mic <id>] [--no-mic] [--output <dir>]
+                               [--region <x,y,w,h>] [--mic <id>] [--no-mic]
+                               [--no-system-audio] [--output <dir>]
                                        Arm instant replay: screen + system audio + mic into
                                        rolling N-second rings (default 60). Prints occupancy
                                        every 2 s. --app scopes video + system audio to one
@@ -51,6 +52,7 @@ func printUsage() {
                          origin). Mutually exclusive with --app; off-screen/empty fails.
       --mic <id>         Use a specific microphone (see list-mics)
       --no-mic           Record without a microphone
+      --no-system-audio  Record without capturing what the Mac is playing
       --output <dir>     Output directory when no [path] is given (default: ~/Movies)
       --script <steps>   Unattended pause timeline, e.g. rec10,pause5,rec10 (seconds each)
       --test-disk-floor <GB>  Trip the disk guard on demand: stop cleanly when free space
@@ -250,6 +252,7 @@ struct RecordOptions {
     var region: CGRect?
     var micID: String?
     var micEnabled = true
+    var systemAudioEnabled = true
     var outputDir = OutputLocation.defaultDirectory()
     var path: String?
     var dryRun = false
@@ -297,6 +300,8 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
             options.micID = value
         case "--no-mic":
             options.micEnabled = false
+        case "--no-system-audio":
+            options.systemAudioEnabled = false
         case "--output":
             options.outputDir = parseOutputDirectory(iterator.next())
         case "--script":
@@ -407,6 +412,7 @@ func printRecordDryRun(_ options: RecordOptions) {
     } else {
         print("  Microphone: off (--no-mic)")
     }
+    print("  System audio: \(options.systemAudioEnabled ? "on" : "off (--no-system-audio)")")
 
     let planned = plannedOutputURL(options)
     let directory = planned.deletingLastPathComponent()
@@ -523,7 +529,8 @@ func performRecording(_ options: RecordOptions) async {
     let content = contentSelection(appBundleID: options.appBundleID, region: options.region)
     let configuration = CaptureConfiguration(
         content: content, microphone: mic.selection,
-        microphoneRecovery: mic.recovery, quality: options.preset)
+        microphoneRecovery: mic.recovery, capturesSystemAudio: options.systemAudioEnabled,
+        quality: options.preset)
     let session: RecordingSession
     do {
         session = try RecordingSession(

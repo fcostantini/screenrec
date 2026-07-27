@@ -83,6 +83,9 @@ public struct Settings: Sendable, Equatable {
     /// against connected devices at load — a pick must survive its device sitting in its case;
     /// resolution happens at every stream start (and falls back to no mic).
     public var microphonePreference: MicrophonePreference
+    /// Whether recordings and replays capture what the Mac is playing (ADR-019). Default on;
+    /// off with a `.none` mic is a legitimate silent recording.
+    public var capturesSystemAudio: Bool
     /// The Source pick (docs/06 item 5, M7-T2): capture one app instead of the whole screen.
     /// Nil ⇒ entire screen. Not validated against running apps at load — the pick survives the
     /// app being closed; a start while it's away fails loud (never a silent whole-screen fallback).
@@ -158,6 +161,7 @@ public struct Settings: Sendable, Equatable {
             quality: .balanced,
             frameRateCap: 60,
             microphonePreference: .none,
+            capturesSystemAudio: true,
             captureAppBundleID: nil,
             captureRegion: nil,
             replayArmed: false,
@@ -211,6 +215,8 @@ public enum SettingsStore {
         public static let hotkeyModifiers = "modifiers"
         /// Absent ⇒ on (M9-T3): the menu-bar clock is opt-out, not opt-in.
         public static let showsMenuBarTimer = "showsMenuBarTimer"
+        /// Absent ⇒ on (M16-T3): system audio is opt-out, so existing installs keep capturing it.
+        public static let capturesSystemAudio = "capturesSystemAudio"
         /// Absent ⇒ the first-arm banner-suppression alert hasn't been shown (M12-T5).
         public static let seenReplayBannerWarning = "seenReplayBannerWarning"
         /// The GIF export caps (M10-T3 follow-up); absent ⇒ 15 / 480 / 30.
@@ -324,6 +330,9 @@ public enum SettingsStore {
         if defaults.object(forKey: Key.showsMenuBarTimer) != nil {
             settings.showsMenuBarTimer = defaults.bool(forKey: Key.showsMenuBarTimer)
         }
+        if defaults.object(forKey: Key.capturesSystemAudio) != nil {
+            settings.capturesSystemAudio = defaults.bool(forKey: Key.capturesSystemAudio)
+        }
         settings.seenReplayBannerWarning = defaults.bool(forKey: Key.seenReplayBannerWarning)
 
         // Each GIF cap snaps to its nearest picker choice; absent/garbage (0) keeps the default.
@@ -425,6 +434,7 @@ public enum SettingsStore {
         }
         defaults.set(settings.countInEnabled, forKey: Key.countInEnabled)
         defaults.set(settings.showsMenuBarTimer, forKey: Key.showsMenuBarTimer)
+        defaults.set(settings.capturesSystemAudio, forKey: Key.capturesSystemAudio)
         defaults.set(settings.seenReplayBannerWarning, forKey: Key.seenReplayBannerWarning)
         defaults.set(settings.gifFPS, forKey: Key.gifFPS)
         defaults.set(settings.gifWidth, forKey: Key.gifWidth)

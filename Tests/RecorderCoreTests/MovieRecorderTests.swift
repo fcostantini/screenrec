@@ -23,7 +23,8 @@ import Testing
         defer { if !keep { try? FileManager.default.removeItem(at: url) } }
 
         let recorder = try MovieRecorder(
-            outputURL: url, frameRate: Self.fps, preset: .balanced, includesMicrophone: true)
+            outputURL: url, frameRate: Self.fps, preset: .balanced,
+            includesMicrophone: true, includesSystemAudio: true)
 
         // System audio: 48 kHz stereo. Mic: 24 kHz mono — a deliberately different format,
         // so the lazily-built mic input can't share the system input (docs/02 §4).
@@ -85,7 +86,8 @@ import Testing
         // includesMicrophone: false ⇒ every input exists at init, so writing starts eagerly
         // and no mic track appears (the M2-T5 `--no-mic` path).
         let recorder = try MovieRecorder(
-            outputURL: url, frameRate: Self.fps, preset: .balanced, includesMicrophone: false)
+            outputURL: url, frameRate: Self.fps, preset: .balanced,
+            includesMicrophone: false, includesSystemAudio: true)
         let systemFormat = makeAudioFormat(sampleRate: 48_000, channels: 2)
         for index in 0..<(Self.fps * Self.seconds) {
             let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
@@ -105,6 +107,58 @@ import Testing
         #expect(tracks.filter { $0.mediaType == .audio }.count == 1)
     }
 
+    @Test func systemAudioOffYieldsVideoAndMicOnly() async throws {
+        // ADR-019: the input must not exist at all — one that never receives a buffer would still
+        // write an empty AAC track, which is what a viewer sees as a silent second track.
+        let url = Self.temporaryOutputURL()
+        try? FileManager.default.removeItem(at: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let recorder = try MovieRecorder(
+            outputURL: url, frameRate: Self.fps, preset: .balanced, includesMicrophone: true,
+            includesSystemAudio: false)
+        let micFormat = makeAudioFormat(sampleRate: 48_000, channels: 1)
+        for index in 0..<(Self.fps * Self.seconds) {
+            let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
+            recorder.consume(
+                makeVideoSampleBuffer(width: Self.width, height: Self.height, pts: pts,
+                                 duration: CMTime(value: 1, timescale: CMTimeScale(Self.fps))),
+                type: .screen)
+            recorder.consume(
+                makeAudioSampleBuffer(format: micFormat, frames: 48_000 / Self.fps, pts: pts),
+                type: .microphone)
+        }
+
+        let asset = AVURLAsset(url: try await recorder.finish())
+        let tracks = try await asset.load(.tracks)
+        #expect(tracks.filter { $0.mediaType == .video }.count == 1)
+        #expect(tracks.filter { $0.mediaType == .audio }.count == 1)
+    }
+
+    @Test func allAudioOffYieldsAPlayableSilentRecording() async throws {
+        // A silent screen recording is legitimate (ADR-019), not an error.
+        let url = Self.temporaryOutputURL()
+        try? FileManager.default.removeItem(at: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let recorder = try MovieRecorder(
+            outputURL: url, frameRate: Self.fps, preset: .balanced, includesMicrophone: false,
+            includesSystemAudio: false)
+        for index in 0..<(Self.fps * Self.seconds) {
+            let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
+            recorder.consume(
+                makeVideoSampleBuffer(width: Self.width, height: Self.height, pts: pts,
+                                 duration: CMTime(value: 1, timescale: CMTimeScale(Self.fps))),
+                type: .screen)
+        }
+
+        let asset = AVURLAsset(url: try await recorder.finish())
+        let tracks = try await asset.load(.tracks)
+        #expect(tracks.filter { $0.mediaType == .video }.count == 1)
+        #expect(tracks.filter { $0.mediaType == .audio }.isEmpty)
+        #expect(try await asset.load(.duration).seconds > 0)
+    }
+
     @Test func aMicrophoneMissingItsGraceFiresTheDropAndYieldsNoMicTrack() async throws {
         // A selected mic that never delivers within the 0.75 s grace: the recorder starts without
         // it and fires the drop signal (M13-T4) — surfaced as a notice, not a silent mic-less take.
@@ -113,7 +167,8 @@ import Testing
         defer { try? FileManager.default.removeItem(at: url) }
 
         let recorder = try MovieRecorder(
-            outputURL: url, frameRate: Self.fps, preset: .balanced, includesMicrophone: true)
+            outputURL: url, frameRate: Self.fps, preset: .balanced,
+            includesMicrophone: true, includesSystemAudio: true)
         let dropped = LockedBox<Bool>()
         recorder.onMicrophoneDroppedAtStart = { dropped.set(true) }
 
@@ -142,7 +197,8 @@ import Testing
         defer { try? FileManager.default.removeItem(at: url) }
 
         let recorder = try MovieRecorder(
-            outputURL: url, frameRate: Self.fps, preset: .balanced, includesMicrophone: true)
+            outputURL: url, frameRate: Self.fps, preset: .balanced,
+            includesMicrophone: true, includesSystemAudio: true)
         let dropped = LockedBox<Bool>()
         recorder.onMicrophoneDroppedAtStart = { dropped.set(true) }
 
@@ -172,7 +228,8 @@ import Testing
         defer { try? FileManager.default.removeItem(at: url) }
 
         let recorder = try MovieRecorder(
-            outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: false)
+            outputURL: url, frameRate: Self.fps, preset: .efficient,
+            includesMicrophone: false, includesSystemAudio: true)
 
         // Only audio was fed — no video frame ever started the session, so there is nothing
         // to finalize and finish() reports it rather than emitting an empty file.
@@ -192,7 +249,8 @@ import Testing
         defer { try? fileManager.removeItem(at: url) }
 
         let recorder = try MovieRecorder(
-            outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: false)
+            outputURL: url, frameRate: Self.fps, preset: .efficient,
+            includesMicrophone: false, includesSystemAudio: true)
         // Only audio — no video frame ever starts the session, so nothing is written.
         recorder.consume(
             makeAudioSampleBuffer(format: makeAudioFormat(sampleRate: 48_000, channels: 2), frames: 1600, pts: .zero),
@@ -210,7 +268,8 @@ import Testing
         defer { try? fileManager.removeItem(at: url) }
 
         let recorder = try MovieRecorder(
-            outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: false)
+            outputURL: url, frameRate: Self.fps, preset: .efficient,
+            includesMicrophone: false, includesSystemAudio: true)
         recorder.cancel()
         #expect(!fileManager.fileExists(atPath: url.path))
     }
@@ -224,7 +283,8 @@ import Testing
         defer { try? fileManager.removeItem(at: url) }
 
         let recorder = try MovieRecorder(
-            outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: false)
+            outputURL: url, frameRate: Self.fps, preset: .efficient,
+            includesMicrophone: false, includesSystemAudio: true)
 
         let frameDuration = CMTime(value: 1, timescale: CMTimeScale(Self.fps))
         for index in 0..<5 {
@@ -261,7 +321,8 @@ import Testing
         // proves it neither re-attempts the writer nor re-notifies after the first failure.
         try await confirmation("write failure reported exactly once") { failed in
             let recorder = try MovieRecorder(
-                outputURL: url, frameRate: Self.fps, preset: .efficient, includesMicrophone: false,
+                outputURL: url, frameRate: Self.fps, preset: .efficient,
+                includesMicrophone: false, includesSystemAudio: true,
                 onWriteFailure: { failed() })
             for index in 0..<2 {
                 let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))

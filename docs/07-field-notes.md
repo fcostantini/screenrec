@@ -7,6 +7,29 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-27 (M16-T3): **An SCK stream with `capturesAudio = false` and no mic opens no audio tap —
+  so nothing but our own assertion keeps the Mac awake.** Completes the M16-T1 note below. The tap
+  assertions are attributed to `replayd` (pid 510), never to the client that asked for them, so they
+  can't be attributed by pid — count them instead, A/B against a baseline:
+
+  | State | `pmset -g assertions \| grep -c "Created for PID: 510"` |
+  |---|---|
+  | Deployed app armed, no CLI (baseline) | 3 |
+  | \+ CLI armed, **all audio off** | **3** — added nothing |
+  | \+ CLI armed, system audio on, no mic | 4 |
+  | after both exited | 3 |
+
+  - ⚠️ **Don't read a raw count as "our" taps** — a first attempt did, and the running menu-bar app's
+    own armed stream was in the number. The baseline is the whole measurement.
+  - Consequence for M16-T4/T5 and anything power-related: "no audio at all" is the only configuration
+    where an armed Mac could idle-sleep — and ADR-018 keeps it awake there anyway, on purpose.
+  - **UNFIXED edge, by ruling (Franco, 2026-07-27):** with both audio sources off, `ReplayMuxer`'s
+    save window loses the clock it anchors on. Its own comment explains why audio is the anchor —
+    "audio flows continuously … anchoring at the video ring alone would save old content" — and with
+    no audio, a still screen (frame-on-change) can leave the newest video frame minutes old, so a save
+    grabs that instead of the trigger moment. Inherent, not introduced; the configuration couldn't
+    exist before M16-T3. Fix would be a wall-clock fallback anchor in the muxer.
+
 - 2026-07-27 (M16-T2): **`CGDisplayPixelsWide/High` return POINTS, not pixels** — 2056×1285 on this
   display, where SCK captures 4112×2570. `CGDisplayCopyDisplayMode(id)` gives both honestly
   (`width`/`height` points, `pixelWidth`/`pixelHeight` pixels) and its pixel size is the one that
