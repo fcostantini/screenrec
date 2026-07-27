@@ -21,8 +21,12 @@
   3→3 (all off) vs 3→4 (system audio on), so that's the only configuration where an armed Mac could
   idle-sleep (ADR-018 keeps it awake there anyway, deliberately). ⚠️ **Known, unfixed by ruling:**
   with no audio at all, `ReplayMuxer` loses the continuous clock it anchors saves on, so a still
-  screen can yield a stale clip (field note). **Deployed app is one commit behind — redeploy to see
-  the new menu row. Next: M16-T4** (notice when audio is arriving but silent) — plan artifact first.
+  screen can yield a stale clip (field note). **DEPLOYED and verified live on the menu:** the row
+  renders checked between `Microphone ▸` and `Quality ▸`; `menudriver click` → unchecked +
+  `capturesSystemAudio = 0` persisted; click again → checked + `= 1` (Franco's setting restored),
+  and the sleep assertion's age reset to 00:00:01 each time — incidental proof that a capture-
+  affecting change really does rebuild the armed stream.
+  **Next: M16-T4** (notice when audio is arriving but silent) — plan artifact first.
 
 - **✅ M16-T2 DONE (2026-07-27) — an armed buffer now says what it costs, and 1.7.2+T1+T2 is
   DEPLOYED.** Settings gained a caption under the slider and the armed menu a dimmed row; measured
