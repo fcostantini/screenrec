@@ -1862,3 +1862,99 @@ Closed entries, moved verbatim to keep STATUS.md's "Now" readable. Unmaintained.
   menu diet inherits exactly one extra row from M17-T2, `Window ▸`, not the dozen a flat list would
   have cost; and M18-T4's “small honesties” is the natural home for the duplicate-label wrinkle a
   relaunched app produces (a live row and a `(closed)` row with the same text).
+
+## M19 (The disk tells the truth) — rotated from STATUS.md 2026-07-28
+
+- **✅ M19-T5 DONE (2026-07-28) — a window pick is an identity, not a title. M19's five tasks are
+  all closed (T1/T4/T5 shipped, T2/T3 won't-do).** Plan artifact (rulings A/B/C approved):
+  `claude.ai/code/artifact/45e7cf23-0703-4e5b-aaed-50222cebe3fa`. **539 tests (+3)**, dev loop green,
+  deployed (pid 93702).
+  **As built:** `WindowSelection` is `id` + `bundleID` only — the field is *gone*, not merely
+  omitted at the save site. A legacy `title` is ignored on load and erased by the next save (the
+  whole dict is rewritten — no migration). A gone pick reads **`Firefox (closed)`** in the row and
+  the `Source:` header alike; without the marker it reads like an app-scoped pick, a different mode.
+  🔴 **The probe found a shipped UI bug on the way:** the menu tags each row with a `WindowSelection`
+  built from the **live** window while the selection came from the **stored** pick, and the type was
+  `Hashable` over `title` — so **a retitled window lost its checkmark** (measured `match=false`).
+  Every browser tab switch did it. It hid because the header is computed separately and stayed
+  correct, with a passing test for the header. Generalised in docs/07: a Picker tag must carry
+  identity only.
+  **Verified live:** the menu did list a private-browsing window and a Slack channel by name (the
+  review's point) → picked one → plist held **`{bundleID, id}` only** → renaming the folder under
+  Finder retitled the window and the row **stayed `✓`** → closing it gave **`✓ Finder (closed)`** in
+  row and header → Start **failed loud** with the M17-T2 copy. Source restored to Entire Screen and
+  the pick cleared.
+  **Next: G19** — three surviving criteria (the disk guard's falling-volume leg is already recorded
+  under M19-T1; the plist has no window title; the MP4 picker names what its sizes cost) — then the
+  **PATCH bump to 1.10.1** and a release cut (`Scripts/release.sh` **in the background**, then push
+  main **and** the tag by hand).
+
+- **📋 FILED 2026-07-28: M22-T6 — a tag carries a downloadable build** (Franco asked mid-session).
+  Nothing is missing tooling-wise: `gh` is installed and authenticated (`fcostantini`, keyring, ssh),
+  `release.sh` already tags and pushes, `bundle.sh` already leaves a signed `dist/ScreenRec.app`. The
+  addition is ~6 lines in the push branch — `ditto -c -k --sequesterRsrc --keepParent` (never
+  `zip -r`, which mangles a bundle and can void the signature) then `gh release create --generate-notes`.
+  **Filed beside M22-T5 to be done in the same edit** (same file, same region).
+  ⚠️ **The real constraint is Gatekeeper, not tooling:** ADR-014's build is self-signed and
+  deliberately not notarized, so a *downloaded* zip is quarantined and macOS 15 refuses it until the
+  recipient uses System Settings → Privacy & Security → Open Anyway — the instruction has to ride
+  with the release or the download is a trap. Notarization stays closed (ADR-014); noted only that
+  `notarytool`/`stapler` do ship with the Command Line Tools here.
+
+- **✅ M19-T4 DONE (2026-07-28) — the Size picker says what each pick costs, and one row is gone.**
+  Plan artifact (rulings A/B/C approved): `claude.ai/code/artifact/e7d999a2-d9b8-4a03-b3a7-0d809feba4f4`.
+  **536 tests (+3)**, dev loop green, deployed to `/Users/Shared/ScreenRec.app` (pid 89360).
+  🔴 **Measured before designing: `1280 px` was a decoy** — one 7.47 s source exported at all four
+  picks gave **6,764,917 B at 1280 vs 6,688,557 B at 1920**, the smaller pick 1% *heavier* for 2.25×
+  fewer pixels, because M18-T2's rate floor gives every output ≤ 1920×1200 exactly 6 Mbps. Dropped;
+  a stored 1280 snaps to 1920 on load, and `--width 1280` still works on the CLI.
+  **As built:** rows read `1920 px · ≈46 MB per minute` · `2560 px · ≈81` ·
+  `Largest (3686 × 2304) · ≈170`, computed from the same `ExportConfiguration` the encoder uses, at
+  `≈`-grade through a new shared **`ApproximateBytes`** (extracted from `ReplayFootprint`, which had
+  the only copy). Destination words (`Message / web`) were **rejected**: a 46 MB minute already
+  exceeds what several services take, so the row would promise what clip *length* decides.
+  **Verified live on the deployed build:** the picker reads `1920 px · ≈46 MB per minute`, and a
+  menu export of a 20 s take produced **15,809,145 B = 45.1 MB/min** against that ≈46.
+  ⚠️ **`strings` can't see a Swift literal ≤ 15 bytes** (immediate values, not data) — the
+  deploy-freshness check reported 0 matches for `" per minute"` from a binary that had it. Grep
+  something longer (docs/07).
+  **Next: M19-T5** (a window pick stops storing its title) — plan artifact first. Then **G19**, then
+  the PATCH bump to 1.10.1.
+
+- **🚫 M19-T2 AND M19-T3 CLOSED "WON'T DO" (2026-07-28, Franco) — the app does not delete the
+  user's files.** Ruled out at the plan gate, before any code: plan artifact
+  `claude.ai/code/artifact/1fb4f5fa-a182-485f-a929-ef11730eed67`. T2 was a GB cap on the recordings
+  folder (swept after finalize, Trash-only); T3 was trashing a recording once its export landed —
+  both out, background policy or per-export offer alike. Cleaning up stays a Finder job.
+  **Worth keeping from the plan:** the real `~/Movies` holds **two clips Franco made himself, and
+  they are the oldest files in it** — so the obvious "trash the oldest `.mov`s over the cap" would
+  have taken his files first. Any future retention idea starts from "only files ScreenRec named".
+  **Consequences:** G19 amended (the cap criterion removed), and **M19 is now a PATCH, not a MINOR**
+  — with retention gone the milestone adds no new capability.
+  **Next: M19-T4** (MP4 picker sizes named by destination, not by pixels) — plan artifact first.
+  Then M19-T5 (a window pick stops storing its title), then G19.
+
+- **✅ M19-T1 DONE (2026-07-28) — the disk guard can finally see the disk filling.** Plan artifact
+  (rulings A/B/C/D approved): `claude.ai/code/artifact/59035276-224a-457b-b5e7-089fa5d7c780`.
+  **533 tests (+3)**, full dev loop green.
+  **The A/B is the whole story, at the real 2 GB floor with no test hook** — 4 GB APFS image,
+  ~2 GiB of `dd` ballast landing 12 s into a 60 s take, free space crossing to 1.78 GiB:
+  **before**, the take ran all 60 s and said `finished (userStopped)`; **after**,
+  `finished (diskAlmostFull)` at **15.3 s** (~3 s after the crossing, 2 s poll) with a playable
+  **14.89 s** file (hvc1 4112×2570 + AAC).
+  **As built:** `DiskSpaceMonitor.availableBytes(forVolumeAtPath:)` builds the `URL` inside the
+  read, so freshness is structural and no caller can hold a stale one; the `watching:` init keeps
+  the path; `AppState.refreshRecordingRoom` routes through it too (ruling C), which retires the
+  copy-and-clear idiom on the volume probe.
+  ⚠️ **Two dead ends measured before designing** (docs/07): `setTemporaryResourceValue` **cannot**
+  poison the capacity keys, so the obvious deterministic test does not exist; and `URL` copies
+  **share** one cache — clearing the copy unfroze the original, so copy-and-clear was never
+  reading "through a private copy".
+  **The regression test that replaces it** sets the floor 32 MB under a live reading, writes
+  64 MiB (12–18 ms; the boot volume moves by exactly 67,108,864, 5/5 trials) and polls again —
+  **verified to fail on the held-`URL` code** by reinstating it.
+  **Ruling A:** `--test-disk-floor` stays as a smoke check; **04 §4.4 no longer rests on it** —
+  the gate is now the falling-volume leg, since the old criterion tripped on the first poll and a
+  frozen reading satisfied it for four milestones.
+  **Next: M19-T2** (a ceiling on `~/Movies`) — plan artifact first. It carries the milestone's
+  MINOR; T1 alone is a PATCH.
