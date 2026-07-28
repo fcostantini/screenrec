@@ -3,14 +3,26 @@
 # Cut a release (M13-T5). The version bump is YOUR semver decision (ADR-013) — bump `VERSION` and
 # `CoreInfo.version` and commit `release: vX.Y.Z` first. This script then verifies that release is
 # consistent, runs the full gate (stricter than the pre-push hook — it also signs the bundle),
-# tags `vX.Y.Z`, and (on confirm) pushes main + the tag.
+# tags `vX.Y.Z`, pushes main + the tag, and publishes the signed bundle as a GitHub release asset.
+#
+# ⚠️ Run it in the BACKGROUND: a foreground timeout SIGTERMs it mid-encode. With no terminal it
+# pushes without asking — `--no-push` opts out (M22-T5).
 
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
+NO_PUSH=
+for arg in "$@"; do
+  case "$arg" in
+    --no-push) NO_PUSH=1 ;;
+    *) printf 'usage: release.sh [--no-push]\n' >&2; exit 64 ;;
+  esac
+done
+
 if [ -t 1 ]; then G=$'\033[32m'; R=$'\033[31m'; Y=$'\033[33m'; D=$'\033[90m'; Z=$'\033[0m'; else G=; R=; Y=; D=; Z=; fi
-ok()  { printf '%s✓%s %s\n' "$G" "$Z" "$1"; }
-die() { printf '%s✗ %s%s\n' "$R" "$1" "$Z" >&2; exit 1; }
+ok()   { printf '%s✓%s %s\n' "$G" "$Z" "$1"; }
+warn() { printf '%s! %s%s\n' "$Y" "$1" "$Z" >&2; }
+die()  { printf '%s✗ %s%s\n' "$R" "$1" "$Z" >&2; exit 1; }
 
 log=$(mktemp -t screenrec-release)
 trap 'rm -f "$log"' EXIT
@@ -49,17 +61,79 @@ step "encode: GifExporter"  env SCREENREC_HW_ENCODE_TESTS=1 swift test --filter 
 step "swift build -c release"  swift build -c release
 step "bundle + sign"        ./Scripts/bundle.sh
 
-# --- tag, then push on confirm ---
+# --- the release notes: how to get past Gatekeeper, then what changed ---
+# The install note is not decoration: this build is signed by us and deliberately NOT notarized
+# (ADR-014), so a *downloaded* zip is quarantined and macOS 15 refuses it — without these steps
+# the download is a trap.
+release_notes() {
+  local previous
+  # The tag directly below this one in version order — found by locating $TAG rather than assuming
+  # it sorts first, so cutting a patch while a higher minor exists still gets the right range.
+  previous=$(git tag --sort=-v:refname | grep -A1 -Fx "$TAG" | sed -n 2p)
+  cat <<'NOTES'
+## Install
+
+1. Unzip and move **ScreenRec.app** to `/Applications`.
+2. macOS will refuse to open it the first time — this build is signed by its author, not notarized
+   by Apple. Open **System Settings › Privacy & Security**, find the ScreenRec message and choose
+   **Open Anyway** (macOS 15 removed the old Control-click shortcut).
+3. Grant Screen Recording and Microphone when asked.
+
+## Changes
+
+NOTES
+  if [ -n "$previous" ]; then git log --pretty='- %s' "$previous..$TAG"
+  else git log --pretty='- %s' -20 "$TAG"; fi
+}
+
+# --- the downloadable build (M22-T6) ---
+# ⚠️ `ditto`, never `zip -r`: it preserves the bundle's symlinks and extended attributes, and a
+# mangled bundle fails `codesign --verify` — the signature is what the TCC grants key to (M0-T3).
+# Never fatal: main and the tag are already pushed by the time this runs, so a failed upload must
+# not report the release as failed. It says how to finish by hand instead.
+publish_release() {
+  local zip="dist/ScreenRec-$VERSION.zip"
+  rm -f "$zip"
+  if ! ditto -c -k --sequesterRsrc --keepParent dist/ScreenRec.app "$zip" >"$log" 2>&1; then
+    warn "could not zip the bundle — $TAG has no download"; return
+  fi
+  ok "zipped $(basename "$zip") ($(du -h "$zip" | cut -f1 | tr -d ' \t'))"
+
+  local notes; notes=$(mktemp -t screenrec-notes)
+  release_notes >"$notes"
+  if gh release create "$TAG" --title "ScreenRec $VERSION" --notes-file "$notes" "$zip" >"$log" 2>&1
+  then
+    ok "github release $TAG"
+    printf '%s  %s%s\n' "$D" "$(tail -1 "$log")" "$Z"
+  else
+    tail -5 "$log" >&2
+    warn "release not created — rerun: gh release create $TAG --title \"ScreenRec $VERSION\" --generate-notes $zip"
+  fi
+  rm -f "$notes"
+}
+
+# --- tag, then push ---
 git tag "$TAG" || die "could not create tag $TAG"
 ok "tagged $TAG"
 
-printf '%sPush %s to origin (main + tag)?%s [y/N] ' "$Y" "$TAG" "$Z"
-read -r reply || reply=""
+if [ -n "$NO_PUSH" ]; then
+  reply=n
+elif [ ! -t 0 ]; then
+  # The background run this script asks for: `read` sees EOF and used to answer N, so every cut
+  # "succeeded" with main and the tag still local (M22-T5).
+  printf '%sno terminal — pushing (--no-push to stop)%s\n' "$D" "$Z"
+  reply=y
+else
+  printf '%sPush %s to origin (main + tag)?%s [y/N] ' "$Y" "$TAG" "$Z"
+  read -r reply || reply=""
+fi
+
 case "$reply" in
   y|Y)
     # Branch + tag in one push so the pre-push hook's gate runs once, not twice.
     step "push main + $TAG" git push origin main "$TAG"
     ok "pushed — release $TAG is live"
+    publish_release
     ;;
   *)
     printf 'Not pushed. When ready:  git push origin main && git push origin %s\n' "$TAG"

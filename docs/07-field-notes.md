@@ -7,6 +7,19 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-28 (M22-T5/T6): releasing, measured.
+  - ⚠️ **`script -q /dev/null cmd <<< "y"` does NOT answer a prompt** — the heredoc feeds `script`'s
+    own stdin, not the pty, so the program sees EOF and the answer echoes after it. Both a `y` and
+    an `n` run "answered" the same way, which would have passed a broken decision. `expect -c
+    'spawn …; expect "y/N"; send "y\r"; expect eof'` drives a real pty and distinguishes them.
+  - **A `ditto` round trip preserves a bundle's signature; the quarantine flag rides along.**
+    Downloaded `ScreenRec-1.10.1.zip` from GitHub, set `com.apple.quarantine` on the zip, and after
+    `ditto -x -k` the **app inherited the same attribute** while `codesign --verify --strict` still
+    read `valid on disk` + `satisfies its Designated Requirement`. `spctl -a -t exec` **rejects** it
+    (`origin=screenrec-dev`) — which is ADR-014 working as designed, and exactly why the release
+    notes lead with the Privacy & Security steps.
+  - The signed 2.9 MB bundle compresses to **972 KB**.
+
 - 2026-07-28 (M19-T5): 🔴 **a SwiftUI Picker tags its rows with a value, so any moving field in that
   value silently breaks the checkmark.** The menu tagged each window row with a `WindowSelection`
   built from the **live** window while the selection came from the **stored** pick — and the type

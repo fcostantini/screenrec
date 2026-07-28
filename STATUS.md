@@ -6,6 +6,26 @@
 
 ## Now
 
+- **✅ M22-T5 + M22-T6 DONE (2026-07-28) — a cut now pushes itself and leaves a download.** Plan
+  artifact (rulings A/B/C approved): `claude.ai/code/artifact/48258a07-0588-472b-9ea5-894cfd24f3a2`.
+  One file (`Scripts/release.sh`), 539 tests unchanged (no product code).
+  **T5:** **no terminal ⇒ push**, said out loud, `--no-push` to opt out; an interactive run keeps its
+  `[y/N]`. A `--push` flag was rejected — same "remember it" failure mode as today. Verified five
+  ways through the shipped block; ⚠️ **`script -q /dev/null cmd <<< "y"` cannot answer a prompt**
+  (the heredoc feeds `script`, not the pty — `y` and `n` both "answered" identically and would have
+  passed a broken decision). `expect` drives a real pty (docs/07).
+  **T6:** `ditto` (never `zip -r`) + `gh release create`, notes leading with the Gatekeeper install
+  steps then `git log` for the range; a `gh` failure **warns** rather than failing a cut whose
+  irreversible half is already pushed.
+  **Verified against the real `v1.10.1`**, by sourcing the shipped functions rather than a copy:
+  **https://github.com/fcostantini/screenrec/releases/tag/v1.10.1** carries `ScreenRec-1.10.1.zip`
+  (992,374 B — 2.9 MB bundle → 972 KB). Downloaded it back, set `com.apple.quarantine`, and after
+  `ditto -x -k` the app **inherited the quarantine** and still read **`valid on disk` · `satisfies
+  its Designated Requirement`**; `spctl` rejects it (`origin=screenrec-dev`) — ADR-014 as designed,
+  and precisely what the install note is for.
+  **Ordering amended in docs/03:** M22 runs **before** M20/M21 (Franco) — no dependency clashes, and
+  T4/T3 protect M20. **Next: M22-T4** (one timecode, one hotkey registry) — plan artifact first.
+
 - **🎉 GATE G19 PASSED + v1.10.1 (2026-07-28) — M19 (The disk tells the truth) is complete.** Three
   criteria, all re-run against the release build; evidence in the gate table. **PATCH, not MINOR
   (ADR-013):** with T2/T3 closed "won't do" the milestone adds no user-facing capability — a safety

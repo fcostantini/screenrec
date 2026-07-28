@@ -1831,13 +1831,25 @@ No user-visible change: the milestone that keeps the next four cheap. **PATCH** 
       with nothing preventing a collision that would silently unregister someone's shortcut.
       **Rulings:** one type with named formats, or one function with a style parameter.
       **Verify:** unit tests over the shared type; every existing string unchanged.
-- [ ] M22-T5 **`release.sh` can push.** It must run in the background (a foreground timeout SIGTERMs
+- [x] M22-T5 **`release.sh` can push.** ✅ 2026-07-28 — **no terminal ⇒ push**, announced in the
+      output, with `--no-push` to opt out; an interactive run keeps its `[y/N]` prompt unchanged.
+      A `--push` flag was rejected: same failure mode as today, since you have to remember it.
+      Verified five ways through the shipped block (no-TTY, no-TTY + `--no-push`, pty + `y`, pty +
+      `n`, pty + Return, plus a bad flag → usage/64). It must run in the background (a foreground timeout SIGTERMs
       it mid-encode, the VT lesson) and in the background its `Push? [y/N]` reads N — so every cut
       "succeeds" with main and the tag still local, and the fix has been "remember to push" twice.
       **Seams:** the prompt at the end of the script. **Rulings:** a `--push` flag, or skip the
       prompt when stdin is not a TTY and say so in the summary. **Verify:** a background run pushes
       main and the tag, and the tag's own pre-push gate still runs.
-- [ ] M22-T6 **A tag carries a downloadable build.** Every release is a bare tag today; handing the
+- [x] M22-T6 **A tag carries a downloadable build.** ✅ 2026-07-28 — `publish_release` zips the
+      signed bundle with `ditto` and creates the GitHub release; a `gh` failure **warns** with the
+      re-run command instead of failing a cut whose irreversible half (main + tag) is already
+      pushed. Notes lead with the three-step Gatekeeper install, then `git log` for the range.
+      **Verified against the real `v1.10.1`** by sourcing the shipped functions:
+      `ScreenRec-1.10.1.zip` (992,374 B) attached, downloaded back, quarantined, and after
+      `ditto -x -k` the app **inherits the quarantine** and still reads **`valid on disk` ·
+      `satisfies its Designated Requirement`** (`spctl` rejects it, `origin=screenrec-dev` — exactly
+      what the install note is for). Every release is a bare tag today; handing the
       app to someone means building it for them or copying a bundle by hand, and ADR-014's sharing
       path assumes they receive a signed `.app`. **Do it in the same edit as M22-T5** — same file,
       same end-of-script region, and the release only exists once the tag is pushed. **Seams:** the
@@ -1916,6 +1928,14 @@ dozen.** T2 nested the window list inside a single `Window ▸` row rather than 
 - **M22 last on purpose.** Structural work has no user-visible payoff, so it is easiest to justify
   *after* the features that would otherwise have landed in `AppState` — and M20/M21 will show which
   seams actually need splitting rather than which ones look untidy today.
+  **↳ AMENDED 2026-07-28 (Franco): M22 runs BEFORE M20/M21.** No dependency clashes — M22 touches
+  only units that exist today — and two of its tasks actively protect the next milestone: **T4**
+  (one hotkey registry) lands before M20-T1 adds a fourth global shortcut to ids that are still bare
+  literals, and **T3** (tests naming `WriterDrain`/`SampleTiming`) lands before M20-T2 might touch
+  `MovieRecorder`, the path four milestones have left alone. The argument above still holds for
+  **T1/T2** specifically (the `AppState` extractions), which may run last within M22 if the seam
+  information is worth waiting for. **T5+T6 went first**, so every later cut pushes itself and
+  leaves a download.
 
 **Parked, deliberately, from the same review:** multi-display region capture (M11 is main-display
 only and honest about it — worth doing the week a second display is attached, not before); an
