@@ -14,6 +14,8 @@ enum HotkeyID: UInt32 {
     /// Esc during the count-in — registered only while the beat runs, since it swallows Esc
     /// system-wide (M18-T4).
     case cancelCountIn = 4
+    /// Marks the running take's current position (M20-T1).
+    case addMark = 5
 }
 
 /// Registers global shortcuts via Carbon `RegisterEventHotKey` — the one global hotkey API that

@@ -398,6 +398,16 @@ collapses toolbar tabs into a `»` overflow menu, hiding three of the four pages
   notification there would be noise, unlike the record hotkey's real "blocked" failure). Lets a demo be
   paused without opening the menu (which is itself captured). Backed by `pauseHotkey`; a third
   `HotkeyCenter` id beside replay=1, record=2.
+- **Global mark shortcut** (M20-T1) — the fourth opt-in shortcut, seeds **⌥⌘M**, recorder pill.
+  Marks the running take's position so a long recording has somewhere to jump back to. Fires
+  `AppState.addMark`, which reads **`RecordingClock`** — the pause-corrected number the menu bar is
+  showing when the key is pressed, *not* the writer's `recordedDuration` — so a mark names the frame
+  the user was looking at. **Ignored while paused** (a frozen clock would stack every press on one
+  frame) and while idle, both silently: the only feedback is a ~2 s menu-bar **bookmark badge**, the
+  `replaySavedFlash` shape, because a demo can carry twenty marks and twenty banners is a punishment.
+  The recording menu adds one dimmed row, **`N marks · last at M:SS`**, stamped at open and absent at
+  zero marks. Backed by `markHotkey`; `HotkeyID.addMark = 5`. ⚠️ **Marks are session state until
+  M20-T2 gives them a home** — they die with the take.
 - **Count in before recording (3-2-1)** (M12-T6) — opt-in toggle, off by default. When on, Start shows a
   3→2→1 count-in overlay (a big translucent number on the main display, **click-through and not a veil**,
   so the target window can be brought forward during the beat), **then** begins capture — the countdown

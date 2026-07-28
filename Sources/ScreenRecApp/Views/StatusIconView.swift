@@ -172,6 +172,7 @@ struct StatusIconView: View {
     var recordingClock: RecordingClock? = nil
     var showsTimer = true
     var replaySavedFlash = false
+    var markAddedFlash = false
     /// Pull for the input meter (M16-T5): returns the peak since the last call. Nil ⇒ no meter.
     var microphoneLevel: (() -> Float)? = nil
 
@@ -188,6 +189,9 @@ struct StatusIconView: View {
             }
             if replaySavedFlash {
                 Image(systemName: "checkmark.circle.fill")
+            }
+            if markAddedFlash {
+                Image(systemName: "bookmark.fill")
             }
         }
         .accessibilityElement(children: .ignore)
@@ -221,6 +225,7 @@ struct StatusIconView: View {
             label += ", " + Timecode.clock(recordingClock.elapsed(now: Date()))
         }
         if replaySavedFlash { label += ", replay saved" }
+        if markAddedFlash { label += ", mark added" }
         return label
     }
 }

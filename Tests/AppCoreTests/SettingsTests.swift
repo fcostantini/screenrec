@@ -90,6 +90,20 @@ import RecorderCore
         #expect(SettingsStore.load(from: defaults).pauseHotkey == nil)
     }
 
+    @Test func markHotkeyIsOptInAndRoundTrips() {
+        // The fourth global shortcut (M20-T1): off unless chosen, like its three siblings.
+        let defaults = makeDefaults().defaults
+        #expect(SettingsStore.load(from: defaults).markHotkey == nil)
+        var settings = Settings.standard
+        settings.markHotkey = .markDefault
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).markHotkey == .markDefault)
+
+        settings.markHotkey = nil
+        SettingsStore.save(settings, to: defaults)
+        #expect(defaults.dictionary(forKey: SettingsStore.Key.markHotkey) == nil)
+    }
+
     @Test func countInEnabledRoundTripsAndDefaultsToOff() {
         let defaults = makeDefaults().defaults
         #expect(SettingsStore.load(from: defaults).countInEnabled == false)   // absent ⇒ off

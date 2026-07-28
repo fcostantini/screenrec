@@ -287,6 +287,16 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
+    /// The system refused the mark shortcut (M20-T1). Unlike its siblings there is no menu
+    /// fallback — marking is the shortcut — so this says what to do instead of what still works.
+    public static func markHotkeyUnavailable() -> RecordingNotification {
+        RecordingNotification(
+            title: "Mark shortcut unavailable",
+            body: "Another app may be using that shortcut. Choose a different one in "
+                + "ScreenRec Settings.",
+            fileURL: nil)
+    }
+
     /// The system refused the pause/resume shortcut (M12-T6). Pausing from the menu still works.
     public static func pauseHotkeyUnavailable() -> RecordingNotification {
         RecordingNotification(

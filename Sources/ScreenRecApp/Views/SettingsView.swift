@@ -162,6 +162,31 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // M20-T1: marks the running take's position, so a long recording has somewhere to
+            // jump back to. Opt-in like its siblings; seeds ⌥⌘M.
+            Toggle("Global mark shortcut", isOn: Binding(
+                get: { state.markHotkey != nil },
+                set: { state.markHotkey = $0 ? (state.markHotkey ?? .markDefault) : nil }))
+            if state.markHotkey != nil {
+                LabeledContent("Mark shortcut") {
+                    HotkeyRecorderButton(
+                        hotkey: Binding(
+                            get: { state.markHotkey ?? .markDefault },
+                            set: { state.markHotkey = $0 }),
+                        accessibilityName: "Mark the moment shortcut",
+                        suspendGlobalHotkey: { _ = state.hotkeyRegistrar?(nil, .addMark) },
+                        restoreGlobalHotkey: {
+                            if let hk = state.markHotkey {
+                                _ = state.hotkeyRegistrar?(hk, .addMark)
+                            }
+                        })
+                }
+                Text("Marks where you are in the current recording, from any app. Ignored while "
+                    + "paused. Must include ⌥ or ⌃.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             // M12-T6: a 3-2-1 beat before capture to switch to the target window. The countdown
             // isn't in the recording.
             Toggle("Count in before recording (3-2-1)", isOn: $state.countInEnabled)

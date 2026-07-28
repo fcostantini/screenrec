@@ -1725,7 +1725,19 @@ thing that makes that strength usable: hit it when the bug happens, or on each b
 the marks are how you get back there. **MINOR** (a new user-facing capability). Needs none of the
 render/compositing stage ADR-015 parked.
 
-- [ ] M20-T1 **Mark the moment.** A global shortcut (⌥⌘M by default) records the current position of
+- [x] M20-T1 **Mark the moment.** ✅ 2026-07-28 — ⌥⌘M (opt-in, seeded, the M9-T4 pattern) marks the
+      running take; a menu-bar bookmark flashes ~2 s (the `replaySavedFlash` shape) and the recording
+      menu carries `N marks · last at M:SS`, stamped at open. **Ruling A: the position comes from
+      `RecordingClock`**, not the writer's `recordedDuration` — the clock is the number the menu bar
+      is *showing* when the key is pressed. **Ruling B: a paused take declines the mark**, since
+      every press would land on the same frozen frame. **First shortcut on M22-T4's typed registry**
+      (`case addMark = 5`, a collision now being a compile error). **564 tests (+7).**
+      **Live:** ⌥⌘M fired from another process (genuinely global) → menu read `1 mark · last at
+      0:05`; paused, a press was declined (still 1 mark); resumed → `2 marks · last at 0:29`; the
+      file was 33 s with the pause absent. **The take recorded its own menu bar**, so the marked
+      frames were checked against the clock they came from: **00:00:05** at the 0:05 mark and
+      **00:00:28** at 0:29 — within the label's 1 Hz tick. ⚠️ **Marks do not survive the take yet
+      — that is T2**, and until then this is a proven mechanism rather than a usable workflow. A global shortcut (⌥⌘M by default) records the current position of
       the running take; nothing happens when idle. **Seams:** `HotkeyCenter` + `AppState`'s
       `hotkeyRegistrar` already carry three shortcuts and the opt-in/seed/recorder-pill pattern
       (M9-T4, M12-T6); the position must come from the **recording clock**, not wall clock — a

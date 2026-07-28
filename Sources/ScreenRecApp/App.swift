@@ -73,6 +73,8 @@ struct ScreenRecApp: App {
                 return hotkeys.setHotkey(hotkey, id: .togglePause) { [weak state] in
                     Task { await state?.togglePause() }
                 }
+            case .addMark:
+                return hotkeys.setHotkey(hotkey, id: .addMark) { [weak state] in state?.addMark() }
             }
         }
         // The 3-2-1 count-in (M12-T6): AppKit overlay lives here, run before capture by AppState.
@@ -165,6 +167,7 @@ private struct StatusIconLabel: View {
             recordingClock: state.recordingClock,
             showsTimer: state.showsMenuBarTimer,
             replaySavedFlash: state.replaySavedFlash,
+            markAddedFlash: state.markAddedFlash,
             microphoneLevel: state.showsMicrophoneLevel ? { state.takeMicrophoneLevel() } : nil)
             .task {
                 // A persisted armed state resumes at launch; `init` never arms (tests
@@ -172,8 +175,9 @@ private struct StatusIconLabel: View {
                 state.activateReplayIfArmed()
                 // The start/stop shortcut isn't tied to arming, so it registers on its own (M9-T4).
                 state.activateRecordHotkey()
-                // Likewise the pause/resume shortcut (M12-T6).
+                // Likewise the pause/resume shortcut (M12-T6) and the mark shortcut (M20-T1).
                 state.activatePauseHotkey()
+                state.activateMarkHotkey()
                 state.syncLaunchAtLogin()
                 // Before any recording can start, so a live partial is never mistaken
                 // for a crash orphan.

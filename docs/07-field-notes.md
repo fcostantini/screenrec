@@ -7,6 +7,19 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-28 (M20-T1): verifying a timestamp against the recording itself.
+  - **A full-screen take records its own menu-bar clock**, so a mark's frame can be checked against
+    the number the user was looking at when they pressed the key: the frame at the 0:05 mark read
+    **00:00:05**, the one at 0:29 read **00:00:28**. That second reading is not an error — the label
+    ticks at **1 Hz**, so expect up to a second of lag between the mark and what the frame shows.
+    Cheapest timing evidence available for anything clock-shaped; M20-T3's seeks can reuse it.
+  - ⚠️ **Do not reason about a driven sequence's timing from your own sleeps.** Every
+    `swift tools/<x>.swift` invocation *compiles first*, several seconds each, so a scripted
+    Start → Pause → dump run drifts far from the arithmetic. Reasoning that way produced a
+    confident false bug report (that the header clock advanced during a pause — it had not; the
+    pause simply landed later than assumed, and Franco knew because he was watching). **Read the
+    app's own clock, not the wall clock you think you commanded.**
+
 - 2026-07-28 (M22-T1): 🔴 **a python range-cut ate 190 lines of `AppState` and the build still had
   to tell me.** Extracting `SourcesModel` by `s[:a] + s[b:]`, the end marker for `regionLabel` was
   `// MARK: - Event folding` — which sits *below the whole Actions section*, so the cut removed

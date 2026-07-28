@@ -6,6 +6,30 @@
 
 ## Now
 
+- **✅ M20-T1 DONE (2026-07-28) — ⌥⌘M marks the running take.** Plan artifact (rulings A/B/C
+  approved): `claude.ai/code/artifact/17df26d2-c25d-4671-a12f-91248a3b9168`. **564 tests (+7)**,
+  dev loop green, deployed (pid 23380).
+  **As built:** opt-in shortcut seeded ⌥⌘M (the M9-T4 pattern), a ~2 s menu-bar **bookmark badge**
+  (the `replaySavedFlash` shape — no notification, since a demo can carry twenty marks), and one
+  dimmed menu row `N marks · last at M:SS`, stamped at open, absent at zero.
+  **Ruling A — the position is `RecordingClock`**, not the writer's `recordedDuration`: the clock is
+  the number the menu bar is *showing* when the key is pressed. **Ruling B — a paused take declines
+  the mark**, since every press would stack on the same frozen frame. **First shortcut on M22-T4's
+  typed registry** (`addMark = 5`; a collision is now a compile error — the payoff for running M22
+  first).
+  **Verified live, and the take checked itself:** ⌥⌘M fired **from another process** (so it is
+  genuinely global) → `1 mark · last at 0:05`; a press while paused was declined; resumed →
+  `2 marks · last at 0:29`; the file was **33 s with the ~13 s pause absent**. Because a full-screen
+  take records its own menu bar, the marked frames were read back: **00:00:05** at the 0:05 mark and
+  **00:00:28** at 0:29 — within the label's 1 Hz tick (docs/07).
+  ⚠️ **I filed a false bug mid-leg** — that the header clock advanced during the pause — by reasoning
+  from my own sleeps rather than the app's clock. Every `swift tools/…` run compiles first, so the
+  pause landed much later than my arithmetic assumed; Franco caught it because he was watching the
+  menu bar. Nothing reached the docs but the lesson (docs/07).
+  ⚠️ **⌥⌘M is currently bound on Franco's machine** (seeded for the leg). Say the word and it goes.
+  **Next: M20-T2** (marks survive the file) — the task with the real decision, and the one that
+  makes marks usable at all: today they die with the take.
+
 - **🎉 GATE G22 PASSED + v1.10.2 (2026-07-28) — M22 (Structure) is complete, and the release cut
   itself.** Evidence in the gate table. **PATCH (ADR-013):** no user-facing change anywhere.
   **The cut is the gate's fourth criterion**, so it is worth reading as evidence: `Scripts/release.sh`

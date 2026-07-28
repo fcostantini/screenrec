@@ -24,6 +24,7 @@ public enum GlobalShortcut: Sendable, Equatable {
     case saveReplay
     case toggleRecording
     case togglePause
+    case addMark
 }
 
 /// The menu-bar app's view state.
@@ -283,6 +284,16 @@ public final class AppState {
         }
     }
 
+    /// Marks the running take's position (M20-T1); nil ⇒ off. Opt-in like every other global
+    /// shortcut here — an always-live combo the user didn't choose can clash.
+    public var markHotkey: Hotkey? {
+        didSet {
+            guard markHotkey != oldValue else { return }
+            persist()
+            registerMarkHotkey()
+        }
+    }
+
     /// Whether Start runs a 3-2-1 count-in first (M12-T6). Off by default. Persisted.
     public var countInEnabled: Bool = false {
         didSet {
@@ -410,6 +421,10 @@ public final class AppState {
     /// the menu, unlike `lastReplay`'s row. Set on save success, auto-cleared after `flashDuration`.
     public private(set) var replaySavedFlash = false
     private var flashTask: Task<Void, Never>?
+    /// The same brief menu-bar confirmation for a mark (M20-T1): a mark has no menu row of its own
+    /// until the menu is opened, so this is the only feedback at the moment of the press.
+    public private(set) var markAddedFlash = false
+    private var markFlashTask: Task<Void, Never>?
     private static let flashDuration: Duration = .seconds(2)
 
     /// The export/trim cluster (M14-T1), the `PermissionsModel` pattern: AppState owns it and
@@ -495,6 +510,7 @@ public final class AppState {
         replayHotkey = settings.replayHotkey
         recordHotkey = settings.recordHotkey
         pauseHotkey = settings.pauseHotkey
+        markHotkey = settings.markHotkey
         countInEnabled = settings.countInEnabled
         showsMenuBarTimer = settings.showsMenuBarTimer
         showsMenuBarLevel = settings.showsMenuBarLevel
@@ -570,7 +586,7 @@ public final class AppState {
                 captureWindow: sources.selectedWindow,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey, recordHotkey: recordHotkey,
-                pauseHotkey: pauseHotkey, countInEnabled: countInEnabled,
+                pauseHotkey: pauseHotkey, markHotkey: markHotkey, countInEnabled: countInEnabled,
                 showsMenuBarTimer: showsMenuBarTimer, showsMenuBarLevel: showsMenuBarLevel,
                 gifFPS: gifFPS, gifWidth: gifWidth, gifMaxSeconds: gifMaxSeconds,
                 stopAfterMinutes: stopAfterMinutes, mp4Width: mp4Width,
@@ -780,11 +796,24 @@ public final class AppState {
         registerPauseHotkey()
     }
 
+    /// The mark shortcut's twin of the above (M20-T1).
+    public func activateMarkHotkey() {
+        registerMarkHotkey()
+    }
+
     private func registerPauseHotkey() {
         guard let hotkeyRegistrar else { return }
         let accepted = hotkeyRegistrar(pauseHotkey, .togglePause)   // nil ⇒ unregister ⇒ true
         if pauseHotkey != nil, !accepted {
             notifier?(RecordingNotifications.pauseHotkeyUnavailable())
+        }
+    }
+
+    private func registerMarkHotkey() {
+        guard let hotkeyRegistrar else { return }
+        let accepted = hotkeyRegistrar(markHotkey, .addMark)   // nil ⇒ unregister ⇒ true
+        if markHotkey != nil, !accepted {
+            notifier?(RecordingNotifications.markHotkeyUnavailable())
         }
     }
 
@@ -906,6 +935,14 @@ public final class AppState {
         guard let bytes = replayBufferBytes(seconds: seconds) else { return awake }
         return "A \(Self.bufferPhrase(seconds)) buffer holds about "
             + "\(ApproximateBytes.formatted(bytes)) in memory. \(awake)"
+    }
+
+    /// The recording menu's mark row (M20-T1), stamped at open and never ticking (M6-T10); nil
+    /// with no marks, since an idle "0 marks" is noise.
+    public var marksMenuLabel: String? {
+        guard let last = session.marks.last else { return nil }
+        let count = session.marks.count
+        return "\(count) mark\(count == 1 ? "" : "s") · last at \(Timecode.length(last))"
     }
 
     /// docs/06: the armed menu's dimmed cost row. Stamped at open, never ticking (M6-T10).
@@ -1216,6 +1253,26 @@ public final class AppState {
         case .pause: await pause()
         case .resume: await resume()
         case .ignore: break
+        }
+    }
+
+    /// Marks the running take's current position (M20-T1) and flashes the menu bar. Silent when
+    /// there is nothing to mark — idle, or paused, where every press would land on the same frozen
+    /// frame. No notification: a demo can carry twenty of these.
+    public func addMark() {
+        guard session.addMark() != nil else { return }
+        flashMarkAdded()
+    }
+
+    /// Shows the menu-bar mark confirmation, then clears it (the `replaySavedFlash` shape, M9-T3).
+    /// A second mark restarts the window rather than stacking.
+    private func flashMarkAdded() {
+        markAddedFlash = true
+        markFlashTask?.cancel()
+        markFlashTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.flashDuration)
+            guard !Task.isCancelled else { return }
+            self?.markAddedFlash = false
         }
     }
 
