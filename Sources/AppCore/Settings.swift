@@ -133,17 +133,17 @@ public struct RegionSelection: Hashable, Sendable {
 /// **reused**, so the bundle ID travels with it and capture refuses any window whose owner
 /// doesn't match — a stale pick must fail, never bind whatever inherited the number.
 ///
-/// `title` is for the menu label only and is never matched on: a browser window's title changes
-/// on every tab switch, so matching it would discard valid picks constantly.
+/// ⚠️ **Identity only — no title** (M19-T5). It was never matched on (a browser retitles on every
+/// tab switch), it put another app's window title in the plist in plaintext, and since the menu
+/// tags its rows with this `Hashable`, carrying a moving field meant a retitled window stopped
+/// matching its own row and lost its checkmark. Labels come from the live window instead.
 public struct WindowSelection: Hashable, Sendable {
     public var id: CGWindowID
     public var bundleID: String
-    public var title: String
 
-    public init(id: CGWindowID, bundleID: String, title: String) {
+    public init(id: CGWindowID, bundleID: String) {
         self.id = id
         self.bundleID = bundleID
-        self.title = title
     }
 
     /// The pick as it currently exists, or nil when it is gone — including the reused-id case,
@@ -154,10 +154,17 @@ public struct WindowSelection: Hashable, Sendable {
         return match
     }
 
-    /// `Firefox — Release Notes`, the menu's label for a window row. Built from a live window so
-    /// a retitled window relabels itself; the stored `title` is the fallback when it is gone.
+    /// `Firefox — Release Notes`, the menu's label for a window row. Always built from a *live*
+    /// window, so a retitled one relabels itself.
     public static func label(appName: String, title: String) -> String {
         "\(appName) — \(title)"
+    }
+
+    /// `Firefox (closed)` — a pick whose window is gone. The app is all we can honestly say, since
+    /// the id isn't durable either. Used by the row *and* the Source header, which without it would
+    /// read like an app-scoped pick — a different capture mode.
+    public static func goneLabel(appName: String) -> String {
+        "\(appName) (closed)"
     }
 }
 
@@ -320,9 +327,10 @@ public enum SettingsStore {
         public static let captureWindow = "captureWindow"
         /// Inner keys of `captureWindow`. The bundle id is what makes a restored pick safe:
         /// window ids are reused, so the id alone could bind another app's window (docs/02 §1c).
+        /// No `title` key: a window title is another app's content and has no business on disk
+        /// (M19-T5). Removed rather than left unused — an unused key invites a future write.
         public static let windowID = "id"
         public static let windowBundleID = "bundleID"
-        public static let windowTitle = "title"
         public static let replayArmed = "replayArmed"
         public static let replaySeconds = "replaySeconds"
         public static let replayHotkey = "replayHotkey"
@@ -507,8 +515,7 @@ public enum SettingsStore {
               let id = CGWindowID(exactly: rawID), id > 0,
               let bundleID = dict[Key.windowBundleID] as? String, !bundleID.isEmpty
         else { return nil }
-        let title = dict[Key.windowTitle] as? String ?? ""
-        return WindowSelection(id: id, bundleID: bundleID, title: title)
+        return WindowSelection(id: id, bundleID: bundleID)
     }
 
     private static func regionSelection(from dict: [String: Any]?) -> RegionSelection? {
@@ -568,8 +575,10 @@ public enum SettingsStore {
             defaults.removeObject(forKey: Key.captureRegion)
         }
         if let window = settings.captureWindow {
-            defaults.set([Key.windowID: Int(window.id), Key.windowBundleID: window.bundleID,
-                          Key.windowTitle: window.title], forKey: Key.captureWindow)
+            // Identity only — see `WindowSelection`. A legacy entry's `title` disappears here,
+            // because the whole dictionary is rewritten.
+            defaults.set([Key.windowID: Int(window.id), Key.windowBundleID: window.bundleID],
+                         forKey: Key.captureWindow)
         } else {
             defaults.removeObject(forKey: Key.captureWindow)
         }

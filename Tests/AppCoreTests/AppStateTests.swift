@@ -186,7 +186,7 @@ import RecorderCore
         // The owner travels with the id so capture can refuse a REUSED id (docs/02 §1c) — an id
         // alone would let a restored pick bind another app's window.
         let state = makeState()
-        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder", title: "Movies"))
+        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
         #expect(state.captureConfiguration.content
             == .window(id: 37, ownerBundleID: "com.apple.finder"))
     }
@@ -195,7 +195,7 @@ import RecorderCore
         // One Source at a time: a leftover app or region pick would win in `captureConfiguration`.
         let state = makeState()
         state.sourceChoice = .app(bundleID: "com.example.app")
-        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder", title: "Movies"))
+        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
         #expect(state.selectedAppBundleID == nil)
         #expect(state.selectedRegion == nil)
         state.sourceChoice = .display(nil)
@@ -205,7 +205,7 @@ import RecorderCore
     @Test func aGoneWindowIsStillListedAndStillChecked() {
         // The pick survives absence (the `(not running)` app rule); Start fails loud instead.
         let state = makeState()
-        let pick = WindowSelection(id: 37, bundleID: "com.apple.finder", title: "Movies")
+        let pick = WindowSelection(id: 37, bundleID: "com.apple.finder")
         state.sourceChoice = .window(pick)
         state.refreshWindows([liveWindow(id: 99)], excluding: nil)
         #expect(state.missingPickedWindow == pick)
@@ -215,22 +215,38 @@ import RecorderCore
         // Same number, different app: the dangerous case. Treating it as present would record
         // the wrong window while looking like it worked.
         let state = makeState()
-        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder", title: "Movies"))
+        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
         state.refreshWindows([liveWindow(id: 37, bundleID: "com.apple.Safari", app: "Safari")],
                              excluding: nil)
         #expect(state.missingPickedWindow != nil)
     }
 
-    @Test func theSourceLabelRelabelsARetitledWindowButKeepsAGoneOne() {
+    @Test func theSourceLabelRelabelsARetitledWindowAndNamesTheAppOfAGoneOne() {
         // Title is display-only and never matched on, so a retitled window (every browser tab
-        // switch) stays the pick and simply relabels.
+        // switch) stays the pick and simply relabels. Gone, it can only name its app — the title
+        // is not stored (M19-T5), and `(closed)` is what separates it from an app-scoped pick.
         let state = makeState()
-        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder", title: "Movies"))
+        // The app names its own resolver from the installed bundle, so a closed window still says
+        // "Finder"; with nothing able to name it, `appName(for:)` falls back to the bundle id.
+        state.appDisplayName = { $0 == "com.apple.finder" ? "Finder" : nil }
+        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
         state.refreshWindows([liveWindow(id: 37, title: "Downloads")], excluding: nil)
         #expect(state.missingPickedWindow == nil)
         #expect(state.sourceMenuLabel == "Finder — Downloads")
         state.refreshWindows([], excluding: nil)
-        #expect(state.sourceMenuLabel.contains("Movies"))   // falls back to the stored title
+        #expect(state.sourceMenuLabel == "Finder (closed)")
+    }
+
+    @Test func aRetitledWindowStillMatchesItsOwnMenuRow() {
+        // The Picker tags each row from the LIVE window while the selection comes from the stored
+        // pick, so any field that moves breaks the match and the checkmark vanishes — measured
+        // before M19-T5 dropped `title` from the type. Fails if it ever comes back.
+        let state = makeState()
+        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
+        state.refreshWindows([liveWindow(id: 37, title: "Downloads")], excluding: nil)
+
+        let rowTag = SourceChoice.window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
+        #expect(state.sourceChoice == rowTag)
     }
 
     @Test func screenRecNeverOffersItsOwnWindows() {

@@ -896,12 +896,12 @@ public final class AppState {
     /// choice of display). Mirrors the checkmarked picker row.
     public var sourceMenuLabel: String {
         if let window = selectedWindow {
-            // Relabel from the live window when it is still there, so a retitled window stays
-            // honest; fall back to the stored title once it is gone.
-            let live = window.resolve(in: capturableWindows)
-            return WindowSelection.label(
-                appName: live?.appName ?? appName(for: window.bundleID),
-                title: live?.title ?? window.title)
+            // Always from the live window, so a retitled one stays honest; a gone pick can only
+            // name its app (M19-T5).
+            guard let live = window.resolve(in: capturableWindows) else {
+                return WindowSelection.goneLabel(appName: appName(for: window.bundleID))
+            }
+            return WindowSelection.label(appName: live.appName, title: live.title)
         }
         if let region = selectedRegion { return "Region \(Self.regionLabel(region.rect.size))" }
         if let bundleID = selectedAppBundleID { return appName(for: bundleID) }

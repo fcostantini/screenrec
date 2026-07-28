@@ -674,9 +674,40 @@ import RecorderCore
     @Test func aWindowPickRoundTripsWithItsOwner() {
         let defaults = UserDefaults(suiteName: "settings-window-\(UUID().uuidString)")!
         var settings = Settings.standard
-        settings.captureWindow = WindowSelection(id: 37, bundleID: "com.apple.finder", title: "Movies")
+        settings.captureWindow = WindowSelection(id: 37, bundleID: "com.apple.finder")
         SettingsStore.save(settings, to: defaults)
         #expect(SettingsStore.load(from: defaults).captureWindow == settings.captureWindow)
+    }
+
+    @Test func aWindowPickStoresNothingButItsIdentity() {
+        // A window title is another app's content — a private-browsing window or a DM would sit
+        // in the plist in plaintext (M19-T5). Nothing but id and owner may reach disk.
+        let defaults = UserDefaults(suiteName: "settings-window-\(UUID().uuidString)")!
+        var settings = Settings.standard
+        settings.captureWindow = WindowSelection(id: 37, bundleID: "com.apple.finder")
+        SettingsStore.save(settings, to: defaults)
+
+        let stored = defaults.dictionary(forKey: SettingsStore.Key.captureWindow)
+        #expect(Set(stored?.keys ?? [:].keys) == ["id", "bundleID"])
+    }
+
+    @Test func aLegacyStoredTitleIsIgnoredAndOverwritten() {
+        // Entries written before M19-T5 carry a title. It must not load, and the next save of
+        // anything must drop it — the whole dictionary is rewritten, so no migration is needed.
+        let defaults = UserDefaults(suiteName: "settings-window-\(UUID().uuidString)")!
+        defaults.set(
+            [SettingsStore.Key.windowID: 37,
+             SettingsStore.Key.windowBundleID: "com.apple.finder",
+             "title": "Private Browsing"],
+            forKey: SettingsStore.Key.captureWindow)
+
+        var settings = SettingsStore.load(from: defaults)
+        #expect(settings.captureWindow == WindowSelection(id: 37, bundleID: "com.apple.finder"))
+
+        settings.quality = .efficient
+        SettingsStore.save(settings, to: defaults)
+        let stored = defaults.dictionary(forKey: SettingsStore.Key.captureWindow)
+        #expect(stored?["title"] == nil)
     }
 
     @Test func aStoredWindowPickWithoutAnOwnerIsDiscarded() {

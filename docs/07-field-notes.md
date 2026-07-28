@@ -7,6 +7,16 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-28 (M19-T5): 🔴 **a SwiftUI Picker tags its rows with a value, so any moving field in that
+  value silently breaks the checkmark.** The menu tagged each window row with a `WindowSelection`
+  built from the **live** window while the selection came from the **stored** pick — and the type
+  was `Hashable` over `title`. Measured before the fix: `selection == rowTag` → **false** after a
+  retitle, i.e. every browser tab switch left the picked window unmarked. It hid for two milestones
+  because the `Source:` header is computed separately and stayed correct — there was even a passing
+  test for the header. **The lesson generalises:** a tag value must carry identity only; if a field
+  can change while the pick stays the same, it does not belong in the value the Picker compares.
+  (Dropping `title` fixed the checkmark and took the window title off disk in the same edit.)
+
 - 2026-07-28 (M19-T4): the Size picker had a decoy row, and the encoder does not spend its budget.
   - 🔴 **`1280 px` produced the same file as `1920 px`** — 6,764,917 vs 6,688,557 bytes from one
     7.47 s source, the smaller pick **1% heavier** for 2.25× fewer pixels. Structural, not

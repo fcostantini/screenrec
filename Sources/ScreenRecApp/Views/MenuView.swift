@@ -100,12 +100,12 @@ struct MenuView: View {
                     ForEach(state.capturableWindows, id: \.id) { window in
                         Text(WindowSelection.label(appName: window.appName, title: window.title))
                             .tag(SourceChoice.window(WindowSelection(
-                                id: window.id, bundleID: window.bundleID, title: window.title)))
+                                id: window.id, bundleID: window.bundleID)))
                     }
                     // A picked window that is gone stays listed and checkmarked — the pick survives
                     // absence (the `(not running)` app rule); Start then fails loud.
                     if let missing = state.missingPickedWindow {
-                        Text("\(WindowSelection.label(appName: state.appName(for: missing.bundleID), title: missing.title)) (closed)")
+                        Text(WindowSelection.goneLabel(appName: state.appName(for: missing.bundleID)))
                             .tag(SourceChoice.window(missing))
                     }
                 } label: { EmptyView() }

@@ -1694,7 +1694,15 @@ a safety fix, clearer picker labels, and a preference that stops being written.
       pure and already tested. **Rulings:** the wording (`Message / web (1920 px)` ·
       `Full quality (3686 × 2304)`), or a caption under the ceiling row instead of renaming.
       **Verify:** unit (the labels) + the live picker.
-- [ ] M19-T5 **A window pick stops storing its title.** `Key.windowTitle` persists the picked
+- [x] M19-T5 **A window pick stops storing its title.** ✅ 2026-07-28 — `WindowSelection` is
+      identity only (`id` + `bundleID`); the plist entry has exactly those two keys, and a legacy
+      `title` is ignored on load and erased by the next save. A gone pick reads **`Firefox
+      (closed)`** in both the row and the `Source:` header (rulings A + B), since without the
+      marker it would read like an app-scoped pick. 🔴 **The probe found a live bug too:** the menu
+      tags rows with the selection, so a *retitled* window stopped matching its own row and lost its
+      checkmark — dropping the field fixes it. Live: pick → plist `{bundleID, id}` only, folder
+      renamed → `✓ Finder — T5-after` still marked, window closed → `✓ Finder (closed)` + Start
+      failed loud. `Key.windowTitle` persists the picked
       window's title into `dev.fcostantini.screenrec.app.plist` — the menu dumped on 2026-07-28
       listed a private-browsing window and a Slack DM by name, and any of those becomes a plaintext
       string on disk. It exists only to label a row: M17-T2's ruling is that the title is never

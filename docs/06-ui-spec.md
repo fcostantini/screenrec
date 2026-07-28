@@ -75,10 +75,16 @@ Order and grouping (separators between groups):
    `Menu` inside a `Menu` with its own inline `Picker`, checkmark and all. The pick is
    **persisted with its owning bundle id** (`captureWindow`), and capture refuses a window whose owner
    doesn't match: window ids are **reused**, so a restored bare id could bind a different app's window
-   — recording the wrong thing while looking like it worked (docs/02 §1c). The title is display-only
-   and never matched on, so a retitled window (every browser tab switch) stays the pick and simply
-   relabels. A picked window that is gone stays listed and checkmarked as `<App> — <Title> (closed)`,
-   the `(not running)` app rule; Start then fails loud.
+   — recording the wrong thing while looking like it worked (docs/02 §1c). ⚠️ **The pick stores the
+   id and the bundle id, and nothing else (M19-T5)**: a window title is another app's content —
+   a private-browsing window, a DM — and it has no business in the preferences plist. Rows label
+   themselves from the *live* window, so a retitled window (every browser tab switch) stays the pick
+   and simply relabels. It also has to be that way for the checkmark: the menu tags each row with
+   the selection value, so a stored title that no longer matched the live one left the picked row
+   unmarked (measured, M19-T5). A picked window that is gone stays listed and checkmarked as
+   **`<App> (closed)`** — the app is all that can be said without a title, and the marker is what
+   keeps it distinct from an app-scoped pick, in the row and in the `Source:` header alike. The
+   `(not running)` app rule; Start then fails loud.
    **Region (M11-T2):** below the app rows, when a region is set, a checkmarked `Region <w>×<h>`
    row (point size) shows the current pick — re-selectable, and it survives its display's absence
    like the app pick (a start against a vanished display fails loud, M11-T1). **M12-T4** moved
