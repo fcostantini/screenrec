@@ -1829,10 +1829,34 @@ No user-visible change: the milestone that keeps the next four cheap. **PATCH** 
       **Seams:** the prompt at the end of the script. **Rulings:** a `--push` flag, or skip the
       prompt when stdin is not a TTY and say so in the summary. **Verify:** a background run pushes
       main and the tag, and the tag's own pre-push gate still runs.
+- [ ] M22-T6 **A tag carries a downloadable build.** Every release is a bare tag today; handing the
+      app to someone means building it for them or copying a bundle by hand, and ADR-014's sharing
+      path assumes they receive a signed `.app`. **Do it in the same edit as M22-T5** — same file,
+      same end-of-script region, and the release only exists once the tag is pushed. **Seams:** the
+      push branch of `Scripts/release.sh`; `bundle.sh` already leaves the signed bundle at
+      `dist/ScreenRec.app`; **`gh` is installed and authenticated** as `fcostantini` (keyring, ssh —
+      checked 2026-07-28), so no new dependency. Shape:
+      `ditto -c -k --sequesterRsrc --keepParent dist/ScreenRec.app dist/ScreenRec-$VERSION.zip`
+      then `gh release create "$TAG" --title … --generate-notes "$ZIP"`. ⚠️ **`ditto`, not `zip`** —
+      `zip -r` mangles a bundle's symlinks and extended attributes and can invalidate the signature.
+      ⚠️ **A downloaded zip is quarantined**, and ADR-014's build is self-signed and deliberately not
+      notarized, so on macOS 15 it will not open until the recipient uses **System Settings → Privacy
+      & Security → Open Anyway** (the right-click→Open shortcut is gone) or runs
+      `xattr -dr com.apple.quarantine`. **That instruction has to ride with the download**, or the
+      release is a trap. Notarization stays closed per ADR-014 — do not reopen it here; note only
+      that `notarytool` and `stapler` *are* present in the Command Line Tools (measured, in case a
+      future decision revisits it). **Rulings:** whether the notes are `--generate-notes` (the commit
+      log is the per-task audit trail) or a hand-written summary plus the Gatekeeper paragraph; and
+      whether a failed `gh` call fails the cut or just warns, given the tag is already pushed by
+      then. **Verify:** a real cut leaves a GitHub release with the zip attached; download it,
+      confirm `xattr -p com.apple.quarantine` reports the attribute, unzip, and confirm the app
+      still passes `codesign --verify --strict` — i.e. the round trip preserved the signature the
+      TCC grants are keyed to (M0-T3).
 
 **Gate G22**: `AppState` is materially smaller with the menu dump unchanged; the six units are named
 by tests that can fail; one timecode type serves every surface; a background release pushes without
-a human. No behaviour change anywhere — the whole suite passes untouched at every step.
+a human and leaves a downloadable, still-signed build behind it. No behaviour change anywhere — the
+whole suite passes untouched at every step.
 
 ## Dependency graph
 

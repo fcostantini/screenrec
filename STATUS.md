@@ -6,6 +6,18 @@
 
 ## Now
 
+- **📋 FILED 2026-07-28: M22-T6 — a tag carries a downloadable build** (Franco asked mid-session).
+  Nothing is missing tooling-wise: `gh` is installed and authenticated (`fcostantini`, keyring, ssh),
+  `release.sh` already tags and pushes, `bundle.sh` already leaves a signed `dist/ScreenRec.app`. The
+  addition is ~6 lines in the push branch — `ditto -c -k --sequesterRsrc --keepParent` (never
+  `zip -r`, which mangles a bundle and can void the signature) then `gh release create --generate-notes`.
+  **Filed beside M22-T5 to be done in the same edit** (same file, same region).
+  ⚠️ **The real constraint is Gatekeeper, not tooling:** ADR-014's build is self-signed and
+  deliberately not notarized, so a *downloaded* zip is quarantined and macOS 15 refuses it until the
+  recipient uses System Settings → Privacy & Security → Open Anyway — the instruction has to ride
+  with the release or the download is a trap. Notarization stays closed (ADR-014); noted only that
+  `notarytool`/`stapler` do ship with the Command Line Tools here.
+
 - **✅ M19-T4 DONE (2026-07-28) — the Size picker says what each pick costs, and one row is gone.**
   Plan artifact (rulings A/B/C approved): `claude.ai/code/artifact/e7d999a2-d9b8-4a03-b3a7-0d809feba4f4`.
   **536 tests (+3)**, dev loop green, deployed to `/Users/Shared/ScreenRec.app` (pid 89360).
