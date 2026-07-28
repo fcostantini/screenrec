@@ -39,10 +39,6 @@ public final class AppState {
 
     private static let log = Logger(subsystem: "dev.fcostantini.screenrec", category: "app")
 
-    // MARK: - What the status item shows
-
-    public private(set) var statusIcon: StatusIcon = .idle
-
     // MARK: - Sources (docs/06 "Menu — idle state", items 5–7)
 
     /// What can be captured and what is picked (M22-T1). The properties below forward to it, so
@@ -347,12 +343,24 @@ public final class AppState {
 
     // MARK: - Header row
 
-    public private(set) var elapsedSeconds: TimeInterval = 0
-    public private(set) var recordedBytes: Int64 = 0
+    /// The recording in flight and what its events mean (M22-T2). The properties below forward,
+    /// so views and tests keep naming `state.statusIcon`, `state.apply(…)` and friends. The
+    /// *actions* stay here: `start()` needs the count-in, permissions, the output location and
+    /// replay, none of which belong to a session's state.
+    public let session = SessionModel()
 
-    /// The live menu-bar clock's basis (M9-T3): nil when idle, set on `.started`, frozen on
-    /// `.paused`, cleared on any ending. The label computes the ticking value from it locally.
-    public private(set) var recordingClock: RecordingClock?
+    public var statusIcon: StatusIcon { session.statusIcon }
+    public var elapsedSeconds: TimeInterval { session.elapsedSeconds }
+    public var recordedBytes: Int64 { session.recordedBytes }
+    public var recordingClock: RecordingClock? { session.recordingClock }
+    public var activeMicrophoneName: String? { session.activeMicrophoneName }
+    public var activeAppName: String? { session.activeAppName }
+    public var activeRegion: CGSize? { session.activeRegion }
+    public var isSessionActive: Bool { session.isActive }
+    public var isPaused: Bool { session.isPaused }
+    public func consume(_ events: AsyncStream<EngineEvent>) async { await session.consume(events) }
+    func apply(_ event: EngineEvent) { session.apply(event) }
+    public func refreshProgress() { session.refreshProgress() }
 
     /// Permissions/onboarding, split out (M9-T7): AppState owns this sub-model and forwards to it.
     /// It needs one input, `microphoneRequired`, supplied from the mic pick; observation propagates
@@ -373,16 +381,6 @@ public final class AppState {
     public var screenWasGrantedAtLaunch: Bool { permissions.screenWasGrantedAtLaunch }
     public var needsRelaunchForScreenGrant: Bool { permissions.needsRelaunchForScreenGrant }
 
-    /// The microphone actually bound for this recording — not necessarily the one picked, since
-    /// a vanished device falls back to the system default. SCK binds the mic once at
-    /// `startCapture` and never re-resolves (02 §4), so this is fixed for the session.
-    public private(set) var activeMicrophoneName: String?
-    /// The app being recorded, for the recording menu's "Recording <app> only" line (docs/06,
-    /// M7-T2); nil for whole-screen. Named at start — the pick is locked for the session.
-    public private(set) var activeAppName: String?
-    /// The region being recorded, for the "Recording region <w>×<h>" line (docs/06, M11-T2); nil
-    /// unless a region is the pick. Sized at start — the pick is locked for the session.
-    public private(set) var activeRegion: CGSize?
     /// Set when a recording didn't survive its own start, or degraded on the way. ADR-007
     /// forbids the silent version of either.
     public private(set) var lastFailure: String?
@@ -468,24 +466,6 @@ public final class AppState {
         }
     }
     private var outputLocation: OutputLocation
-    private var session: RecordingSession?
-    private var currentOutputURL: URL?
-    /// Captures `self` weakly and is awaited by `stopAndWaitForFinalize()`. Nothing cancels it in
-    /// `deinit` (nonisolated, can't touch this) and nothing needs to: the loop exits when the
-    /// session's stream finishes, which `RecordingSession` guarantees after `finished`/`failed`.
-    private var consumeTask: Task<Void, Never>?
-
-    /// Whether a session is in flight — the menu shows recording controls, the source pickers
-    /// are hidden, and quitting has to confirm.
-    ///
-    /// Not derived from `statusIcon`: between `start()` and the first complete video frame the
-    /// icon still reads `.idle` while a session exists. Keying off it would offer Start a second
-    /// time in that window, and would let ⌘Q skip its confirmation.
-    public var isSessionActive: Bool { session != nil }
-
-    /// Drives the menu's Pause/Resume swap.
-    public var isPaused: Bool { statusIcon == .paused }
-
     /// Posts a notification. Injected because AppCore may not import UserNotifications (docs/01)
     /// — and because `UNUserNotificationCenter.current()` needs a real bundle, which tests lack.
     public var notifier: (@MainActor (RecordingNotification) -> Void)?
@@ -543,6 +523,14 @@ public final class AppState {
             self?.replayConfigurationChanged()
         }
         sources.onDisplayChanged = { [weak self] in self?.replayConfigurationChanged() }
+
+        // The fold reports; AppState decides who hears it and what outlives the session
+        // (M22-T2 ruling A — `lastFailure` is set before any session exists, M17-T2).
+        session.notifier = { [weak self] in self?.notifier?($0) }
+        session.reportFailure = { [weak self] message, outlivesSession in
+            self?.lastFailure = message
+            if outlivesSession { self?.failureOutlivesSession = true }
+        }
 
         replay.onMicrophoneLost = { [weak self] in
             self?.notifier?(RecordingNotifications.replayMicrophoneLost())
@@ -697,11 +685,11 @@ public final class AppState {
 
     private func syncReplayArming() {
         if isReplayArmed {
-            if let session {
+            if let capture = session.capture {
                 // Resolved, not raw: an absent picked mic must not attach a ring the
                 // recording's router will never feed (picked-device-or-nothing, 02 §1).
                 replay.recordingStarted(
-                    router: session.router, configuration: replayCaptureConfiguration(),
+                    router: capture.router, configuration: replayCaptureConfiguration(),
                     seconds: Double(replaySeconds), outputDirectory: outputDirectory)
             } else {
                 replay.arm(
@@ -718,12 +706,12 @@ public final class AppState {
 
     private func replayConfigurationChanged() {
         guard isReplayArmed else { return }
-        if let session {
+        if let capture = session.capture {
             // Mid-recording only quality/fps can reach here (sources are locked, and the buffer
             // length takes `windowChanged` instead); rebuild on the recording's stream, with
             // the mic pick resolved the same way every replay path resolves it.
             replay.recordingStarted(
-                router: session.router, configuration: replayCaptureConfiguration(),
+                router: session.capture!.router, configuration: replayCaptureConfiguration(),
                 seconds: Double(replaySeconds), outputDirectory: outputDirectory)
         } else {
             replay.configurationChanged(
@@ -894,14 +882,14 @@ public final class AppState {
     /// stream when one runs, else the armed stream's. A **method**, not a published property: the
     /// meter polls it off a timer, and a per-frame publish is exactly what M6-T10 forbids.
     public func takeMicrophoneLevel() -> Float {
-        let source = session?.microphoneLevel ?? replay.microphoneLevelSource
+        let source = session.capture?.microphoneLevel ?? replay.microphoneLevelSource
         return source?.takePeakLevel() ?? 0
     }
 
     /// Whether the label should draw the meter at all: only when a stream with a mic exists.
     public var showsMicrophoneLevel: Bool {
         guard showsMenuBarLevel, presentMicrophonePreference != .none else { return false }
-        return session != nil || isReplayArmed
+        return session.isActive || isReplayArmed
     }
 
     /// docs/06: says so when both audio sources are off, so a silent take isn't discovered
@@ -1031,22 +1019,6 @@ public final class AppState {
         refreshRecentRecordings()
     }
 
-    /// Re-reads the writer's duration and the file's size on disk.
-    ///
-    /// Polled, not pushed — no per-sample progress event (there was a dead `fileProgress` arm, retired
-    /// M14-T3). Suits docs/06 here anyway ("≤ 1 Hz, menu open only").
-    public func refreshProgress() {
-        let duration = session?.recordedDuration.seconds ?? 0
-        // NaN until the first frame starts the session (docs/02 §10).
-        let seconds = duration.isFinite ? duration : 0
-        let bytes = currentOutputURL.map(OutputLocation.currentFileSize(for:)) ?? 0
-        // Assign only on real change: @Observable publishes on every set, and a publish
-        // rebuilds the OPEN menu's AppKit rows — which garbles hover/highlight state.
-        // Idle both values sit at zero, so the idle menu never rebuilds at all.
-        if elapsedSeconds != seconds { elapsedSeconds = seconds }
-        if recordedBytes != bytes { recordedBytes = bytes }
-    }
-
     // MARK: - Configuration
 
     /// What the pickers currently describe. Pure, so the menu→capture translation is testable
@@ -1083,7 +1055,7 @@ public final class AppState {
 
     public func start() async {
         // See `isSessionActive`: the menu is clickable again before the first frame lands.
-        guard session == nil, !isCountingIn else { return }
+        guard !session.isActive, !isCountingIn else { return }
 
         lastFailure = nil
         failureOutlivesSession = false
@@ -1109,12 +1081,11 @@ public final class AppState {
 
     /// The actual capture start, after any count-in. Split from `start()` so the count-in can defer it.
     private func beginCapture() async {
-        guard session == nil else { return }
+        guard !session.isActive else { return }
 
         var configuration = captureConfiguration
-        configuration.microphone = resolvedMicrophone()
-        activeAppName = selectedAppBundleID.map(appName(for:))
-        activeRegion = selectedRegion?.rect.size
+        let microphone = resolvedMicrophone()
+        configuration.microphone = microphone.selection
 
         let outputURL: URL
         do {
@@ -1132,9 +1103,9 @@ public final class AppState {
             return
         }
 
-        let session: RecordingSession
+        let capture: RecordingSession
         do {
-            session = try RecordingSession(configuration: configuration, outputURL: outputURL)
+            capture = try RecordingSession(configuration: configuration, outputURL: outputURL)
         } catch {
             // The reservation is an O_EXCL placeholder at the `.partial` companion; with no
             // recorder, drop it rather than leave a 0-byte file and the name taken.
@@ -1145,10 +1116,9 @@ public final class AppState {
             return
         }
 
-        self.session = session
-        currentOutputURL = outputURL
-        elapsedSeconds = 0
-        recordedBytes = 0
+        session.attach(
+            capture, outputURL: outputURL, microphoneName: microphone.name,
+            appName: selectedAppBundleID.map(appName(for:)), region: selectedRegion?.rect.size)
         scheduleAutomaticStop()
 
         // `activeMicrophoneName` is what `resolvedMicrophone()` above just resolved to; posting
@@ -1162,23 +1132,23 @@ public final class AppState {
         // buffer restarts — a new stream is a new pts epoch).
         if isReplayArmed {
             replay.recordingStarted(
-                router: session.router, configuration: configuration,
+                router: capture.router, configuration: configuration,
                 seconds: Double(replaySeconds), outputDirectory: outputDirectory)
         }
 
-        let events = session.events
-        consumeTask = Task { [weak self] in
+        let events = capture.events
+        session.consumeTask = Task { [weak self] in
             guard let self else { return }
             await consume(events)
             endSession()
         }
-        await session.start()
+        await capture.start()
     }
 
     /// Clean, user-initiated stop. The file finalizes and `finished` follows, which is what
     /// actually ends the session — see `endSession`.
     public func stop() async {
-        await session?.stop()
+        await session.capture?.stop()
     }
 
     /// Arms the `Stop After` bound for this take (M18-T4), if one is set. Wall clock from the
@@ -1209,15 +1179,15 @@ public final class AppState {
     /// Throw the current take away: the file is removed and the session ends at `.discarded`,
     /// which — like every ending — returns to idle via `endSession`.
     public func discard() async {
-        await session?.discard()
+        await session.capture?.discard()
     }
 
     public func pause() async {
-        await session?.pause()
+        await session.capture?.pause()
     }
 
     public func resume() async {
-        await session?.resume()
+        await session.capture?.resume()
     }
 
     /// What the global start/stop shortcut does (M9-T4): a session in flight — recording or paused —
@@ -1261,87 +1231,17 @@ public final class AppState {
     /// terminating: `RecordingSession` finishes its stream only once the writer is done, so
     /// awaiting the consume task is what keeps a live writer from being abandoned.
     public func stopAndWaitForFinalize() async {
-        guard let consumeTask else { return }
+        guard let task = session.consumeTask else { return }
         await stop()
-        await consumeTask.value
+        await task.value
     }
 
     // MARK: - Event folding
 
-    /// Drives the state off a `RecordingSession.events` stream until the session finishes.
-    /// The stream terminates after `finished`/`failed`, which returns the icon to `.idle`.
-    public func consume(_ events: AsyncStream<EngineEvent>) async {
-        for await event in events { apply(event) }
-    }
-
-    /// Folds one engine event into the state. Internal: production always arrives via
-    /// `consume(_:)`; only tests hand-feed events.
-    func apply(_ event: EngineEvent) {
-        notify(about: event)
-        switch event {
-        case .started:
-            recordingClock = RecordingClock(accumulated: 0, runningSince: Date())
-            statusIcon = .recording
-        case .resumed:
-            recordingClock?.runningSince = Date()   // resume the span; keep what was banked
-            statusIcon = .recording
-        case .paused:
-            recordingClock?.bankAndFreeze(now: Date())
-            statusIcon = .paused
-        case .stopped, .finished, .discarded:
-            // Every ending is the same to the icon, including fail-stops (ADR-007 successes with
-            // a cause) and discards. The cause, if any, reaches the user as a notification.
-            recordingClock = nil
-            statusIcon = .idle
-        case .failed(let message):
-            recordingClock = nil
-            statusIcon = .idle
-            lastFailure = message
-            failureOutlivesSession = true
-        case .microphoneLost:
-            // The one mid-recording problem that does not end the session (ADR-012): the
-            // recording continues, and the icon must keep saying so. The rescue may clear it.
-            lastFailure = "Microphone disconnected — still recording."
-        case .microphoneRecovered:
-            // The rescue spliced the mic back (M8-T2); the loss notice would now be a lie.
-            lastFailure = nil
-        case .microphoneSilent:
-            // Connected but carrying nothing (M16-T4). Same shape as a loss: the menu says so and
-            // the recording continues.
-            lastFailure = "Microphone is silent — still recording."
-        case .microphoneAudible:
-            lastFailure = nil
-        case .microphoneDroppedAtStart:
-            // The wanted mic never started (M13-T4); the recording continues without it. Say so in
-            // the menu, or the active-mic-name row would name a mic that isn't in the take.
-            lastFailure = "No microphone — it didn't start in time."
-        case .recordingFileRestored:
-            break   // recording unaffected; the notification carries the news
-        }
-    }
-
-    /// Posts the notification an event warrants, if any (docs/06).
-    ///
-    /// Runs before the fold, while `session` is still alive: `.finished` carries no duration, and
-    /// the writer's own `recordedDuration` is the only accurate source for the title's clock —
-    /// `elapsedSeconds` only advances while the menu is open, so it is usually stale or zero.
-    private func notify(about event: EngineEvent) {
-        let duration = session?.recordedDuration.seconds ?? 0
-        guard let notification = RecordingNotifications.notification(
-            for: event,
-            duration: duration.isFinite ? duration : 0,
-            // `hasStartedSession`, not the icon: the icon flips to `.recording` on the first
-            // frame, before an unwritable-folder write failure surfaces (02 §2).
-            hadStarted: session?.hasStartedSession ?? false) else { return }
-        notifier?(notification)
-    }
-
     /// Internal, not private, so the failure-lifecycle tests can drive the teardown that
     /// lands on top of a start failure (the bug M17-T2 found live).
     func endSession() {
-        session = nil
-        currentOutputURL = nil
-        consumeTask = nil
+        session.clear()
         // The recording's stream is going away; an armed replay resumes on a private one.
         if isReplayArmed {
             replay.recordingEnded(
@@ -1351,11 +1251,6 @@ public final class AppState {
         automaticStop?.cancel()
         automaticStop = nil
         stopsAt = nil
-        activeMicrophoneName = nil
-        activeAppName = nil
-        activeRegion = nil
-        elapsedSeconds = 0
-        recordedBytes = 0
         // A transient notice (a lost mic) must not outlive the recording it described. A failure
         // must: it is the only account the user gets of a Start that produced nothing, and the
         // engine yields it *through* the session, so teardown lands right on top of it.
@@ -1372,23 +1267,21 @@ public final class AppState {
     /// Resolves the pick to a device (or none) for a recording, and names it for the menu — SCK
     /// needs an explicit device ID or capture fails with an opaque "invalid parameter" (02 §1).
     /// Shares `microphoneResolution()` with the replay path so the two never bind different mics.
-    private func resolvedMicrophone() -> MicrophoneSelection {
-        guard microphonePreference != .none else {
-            activeMicrophoneName = nil
-            return .none
-        }
+    /// Returns the name alongside the selection: the name is session-scoped state (`SessionModel`
+    /// takes it at `attach`), and this runs before a session exists.
+    private func resolvedMicrophone() -> (selection: MicrophoneSelection, name: String?) {
+        guard microphonePreference != .none else { return (.none, nil) }
         switch microphoneResolution() {
         case .explicit(let resolved):
-            activeMicrophoneName = AudioInputs.available().first { $0.uniqueID == resolved }?.name
-            return .device(id: resolved)
+            return (.device(id: resolved),
+                    AudioInputs.available().first { $0.uniqueID == resolved }?.name)
         case .noDevice:
             // Record the screen anyway — losing a capture over a missing microphone is the worse
             // outcome (ADR-012) — but never silently (ADR-007).
-            activeMicrophoneName = nil
             lastFailure = microphonePreference == .automatic
                 ? "No microphone connected — recording without one."
                 : "The selected microphone isn't connected — recording without it."
-            return .none
+            return (.none, nil)
         }
     }
 

@@ -6,6 +6,30 @@
 
 ## Now
 
+- **✅ M22-T2 DONE (2026-07-28) — `AppState` sheds the session. All six M22 tasks are done; G22 is
+  the only thing left in the milestone.** Plan artifact (rulings A/B/C approved):
+  `claude.ai/code/artifact/3c800991-74e7-4187-badc-01ef4e61eab0`. **557 tests passed untouched**,
+  dev loop green, deployed (pid 19088).
+  **As built:** `SessionModel` (187 lines) owns the capture handle, the counters, the clock, the
+  `active*` facts and `apply(_:)`. **The actions stayed on `AppState`** — `start()` needs the
+  count-in, permissions, the output location and replay, and moving it would have relocated the
+  tangle rather than cut it. 1,391 → **1,288 lines**.
+  **Ruling A held up in the code:** `lastFailure` is set *before any session exists*, so it stays on
+  `AppState`; the fold reports through `reportFailure(message, outlivesSession:)` and the policy
+  lives with the state. **Ruling B:** `activeMicrophoneName` moved, and `resolvedMicrophone()` now
+  **returns** the name rather than assigning it, since it runs before there is a session to hold it.
+  🔴 **Two guards silently inverted** when `session` stopped being an optional — `guard session ==
+  nil` (always false now → Start became a no-op after a cancelled count-in) and `session != nil ||
+  isReplayArmed` (always true → the meter would show when idle). **Both were caught by tests that
+  did not move**, which is the whole argument for that bar.
+  **Verified live:** the deployed menu dumped identical (only my own Terminal window's spinner
+  differed), and Start → Pause → Resume → Stop froze the clock at **00:00:06 across three seconds**,
+  resumed to **00:00:10**, and wrote an **11.90 s** 3-track file — the paused wall-clock correctly
+  absent.
+  **Next: G22** — all four criteria are now met on paper (`AppState` 1,569 → 1,288 with the menu
+  unchanged; six units named by failing-capable tests; one timecode type; a background release that
+  pushes and leaves a download). Then the **PATCH bump to 1.10.2**.
+
 - **✅ M22-T1 DONE (2026-07-28) — `AppState` sheds its sources.** Plan artifact (rulings A/B/C
   approved): `claude.ai/code/artifact/029afaee-ad23-4a1b-a253-707826543efb`. **557 tests passed
   untouched**, dev loop green, deployed (pid 15658).

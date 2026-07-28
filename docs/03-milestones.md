@@ -1824,7 +1824,19 @@ No user-visible change: the milestone that keeps the next four cheap. **PATCH** 
       **class** keeps per-property granularity, a struct would collapse it to one — do not "simplify"
       it into a value type. **Verify:** tests pass untouched; the menu's dump is byte-identical
       before and after.
-- [ ] M22-T2 **`AppState` sheds the session.** Same shape: **`SessionModel`** takes the session
+- [x] M22-T2 **`AppState` sheds the session.** ✅ 2026-07-28 — `SessionModel` (187 lines) owns the
+      capture handle, the counters, the clock, the `active*` facts and the fold; **the actions
+      stayed**, because `start()` needs the count-in, permissions, the output location and replay,
+      and moving that would relocate the tangle rather than cut it. **557 tests passed untouched**;
+      1,391 → **1,288 lines**. **Ruling A: `lastFailure` stays on `AppState`** — it is set before
+      any session exists (M17-T2) — and the fold reports through a `reportFailure(message,
+      outlivesSession:)` closure, so the policy stays where the state is. **Ruling B:**
+      `activeMicrophoneName` moved and `resolvedMicrophone()` now *returns* the name, since it runs
+      before a session exists; the mic **pick** stayed. 🔴 **Two guards silently inverted** when
+      `session` stopped being optional (`session == nil` on a non-optional, and `session != nil ||
+      isReplayArmed`) — the suite caught both, which is exactly what "tests pass untouched" is for.
+      **Live:** menu dump identical, and a Start → Pause → Resume → Stop cycle froze the clock at
+      `00:00:06` across three seconds, resumed to `00:00:10`, and wrote an 11.90 s 3-track file. Same shape: **`SessionModel`** takes the session
       lifecycle, the event folding (`apply(_:)`), the clock and the elapsed/bytes counters.
       **Rulings:** where `lastFailure` lives — it outlives the session deliberately (M17-T2), so it
       may belong on AppState even after the split. **Verify:** as T1, plus one live recording through
