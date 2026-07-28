@@ -31,10 +31,4 @@ import Testing
             == "Starts exactly at 1:01 · keeps 3.4 s before it inside the file")
     }
 
-    @Test func timecodeMatchesTheTrimWindowsFormat() {
-        #expect(KeyframeIndex.timecode(0) == "0:00")
-        #expect(KeyframeIndex.timecode(9.9) == "0:09")     // floors, never rounds an in-point up
-        #expect(KeyframeIndex.timecode(61) == "1:01")
-        #expect(KeyframeIndex.timecode(600) == "10:00")
-    }
 }

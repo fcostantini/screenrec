@@ -46,13 +46,6 @@ public enum KeyframeIndex {
         guard leadIn > subFrameTolerance else { return nil }
         return String(
             format: "Starts exactly at %@ · keeps %.1f s before it inside the file",
-            timecode(requested), leadIn)
-    }
-
-    /// `M:SS`, floored — the one timecode the trim window and the CLI both render, so a lead-in
-    /// sentence can't disagree with the `In`/`Out` readouts beside it.
-    public static func timecode(_ seconds: Double) -> String {
-        let whole = Int(seconds.rounded(.down))
-        return String(format: "%d:%02d", whole / 60, whole % 60)
+            Timecode.cutPoint(requested), leadIn)
     }
 }

@@ -26,7 +26,7 @@ public enum RecordingNotifications {
         switch event {
         case .finished(let url, .userStopped, _):
             return RecordingNotification(
-                title: "Recording saved · \(MenuHeader.elapsed(duration))",
+                title: "Recording saved · \(Timecode.clock(duration))",
                 body: url.lastPathComponent,
                 fileURL: url)
 
@@ -34,7 +34,7 @@ public enum RecordingNotifications {
             // ADR-007 in UI form: a fail-stop is a success with a cause, so the title is the
             // same "saved" as a manual stop and the cause rides in the body.
             return RecordingNotification(
-                title: "Recording saved · \(MenuHeader.elapsed(duration))",
+                title: "Recording saved · \(Timecode.clock(duration))",
                 body: "Ended: \(cause(reason)). File is playable.",
                 fileURL: url)
 

@@ -1823,7 +1823,18 @@ No user-visible change: the milestone that keeps the next four cheap. **PATCH** 
       it) and `SampleTiming`/`PCMSampleBuffer` sit on the sample path, where docs/01's rules are
       strictest. **Verify:** each named in a test that fails when its logic is broken — the M17-T2
       standard, not a test that merely runs it.
-- [ ] M22-T4 **One timecode, one hotkey registry.** Four `M:SS` formatters
+- [x] M22-T4 **One timecode, one hotkey registry.** ✅ 2026-07-28 — `Timecode.cutPoint` (floored,
+      a point you can cut at) · `.clock` (`HH:MM:SS`, truncated, NaN-safe) · `.length` (rounded, a
+      finished thing's label) in `RecorderCore/Support`, replacing five renderers with three
+      roundings across two modules; the rounding lives in the **name**, since a style parameter
+      invites a default and a default is how the next caller picks the wrong rule. `HotkeyID: UInt32`
+      now types `setHotkey`, so the four ids can't collide — **duplicate raw values don't compile**,
+      which is the guarantee. ⚠️ **Correction to the entry below: the `In 0:05` / `0:04` bug was
+      already fixed** by M18-T1 (both surfaces call the same renderer); what remained was the
+      condition, and M20's mark list would have been the sixth caller. **Verify:** 540 tests, the 14
+      pinned strings moved to `TimecodeTests` unchanged, and the deployed menu dumps **byte-identical**
+      before/after (90 rows; the only diff was a live Slack window retitling between dumps).
+      ~~Four `M:SS` formatters~~
       (`KeyframeIndex.timecode`, `AppState.clockPhrase`, `MenuHeader.elapsed`,
       `RecentRecordings.clock`, plus `shortBufferPhrase`) already shipped one bug between them:
       M18-T1's window read `In 0:05` above `Starts exactly at 0:04` because two of them rounded

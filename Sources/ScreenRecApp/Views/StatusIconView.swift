@@ -1,5 +1,6 @@
 import AppCore
 import AppKit
+import RecorderCore
 import SwiftUI
 
 /// Draws the status item (docs/06 "Status item").
@@ -217,7 +218,7 @@ struct StatusIconView: View {
     private var accessibilityLabel: String {
         var label = StatusIconImage.label(for: icon, isReplayArmed: isReplayArmed)
         if showsTimer, let recordingClock {
-            label += ", " + MenuHeader.elapsed(recordingClock.elapsed(now: Date()))
+            label += ", " + Timecode.clock(recordingClock.elapsed(now: Date()))
         }
         if replaySavedFlash { label += ", replay saved" }
         return label
@@ -232,7 +233,7 @@ private struct MenuBarTimer: View {
     private let ticker = Timer.publish(every: 1, tolerance: 0.1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        Text(MenuHeader.elapsed(clock.elapsed(now: now)))
+        Text(Timecode.clock(clock.elapsed(now: now)))
             .monospacedDigit()
             .onReceive(ticker) { now = $0 }
     }

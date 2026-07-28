@@ -83,7 +83,7 @@ func runTrim(_ args: [String]) async {
         ? URL(fileURLWithPath: (positionals[1] as NSString).expandingTildeInPath)
         : Exporter.availableURL(basedOn: Trimmer.trimmedSibling(of: input))
 
-    print("Trimming  \(input.lastPathComponent)  [\(KeyframeIndex.timecode(from)) – \(KeyframeIndex.timecode(to))]")
+    print("Trimming  \(input.lastPathComponent)  [\(Timecode.cutPoint(from)) – \(Timecode.cutPoint(to))]")
     // A lossless trim keeps the frames back to the preceding sync sample (M18-T1) — state it
     // before the trim runs, the same sentence the Trim window shows.
     if mode == .lossless,
@@ -95,7 +95,7 @@ func runTrim(_ args: [String]) async {
         let result = try await Trimmer.trim(from: input, to: output, start: from, end: to, mode: mode)
         let how = mode == .lossless
             ? "passthrough, no re-encode"
-            : "re-encoded; the file holds only \(KeyframeIndex.timecode(from)) – \(KeyframeIndex.timecode(to))"
+            : "re-encoded; the file holds only \(Timecode.cutPoint(from)) – \(Timecode.cutPoint(to))"
         print(
             String(
                 format: "Wrote     %@  (%.2fs, %.1f MB) — %@.",

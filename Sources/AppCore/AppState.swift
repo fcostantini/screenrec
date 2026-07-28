@@ -1058,18 +1058,14 @@ public final class AppState {
     static func bufferPhrase(_ seconds: Int) -> String {
         if seconds < 60 { return "\(seconds)-second" }
         if seconds % 60 == 0 { return "\(seconds / 60)-minute" }
-        return clockPhrase(seconds)
+        return Timecode.length(Double(seconds))
     }
 
     /// The menu's tighter column: `45 s` / `1 min` / `1:45`.
     static func shortBufferPhrase(_ seconds: Int) -> String {
         if seconds < 60 { return "\(seconds) s" }
         if seconds % 60 == 0 { return "\(seconds / 60) min" }
-        return clockPhrase(seconds)
-    }
-
-    private static func clockPhrase(_ seconds: Int) -> String {
-        String(format: "%d:%02d", seconds / 60, seconds % 60)
+        return Timecode.length(Double(seconds))
     }
 
     public func refreshRecentRecordings() {

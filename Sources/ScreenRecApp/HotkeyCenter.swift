@@ -3,6 +3,19 @@ import Carbon.HIToolbox
 import Foundation
 import SwiftUI
 
+/// Every Carbon hotkey this app registers.
+///
+/// ⚠️ Ids are process-global, so two features sharing a number silently unregister each other.
+/// The guarantee is the enum, not the list: duplicate raw values don't compile.
+enum HotkeyID: UInt32 {
+    case saveReplay = 1
+    case toggleRecording = 2
+    case togglePause = 3
+    /// Esc during the count-in — registered only while the beat runs, since it swallows Esc
+    /// system-wide (M18-T4).
+    case cancelCountIn = 4
+}
+
 /// Registers global shortcuts via Carbon `RegisterEventHotKey` — the one global hotkey API that
 /// needs no Accessibility/Input-Monitoring grant (02 §9). Holds several at once, keyed by id
 /// (M9-T4: save-replay and start/stop record), each with its own action; the shared handler
@@ -18,7 +31,10 @@ final class HotkeyCenter {
     /// False means the system refused the combo (taken by another app) — the caller must tell the
     /// user, because every UI surface advertises the shortcut as live.
     @discardableResult
-    func setHotkey(_ hotkey: Hotkey?, id: UInt32, action: @escaping @MainActor () -> Void = {}) -> Bool {
+    func setHotkey(
+        _ hotkey: Hotkey?, id which: HotkeyID, action: @escaping @MainActor () -> Void = {}
+    ) -> Bool {
+        let id = which.rawValue
         if let existing = refs[id] {
             UnregisterEventHotKey(existing)
             refs[id] = nil

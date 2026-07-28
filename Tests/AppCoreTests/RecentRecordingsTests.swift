@@ -140,15 +140,6 @@ import Testing
         #expect(RecentRecordings.rowTitle(for: url, detail: sizeOnly) == "Clip.mov — \(size)")
     }
 
-    @Test func lengthsPastAnHourGrowAnHoursField() {
-        #expect(RecentRecordings.clock(0) == "0:00")
-        #expect(RecentRecordings.clock(9.6) == "0:10")
-        #expect(RecentRecordings.clock(600) == "10:00")
-        #expect(RecentRecordings.clock(3599) == "59:59")
-        #expect(RecentRecordings.clock(3600) == "1:00:00")
-        #expect(RecentRecordings.clock(7384) == "2:03:04")
-    }
-
     @Test func anUnchangedFileIsNeverReadTwice() async throws {
         // The cache is the whole reason the read can ride the menu open (M6-T10): a second open
         // must cost nothing. A changed file must still be re-read, or a re-recording keeps a

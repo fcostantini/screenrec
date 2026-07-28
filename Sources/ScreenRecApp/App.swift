@@ -64,13 +64,13 @@ struct ScreenRecApp: App {
             guard let hotkeys, let state else { return false }
             switch which {
             case .saveReplay:
-                return hotkeys.setHotkey(hotkey, id: 1) { [weak state] in state?.saveReplay() }
+                return hotkeys.setHotkey(hotkey, id: .saveReplay) { [weak state] in state?.saveReplay() }
             case .toggleRecording:
-                return hotkeys.setHotkey(hotkey, id: 2) { [weak state] in
+                return hotkeys.setHotkey(hotkey, id: .toggleRecording) { [weak state] in
                     Task { await state?.toggleRecording() }
                 }
             case .togglePause:
-                return hotkeys.setHotkey(hotkey, id: 3) { [weak state] in
+                return hotkeys.setHotkey(hotkey, id: .togglePause) { [weak state] in
                     Task { await state?.togglePause() }
                 }
             }

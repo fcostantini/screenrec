@@ -77,9 +77,9 @@ struct TrimView: View {
             HStack {
                 Button("Set In") { setIn() }
                     .keyboardShortcut("i", modifiers: [])
-                Text("In \(KeyframeIndex.timecode(inSeconds))").monospacedDigit().foregroundStyle(.secondary)
+                Text("In \(Timecode.cutPoint(inSeconds))").monospacedDigit().foregroundStyle(.secondary)
                 Spacer()
-                Text("Out \(KeyframeIndex.timecode(outSeconds))").monospacedDigit().foregroundStyle(.secondary)
+                Text("Out \(Timecode.cutPoint(outSeconds))").monospacedDigit().foregroundStyle(.secondary)
                 Button("Set Out") { outSeconds = max(currentTime(), inSeconds) }
                     .keyboardShortcut("o", modifiers: [])
             }
@@ -94,7 +94,7 @@ struct TrimView: View {
             }
 
             HStack {
-                Text("Trimmed length ≈ \(KeyframeIndex.timecode(max(0, outSeconds - inSeconds)))")
+                Text("Trimmed length ≈ \(Timecode.cutPoint(max(0, outSeconds - inSeconds)))")
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Play Range") { playRange() }
@@ -108,8 +108,8 @@ struct TrimView: View {
                 .disabled(!hasRange || state.exportInProgress != nil)
             }
 
-            Toggle("Re-encode — the clip will contain only \(KeyframeIndex.timecode(inSeconds)) – "
-                + "\(KeyframeIndex.timecode(outSeconds))", isOn: $reencodes)
+            Toggle("Re-encode — the clip will contain only \(Timecode.cutPoint(inSeconds)) – "
+                + "\(Timecode.cutPoint(outSeconds))", isOn: $reencodes)
 
             Text("Both start exactly where you set them. Lossless copies the streams, so the clip "
                 + "also keeps the frames back to the previous keyframe inside the file; re-encoding "

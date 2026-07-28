@@ -18,7 +18,6 @@ final class CountInController {
     /// key event reaches it — a Carbon hotkey is the one global route that needs no TCC grant
     /// (02 §9). It is registered only while a count is live, since it swallows Esc system-wide.
     private static let escape = Hotkey(keyCode: kVK_Escape, modifiers: 0)
-    private static let escapeHotkeyID: UInt32 = 4
 
     init(hotkeys: HotkeyCenter) {
         self.hotkeys = hotkeys
@@ -72,7 +71,7 @@ final class CountInController {
         RunLoop.main.add(ticker, forMode: .common)
         timer = ticker
 
-        hotkeys.setHotkey(Self.escape, id: Self.escapeHotkeyID) { [weak self] in
+        hotkeys.setHotkey(Self.escape, id: .cancelCountIn) { [weak self] in
             guard let self, window != nil else { return }
             dismiss()
             completion(.cancelled)
@@ -84,7 +83,7 @@ final class CountInController {
         timer = nil
         window?.orderOut(nil)
         window = nil
-        hotkeys.setHotkey(nil, id: Self.escapeHotkeyID)   // Esc belongs to everyone else again
+        hotkeys.setHotkey(nil, id: .cancelCountIn)   // Esc belongs to everyone else again
     }
 }
 

@@ -188,7 +188,7 @@ struct MenuView: View {
     @ViewBuilder private var recordingItems: some View {
         // Header values stamp per open and hold: a publish rebuilds the open menu's AppKit
         // rows and garbles hover (M6-T10), so nothing may tick while it's up.
-        Text("\(MenuHeader.elapsed(state.elapsedSeconds)) — "
+        Text("\(Timecode.clock(state.elapsedSeconds)) — "
              + MenuHeader.recordingDetail(bytes: state.recordedBytes))
             .modifier(RefreshOnMenuOpen(refresh: refreshAtOpen))
 

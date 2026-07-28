@@ -39,15 +39,7 @@ public enum RecentRecordings {
         guard let detail else { return name }
         let size = ByteCountFormatter.string(fromByteCount: Int64(detail.byteCount), countStyle: .file)
         guard let duration = detail.duration else { return "\(name) — \(size)" }
-        return "\(name) — \(clock(duration)) · \(size)"
-    }
-
-    /// `M:SS` through `KeyframeIndex.timecode`, growing to `H:MM:SS` past an hour — the menu's
-    /// tighter form of docs/06's `HH:MM:SS`. Rounds first, since a row is a label, not a cut point.
-    static func clock(_ seconds: Double) -> String {
-        let whole = Int(seconds.rounded())
-        guard whole >= 3600 else { return KeyframeIndex.timecode(Double(whole)) }
-        return String(format: "%d:%02d:%02d", whole / 3600, (whole % 3600) / 60, whole % 60)
+        return "\(name) — \(Timecode.length(duration)) · \(size)"
     }
 
     /// Picks the newest entries. Pure, split from the environment-dependent directory read so

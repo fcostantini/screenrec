@@ -6,6 +6,26 @@
 
 ## Now
 
+- **✅ M22-T4 DONE (2026-07-28) — one timecode type, one hotkey registry.** Plan artifact (rulings
+  A/B/C approved): `claude.ai/code/artifact/229b2108-d4ea-4ae3-b31f-a4365f4275e2`. **540 tests**,
+  dev loop green, deployed (pid 4080).
+  **As built:** `Timecode.cutPoint` (floored — a point you can cut at) · `.clock` (`HH:MM:SS`,
+  truncated, NaN-safe) · `.length` (rounded — a finished thing's label), in `RecorderCore/Support`,
+  replacing **five renderers with three roundings across two modules**. The rounding is in the
+  **name**: a style parameter invites a default, and a default is how the next caller silently picks
+  the wrong rule. `HotkeyID: UInt32` types `setHotkey`, so the four ids cannot collide —
+  **duplicate raw values don't compile**, which is the actual guarantee; `GlobalShortcut` stays in
+  AppCore naming intent, so AppState still knows nothing about Carbon.
+  ⚠️ **Correction to docs/03's premise:** the `In 0:05` above `Starts exactly at 0:04` bug was
+  **already fixed** by M18-T1 — both surfaces call the same renderer, and its doc says why. What
+  remained was the *condition*, with M20's mark list about to become the sixth caller. Said plainly
+  in the task entry rather than justifying the work with a bug that wasn't there.
+  **Verified:** the 14 pinned strings moved to `TimecodeTests` with their assertions unchanged, and
+  the deployed menu dumped **byte-identical** before/after (90 rows compared; the single diff was a
+  live Slack window retitling itself between the two dumps).
+  **Next: M22-T3** (six units get a test that names them) — plan artifact first. Then T1/T2, which
+  docs/03 argues could wait for M20/M21 to show the seams.
+
 - **✅ M22-T5 + M22-T6 DONE (2026-07-28) — a cut now pushes itself and leaves a download.** Plan
   artifact (rulings A/B/C approved): `claude.ai/code/artifact/48258a07-0588-472b-9ea5-894cfd24f3a2`.
   One file (`Scripts/release.sh`), 539 tests unchanged (no product code).
