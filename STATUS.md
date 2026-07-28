@@ -16,8 +16,12 @@
   🔴 **That pass earned its keep immediately:** the first `Polling` test **passed against broken
   code**. Swallowing cancellation costs *exactly one* extra tick (`Task.sleep` throws the instant
   it's cancelled, so the loop wakes, ticks, then exits on `!Task.isCancelled`) — and the assertion
-  tolerated one. Rewritten to check a window **shorter than the interval**: tick every 300 ms,
-  cancel, look 80 ms later. Mutate before believing a new test (docs/07).
+  tolerated one. Rewritten to check a window **shorter than the interval**. 🔴 **And that rewrite
+  then flaked the gate** — a fixed-sleep assertion (`atCancel == 1` after 400 ms) passed alone and
+  failed inside the 557-test suite, where the tick hadn't been scheduled. Now it waits for the tick
+  with a deadline, *then* measures the short window; **5/5 clean full-suite runs**, and it still
+  fails against the mutation. Mutate before believing a new test — and never time one with a fixed
+  sleep (docs/07).
   ⚠️ Two CoreMedia facts found on the way: `CMSampleBufferGetDuration` returns the **total**, so a
   per-entry duration reads back ×480 on an audio buffer; and CoreMedia **refuses to create** an
   audio buffer with an invalid PTS, so that case can only come from `makeMarkerBuffer()`.

@@ -14,6 +14,12 @@ file every session is required to read.
   `!Task.isCancelled` — and the assertion tolerated one (`<= atCancel + 1`). The fix is a window
   *shorter than the interval*: tick every 300 ms, cancel, and check 80 ms later, where a correct
   loop cannot have ticked and a broken one already has. **Mutate before believing a new test.**
+  - 🔴 **…and that fix then flaked the gate.** Asserting `atCancel == 1` after a fixed 400 ms sleep
+    passed alone and failed inside the full suite (`atCancel → 0`): 557 tests run concurrently, and
+    a 300 ms tick simply hadn't been scheduled yet. **A timing assertion must never come from a
+    fixed sleep** — wait for the observation with a generous deadline (a broken loop never reaches
+    it however long you wait), *then* measure the short window that distinguishes the bug. Third
+    time this suite's reliability has been the thing at risk (M15-T1).
   - ⚠️ **`CMSampleBufferGetDuration` returns the buffer's TOTAL duration**, so
     `SampleTiming.retimed(duration:)` — which sets it per timing entry — reads back multiplied by
     the sample count on a multi-sample audio buffer (480 samples × 1/30 = 16 s). Assert it on a
