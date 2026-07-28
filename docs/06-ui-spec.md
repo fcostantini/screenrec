@@ -19,6 +19,7 @@ missing permissions only).
 | recording | filled red circle | subtle pulse; respect Reduce Motion (static red) |
 | paused | half-filled circle, amber | |
 | input level (M16-T5) | three rising bars right of the glyph, lit by peak level | **composited into the icon image** — a MenuBarExtra label renders only its first `Image` (measured, docs/07). Shown while recording or armed with a mic; opt-out `showsMenuBarLevel`. Lit/unlit by opacity, not colour: the idle icon is a template, where only alpha survives |
+| elapsed clock (M9-T3) | `HH:MM:SS` right of the glyph while recording | **drawn into the icon image**, not carried as a `Text`: the `.menu` bridge renders a label's `Text` as the status item's AppKit *title* and discards SwiftUI layout and styling, leaving the digits 1.5 px high at 2× with no way to move them (measured, docs/07). Centred on the font's cap height, since digits have no descenders. Opt-out `showsMenuBarTimer` |
 | replay armed (idle) | outline circle + small dot badge | armed is orthogonal to recording. **M5** — see the Settings amendment: the badge ships with the feature that can be armed, not before (it had been re-homed T1→T2→T4 before Franco ruled) |
 
 ## Menu — idle state

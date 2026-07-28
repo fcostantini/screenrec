@@ -7,6 +7,26 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-28 (menu-bar clock alignment): 🔴 **the `.menu` MenuBarExtra hands a label's `Text` to the
+  status item as its AppKit *title* and throws away every SwiftUI modifier on it.** Franco saw the
+  elapsed clock sitting high beside the icon; measured, its ink centre was **22.0 against the icon's
+  23.5** in a 48 px bar — 1.5 px at 2×, because digits carry no descenders while the line box
+  reserves room for them. Three fixes were deployed and re-measured, and **none moved it a pixel**:
+  `.offset(y: 0.75)`, `.offset(y: 5)` (deliberately huge — the decisive one), and `.padding(.top:)`.
+  A `.font(.system(size: 6))` then rendered at **full size**, which is what proves the mechanism:
+  the string is drawn by AppKit, not by us. Same family as this file's older note that a MenuBarExtra
+  label renders only its **first** `Image`.
+  - ⚠️ **Padding the icon's own canvas doesn't work either** — the status item **scales an
+    oversized image back down** to the bar: a 0.75 pt taller canvas moved the ink up only 0.5 px
+    *and* shrank the glyph from 26 to 25 px. Anything that changes the image's height trades
+    alignment for size.
+  - **What worked:** draw the clock *into* the image (`StatusIconImage.withClock`), centred on the
+    font's **cap height** rather than its line box — the same reason the armed badge and the level
+    meter composite instead of sitting beside the glyph. Digits went 22.0 → **23.0** against the
+    icon's 23.5; the remaining 0.5 px is sub-pixel rounding of the baseline. The cost is owning the
+    font and the ink colour: a non-template image can't be tinted by the menu bar, so the colour
+    follows `NSApp.effectiveAppearance` (the trade the meter already makes).
+
 - 2026-07-28 (M20-T1): verifying a timestamp against the recording itself.
   - **A full-screen take records its own menu-bar clock**, so a mark's frame can be checked against
     the number the user was looking at when they pressed the key: the frame at the 0:05 mark read

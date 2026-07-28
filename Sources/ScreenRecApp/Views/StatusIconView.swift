@@ -134,6 +134,47 @@ enum StatusIconImage {
         }
     }
 
+    /// Draws the elapsed clock **into** the icon image, instead of letting the label carry a
+    /// `Text`.
+    ///
+    /// ⚠️ The `.menu` MenuBarExtra hands a label's `Text` to the status item as its AppKit *title*
+    /// and discards SwiftUI layout and styling entirely — `.offset`, `.padding` and even a 6 pt
+    /// `.font` all render identically (measured, docs/07). That title's digits sit 1.5 px at 2×
+    /// above the bar's centre, because digits carry no descenders while the line box reserves room
+    /// for them, and nothing in SwiftUI can move it. Drawing the clock here is the only way to put
+    /// it on the same optical line as the glyph — the same reason the armed badge and the level
+    /// meter composite rather than sit beside it.
+    ///
+    /// Centred on the digits' **cap height**, not the line box, which is the whole point.
+    static func withClock(_ base: NSImage, text: String) -> NSImage {
+        let font = NSFont.monospacedDigitSystemFont(
+            ofSize: NSFont.systemFontSize(for: .regular), weight: .regular)
+        // A non-template image can't be tinted by the menu bar, so the ink follows the effective
+        // appearance — the same trade the meter already makes.
+        let ink: NSColor = base.isTemplate
+            ? .black
+            : (NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? .white : .black)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ink]
+        let string = NSAttributedString(string: text, attributes: attributes)
+        let textSize = string.size()
+        let gap: CGFloat = 4
+
+        let size = NSSize(width: base.size.width + gap + ceil(textSize.width), height: base.size.height)
+        let image = NSImage(size: size, flipped: false) { _ in
+            base.draw(
+                in: NSRect(origin: .zero, size: base.size), from: .zero,
+                operation: .sourceOver, fraction: 1)
+            // Baseline placed so the cap-height box straddles the centre; `draw(at:)` takes the
+            // line's bottom-left, which is the baseline plus the (negative) descender.
+            let baseline = (size.height - font.capHeight) / 2
+            string.draw(at: NSPoint(x: base.size.width + gap, y: baseline + font.descender))
+            return true
+        }
+        image.isTemplate = base.isTemplate
+        return image
+    }
+
     /// Maps the pulse's phase in [0,1) to an alpha: a raised cosine, so it eases at both ends.
     static func pulseAlpha(atPhase phase: Double) -> Double {
         let eased = (1 + cos(2 * .pi * phase)) / 2      // 1 → 0 → 1 over the cycle
@@ -181,12 +222,15 @@ struct StatusIconView: View {
     /// M6-T10 rule that also froze the in-menu clock.
     @State private var levelBars = 0
 
+    /// Drives the drawn clock. The text lives inside the icon image now (see `withClock`), so the
+    /// tick has to rebuild the image rather than update a `Text`.
+    @State private var now = Date()
+    private let clockTicker = Timer.publish(
+        every: 1, tolerance: 0.1, on: .main, in: .common).autoconnect()
+
     var body: some View {
         HStack(spacing: 4) {
             iconImage
-            if showsTimer, let recordingClock {
-                MenuBarTimer(clock: recordingClock)
-            }
             if replaySavedFlash {
                 Image(systemName: "checkmark.circle.fill")
             }
@@ -201,16 +245,24 @@ struct StatusIconView: View {
             let lit = MicrophoneLevel.bars(forPeak: microphoneLevel())
             if lit != levelBars { levelBars = lit }
         }
+        .onReceive(clockTicker) { now = $0 }
+    }
+
+    /// The elapsed clock to draw beside the glyph, or nil when it isn't shown.
+    private var clockText: String? {
+        guard showsTimer, let recordingClock else { return nil }
+        return Timecode.clock(recordingClock.elapsed(now: now))
     }
 
     @ViewBuilder private var iconImage: some View {
         if icon == .recording && !reduceMotion {
             PulsingRecordingIcon(
                 label: StatusIconImage.label(for: icon, isReplayArmed: isReplayArmed),
-                isReplayArmed: isReplayArmed, levelBars: shownBars)
+                isReplayArmed: isReplayArmed, levelBars: shownBars, clock: clockText)
         } else {
-            Image(nsImage: StatusIconImage.image(
-                for: icon, isReplayArmed: isReplayArmed, levelBars: shownBars))
+            let base = StatusIconImage.image(
+                for: icon, isReplayArmed: isReplayArmed, levelBars: shownBars)
+            Image(nsImage: clockText.map { StatusIconImage.withClock(base, text: $0) } ?? base)
         }
     }
 
@@ -231,19 +283,6 @@ struct StatusIconView: View {
 }
 
 /// The live elapsed clock in the status-item label (M9-T3). Redraws once a second off its own
-/// timer; a paused clock (`runningSince == nil`) yields a constant value, so it simply freezes.
-private struct MenuBarTimer: View {
-    let clock: RecordingClock
-    @State private var now = Date()
-    private let ticker = Timer.publish(every: 1, tolerance: 0.1, on: .main, in: .common).autoconnect()
-
-    var body: some View {
-        Text(Timecode.clock(clock.elapsed(now: now)))
-            .monospacedDigit()
-            .onReceive(ticker) { now = $0 }
-    }
-}
-
 /// The input meter's clock (M16-T5). Polls rather than subscribes: a per-buffer publish is what
 /// M6-T10 forbids, and the poll only writes state when the bar count changes — so a silent room
 /// costs no redraws at all.
@@ -263,6 +302,8 @@ private struct PulsingRecordingIcon: View {
     let label: String
     let isReplayArmed: Bool
     let levelBars: Int?
+    /// Drawn into the image beside the glyph — see `StatusIconImage.withClock`.
+    let clock: String?
 
     @State private var phase: Double = 0
 
@@ -271,9 +312,10 @@ private struct PulsingRecordingIcon: View {
     ).autoconnect()
 
     var body: some View {
-        Image(nsImage: StatusIconImage.recordingImage(
+        let faded = StatusIconImage.recordingImage(
             fadedTo: StatusIconImage.pulseAlpha(atPhase: phase), isReplayArmed: isReplayArmed,
-            levelBars: levelBars))
+            levelBars: levelBars)
+        Image(nsImage: clock.map { StatusIconImage.withClock(faded, text: $0) } ?? faded)
             .accessibilityLabel(label)
             .onReceive(ticker) { _ in
                 phase = (phase + 1 / Self.framesPerCycle).truncatingRemainder(dividingBy: 1)
