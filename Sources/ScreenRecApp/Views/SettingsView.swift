@@ -19,7 +19,48 @@ struct SettingsView: View {
     /// The editable `M:SS` value beside the slider — finer than the 15 s slider steps, typed.
     @State private var replayText = ""
 
+    /// The Settings window's pages (M18-T6). As one `Form` with `.fixedSize()` the window had no
+    /// ceiling: it measured 1137 pt against 1260 pt of usable screen, and every new preference made
+    /// it worse.
+    private enum Page: String, CaseIterable, Identifiable {
+        case general = "General"
+        case recording = "Recording"
+        case replay = "Instant Replay"
+        case sharing = "Sharing"
+
+        var id: Self { self }
+    }
+
+    @State private var page: Page = .general
+
     var body: some View {
+        VStack(spacing: 0) {
+            // A segmented control, not `TabView`: at this width SwiftUI collapses toolbar tabs into
+            // a `»` overflow menu, which hides three of the four pages behind a chevron.
+            Picker("", selection: $page) {
+                ForEach(Page.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+
+            switch page {
+            case .general: general
+            case .recording: recording
+            case .replay: instantReplay
+            case .sharing: sharing
+            }
+        }
+        .frame(width: 460)
+        .fixedSize()
+        .onAppear { syncReplayControls() }
+        .onChange(of: state.replaySeconds) { syncReplayControls() }
+    }
+
+    /// Where files go and what the menu bar shows — plus the build, which M16-T6 put here so
+    /// "am I on the build with the fix?" is answerable from inside the app.
+    private var general: some View {
         Form {
             LabeledContent("Output folder") {
                 HStack(spacing: 8) {
@@ -38,6 +79,28 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            Toggle("Launch at login", isOn: $state.launchAtLogin)
+
+            Toggle("Show recording time in the menu bar", isOn: $state.showsMenuBarTimer)
+
+            // M16-T5: the meter's twin opt-out. Shown while recording or armed, so a dead mic is
+            // visible before a take.
+            Toggle("Show input level in the menu bar", isOn: $state.showsMenuBarLevel)
+
+
+            // M16-T6: ADR-014 hands people a signed .app directly — the version has to be
+            // answerable from inside the app.
+            Text(state.versionLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .formStyle(.grouped)
+    }
+
+    /// What a take *is*: its quality and rate, the beat before it, and the shortcuts that start
+    /// and pause it.
+    private var recording: some View {
+        Form {
             Picker("Quality", selection: $state.quality) {
                 ForEach(QualityPreset.allCases, id: \.self) { preset in
                     Text(preset.settingsTitle).tag(preset)
@@ -49,14 +112,6 @@ struct SettingsView: View {
                     Text("\(fps) fps").tag(fps)
                 }
             }
-
-            Toggle("Launch at login", isOn: $state.launchAtLogin)
-
-            Toggle("Show recording time in the menu bar", isOn: $state.showsMenuBarTimer)
-
-            // M16-T5: the meter's twin opt-out. Shown while recording or armed, so a dead mic is
-            // visible before a take.
-            Toggle("Show input level in the menu bar", isOn: $state.showsMenuBarLevel)
 
             // M9-T4: opt-in, because a start/stop combo is always live (unlike replay's, which fires
             // only while armed). Enabling seeds ⌥⌘S; the recorder pill changes it.
@@ -110,67 +165,70 @@ struct SettingsView: View {
             // M12-T6: a 3-2-1 beat before capture to switch to the target window. The countdown
             // isn't in the recording.
             Toggle("Count in before recording (3-2-1)", isOn: $state.countInEnabled)
+        }
+        .formStyle(.grouped)
+    }
 
-            // M16-T6: ADR-014 hands people a signed .app directly — the version has to be
-            // answerable from inside the app.
-            Text(state.versionLabel)
+    private var instantReplay: some View {
+        Form {
+            LabeledContent("Replay buffer") {
+                HStack(spacing: 10) {
+                    // Continuous slider (no `step:`, so no tick marks), snapped to 15 s in the
+                    // binding; committed on release so a drag while armed resizes the ring once
+                    // (via `windowChanged`), not hundreds of times.
+                    Slider(value: snappedReplayBinding, in: Self.replayRange) { editing in
+                        if !editing { state.replaySeconds = Int(draftReplaySeconds) }
+                    }
+                    TextField("", text: $replayText)
+                        .labelsHidden()
+                        .multilineTextAlignment(.trailing)
+                        .monospacedDigit()
+                        .frame(width: 54)
+                        .onSubmit(commitTypedReplayBuffer)
+                }
+            }
+            // The cost of the window the slider just set (M16-T2) — memory, and ADR-018's
+            // deliberate wakefulness. Reads `draftReplaySeconds` so it tracks the drag, not
+            // the commit-on-release.
+            Text(state.replayBufferCaption(seconds: Int(draftReplaySeconds)))
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Section("Instant Replay") {
-                LabeledContent("Replay buffer") {
-                    HStack(spacing: 10) {
-                        // Continuous slider (no `step:`, so no tick marks), snapped to 15 s in the
-                        // binding; committed on release so a drag while armed resizes the ring once
-                        // (via `windowChanged`), not hundreds of times.
-                        Slider(value: snappedReplayBinding, in: Self.replayRange) { editing in
-                            if !editing { state.replaySeconds = Int(draftReplaySeconds) }
+            LabeledContent("Save replay shortcut") {
+                HotkeyRecorderButton(
+                    hotkey: $state.replayHotkey,
+                    accessibilityName: "Save replay shortcut",
+                    suspendGlobalHotkey: { _ = state.hotkeyRegistrar?(nil, .saveReplay) },
+                    restoreGlobalHotkey: {
+                        if state.isReplayArmed {
+                            _ = state.hotkeyRegistrar?(state.replayHotkey, .saveReplay)
                         }
-                        TextField("", text: $replayText)
-                            .labelsHidden()
-                            .multilineTextAlignment(.trailing)
-                            .monospacedDigit()
-                            .frame(width: 54)
-                            .onSubmit(commitTypedReplayBuffer)
-                    }
-                }
-                // The cost of the window the slider just set (M16-T2) — memory, and ADR-018's
-                // deliberate wakefulness. Reads `draftReplaySeconds` so it tracks the drag, not
-                // the commit-on-release.
-                Text(state.replayBufferCaption(seconds: Int(draftReplaySeconds)))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                LabeledContent("Save replay shortcut") {
-                    HotkeyRecorderButton(
-                        hotkey: $state.replayHotkey,
-                        accessibilityName: "Save replay shortcut",
-                        suspendGlobalHotkey: { _ = state.hotkeyRegistrar?(nil, .saveReplay) },
-                        restoreGlobalHotkey: {
-                            if state.isReplayArmed {
-                                _ = state.hotkeyRegistrar?(state.replayHotkey, .saveReplay)
-                            }
-                        })
-                }
-                Text("Shortcuts must include ⌥ or ⌃."
-                    + (state.isReplayArmed
-                        ? " Changing the buffer or sources restarts replay from empty." : ""))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                // Banner suppression (docs/06 §Notifications): while armed, the screen is captured,
-                // so macOS hides banners — ours and other apps'. Name the fix, not the API.
-                Text("While replay is armed, macOS hides notification banners — ScreenRec's and other "
-                    + "apps'. To keep seeing them, turn on \"Allow notifications when mirroring or "
-                    + "sharing the display\" in System Settings › Notifications.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Open Notification Settings…") { NotificationSettings.open() }
-                    .buttonStyle(.link)
-                    .font(.caption)
+                    })
             }
+            Text("Shortcuts must include ⌥ or ⌃."
+                + (state.isReplayArmed
+                    ? " Changing the buffer or sources restarts replay from empty." : ""))
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
+            // Banner suppression (docs/06 §Notifications): while armed, the screen is captured,
+            // so macOS hides banners — ours and other apps'. Name the fix, not the API.
+            Text("While replay is armed, macOS hides notification banners — ScreenRec's and other "
+                + "apps'. To keep seeing them, turn on \"Allow notifications when mirroring or "
+                + "sharing the display\" in System Settings › Notifications.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Open Notification Settings…") { NotificationSettings.open() }
+            .buttonStyle(.link)
+            .font(.caption)
+        }
+        .formStyle(.grouped)
+    }
+
+    /// The two derive-a-file formats together — both answer "what comes out when I share this".
+    private var sharing: some View {
+        Form {
             Section("MP4") {
                 Picker("Size", selection: $state.mp4Width) {
                     ForEach(Settings.allowedMP4Widths, id: \.self) {
@@ -203,10 +261,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420)
-        .fixedSize()
-        .onAppear { syncReplayControls() }
-        .onChange(of: state.replaySeconds) { syncReplayControls() }
     }
 
     /// The replay slider's range as `Double`s (M9-T8), kept off the view body so the type-checker

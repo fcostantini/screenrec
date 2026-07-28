@@ -7,8 +7,27 @@
 ## Now
 
 
-- **✅ M18-T5 DONE (2026-07-28) — a region pick can be corrected instead of redrawn. M18 is one
-  task from complete (T6 only).** Plan artifact (rulings A1/B1 approved):
+- **✅ M18-T6 DONE (2026-07-28) — Settings is four tabs; 1137 pt → 437. ALL SIX M18 TASKS ARE
+  DONE.** Plan artifact (rulings A1/B1 approved):
+  `claude.ai/code/artifact/1e6438cb-3c97-49fb-843e-3981ebfa596c`. **530 tests unchanged** (layout
+  only — no binding, key or `AppState` property moved), deployed.
+  **Measured first:** 420 × **1137 pt** against **1260 pt** of usable screen — **90%** — and as one
+  `Form` with `.fixedSize()` it had no ceiling; a 13-inch Air would lose ~200 pt off the bottom.
+  **As built:** **General** (folder, launch at login, menu-bar toggles, version) · **Recording**
+  (quality, frame rate, count-in, both global shortcuts) · **Instant Replay** · **Sharing**
+  (MP4 + GIF). Recording collects what changes what a take *is*.
+  ⚠️ **`TabView` was the wrong mechanism and only a screenshot said so:** at this width SwiftUI
+  collapsed all four toolbar tabs into a **`»` overflow menu** — Franco saw it before I did. A
+  `Picker(.segmented)` over a `Page` enum can't collapse.
+  **Verified live per tab:** General 292 · Recording 289 · Instant Replay 372 · **Sharing 437 pt**
+  (tallest), every row in its intended tab, and a Sharing picker round-tripped (`gifFPS` 15 → 20 →
+  15, restored). **90% → 35% of the usable screen.**
+  🔴 **Also found: a python range-rewrite in the M18-T5 commit silently deleted the filed M18-T6
+  entry from docs/03** — committed and pushed before it was noticed, restored here. Third
+  silent-replace casualty this session (docs/07).
+  **Next: G18** — the milestone gate — then the **MINOR** bump (1.10.0) per ADR-013.
+
+- **✅ M18-T5 DONE (2026-07-28) — a region pick can be corrected instead of redrawn.** Plan artifact (rulings A1/B1 approved):
   `claude.ai/code/artifact/0929e0e2-113e-4d2e-b09c-c19c1941607c`. **530 tests (+5)**, dev loop green,
   deployed; Source restored to Entire Screen.
   **Two premises measured first, both cheap:** the SCK↔view flip is **its own inverse**, so seeding

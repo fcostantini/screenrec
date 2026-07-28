@@ -7,6 +7,20 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-28 (M18-T6):
+  - ⚠️ **`TabView` collapses macOS toolbar tabs into a `»` overflow menu when the window is
+    narrow** — at 460 pt all four of ours hid behind a chevron, worse than the tall page it
+    replaced. Nothing in the code said so and the AX dump looked healthy (`AXToolbar` present); the
+    screenshot is what showed it, and Franco saw it before I did. A `Picker(.segmented)` over an
+    enum can't collapse. After: 1137 pt → 437 pt at the tallest tab (90% → 35% of usable height).
+  - ⚠️ **A SwiftUI segmented picker's buttons carry their label as the AX *description*, not the
+    title** — a `menudriver`-style lookup by title finds nothing at all.
+  - 🔴 **A python `s[:start] + new + s[end:]` rewrite silently ate a whole task entry.** M18-T5's
+    doc update replaced everything from its own heading to `**Gate G18**:`, which spanned the
+    already-filed M18-T6 — committed and pushed before anyone noticed. Third silent-replace
+    casualty this session: prefer anchored single-string replaces, and check the surrounding
+    headings after a range edit.
+
 - 2026-07-28 (M18-T5):
   - ⚠️ **A deploy can report success and still be stale.** `swift build -c release` + `Scripts/bundle.sh`
     + `ditto` all succeeded, yet the running app showed the new hint line while missing the new badge

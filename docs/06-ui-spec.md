@@ -372,6 +372,13 @@ the old line is simply false above three green ticks.
 
 ## Settings window (SwiftUI Form, UserDefaults-backed)
 
+**Four tabs since M18-T6** — a segmented control, not `TabView`: at this window's width SwiftUI
+collapses toolbar tabs into a `»` overflow menu, hiding three of the four pages behind a chevron.
+**General** (output folder, launch at login, the menu-bar toggles, the version footer) ·
+**Recording** (quality, frame rate, count-in, the two global shortcuts) · **Instant Replay** ·
+**Sharing** (MP4 + GIF). The window sizes to the current tab — tallest measured **437 pt**, against
+**1137 pt** as one page (90% of a 1260 pt usable screen).
+
 - Output folder (choose → `opendir` preflight immediately, friendly error per 02 §2)
 - Quality preset · Frame-rate cap (30/60)
 - **Show recording time in the menu bar** (M9-T3) — top-level toggle, on by default; off ⇒ the

@@ -1613,6 +1613,23 @@ ride the same bump.
       **stale despite reporting success** — the badge lacked its new suffix until a second
       `swift build -c release` + `bundle.sh` + `ditto`; re-run the leg, don't assume the deploy took.
 
+- [x] M18-T6 **The Settings window is too tall to fit.** (Franco flagged it when M18-T2's MP4
+      section pushed the window past the screen.) **Measured on the running app: 420 × 1137 pt
+      against 1260 pt of usable screen — 90%**, and as one `Form` with `.fixedSize()` it had no
+      ceiling; on a 13-inch Air it would run ~200 pt off the bottom with no scroll view to save it.
+      **Rulings (Franco, 2026-07-28):** four tabs, and the version stays in General (the default
+      tab). **As built:** four `Form`s behind a segmented control — **General** (folder, launch at
+      login, the two menu-bar toggles, the version) · **Recording** (quality, frame rate, count-in,
+      the two global shortcuts) · **Instant Replay** (unchanged) · **Sharing** (MP4 + GIF). The split
+      isn't alphabetical: Recording collects what changes what a take *is*.
+      ⚠️ **`TabView` was the wrong mechanism and only a screenshot said so** — at this width SwiftUI
+      collapsed all four toolbar tabs into a `»` overflow menu, hiding three pages behind a chevron
+      (Franco saw it before I did). A `Picker(.segmented)` over a `Page` enum can't collapse.
+      **Verified live, per tab:** General 292 pt · Recording 289 · Instant Replay 372 · **Sharing 437**
+      (the tallest), every row present and in its intended tab, and a picker driven on Sharing
+      round-tripped (`gifFPS` 15 → 20 → 15). **1137 → 437 pt, 90% → 35% of the usable screen.**
+      530 tests unchanged — layout only: no binding, key or `AppState` property moved.
+
 **Gate G18**: a trim states the cut point it will actually make and a precise trim hits the requested
 second exactly; an MP4 export honours a chosen size; the idle menu is materially shorter with every
 action still reachable and no slower to open; the count-in is cancellable; a region pick can be
