@@ -1,5 +1,7 @@
+import AVFoundation
 import CoreMedia
 import CoreVideo
+import Foundation
 import Testing
 
 @testable import RecorderCore
@@ -152,4 +154,39 @@ func makeMarkerBuffer() -> CMSampleBuffer {
         sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &buffer)
     precondition(status == noErr, "CMSampleBufferCreate failed: \(status)")
     return buffer!
+}
+
+/// A real `.mov` with one LPCM audio track — no video encoder, so this runs in every suite
+/// rather than behind the hardware-encode gate.
+func makeAudioOnlyClip(seconds: Int) async throws -> URL {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("mediafile-\(UUID().uuidString).mov")
+    try? FileManager.default.removeItem(at: url)
+
+    let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+    let format = makeAudioFormat(sampleRate: 48_000, channels: 1)
+    let input = AVAssetWriterInput(
+        mediaType: .audio,
+        outputSettings: [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: 48_000,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+        ])
+    input.expectsMediaDataInRealTime = false
+    writer.add(input)
+    writer.startWriting()
+    writer.startSession(atSourceTime: .zero)
+
+    for second in 0..<seconds {
+        input.append(makeAudioSampleBuffer(
+            format: format, frames: 48_000,
+            pts: CMTime(value: CMTimeValue(second), timescale: 1)))
+    }
+    input.markAsFinished()
+    await writer.finishWriting()
+    return url
 }

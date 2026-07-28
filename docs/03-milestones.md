@@ -1817,7 +1817,16 @@ No user-visible change: the milestone that keeps the next four cheap. **PATCH** 
       **Rulings:** where `lastFailure` lives — it outlives the session deliberately (M17-T2), so it
       may belong on AppState even after the split. **Verify:** as T1, plus one live recording through
       the app.
-- [ ] M22-T3 **Six units get a test that names them.** `WriterDrain`, `VideoFrameReader`,
+- [x] M22-T3 **Six units get a test that names them.** ✅ 2026-07-28 — six suites, **557 tests
+      (+17)**, each verified by **breaking its unit and watching the test fail**: `WriterDrain`
+      (never leave the group → the deadlock, caught by a bounded `wait`), `SampleTiming` (drop the
+      duration override), `PCMSampleBuffer` (ignore `fill`'s failure), `Polling` (swallow
+      cancellation), `MediaFile` (never read a duration), `VideoFrameReader` (drop the fps gate).
+      🔴 **The mutation pass earned its keep on `Polling`:** the first version of that test *passed*
+      against broken code — swallowing cancellation costs exactly one extra tick and the assertion
+      tolerated one. Rewritten to check a window shorter than the interval (docs/07).
+      `VideoFrameReader`'s subsample test needs the encoder, so it is gated and **added to both the
+      pre-push hook and `release.sh`** — a gated test nothing runs is not a test. `WriterDrain`, `VideoFrameReader`,
       `PCMSampleBuffer`, `SampleTiming`, `Polling`, `MediaFile` — no test mentions any of them.
       `WriterDrain` is shared write-path logic (M14-T2 deduplicated it *because* two writers rely on
       it) and `SampleTiming`/`PCMSampleBuffer` sit on the sample path, where docs/01's rules are

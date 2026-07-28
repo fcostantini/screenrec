@@ -58,6 +58,7 @@ step "swift test"           swift test
 step "encode: Exporter"     env SCREENREC_HW_ENCODE_TESTS=1 swift test --filter ExporterTests
 step "encode: Trimmer"      env SCREENREC_HW_ENCODE_TESTS=1 swift test --filter TrimmerTests
 step "encode: GifExporter"  env SCREENREC_HW_ENCODE_TESTS=1 swift test --filter GifExporterTests
+step "encode: VideoFrameReader" env SCREENREC_HW_ENCODE_TESTS=1 swift test --filter VideoFrameReaderTests
 step "swift build -c release"  swift build -c release
 step "bundle + sign"        ./Scripts/bundle.sh
 

@@ -7,6 +7,21 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-28 (M22-T3): 🔴 **a test that looked right proved nothing, and only mutation said so.**
+  Breaking each of the six units and re-running its new test caught `PollingTests`: swallowing
+  cancellation (`try?` instead of `catch { return }`) costs **exactly one** extra tick — the loop
+  wakes immediately because `Task.sleep` throws the instant it is cancelled, ticks, then exits on
+  `!Task.isCancelled` — and the assertion tolerated one (`<= atCancel + 1`). The fix is a window
+  *shorter than the interval*: tick every 300 ms, cancel, and check 80 ms later, where a correct
+  loop cannot have ticked and a broken one already has. **Mutate before believing a new test.**
+  - ⚠️ **`CMSampleBufferGetDuration` returns the buffer's TOTAL duration**, so
+    `SampleTiming.retimed(duration:)` — which sets it per timing entry — reads back multiplied by
+    the sample count on a multi-sample audio buffer (480 samples × 1/30 = 16 s). Assert it on a
+    single-sample video buffer, which is the shape the tail patch actually retimes.
+  - ⚠️ **CoreMedia refuses to create an audio sample buffer with an invalid PTS**
+    (`CMAudioSampleBufferCreateReadyWithPacketDescriptions` fails), so the "no numeric timing" case
+    can only be built from `makeMarkerBuffer()`.
+
 - 2026-07-28 (M22-T5/T6): releasing, measured.
   - ⚠️ **`script -q /dev/null cmd <<< "y"` does NOT answer a prompt** — the heredoc feeds `script`'s
     own stdin, not the pty, so the program sees EOF and the answer echoes after it. Both a `y` and

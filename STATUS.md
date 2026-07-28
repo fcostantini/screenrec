@@ -6,6 +6,26 @@
 
 ## Now
 
+- **✅ M22-T3 DONE (2026-07-28) — the six unnamed units now have tests that can fail.** No plan
+  artifact (Franco waived it for this one). **557 tests (+17)**, dev loop green.
+  **Each test verified by mutation, not by passing:** I broke every unit and confirmed its test
+  noticed — `WriterDrain` (never leave the group → the deadlock, caught by a bounded `wait` rather
+  than a hung suite), `SampleTiming` (drop the duration override), `PCMSampleBuffer` (ignore
+  `fill`'s failure), `Polling` (swallow cancellation), `MediaFile` (never read a duration),
+  `VideoFrameReader` (drop the fps gate).
+  🔴 **That pass earned its keep immediately:** the first `Polling` test **passed against broken
+  code**. Swallowing cancellation costs *exactly one* extra tick (`Task.sleep` throws the instant
+  it's cancelled, so the loop wakes, ticks, then exits on `!Task.isCancelled`) — and the assertion
+  tolerated one. Rewritten to check a window **shorter than the interval**: tick every 300 ms,
+  cancel, look 80 ms later. Mutate before believing a new test (docs/07).
+  ⚠️ Two CoreMedia facts found on the way: `CMSampleBufferGetDuration` returns the **total**, so a
+  per-entry duration reads back ×480 on an audio buffer; and CoreMedia **refuses to create** an
+  audio buffer with an invalid PTS, so that case can only come from `makeMarkerBuffer()`.
+  `VideoFrameReader`'s subsample test needs the encoder → gated, and **added to the pre-push hook
+  and `release.sh`**, because a gated test nothing runs is not a test.
+  **Next: M22-T1** (`AppState` sheds its sources) — or hold T1/T2 for M20/M21 to show the seams, as
+  docs/03 argues. Franco's call.
+
 - **✅ M22-T4 DONE (2026-07-28) — one timecode type, one hotkey registry.** Plan artifact (rulings
   A/B/C approved): `claude.ai/code/artifact/229b2108-d4ea-4ae3-b31f-a4365f4275e2`. **540 tests**,
   dev loop green, deployed (pid 4080).
