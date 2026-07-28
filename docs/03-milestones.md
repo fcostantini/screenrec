@@ -1547,20 +1547,26 @@ ride the same bump.
       all yuv420p + faststart, bitrate at or above the 6 Mbps reference, up to 19.6; and a persisted `Largest` pick driven
       through the real Settings picker → menu export → **3686 × 2304, High, Level 5.2** (setting
       restored to 1920 afterwards).
-- [ ] M18-T3 **The menu earns its rows back.** The idle menu is 20–26 rows: header, Start, Arm,
-      banner caveat, Save Replay, export receipt, replay receipt, three submenu titles, folder, five
-      recents, a "Recent Exports" label, three exports, Settings, Quit — file lists are two-thirds of
-      its height. M12-T3 settled *ordering* well; what's drifted is that every feature since M10 has
-      landed as another top-level row. **Seams:** fold recents + exports into the `Open Recordings
-      Folder` row as a single `Recordings ▸` submenu (they already read as its contents, and the
-      leading-whitespace indent hack goes away with them); ask whether the two receipts need standing
-      rows or belong inside it; and give each recents row its **duration + size** so picking the right
-      take is one step (`Recording … .mov — 12:34 · 240 MB`). **Rulings:** size is a cheap
-      `resourceValues` read but duration needs an `AVAsset` load — so it must be async-and-cached and
-      **stamped at open, never ticking** (M6-T10); if that proves too slow for five rows, ship size
-      only. **Coordinate with M17-T2**, which wants to *add* window rows. **Verify:** `menudriver
-      dump` before/after with the row count in STATUS.md; every action still reachable; opening the
-      menu is not measurably slower.
+- [x] M18-T3 **The menu earns its rows back.** The idle menu measured **20 rows with three
+      recordings and no exports, and 32 at worst** (5 recents + 3 exports + the `Recent Exports`
+      label + both receipts + the failure and no-audio rows) — the file browser was two thirds of it.
+      **Rulings (Franco, 2026-07-27):** (a) the export and replay receipts **stay** under Start —
+      they exist for the minute after an export, already self-expire, and burying them is exactly
+      wrong then; (b) rows read **`<name> — 23:04 · 5.5 GB`**, the name exactly as on disk (docs/06).
+      **As built:** one **`Recordings ▸`** submenu holding `Open Folder — ~/Movies`, the recents and
+      the Recent Exports group → **17 rows today, 23 at worst**. The leading-space indent hack and
+      its accessibility labels are gone: inside a submenu the nesting is real. Row details are read
+      **off the open and cached by modification date** (M6-T10); measured 1–8 ms per file, and the
+      657 MB file was the *fastest* of three (a header read, not a scan). ⚠️ **`URL` caches resource
+      values per instance** and the menu holds its URLs across opens — the cache check clears them
+      first, or a re-recorded file keeps a stale size forever (caught by the test, not by review).
+      **Verified live on the deployed build:** `menudriver dump` before/after → **20 → 17** rows
+      (the 9-row worst case → 23); every action still present, the only diffs being three live window
+      titles that changed between dumps and the deliberate `Open Recordings Folder` → `Open Folder`
+      rename; menu open **0.57–0.60 s** against a **0.57–0.59 s** baseline (5 runs each, same
+      harness); rows rendered their details on the *first* open (`Replay … .mov — 4:30 · 656,9 MB`);
+      and the rewired folder row opened `~/Movies` in Finder. 513 tests (+5).
+
 - [ ] M18-T4 **Four small honesties.** (1) **The 3-2-1 count-in can't be cancelled** — once Start
       fires, `isCountingIn` blocks re-entry and capture begins three seconds later; <kbd>Esc</kbd>
       does nothing and the Start row is a silent no-op. It is the one moment in the product that

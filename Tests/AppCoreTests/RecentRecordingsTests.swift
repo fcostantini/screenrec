@@ -114,4 +114,70 @@ import Testing
         let gone = URL(fileURLWithPath: "/nope/does/not/exist")
         #expect(RecentRecordings.inDirectory(gone).isEmpty)
     }
+
+    // MARK: - Row titles (M18-T3)
+
+    @Test func aRowNamesTheFileItsLengthAndItsSize() {
+        // Picking the right take should be one step, so the row carries what distinguishes takes.
+        let detail = RecentRecordings.RowDetail(
+            byteCount: 5_500_000_000, duration: 1384, modified: Date())
+        // The size goes through ByteCountFormatter (docs/06), which is locale-formatted — assert
+        // the structure around it, not one machine's decimal separator.
+        let size = ByteCountFormatter.string(fromByteCount: 5_500_000_000, countStyle: .file)
+        #expect(RecentRecordings.rowTitle(for: Self.url("Recording 2026-07-27 at 13.01.24.mov"),
+                                          detail: detail)
+            == "Recording 2026-07-27 at 13.01.24.mov — 23:04 · \(size)")
+    }
+
+    @Test func aRowStatesWhatIsKnown() {
+        // Details arrive after the menu opens, and a file that isn't readable media never gets a
+        // length — both states have to read as a row, not as a gap waiting to be filled.
+        let url = Self.url("Clip.mov")
+        #expect(RecentRecordings.rowTitle(for: url, detail: nil) == "Clip.mov")
+        let sizeOnly = RecentRecordings.RowDetail(
+            byteCount: 17_000_000, duration: nil, modified: Date())
+        let size = ByteCountFormatter.string(fromByteCount: 17_000_000, countStyle: .file)
+        #expect(RecentRecordings.rowTitle(for: url, detail: sizeOnly) == "Clip.mov — \(size)")
+    }
+
+    @Test func lengthsPastAnHourGrowAnHoursField() {
+        #expect(RecentRecordings.clock(0) == "0:00")
+        #expect(RecentRecordings.clock(9.6) == "0:10")
+        #expect(RecentRecordings.clock(600) == "10:00")
+        #expect(RecentRecordings.clock(3599) == "59:59")
+        #expect(RecentRecordings.clock(3600) == "1:00:00")
+        #expect(RecentRecordings.clock(7384) == "2:03:04")
+    }
+
+    @Test func anUnchangedFileIsNeverReadTwice() async throws {
+        // The cache is the whole reason the read can ride the menu open (M6-T10): a second open
+        // must cost nothing. A changed file must still be re-read, or a re-recording keeps a
+        // stale length forever.
+        let directory = try makeFixture([(name: "A.mov", minutesAgo: 1)])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("A.mov")
+
+        let first = await RecentRecordings.details(for: [url], cached: [:])
+        let entry = try #require(first[url])
+        #expect(entry.byteCount == 1)      // the fixture writes one byte
+        #expect(entry.duration == nil)     // …which is not readable media
+
+        // A hit keeps the cached entry rather than re-reading.
+        let stamped = RecentRecordings.RowDetail(
+            byteCount: 1, duration: 12.5, modified: entry.modified)
+        #expect(await RecentRecordings.details(for: [url], cached: [url: stamped])[url]?.duration
+            == 12.5)
+
+        // Touching the file invalidates it.
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date()], ofItemAtPath: url.path)
+        #expect(await RecentRecordings.details(for: [url], cached: [url: stamped])[url]?.duration
+            == nil)
+    }
+
+    @Test func aVanishedFileGetsNoRowDetail() async {
+        let details = await RecentRecordings.details(
+            for: [Self.url("Gone.mov")], cached: [:])
+        #expect(details.isEmpty)
+    }
 }

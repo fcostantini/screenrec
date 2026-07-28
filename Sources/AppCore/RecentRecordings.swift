@@ -22,6 +22,34 @@ public enum RecentRecordings {
         let modified: Date
     }
 
+    /// What a row says about a file beyond its name (M18-T3), so picking the right take is one
+    /// step. `duration` is nil when the file isn't readable media. `modified` is what the read was
+    /// valid at, so the same value serves as the cache key.
+    struct RowDetail: Equatable, Sendable {
+        let byteCount: Int
+        let duration: Double?
+        let modified: Date
+    }
+
+    /// `Recording 2026-07-27 at 13.01.24.mov — 23:04 · 5.5 GB` (docs/06: names exactly as on disk,
+    /// sizes through `ByteCountFormatter`). Name-only until the read lands, and name + size for a
+    /// file that isn't readable media — a row states what is known, never a placeholder.
+    static func rowTitle(for url: URL, detail: RowDetail?) -> String {
+        let name = url.lastPathComponent
+        guard let detail else { return name }
+        let size = ByteCountFormatter.string(fromByteCount: Int64(detail.byteCount), countStyle: .file)
+        guard let duration = detail.duration else { return "\(name) — \(size)" }
+        return "\(name) — \(clock(duration)) · \(size)"
+    }
+
+    /// `M:SS` through `KeyframeIndex.timecode`, growing to `H:MM:SS` past an hour — the menu's
+    /// tighter form of docs/06's `HH:MM:SS`. Rounds first, since a row is a label, not a cut point.
+    static func clock(_ seconds: Double) -> String {
+        let whole = Int(seconds.rounded())
+        guard whole >= 3600 else { return KeyframeIndex.timecode(Double(whole)) }
+        return String(format: "%d:%02d:%02d", whole / 3600, (whole % 3600) / 60, whole % 60)
+    }
+
     /// Picks the newest entries. Pure, split from the environment-dependent directory read so
     /// the choosing is testable on its own.
     ///
@@ -57,5 +85,30 @@ public enum RecentRecordings {
             return Entry(url: url, modified: modified)
         }
         return newest(entries, limit: limit)
+    }
+
+    /// Size and duration for each of `urls`, reusing `cached` for any file whose size and
+    /// modification date are unchanged — so a repeat menu open reads nothing, and only a genuinely
+    /// new file pays for an asset load. Files that can't be read are dropped, which is what evicts
+    /// trashed ones.
+    static func details(for urls: [URL], cached: [URL: RowDetail]) async -> [URL: RowDetail] {
+        var fresh: [URL: RowDetail] = [:]
+        for url in urls {
+            // `URL` caches resource values per instance, and the menu holds the same URLs across
+            // opens — without this, a re-recorded file keeps its first size and length forever.
+            var probe = url
+            probe.removeAllCachedResourceValues()
+            guard let values = try? probe.resourceValues(
+                    forKeys: [.fileSizeKey, .contentModificationDateKey]),
+                  let bytes = values.fileSize, let modified = values.contentModificationDate
+            else { continue }
+            if let hit = cached[url], hit.modified == modified, hit.byteCount == bytes {
+                fresh[url] = hit
+                continue
+            }
+            fresh[url] = RowDetail(
+                byteCount: bytes, duration: await MediaFile.duration(of: url), modified: modified)
+        }
+        return fresh
     }
 }

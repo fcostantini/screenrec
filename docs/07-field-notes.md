@@ -7,6 +7,19 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-27 (M18-T3):
+  - ⚠️ **`URL` caches resource values per instance, and a menu holds its URLs across opens.** The
+    recents cache keys on modification date, and a unit test that touched a file and re-read it
+    still got the *old* date back — so a re-recorded or replaced file would have kept its first size
+    and length forever. `removeAllCachedResourceValues()` before the read fixes it. Caught by the
+    test, not by review or by reading the code.
+  - **Out of scope, noticed:** three sites now open-code "load a URL's duration"
+    (`Trimmer.trim`'s result, `TrimView.load`, `CaptureSelfTest`) and could adopt
+    `MediaFile.duration`.
+  - ✅ **A file's duration is a header read, not a scan.** 1–8 ms per file, and the **657 MB** file
+    was the *fastest* of three (2.0 ms) while a 17 MB one took 7.8 — the first read pays for
+    framework warm-up, not for bytes. Cheap enough for a menu row, still done off the open.
+
 - 2026-07-27 (M18-T2):
   - 🔴 **"AVAssetWriter's H.264 path caps at 4096×2304" is false, and it had been load-bearing since
     M2.** The writer encodes 4112×2570 H.264 without complaint — it just moves to **Level 6.0**.

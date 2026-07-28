@@ -7,6 +7,25 @@
 ## Now
 
 
+- **✅ M18-T3 DONE (2026-07-27) — the menu's file browser is one `Recordings ▸` row.** Plan artifact
+  (rulings A1/B1 approved): `claude.ai/code/artifact/e6b55bd5-fe54-455a-a06d-f55aa11b8431`.
+  **513 tests (+5)**, full dev loop green, deployed and re-armed.
+  **Measured before designing:** the idle menu is **20 rows** today (3 recordings, no exports) and
+  **32 at worst**; the folder + 5 recents + the `Recent Exports` label + 3 exports are 9 of them.
+  Folding leaves **17 / 23**. Duration per row is affordable — **1–8 ms**, and the 657 MB file was
+  the *fastest* of three (header read, not a scan) — so rows read `<name> — 23:04 · 5.5 GB`, read
+  off the open and cached by modification date (M6-T10).
+  ⚠️ **A test caught a bug review would not have:** `URL` caches resource values per instance and
+  the menu holds its URLs across opens, so a re-recorded file kept its first size forever until the
+  cache check started clearing them.
+  **Verified live:** `menudriver dump` before/after → **20 → 17** rows; every action still present
+  (the only diffs are three window titles that changed between dumps and the intended `Open
+  Recordings Folder` → `Open Folder` rename); open time **0.57–0.60 s** vs the **0.57–0.59 s**
+  baseline — not measurably slower; rows carried their details on the *first* open
+  (`Replay … .mov — 4:30 · 656,9 MB`); the rewired folder row opened `~/Movies` in Finder.
+  **Next: M18-T4** (four small honesties) — plan artifact first. Its item (4) is where the stale
+  export-receipt row Franco hit belongs.
+
 - **✅ M18-T2 DONE (2026-07-27) — `Export as MP4` has a Size, and the ceiling is a decoder's, not
   an API's.** Plan artifact (rulings A1/B1/C1 approved):
   `claude.ai/code/artifact/6ded5178-712a-4862-990d-547be5f1a39d`. **508 tests (+6)**, dev loop green,

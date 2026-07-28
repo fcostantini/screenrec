@@ -112,13 +112,23 @@ Order and grouping (separators between groups):
    so an away device shows `None`, and Automatic shortens to `Automatic`; a picked-but-closed app shows
    its name (the `(not running)` detail stays on the submenu row). Pure `sourceMenuLabel`/`microphoneMenuLabel`.
 8. — separator —
-9. `Open Recordings Folder — <~/path>` — reveals the output dir in Finder, and **shows the current
+9. **`Recordings ▸`** (M18-T3) — the whole file browser, one level down. It was nine top-level rows
+   (the folder, five recents, the `Recent Exports` label and three exports) out of a menu that
+   measured 20 rows with three files and 32 at worst; folding it leaves 17 and 23. First row is
+   **`Open Folder — <~/path>`**, which reveals the output dir in Finder and **shows the current
    destination** as a home-relative path (e.g. `~/Movies`) so it's visible without opening (Franco,
-   2026-07-16). One title string — a SwiftUI `.menu` can't two-tone the path (same limitation as
-   item 10).
-10. Recent recordings: up to 5 most-recent files from the output dir, **indented one level**
-    under `Open Recordings Folder` so they read as its contents rather than as more commands
-    (Franco, 2026-07-15). **M10-T2/T3/T4 made each a submenu**, then **M12-T1 added the share/preview
+   2026-07-16). One title string — a SwiftUI `.menu` can't two-tone the path.
+10. Recent recordings: up to 5 most-recent files from the output dir, inside `Recordings ▸` under a
+    divider — until M18-T3 they were top-level rows **faked** one level in, since a SwiftUI menu
+    exposes no `NSMenuItem.indentationLevel`; nesting them makes the indent real and the
+    leading-space titles (and their accessibility labels) go away. Each row carries **what
+    distinguishes takes**: `<name> — 23:04 · 5.5 GB` (M18-T3; name exactly as on disk, size through
+    `ByteCountFormatter`, length `M:SS` growing to `H:MM:SS`). The read is **off the open and cached
+    by modification date** (M6-T10): a row shows its name the first time a file is seen and gains
+    its length and size when the read lands — measured 1–8 ms per file, and a repeat open re-reads
+    nothing. ⚠️ `URL` caches resource values per instance and the menu holds its URLs across opens,
+    so the cache check clears them first or a re-recorded file keeps a stale size forever.
+    (Franco, 2026-07-15: they read as the folder's contents rather than as more commands.) **M10-T2/T3/T4 made each a submenu**, then **M12-T1 added the share/preview
     row** — `<name> ▸ { Reveal in Finder · Quick Look · Share… · Copy | Export as MP4 · Save as GIF ·
     Trim… }` (the `|` is a divider: act-on-this-file above, derive-a-new-file below) — so the
     export/share/edit actions have a home; the old direct click-to-reveal moved into the submenu.

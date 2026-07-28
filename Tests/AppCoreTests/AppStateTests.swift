@@ -567,4 +567,41 @@ import RecorderCore
         state.refreshRecentRecordings()
         #expect(!published.isRaised)
     }
+
+    // MARK: - Recent row details (M18-T3)
+
+    @Test func recentRowDetailsRideTheOpenAndSurviveAReopen() async throws {
+        // The row read hangs off the menu open, where a quick reopen can put two passes in flight.
+        // The app and window lists both guard against that (a stale pass landing last drops rows
+        // while the menu is up); this one has to as well.
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("rows-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try Data("x".utf8).write(to: directory.appendingPathComponent("Take.mov"))
+
+        let state = makeState()
+        state.outputDirectory = directory
+        state.refreshRecentRecordings()
+        // The URL the menu actually holds: a listing resolves /var → /private/var, and the details
+        // are keyed by URL, so a hand-built path would key a different entry.
+        let recording = try #require(state.recentRecordings.first)
+        #expect(recording.lastPathComponent == "Take.mov")
+        // Before the read lands, the row is its name — never a placeholder.
+        #expect(state.rowTitle(for: recording) == "Take.mov")
+
+        await state.refreshRecentDetails()
+        #expect(state.rowTitle(for: recording) == "Take.mov — 1 byte")
+
+        // Two passes at once must not leave a row without its detail.
+        async let first: Void = state.refreshRecentDetails()
+        async let second: Void = state.refreshRecentDetails()
+        _ = await (first, second)
+        #expect(state.rowTitle(for: recording) == "Take.mov — 1 byte")
+
+        // A file that goes away loses its row rather than keeping a stale one.
+        try FileManager.default.removeItem(at: recording)
+        await state.refreshRecentDetails()
+        #expect(state.rowTitle(for: recording) == "Take.mov")
+    }
 }

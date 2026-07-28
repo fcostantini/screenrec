@@ -147,24 +147,23 @@ struct MenuView: View {
 
         Divider()
 
-        Button("Open Recordings Folder — \(MenuHeader.recordingsFolder(state.outputDirectory))") {
-            Finder.open(state.outputDirectory)
-        }
-        // Indented under the folder above. The indent is in the title because a SwiftUI menu
-        // gives no access to `NSMenuItem.indentationLevel` — hence the accessibility label. Each
-        // row is a submenu (M10-T2): reveal, or export a shareable MP4.
-        ForEach(state.recentRecordings, id: \.self) { url in
-            Menu("    \(url.lastPathComponent)") { fileActions(url) }
-                .accessibilityLabel(url.lastPathComponent)
-        }
+        // The whole file browser, one level down (M18-T3, docs/06 item 9).
+        Menu("Recordings") {
+            Button("Open Folder — \(MenuHeader.recordingsFolder(state.outputDirectory))") {
+                Finder.open(state.outputDirectory)
+            }
 
-        // Recent Exports (M12-T2): derived .mp4/.gif get their own group so they don't crowd the
-        // recordings out of the 5-row window; same submenu, so they inherit share/copy/preview.
-        if !state.recentExports.isEmpty {
-            Text("Recent Exports")
-            ForEach(state.recentExports, id: \.self) { url in
-                Menu("    \(url.lastPathComponent)") { fileActions(url) }
-                    .accessibilityLabel(url.lastPathComponent)
+            if !state.recentRecordings.isEmpty {
+                Divider()
+                fileRows(state.recentRecordings)
+            }
+
+            // Recent Exports (M12-T2): derived .mp4/.gif get their own group so they don't crowd
+            // the recordings out of the 5-row window; same submenu, so they inherit share/copy.
+            if !state.recentExports.isEmpty {
+                Divider()
+                Text("Recent Exports")
+                fileRows(state.recentExports)
             }
         }
     }
@@ -246,6 +245,14 @@ struct MenuView: View {
         } else if let last = state.lastExport {
             Menu(last.menuTitle) { fileActions(last.url) }
             Divider()
+        }
+    }
+
+    /// One row per file: each is a submenu (M10-T2) titled with what distinguishes takes —
+    /// `<name> — 23:04 · 5.5 GB` once the details arrive (M18-T3).
+    @ViewBuilder private func fileRows(_ urls: [URL]) -> some View {
+        ForEach(urls, id: \.self) { url in
+            Menu(state.rowTitle(for: url)) { fileActions(url) }
         }
     }
 
@@ -360,6 +367,7 @@ struct MenuView: View {
     /// change, so a no-op reopen publishes nothing and the open menu isn't rebuilt (M6-T10).
     private func refreshAtOpen() {
         state.refreshRecentRecordings()
+        Task { await state.refreshRecentDetails() }
         state.expireStaleExportReceipt()   // drop a receipt aged out since a prior session (M12-T3)
         if !state.isSessionActive {
             state.refreshSources(displays: DisplayOption.liveScreens())

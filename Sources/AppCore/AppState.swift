@@ -346,6 +346,11 @@ public final class AppState {
     /// derived share files have an in-menu home and inherit the file submenu. Refreshed with recents.
     public private(set) var recentExports: [URL] = []
 
+    /// Length and size per recent row (M18-T3); each entry also carries the modification date it
+    /// was read at, which is what lets an unchanged file skip the re-read.
+    private(set) var recentDetails: [URL: RecentRecordings.RowDetail] = [:]
+    private var isRefreshingRecentDetails = false
+
     /// The last replay saved this armed session, for the menu's banner-independent confirmation
     /// (M9-T2): the "Replay saved" notification is suppressed while armed (docs/06). Cleared on
     /// disarm; updated on each save.
@@ -1036,6 +1041,23 @@ public final class AppState {
             outputDirectory, extensions: RecentRecordings.exportExtensions,
             limit: RecentRecordings.exportLimit)
         if recentExports != exportFiles { recentExports = exportFiles }
+    }
+
+    /// What each recent row says beyond its name (M18-T3), read off the menu open so the menu
+    /// never waits on the filesystem. One at a time, like the app and window lists: a quick reopen
+    /// would otherwise let a stale pass land last and drop a row's detail while the menu is up.
+    public func refreshRecentDetails() async {
+        guard !isRefreshingRecentDetails else { return }
+        isRefreshingRecentDetails = true
+        defer { isRefreshingRecentDetails = false }
+        let fresh = await RecentRecordings.details(
+            for: recentRecordings + recentExports, cached: recentDetails)
+        if recentDetails != fresh { recentDetails = fresh }
+    }
+
+    /// A row's menu title, name-only until its details arrive.
+    public func rowTitle(for url: URL) -> String {
+        RecentRecordings.rowTitle(for: url, detail: recentDetails[url])
     }
 
     /// Drops a stale export receipt at menu open (M12-T3) — forwards to `exports` (M14-T1).
