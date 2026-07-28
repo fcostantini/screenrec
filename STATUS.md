@@ -30,7 +30,7 @@
   never cut early). **The capture path is untouched: `git diff v1.9.0..HEAD` over
   `RecorderCore/Capture` and `RecorderCore/Recording` is empty**, and a regression capture is
   4112×2570 hvc1 + 2 audio tracks.
-  **M18 is six user-facing improvements → MINOR (ADR-013): 1.10.0, Franco's call to cut** (bump
+  **M18 is six user-facing improvements → MINOR (ADR-013): 1.10.0** (bump
   `VERSION` + `CoreInfo.version`, then `Scripts/release.sh` **in the background** — never under a
   short foreground timeout, or it gets SIGTERM'd mid-encode — then push main **and** the tag, which
   the background run does not do).
