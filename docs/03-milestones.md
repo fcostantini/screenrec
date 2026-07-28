@@ -1630,10 +1630,13 @@ ride the same bump.
       round-tripped (`gifFPS` 15 → 20 → 15). **1137 → 437 pt, 90% → 35% of the usable screen.**
       530 tests unchanged — layout only: no binding, key or `AppState` property moved.
 
-**Gate G18**: a trim states the cut point it will actually make and a precise trim hits the requested
-second exactly; an MP4 export honours a chosen size; the idle menu is materially shorter with every
-action still reachable and no slower to open; the count-in is cancellable; a region pick can be
-adjusted rather than redrawn. No capture-path change anywhere in the milestone.
+**Gate G18** ⚠️ **first criterion amended 2026-07-28 (M18-T1's measurement):** a lossless trim was
+never cutting early — the export writes an edit list and playback starts exactly at the in-point —
+so "states the cut point it will actually make" was written on a false premise. The criterion is now
+**a trim states what it keeps that you didn't ask for, and a re-encoding trim's file holds only the
+kept range**. The rest stands: an MP4 export honours a chosen size; the idle menu is materially
+shorter with every action still reachable and no slower to open; the count-in is cancellable; a
+region pick can be adjusted rather than redrawn. No capture-path change anywhere in the milestone.
 
 **Non-goals (M18):** a timeline editor, multi-clip, or anything needing the render/compositing stage
 (ADR-015 — trim and transcode only); frame-accurate scrubbing UI; re-opening the `.menu` MenuBarExtra
