@@ -45,59 +45,82 @@ public final class AppState {
 
     // MARK: - Sources (docs/06 "Menu — idle state", items 5–7)
 
-    public private(set) var displays: [DisplayOption] = []
-    public private(set) var microphones: [AudioInputDevice] = []
-    /// Running apps for the Source picker (docs/06 item 5, M7-T2). Fetched async by the view at
-    /// menu open — `SCShareableContent` takes ~a second — through `refreshApps`.
-    public private(set) var capturableApps: [CapturableApp] = []
-    /// On-screen windows for the Source picker (docs/06 item 5, M17-T2). Fetched async by the view
-    /// at menu open, like the app list.
-    public private(set) var capturableWindows: [CapturableWindow] = []
+    /// What can be captured and what is picked (M22-T1). The properties below forward to it, so
+    /// every existing caller — menu, Settings, tests — keeps naming `state.selectedWindow` and
+    /// friends.
+    public let sources = SourcesModel()
 
-    /// The user's picks, as the plain identifiers the menu selects by: RecorderCore's
-    /// `DisplaySelection`/`MicrophoneSelection` carry associated values and aren't `Hashable`,
-    /// so they can't be SwiftUI picker tags. `captureConfiguration` translates.
-    public var selectedDisplayID: CGDirectDisplayID? {    // nil ⇒ whatever is the main display
-        didSet {
-            if selectedDisplayID != oldValue, !isRehomingSources { replayConfigurationChanged() }
-        }
+    public private(set) var microphones: [AudioInputDevice] = []
+
+    public var displays: [DisplayOption] { sources.displays }
+    public var capturableApps: [CapturableApp] { sources.capturableApps }
+    public var capturableWindows: [CapturableWindow] { sources.capturableWindows }
+
+    public var selectedDisplayID: CGDirectDisplayID? {
+        get { sources.selectedDisplayID }
+        set { sources.selectedDisplayID = newValue }
     }
-    /// The Source pick when it's an app (docs/06 item 5, M7-T2); nil ⇒ entire screen. Persisted,
-    /// and — like the mic pick — it survives the app not running: never re-homed by absence, and
-    /// a start while the app is away fails loud (never a silent whole-screen fallback).
     public var selectedAppBundleID: String? {
-        didSet {
-            guard selectedAppBundleID != oldValue, !isRehomingSources else { return }
-            persist()
-            replayConfigurationChanged()
-        }
+        get { sources.selectedAppBundleID }
+        set { sources.selectedAppBundleID = newValue }
     }
-    /// The Source pick when it's a region (docs/06 item 5, M11-T2); nil ⇒ not a region. Set via the
-    /// drag overlay through `setRegion`; persisted, and — like the app pick — it survives its display
-    /// vanishing (a start then fails loud, never a silent whole-screen fallback).
     public var selectedRegion: RegionSelection? {
-        didSet {
-            guard selectedRegion != oldValue, !isRehomingSources else { return }
-            persist()
-            replayConfigurationChanged()
-        }
+        get { sources.selectedRegion }
+        set { sources.selectedRegion = newValue }
     }
-    /// The Source pick when it's a window (docs/06 item 5, M17-T2); nil ⇒ not a window pick.
-    /// Persisted, and like the app and region picks it survives its subject's absence — a start
-    /// against a window that is gone (or whose id now belongs to another app) fails loud.
     public var selectedWindow: WindowSelection? {
-        didSet {
-            guard selectedWindow != oldValue, !isRehomingSources else { return }
-            persist()
-            replayConfigurationChanged()
-        }
+        get { sources.selectedWindow }
+        set { sources.selectedWindow = newValue }
     }
+    public var sourceChoice: SourceChoice {
+        get { sources.sourceChoice }
+        set { sources.sourceChoice = newValue }
+    }
+    public var recordableAppsFilter: (([CapturableApp]) -> [CapturableApp])? {
+        get { sources.recordableAppsFilter }
+        set { sources.recordableAppsFilter = newValue }
+    }
+    public var appDisplayName: ((String) -> String?)? {
+        get { sources.appDisplayName }
+        set { sources.appDisplayName = newValue }
+    }
+    public var missingPickedApp: CapturableApp? { sources.missingPickedApp }
+    public var missingPickedWindow: WindowSelection? { sources.missingPickedWindow }
+    public var sourceMenuLabel: String { sources.sourceMenuLabel }
+    public func appName(for bundleID: String) -> String { sources.appName(for: bundleID) }
+    public func refreshCapturableApps() async { await sources.refreshCapturableApps() }
+    public func refreshCapturableWindows() async { await sources.refreshCapturableWindows() }
+    public func setRegion(displayID: CGDirectDisplayID?, rect: CGRect) {
+        sources.setRegion(displayID: displayID, rect: rect)
+    }
+    func refreshApps(_ apps: [CapturableApp], excluding own: String? = Bundle.main.bundleIdentifier) {
+        sources.refreshApps(apps, excluding: own)
+    }
+    func refreshWindows(
+        _ windows: [CapturableWindow], excluding own: String? = Bundle.main.bundleIdentifier
+    ) {
+        sources.refreshWindows(windows, excluding: own)
+    }
+
+    /// Publishes the screen list and re-reads the microphones; the view calls it at menu open.
+    /// The display half re-homes a stale pick — see `SourcesModel.refreshDisplays`.
+    ///
+    /// The microphone pick deliberately survives its device's absence: clearing it here would
+    /// forget the user's choice every time the AirPods sat in their case at menu-open. The menu's
+    /// picker binding shows None while the device is away (`presentMicrophonePreference`), and
+    /// stream starts resolve to the picked device or nothing, so nothing lies.
+    public func refreshSources(displays: [DisplayOption]) {
+        sources.refreshDisplays(displays)
+        let microphones = AudioInputs.available()
+        if self.microphones != microphones { self.microphones = microphones }
+    }
+
     /// The user's microphone pick: a specific device, `.automatic` (follow the system default at
     /// capture start, M6-T13), or `.none`. Persisted, and survives its device's absence — resolution
     /// happens at every stream start (device-if-present, else no mic; the default for `.automatic`).
     public var microphonePreference: MicrophonePreference {   // set once in init, then by the picker
         didSet {
-            guard microphonePreference != oldValue, !isRehomingSources else { return }
+            guard microphonePreference != oldValue else { return }
             persist()
             replayConfigurationChanged()
         }
@@ -120,11 +143,7 @@ public final class AppState {
         return nil
     }
 
-    /// True while `refreshSources` re-homes stale picks (housekeeping, not user intent) and
-    /// while `sourceChoice` batches its two backing writes — either way, the suppressed didSets
-    /// must not restart the armed stream: a rebuild wipes the replay buffer, and the batched
-    /// case would otherwise rebuild twice, once against a config that exists for a microsecond.
-    private var isRehomingSources = false
+    // MARK: - Settings (docs/06 "Settings window")
 
     // Persisted (docs/06). The display and microphone picks deliberately are not: they name
     // hardware that may not be there next launch, and `refreshSources` already re-homes it.
@@ -184,7 +203,7 @@ public final class AppState {
 
     /// Re-reads the room figure. Volume I/O, so the menu calls it at open (M6-T10).
     public func refreshRecordingRoom() {
-        guard let pixels = capturePixelSize,
+        guard let pixels = sources.capturePixelSize,
               let free = DiskSpaceMonitor.availableBytes(forVolumeAtPath: outputDirectory.path)
         else {
             recordingRoomSeconds = nil
@@ -486,9 +505,11 @@ public final class AppState {
         frameRateCap = settings.frameRateCap
         microphonePreference = settings.microphonePreference
         capturesSystemAudio = settings.capturesSystemAudio
-        selectedAppBundleID = settings.captureAppBundleID
-        selectedRegion = settings.captureRegion
-        selectedWindow = settings.captureWindow
+        // ⚠️ Seeded before `sources.onPickChanged` is wired below, so restoring a pick can't
+        // persist it back or rebuild an armed stream that doesn't exist yet.
+        sources.selectedAppBundleID = settings.captureAppBundleID
+        sources.selectedRegion = settings.captureRegion
+        sources.selectedWindow = settings.captureWindow
         isReplayArmed = settings.replayArmed
         replaySeconds = settings.replaySeconds
         replayHotkey = settings.replayHotkey
@@ -513,6 +534,15 @@ public final class AppState {
         // Export notifications forward to whatever `notifier` the app wires (M14-T1) — read at call
         // time, so it tracks the notifier set after init.
         exports.notify = { [weak self] in self?.notifier?($0) }
+
+        // The source picks live in their own model (M22-T1) but persistence and the armed stream
+        // are AppState's, so it wires both back. The display pick is deliberately not persisted —
+        // it names hardware that may be gone next launch.
+        sources.onPickChanged = { [weak self] in
+            self?.persist()
+            self?.replayConfigurationChanged()
+        }
+        sources.onDisplayChanged = { [weak self] in self?.replayConfigurationChanged() }
 
         replay.onMicrophoneLost = { [weak self] in
             self?.notifier?(RecordingNotifications.replayMicrophoneLost())
@@ -547,9 +577,9 @@ public final class AppState {
                 outputDirectory: outputDirectory, quality: quality, frameRateCap: frameRateCap,
                 microphonePreference: microphonePreference,
                 capturesSystemAudio: capturesSystemAudio,
-                captureAppBundleID: selectedAppBundleID,
-                captureRegion: selectedRegion,
-                captureWindow: selectedWindow,
+                captureAppBundleID: sources.selectedAppBundleID,
+                captureRegion: sources.selectedRegion,
+                captureWindow: sources.selectedWindow,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey, recordHotkey: recordHotkey,
                 pauseHotkey: pauseHotkey, countInEnabled: countInEnabled,
@@ -656,7 +686,7 @@ public final class AppState {
     /// computed (M16-T2).
     public func mp4SizeLabel(forWidth width: Int) -> String {
         let isCeiling = width == Settings.mp4CeilingWidth
-        guard let pixels = displayPixelSize else { return isCeiling ? "Largest" : "\(width) px" }
+        guard let pixels = sources.displayPixelSize else { return isCeiling ? "Largest" : "\(width) px" }
         let configuration = ExportConfiguration(maxWidth: width)
         let fitted = Exporter.fittedSize(
             width: pixels.width, height: pixels.height, configuration: configuration)
@@ -781,104 +811,6 @@ public final class AppState {
     /// Also re-homes the display selection: docs/06 wants one row per screen with a checkmark on
     /// the current one, so the selection must name a row that exists — covering first launch and
     /// the picked display going away.
-    public func refreshSources(displays: [DisplayOption]) {
-        isRehomingSources = true
-        defer { isRehomingSources = false }
-        // Assign only on real change: @Observable publishes on every set, and a publish rebuilds
-        // the open menu's AppKit rows (garbling hover/highlight, M6-T10). Menu opens re-read
-        // these, usually to the same values.
-        if self.displays != displays { self.displays = displays }
-        let microphones = AudioInputs.available()
-        if self.microphones != microphones { self.microphones = microphones }
-
-        if selectedDisplayID == nil || !displays.contains(where: { $0.id == selectedDisplayID }) {
-            selectedDisplayID = (displays.first(where: \.isMain) ?? displays.first)?.id
-        }
-        // The microphone pick deliberately survives its device's absence: clearing it here
-        // would forget the user's choice every time the AirPods sat in their case at menu-open.
-        // The menu's picker binding shows None while the device is away
-        // (`presentMicrophonePreference`), and stream starts resolve to the picked device or
-        // nothing (Automatic follows the system default), so nothing lies.
-    }
-
-    /// Fetches and publishes the Source picker's app list; the view calls this at menu open.
-    /// In-flight-guarded (a quick reopen must not stack ~1 s shareable-content fetches); a
-    /// fetch failure keeps the last-known list rather than blanking an open picker.
-    public func refreshCapturableApps() async {
-        guard !isRefreshingApps else { return }
-        isRefreshingApps = true
-        defer { isRefreshingApps = false }
-        guard let apps = try? await CapturableApps.available() else { return }
-        refreshApps(apps)
-    }
-    private var isRefreshingApps = false
-
-    /// Fetches and publishes the Source picker's window list; the view calls this at menu open,
-    /// alongside the app list. Same in-flight guard and same keep-the-last-list-on-failure rule.
-    public func refreshCapturableWindows() async {
-        guard !isRefreshingWindows else { return }
-        isRefreshingWindows = true
-        defer { isRefreshingWindows = false }
-        guard let windows = try? await CapturableWindows.available() else { return }
-        refreshWindows(windows)
-    }
-    private var isRefreshingWindows = false
-
-    /// Membership + publish, assign-on-change only (M6-T10). ScreenRec never lists its own windows,
-    /// for the same reason it never lists itself as an app. `excluding` is injected so tests don't
-    /// depend on the test runner's bundle identity.
-    func refreshWindows(
-        _ windows: [CapturableWindow], excluding ownBundleID: String? = Bundle.main.bundleIdentifier
-    ) {
-        let windows = windows.filter { $0.bundleID != ownBundleID }
-        if capturableWindows != windows { capturableWindows = windows }
-    }
-
-    /// The picked window while it isn't in the live list — closed, or its id now belongs to another
-    /// app. The menu shows it checkmarked and marked gone, so the pick stays visible without lying
-    /// (the `(not running)` app precedent); Start then fails loud.
-    public var missingPickedWindow: WindowSelection? {
-        guard let selectedWindow, selectedWindow.resolve(in: capturableWindows) == nil else { return nil }
-        return selectedWindow
-    }
-
-    /// Membership + publish, assign-on-change only (M6-T10). ScreenRec never lists itself —
-    /// recording the recorder is noise; `recordableAppsFilter` applies the app layer's policy.
-    /// `excluding` is injected so tests don't depend on the test runner's bundle identity.
-    func refreshApps(
-        _ apps: [CapturableApp], excluding ownBundleID: String? = Bundle.main.bundleIdentifier
-    ) {
-        var apps = apps.filter { $0.bundleID != ownBundleID }
-        apps = recordableAppsFilter?(apps) ?? apps
-        if capturableApps != apps { capturableApps = apps }
-    }
-
-    /// Which running apps belong in the Source picker, beyond self-exclusion. Injected by the
-    /// app (the activation-policy read needs NSRunningApplication — AppKit); takes the whole
-    /// list so the implementation can snapshot the process table once. Nil ⇒ no extra filter.
-    public var recordableAppsFilter: (([CapturableApp]) -> [CapturableApp])?
-
-    /// The picked app while it isn't in the live list: the menu shows it as a checkmarked
-    /// "(not running)" row, so the pick stays visible without lying (the mic pattern's truth
-    /// discipline, M7-T2).
-    public var missingPickedApp: CapturableApp? {
-        guard let bundleID = selectedAppBundleID,
-              !capturableApps.contains(where: { $0.bundleID == bundleID }) else { return nil }
-        return CapturableApp(bundleID: bundleID, name: appName(for: bundleID))
-    }
-
-    /// Resolves an installed app's display name from its bundle ID (works while it isn't
-    /// running). Injected by the app — NSWorkspace is AppKit, banned here. Nil in tests.
-    public var appDisplayName: ((String) -> String?)?
-
-    /// Bundle ID → display name: the live list, then the installed-app resolver, then the ID
-    /// itself — the one fallback chain, and it never returns an empty string.
-    public func appName(for bundleID: String) -> String {
-        capturableApps.first { $0.bundleID == bundleID }?.name
-            ?? appDisplayName?(bundleID)
-            ?? bundleID
-    }
-
     /// What the menu's Microphone picker highlights: the pick, except a specific device that's
     /// currently away shows as `.none` (checkmark on None) — the truthful display of a pick whose
     /// device is in its case, without forgetting the pick. `.automatic` isn't a device, so it
@@ -889,27 +821,6 @@ public final class AppState {
             return .none
         }
         return microphonePreference
-    }
-
-    /// The current Source pick as menu text (M12-T3), so the submenu title tells the truth without
-    /// being opened: `Region 1645×721`, an app's name, or the whole screen (named when there's a
-    /// choice of display). Mirrors the checkmarked picker row.
-    public var sourceMenuLabel: String {
-        if let window = selectedWindow {
-            // Always from the live window, so a retitled one stays honest; a gone pick can only
-            // name its app (M19-T5).
-            guard let live = window.resolve(in: capturableWindows) else {
-                return WindowSelection.goneLabel(appName: appName(for: window.bundleID))
-            }
-            return WindowSelection.label(appName: live.appName, title: live.title)
-        }
-        if let region = selectedRegion { return "Region \(Self.regionLabel(region.rect.size))" }
-        if let bundleID = selectedAppBundleID { return appName(for: bundleID) }
-        if displays.count > 1,
-           let screen = displays.first(where: { $0.id == selectedDisplayID }) {
-            return "Entire Screen (\(screen.name))"
-        }
-        return "Entire Screen"
     }
 
     /// The current Microphone pick as menu text (M12-T3): `None`, `Automatic`, or the device name —
@@ -926,7 +837,7 @@ public final class AppState {
     /// or nil before the screen list arrives — a surface withholds the figure rather than guess.
     /// Takes the window as an argument so the Settings slider can quote its in-progress value.
     public func replayBufferBytes(seconds: Int) -> Int64? {
-        guard let pixels = capturePixelSize else { return nil }
+        guard let pixels = sources.capturePixelSize else { return nil }
         // `present…`, not the raw pick: an away device attaches no mic ring, so billing for one
         // would quote a buffer the armed stream isn't going to hold.
         return ReplayFootprint.estimatedBytes(
@@ -1016,41 +927,6 @@ public final class AppState {
         }
         return "\(Self.shortBufferPhrase(replaySeconds)) buffer · "
             + "≈\(ApproximateBytes.formatted(bytes)) · Mac stays awake"
-    }
-
-    /// Pixels the armed stream encodes, mirroring `CaptureEngine`'s own resolution: a region's rect
-    /// on its display; an app filter composites **on the main display** whatever display the pickers
-    /// remember, and its frames stay display-sized (02 §1a); a whole-screen pick follows the
-    /// selection. Nil when that display's geometry is unknown.
-    private var capturePixelSize: (width: Int, height: Int)? {
-        guard let screen = displayForCurrentSelection,
-              screen.pointPixelScale > 0, screen.pointSize != .zero else { return nil }
-        return CaptureConfiguration.pixelDimensions(
-            pointSize: selectedRegion?.rect.size ?? screen.pointSize,
-            pointPixelScale: screen.pointPixelScale)
-    }
-
-    /// The whole display a capture would land on, ignoring any region narrowing — what a
-    /// full-screen recording of the current pick measures. The export Size picker quotes this and
-    /// not `capturePixelSize`: a region pick says nothing about the size of the *file* being
-    /// exported, which may be an older full-screen take.
-    private var displayPixelSize: (width: Int, height: Int)? {
-        guard let screen = displayForCurrentSelection,
-              screen.pointPixelScale > 0, screen.pointSize != .zero else { return nil }
-        return CaptureConfiguration.pixelDimensions(
-            pointSize: screen.pointSize, pointPixelScale: screen.pointPixelScale)
-    }
-
-    private var displayForCurrentSelection: DisplayOption? {
-        let displayID = selectedRegion?.displayID
-            ?? (selectedAppBundleID == nil ? selectedDisplayID : nil)
-        return displayOption(for: displayID)
-    }
-
-    /// A display id as its option; a nil id means the main display, matching the engine's `.main`.
-    private func displayOption(for id: CGDirectDisplayID?) -> DisplayOption? {
-        guard let id else { return displays.first(where: \.isMain) ?? displays.first }
-        return displays.first { $0.id == id }
     }
 
     /// `45-second` / `1-minute` / `1:45` — whole minutes read better than `1:00`, and the slider's
@@ -1198,59 +1074,10 @@ public final class AppState {
             quality: quality)
     }
 
-    /// The Source picker's one Hashable selection over its row kinds (docs/06 item 5, M7-T2/M11-T2).
-    /// Writing one kind clears the others; the remembered display survives an app/region detour.
-    /// The backing writes are batched (`isRehomingSources`) into ONE persist + rebuild.
-    public var sourceChoice: SourceChoice {
-        get {
-            if let window = selectedWindow { return .window(window) }
-            if let region = selectedRegion { return .region(display: region.displayID, rect: region.rect) }
-            return selectedAppBundleID.map { .app(bundleID: $0) } ?? .display(selectedDisplayID)
-        }
-        set {
-            guard newValue != sourceChoice else { return }
-            isRehomingSources = true
-            switch newValue {
-            case .display(let id):
-                selectedAppBundleID = nil
-                selectedRegion = nil
-                selectedWindow = nil
-                selectedDisplayID = id
-            case .app(let bundleID):
-                selectedAppBundleID = bundleID
-                selectedRegion = nil
-                selectedWindow = nil
-            case .region(let displayID, let rect):
-                selectedAppBundleID = nil
-                selectedWindow = nil
-                selectedRegion = RegionSelection(displayID: displayID, rect: rect)
-            case .window(let window):
-                selectedAppBundleID = nil
-                selectedRegion = nil
-                selectedWindow = window
-            }
-            isRehomingSources = false
-            persist()
-            replayConfigurationChanged()
-        }
-    }
-
-    /// Sets a drawn region as the Source (M11-T2) — the overlay's one entry point. Goes through
-    /// `sourceChoice` so it inherits the batched persist + single armed-stream rebuild.
-    public func setRegion(displayID: CGDirectDisplayID?, rect: CGRect) {
-        sourceChoice = .region(display: displayID, rect: rect)
-    }
-
     /// Opens the drag-to-select overlay (M11-T2). Injected by the app — the overlay is AppKit,
     /// banned in AppCore; nil in tests. The menu's "Select Region…" calls this. `@MainActor`-typed
     /// like the other injections (it drives AppKit and `setRegion`).
     public var beginRegionSelection: (@MainActor () -> Void)?
-
-    /// "<w>×<h>" for a region's size in points, e.g. the picker's `Region 820×512` row. The
-    /// engine snaps to even pixels at capture (M11-T1); the menu shows the chosen point size.
-    public static func regionLabel(_ size: CGSize) -> String {
-        "\(Int(size.width.rounded()))×\(Int(size.height.rounded()))"
-    }
 
     // MARK: - Actions (docs/06 "Menu — idle/recording state", items 2–3)
 

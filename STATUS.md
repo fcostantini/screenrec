@@ -6,6 +6,29 @@
 
 ## Now
 
+- **✅ M22-T1 DONE (2026-07-28) — `AppState` sheds its sources.** Plan artifact (rulings A/B/C
+  approved): `claude.ai/code/artifact/029afaee-ad23-4a1b-a253-707826543efb`. **557 tests passed
+  untouched**, dev loop green, deployed (pid 15658).
+  **As built:** `SourcesModel` (288 lines, `@Observable` **class** — M15-T2's ruling) owns the
+  lists, the four picks, `sourceChoice`, the missing-pick rows, the labels and the pick's geometry.
+  `AppState` forwards, so no view binding and no test moved — except `regionLabel`, deliberately
+  renamed (3 call sites) rather than left as a second name for one thing. Persistence and the
+  armed-stream rebuild come back through two injected closures; the display pick fires only the
+  rebuild, since it isn't persisted.
+  **1,568 → 1,391 lines (11%) — I predicted ~1,290 and was wrong by 100**: the forwarding surface
+  costs more than estimated. The win is that M20/M21 have a seam; it is not a small file yet.
+  ⚠️ **The `// MARK: - Sources` section was mis-filed** — quality, frame rate, both menu-bar
+  toggles, GIF/MP4 sizes and Stop-After all sat under it and are *settings*. They stayed, under a
+  new `// MARK: - Settings`.
+  🔴 **A python range-cut ate 190 lines of `AppState`** (the `regionLabel` end marker sat below the
+  whole Actions section) — the same failure as M18-T6's doc rewrite, in code this time. Reverted,
+  then redone with every cut declaring its expected line count and aborting on a mismatch; two wrong
+  markers then surfaced as aborts instead of silent deletions (docs/07).
+  **Verified live:** the deployed menu dumped identical (only a live Slack window retitled itself
+  between dumps), and a menu-driven recording produced **4112×2570 hvc1 + 2 audio tracks**.
+  **Next: M22-T2** (`AppState` sheds the session) — the last task in M22, and where the
+  microphone's `presentMicrophonePreference` question lands.
+
 - **✅ M22-T3 DONE (2026-07-28) — the six unnamed units now have tests that can fail.** No plan
   artifact (Franco waived it for this one). **557 tests (+17)**, dev loop green.
   **Each test verified by mutation, not by passing:** I broke every unit and confirmed its test

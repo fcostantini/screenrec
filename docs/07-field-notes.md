@@ -7,6 +7,17 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-28 (M22-T1): 🔴 **a python range-cut ate 190 lines of `AppState` and the build still had
+  to tell me.** Extracting `SourcesModel` by `s[:a] + s[b:]`, the end marker for `regionLabel` was
+  `// MARK: - Event folding` — which sits *below the whole Actions section*, so the cut removed
+  `start()`, `stop()`, pause and the rest. Same failure as M18-T6's doc rewrite, now in code.
+  **The rule that fixed it:** every range cut declares its expected line count and aborts if the
+  range doesn't match, printing the first and last line removed. Six cuts, six size checks, and
+  the two wrong markers surfaced as aborts instead of silent deletions.
+  - **The forwarding surface costs more than it looks.** Predicted `AppState` at ~1,290 lines,
+    landed at **1,391** (1,568 before): ~235 lines left, ~70 came back as forwards. Worth stating
+    up front on the next extraction — the win is the seam, not the line count.
+
 - 2026-07-28 (M22-T3): 🔴 **a test that looked right proved nothing, and only mutation said so.**
   Breaking each of the six units and re-running its new test caught `PollingTests`: swallowing
   cancellation (`try?` instead of `catch { return }`) costs **exactly one** extra tick — the loop

@@ -461,8 +461,8 @@ import RecorderCore
     }
 
     @Test func regionLabelFormatsThePointSize() {
-        #expect(AppState.regionLabel(CGSize(width: 820, height: 512)) == "820×512")
-        #expect(AppState.regionLabel(CGSize(width: 800.4, height: 499.6)) == "800×500")
+        #expect(SourcesModel.regionLabel(CGSize(width: 820, height: 512)) == "820×512")
+        #expect(SourcesModel.regionLabel(CGSize(width: 800.4, height: 499.6)) == "800×500")
     }
 
     // MARK: - Session shape

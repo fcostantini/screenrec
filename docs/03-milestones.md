@@ -1803,7 +1803,19 @@ an excluded app's audio is measurably absent while the rest of the system's audi
 
 No user-visible change: the milestone that keeps the next four cheap. **PATCH** (ADR-013).
 
-- [ ] M22-T1 **`AppState` sheds its sources.** 1,572 lines and 122 public members across thirteen
+- [x] M22-T1 **`AppState` sheds its sources.** ✅ 2026-07-28 — `SourcesModel` (288 lines,
+      `@Observable` **class** per M15-T2) owns the lists, the four picks, `sourceChoice`, the
+      missing-pick rows, the labels and the pick's geometry; `AppState` forwards, so **557 tests
+      passed untouched** and the deployed menu dumped identical (the only diff was a live Slack
+      window retitling itself). Persistence and the armed-stream rebuild come back through two
+      injected closures — the display pick fires only the rebuild, since it isn't persisted.
+      **1,568 → 1,391 lines (11%), not the ~1,290 I predicted** — the forwarding surface costs more
+      than estimated; the win is the seam, not the number. Live: a menu-driven recording is
+      4112×2570 hvc1 + 2 audio tracks. ⚠️ **The `// MARK: - Sources` section was mis-filed** —
+      quality, frame rate, both menu-bar toggles, GIF/MP4 and Stop-After all lived under it and are
+      *settings*; they stayed, under a new `// MARK: - Settings`. `regionLabel` moved with the model
+      (3 call sites renamed). **Ruling A: the microphone stayed** — its presentation is entangled
+      with the session's live mic events, so it belongs to T2's question. 1,572 lines and 122 public members across thirteen
       `MARK` sections; five of this session's six tasks edited it. **Seams:** `PermissionsModel`
       (M9-T7) and `ExportModel` (M14-T1) are the pattern and the precedent — a `let` reference to an
       `@Observable` class, forwarding properties on AppState, tests unchanged. Extract

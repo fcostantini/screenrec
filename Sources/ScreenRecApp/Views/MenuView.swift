@@ -85,7 +85,7 @@ struct MenuView: View {
                 // Select Region… below. Its tag matches `sourceChoice`'s region case.
                 if let region = state.selectedRegion {
                     Divider()
-                    Text("Region \(AppState.regionLabel(region.rect.size))")
+                    Text("Region \(SourcesModel.regionLabel(region.rect.size))")
                         .tag(SourceChoice.region(display: region.displayID, rect: region.rect))
                 }
             } label: { EmptyView() }
@@ -215,7 +215,7 @@ struct MenuView: View {
                 Text("Recording \(app) only")
             }
             if let region = state.activeRegion {
-                Text("Recording region \(AppState.regionLabel(region))")
+                Text("Recording region \(SourcesModel.regionLabel(region))")
             }
             if let microphone = state.activeMicrophoneName {
                 Text("\(microphone) · separate track")
