@@ -534,6 +534,10 @@ import RecorderCore
 
         defaults.set(2000, forKey: "mp4Width")   // → 1920
         #expect(SettingsStore.load(from: defaults).mp4Width == 1920)
+        // A 1280 stored before M19-T4 dropped that row: it never produced a smaller file than
+        // 1920, so snapping up loses nothing.
+        defaults.set(1280, forKey: "mp4Width")
+        #expect(SettingsStore.load(from: defaults).mp4Width == 1920)
         defaults.set(99_999, forKey: "mp4Width")  // above the list → the ceiling
         #expect(SettingsStore.load(from: defaults).mp4Width == Settings.mp4CeilingWidth)
         defaults.set(0, forKey: "mp4Width")       // absent/garbage keeps the default

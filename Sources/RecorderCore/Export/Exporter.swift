@@ -54,6 +54,13 @@ public struct ExportConfiguration: Sendable {
         let scaled = Double(referenceVideoBitRate) * Double(width * height) / Double(referencePixels)
         return min(max(Int(scaled.rounded()), referenceVideoBitRate), Self.maximumVideoBitRate)
     }
+
+    /// What a minute of `width × height` output costs at these rates — what the Size picker quotes
+    /// (M19-T4). A budget, not a promise: VideoToolbox spends less on easy content (12.9 Mbps
+    /// against a 22.1 Mbps target on a static desktop, docs/07), so quote it via `ApproximateBytes`.
+    public func bytesPerMinute(forWidth width: Int, height: Int) -> Int64 {
+        Int64(videoBitRate(forWidth: width, height: height) + audioBitRate) * 60 / 8
+    }
 }
 
 /// A completed export.

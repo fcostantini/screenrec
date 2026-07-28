@@ -6,6 +6,26 @@
 
 ## Now
 
+- **✅ M19-T4 DONE (2026-07-28) — the Size picker says what each pick costs, and one row is gone.**
+  Plan artifact (rulings A/B/C approved): `claude.ai/code/artifact/e7d999a2-d9b8-4a03-b3a7-0d809feba4f4`.
+  **536 tests (+3)**, dev loop green, deployed to `/Users/Shared/ScreenRec.app` (pid 89360).
+  🔴 **Measured before designing: `1280 px` was a decoy** — one 7.47 s source exported at all four
+  picks gave **6,764,917 B at 1280 vs 6,688,557 B at 1920**, the smaller pick 1% *heavier* for 2.25×
+  fewer pixels, because M18-T2's rate floor gives every output ≤ 1920×1200 exactly 6 Mbps. Dropped;
+  a stored 1280 snaps to 1920 on load, and `--width 1280` still works on the CLI.
+  **As built:** rows read `1920 px · ≈46 MB per minute` · `2560 px · ≈81` ·
+  `Largest (3686 × 2304) · ≈170`, computed from the same `ExportConfiguration` the encoder uses, at
+  `≈`-grade through a new shared **`ApproximateBytes`** (extracted from `ReplayFootprint`, which had
+  the only copy). Destination words (`Message / web`) were **rejected**: a 46 MB minute already
+  exceeds what several services take, so the row would promise what clip *length* decides.
+  **Verified live on the deployed build:** the picker reads `1920 px · ≈46 MB per minute`, and a
+  menu export of a 20 s take produced **15,809,145 B = 45.1 MB/min** against that ≈46.
+  ⚠️ **`strings` can't see a Swift literal ≤ 15 bytes** (immediate values, not data) — the
+  deploy-freshness check reported 0 matches for `" per minute"` from a binary that had it. Grep
+  something longer (docs/07).
+  **Next: M19-T5** (a window pick stops storing its title) — plan artifact first. Then **G19**, then
+  the PATCH bump to 1.10.1.
+
 - **🚫 M19-T2 AND M19-T3 CLOSED "WON'T DO" (2026-07-28, Franco) — the app does not delete the
   user's files.** Ruled out at the plan gate, before any code: plan artifact
   `claude.ai/code/artifact/1fb4f5fa-a182-485f-a929-ef11730eed67`. T2 was a GB cap on the recordings

@@ -144,12 +144,27 @@ private final class Box<Value>: @unchecked Sendable {
         #expect(recorded.value?.maxHeight == 2304)
     }
 
-    @Test func theSizePickerNamesWhatTheLargestPickWouldProduce() {
-        // "Largest" is a fit, not a number — the row has to say what it means for this source.
+    @Test func theSizePickerStatesWhatEachPickCosts() {
+        // Every pick plays anywhere (M18-T2), so weight is what actually decides between them —
+        // and "Largest" is a fit, not a number, so the row says what it means for this source.
+        let state = makeState()
+        state.refreshSources(displays: [DisplayOption(
+            id: 1, name: "Built-in", isMain: true,
+            pointSize: CGSize(width: 2056, height: 1285), pointPixelScale: 2)])
+
+        #expect(state.mp4SizeLabel(forWidth: 1920) == "1920 px · ≈46 MB per minute")
+        #expect(state.mp4SizeLabel(forWidth: 2560) == "2560 px · ≈81 MB per minute")
+        let largest = state.mp4SizeLabel(forWidth: Settings.mp4CeilingWidth)
+        #expect(largest.hasPrefix("Largest (3686 × 2304) · ≈"))
+        #expect(largest.contains("170"))
+    }
+
+    @Test func theSizePickerWithholdsAWeightItCannotCompute() {
+        // No display geometry ⇒ no fit and no estimate. Never quote a number that can't be
+        // computed (M16-T2) — the row degrades to the size alone.
         let state = makeState()
         #expect(state.mp4SizeLabel(forWidth: 1920) == "1920 px")
-        let largest = state.mp4SizeLabel(forWidth: Settings.mp4CeilingWidth)
-        #expect(largest.hasPrefix("Largest"))
+        #expect(state.mp4SizeLabel(forWidth: Settings.mp4CeilingWidth) == "Largest")
     }
 
     @Test func oneExportAtATimeAcrossFormats() async {

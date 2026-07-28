@@ -24,25 +24,4 @@ public enum ReplayFootprint {
         let retained = seconds + ReplayWindow.slackSeconds
         return Int64(((videoBytesPerSecond + audioBytesPerSecond) * retained).rounded())
     }
-
-    /// The estimate as a surface should show it: two significant figures, in the user's locale.
-    /// `183,1 MB` would read as a measurement — this is a model, so it rounds to `180 MB`.
-    public static func formatted(_ bytes: Int64) -> String {
-        formatter.string(fromByteCount: roundedToTwoSignificantFigures(bytes))
-    }
-
-    static func roundedToTwoSignificantFigures(_ bytes: Int64) -> Int64 {
-        guard bytes > 0 else { return 0 }
-        let magnitude = pow(10, (log10(Double(bytes)).rounded(.down) - 1))
-        guard magnitude >= 1 else { return bytes }
-        return Int64(((Double(bytes) / magnitude).rounded() * magnitude).rounded())
-    }
-
-    private static let formatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        // `.file` is decimal, which is what Finder shows the same file as.
-        formatter.countStyle = .file
-        formatter.allowedUnits = [.useMB, .useGB]
-        return formatter
-    }()
 }

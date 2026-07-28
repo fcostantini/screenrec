@@ -235,9 +235,9 @@ struct SettingsView: View {
                         Text(state.mp4SizeLabel(forWidth: $0)).tag($0)
                     }
                 }
-                Text("Applies to Export as MP4. Height follows the source's aspect, and a bigger "
-                    + "pick means a bigger file. Sizes stop where H.264 does on phones, so the clip "
-                    + "still plays where you send it.")
+                Text("Applies to Export as MP4. Height follows the source's aspect. Sizes stop "
+                    + "where H.264 does on phones, so the clip still plays where you send it — "
+                    + "the weights are rough and depend on what's on screen.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

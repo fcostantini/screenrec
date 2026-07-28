@@ -649,16 +649,20 @@ public final class AppState {
         ExportConfiguration(maxWidth: mp4Width)
     }
 
-    /// The Size picker's label for `width`: a plain number, except the ceiling row, which states
-    /// what it would really produce for the current source — "largest" is a fit, not a number, and
-    /// on a window pick it can be far smaller than the ceiling.
+    /// The Size picker's label for `width`: the size, then what a minute of it weighs (M19-T4) —
+    /// every pick plays anywhere (M18-T2), so weight is what decides between them. The ceiling row
+    /// states its real fit for the current source, which on a window pick is far below the ceiling.
+    /// Without a source geometry the row is the size alone — never quote a figure that can't be
+    /// computed (M16-T2).
     public func mp4SizeLabel(forWidth width: Int) -> String {
-        guard width == Settings.mp4CeilingWidth else { return "\(width) px" }
-        guard let pixels = displayPixelSize else { return "Largest" }
+        let isCeiling = width == Settings.mp4CeilingWidth
+        guard let pixels = displayPixelSize else { return isCeiling ? "Largest" : "\(width) px" }
+        let configuration = ExportConfiguration(maxWidth: width)
         let fitted = Exporter.fittedSize(
-            width: pixels.width, height: pixels.height,
-            configuration: ExportConfiguration(maxWidth: width))
-        return "Largest (\(fitted.width) × \(fitted.height))"
+            width: pixels.width, height: pixels.height, configuration: configuration)
+        let size = isCeiling ? "Largest (\(fitted.width) × \(fitted.height))" : "\(width) px"
+        let perMinute = configuration.bytesPerMinute(forWidth: fitted.width, height: fitted.height)
+        return "\(size) · ≈\(ApproximateBytes.formatted(perMinute)) per minute"
     }
 
     private func syncReplayArming() {
@@ -1002,7 +1006,7 @@ public final class AppState {
         let awake = "While armed, ScreenRec keeps your Mac awake."
         guard let bytes = replayBufferBytes(seconds: seconds) else { return awake }
         return "A \(Self.bufferPhrase(seconds)) buffer holds about "
-            + "\(ReplayFootprint.formatted(bytes)) in memory. \(awake)"
+            + "\(ApproximateBytes.formatted(bytes)) in memory. \(awake)"
     }
 
     /// docs/06: the armed menu's dimmed cost row. Stamped at open, never ticking (M6-T10).
@@ -1011,7 +1015,7 @@ public final class AppState {
             return "Mac stays awake while armed"
         }
         return "\(Self.shortBufferPhrase(replaySeconds)) buffer · "
-            + "≈\(ReplayFootprint.formatted(bytes)) · Mac stays awake"
+            + "≈\(ApproximateBytes.formatted(bytes)) · Mac stays awake"
     }
 
     /// Pixels the armed stream encodes, mirroring `CaptureEngine`'s own resolution: a region's rect

@@ -428,12 +428,20 @@ collapses toolbar tabs into a `»` overflow menu, hiding three of the four pages
   "about 50 hours" is noise. The figure counts only space *above* the 2 GiB reserve, since capture
   stops itself there (02 §7), and `BitrateModel` errs high on cost so it never over-promises.
 - **MP4** (M18-T2) — a section above GIF (the menu orders them that way), one Picker steering
-  `Export as MP4`: **Size** — 1280 / 1920 / 2560 px, plus a ceiling row that names what it would
+  `Export as MP4`: **Size** — 1920 / 2560 px, plus a ceiling row that names what it would
   really produce for the current source, `Largest (3686 × 2304)`. Default 1920, i.e. every export
   before this was a setting. Sizes stop at H.264 Level 5.2's frame size, because past it the
   encoder moves to Level 6.0 and phones stop decoding (docs/02 §3) — "Original" is deliberately not
   offered. Bitrate is not a picker: it rises with the output's pixel count from 6 Mbps at
   1920×1200 and never falls below it, so a smaller output is never softer than it used to be. The CLI (`export --to-mp4 --width`) has its own flag and does not read these prefs.
+  - **Each row states what a minute of it weighs (M19-T4)** — `1920 px · ≈46 MB per minute`,
+    `2560 px · ≈81`, `Largest (3686 × 2304) · ≈170`. Since every pick already plays anywhere, weight
+    is the thing that decides between them; destination words (`Message / web`) would promise an
+    acceptance that clip *length* governs, not the row. `≈`-grade through `ApproximateBytes`, like
+    the replay buffer's memory figure, and withheld entirely when no source geometry is known.
+  - **1280 px was removed in M19-T4**: the bitrate floor above gave it the same 6 Mbps as 1920, so
+    it measured 1% *heavier* for 2.25× fewer pixels — a decoy row. A stored 1280 snaps to 1920 on
+    load; `--width 1280` on the CLI still works.
 - **GIF** (M10-T3 follow-up) — a section below it, three Pickers steering `Save as GIF`:
   **Frames per second** (12/15/20/24) · **Width** (320/480/640/800 px; caps height too) · **Maximum
   length** (10/15/30/60 s). Defaults 15 / 480 / 30. The CLI (`export --to-gif`) has its own

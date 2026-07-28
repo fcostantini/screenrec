@@ -40,7 +40,7 @@ import Testing
             width: Self.width, height: Self.height, frameRateCap: 60, seconds: 60,
             includesMicrophone: true)
         #expect(bytes > 180_000_000 && bytes < 186_000_000)
-        #expect(ReplayFootprint.formatted(bytes).contains("180"))
+        #expect(ApproximateBytes.formatted(bytes).contains("180"))
     }
 
     @Test func micOffDropsOnlyTheMicRing() {
@@ -71,10 +71,4 @@ import Testing
             includesMicrophone: true) == 0)
     }
 
-    @Test func roundsToTwoSignificantFiguresSoTheEstimateReadsAsOne() {
-        #expect(ReplayFootprint.roundedToTwoSignificantFigures(183_133_368) == 180_000_000)
-        #expect(ReplayFootprint.roundedToTwoSignificantFigures(2_663_000_000) == 2_700_000_000)
-        #expect(ReplayFootprint.roundedToTwoSignificantFigures(8_243_000) == 8_200_000)
-        #expect(ReplayFootprint.roundedToTwoSignificantFigures(0) == 0)
-    }
 }

@@ -7,6 +7,24 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-28 (M19-T4): the Size picker had a decoy row, and the encoder does not spend its budget.
+  - 🔴 **`1280 px` produced the same file as `1920 px`** — 6,764,917 vs 6,688,557 bytes from one
+    7.47 s source, the smaller pick **1% heavier** for 2.25× fewer pixels. Structural, not
+    content: M18-T2 floors the export rate at the 6 Mbps reference so a native-size region export
+    can never get softer, and the floor keys off the **output** size, so every pick at or below
+    1920×1200 asks for exactly 6 Mbps. Row dropped.
+  - **The four picks, same source** (target → achieved, file): 1280×800 6.0 → 7.24 Mbps 6.76 MB ·
+    1920×1200 6.0 → 7.16 Mbps 6.69 MB · 2560×1600 10.7 → 12.24 Mbps 11.43 MB · 3686×2304
+    **22.1 → 12.86 Mbps** 12.02 MB. The largest is the one to note: VideoToolbox spends only what
+    the content needs, and a static desktop cannot fill 22 Mbps — so a size label can state a
+    *budget*, never a file size. (It also **overshoots** the target by ~20% at the smaller sizes.)
+  - ⚠️ **`strings` cannot see a Swift literal ≤ 15 bytes** — they compile to immediate values, not
+    data. Deploy-freshness checks in this repo use `strings <binary> | grep`, and `" per minute"`
+    (11 bytes) returned **0 matches from a binary that contained it**. Grep a longer string.
+  - **Filed, not done:** the floor could scale when an export *downscales* (keeping it only at
+    native size), which would preserve M18-T2's guarantee and make a genuinely small pick possible.
+    Measured here on static content only — it needs a busy-content measurement and its own task.
+
 - 2026-07-28 (M19-T1): the guard fix, and two dead ends measured on the way.
   - **The live A/B, at the real 2 GB floor with no test hook** (4 GB APFS image, ~2 GiB of `dd`
     ballast landing 12 s into a 60 s take, free space crossing to 1.78 GiB): **before**, the take

@@ -1682,7 +1682,12 @@ a safety fix, clearer picker labels, and a preference that stops being written.
 - [x] ~~M19-T3 **Delete the original when the export lands.**~~ — **CLOSED "won't do" 2026-07-28
       (Franco)**, with M19-T2 and for the same reason: the app deleting a recording is out, whether
       it is a background policy or a per-export offer. An export leaves its source alone.
-- [ ] M19-T4 **MP4 sizes named by destination, not by pixels.** M18-T2 stops at H.264 Level 5.2 so
+- [x] M19-T4 **MP4 sizes named by destination, not by pixels.** ✅ 2026-07-28 — each row states what
+      a minute weighs (`1920 px · ≈46 MB per minute`), which is what decides between picks that all
+      play anywhere; **`1280 px` was dropped**, measured to weigh 1% *more* than 1920 for 2.25×
+      fewer pixels (the M18-T2 rate floor). Live: the deployed picker reads the new row and a menu
+      export landed at **45.1 MB/min** against its promised ≈46. Destination words were ruled out —
+      they promise an acceptance that clip length governs (docs/07, docs/06). M18-T2 stops at H.264 Level 5.2 so
       phones can decode it, but the picker still reads `1280 px · 1920 px · 2560 px · Largest`, and
       the largest is far outside what messaging apps accept — the recipe Franco actually uses is
       1920 wide. **Seams:** `Settings.allowedMP4Widths` + `AppState.mp4SizeLabel(forWidth:)`, both

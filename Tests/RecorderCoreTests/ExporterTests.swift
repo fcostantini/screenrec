@@ -43,6 +43,18 @@ import Testing
         #expect(config.videoBitRate(forWidth: 7680, height: 4320) == 24_000_000)
     }
 
+    @Test func aMinuteWeighsTheVideoBudgetPlusItsAudio() {
+        // What the Size picker prints (M19-T4). Measured against the shipped export path: a
+        // 1920 × 1200 minute at 6 Mbps + 160 kbps audio is ~46 MB, and 48 MB came off the disk.
+        let config = ExportConfiguration()
+        #expect(config.bytesPerMinute(forWidth: 1920, height: 1200) == 46_200_000)
+        // The floor is why 1280 left the picker: the same weight for 2.25× fewer pixels.
+        #expect(config.bytesPerMinute(forWidth: 1280, height: 800)
+            == config.bytesPerMinute(forWidth: 1920, height: 1200))
+        // And why the ceiling row is the deterrent it looks like.
+        #expect(config.bytesPerMinute(forWidth: 3686, height: 2304) > 160_000_000)
+    }
+
     @Test func noConfigurationCanExceedTheLevelSafeBox() {
         // The ceiling is silent when crossed — the encoder just emits Level 6.0 and the file fails
         // on someone else's phone — so a caller must not be able to opt out of it (02 §3).

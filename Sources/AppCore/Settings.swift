@@ -227,7 +227,10 @@ public struct Settings: Sendable, Equatable {
     /// The "Largest" pick: fit the source inside `Exporter.levelSafeBox` rather than promise a
     /// number (M18-T2).
     public static let mp4CeilingWidth = Exporter.levelSafeBox.width
-    public static let allowedMP4Widths = [1280, 1920, 2560, mp4CeilingWidth]
+    /// No row below the reference size: the export rate is floored there (`ExportConfiguration`),
+    /// so a 1280-wide pick weighed 1% *more* than 1920 while carrying 2.25× fewer pixels — measured
+    /// M19-T4. A stored 1280 snaps up through `nearest(_:in:)`.
+    public static let allowedMP4Widths = [1920, 2560, mp4CeilingWidth]
     public static let allowedStopAfterMinutes = [0, 5, 15, 30, 60]
 
     /// The list member closest to `value` (ties → the lower), so a hand-edited or future-version
