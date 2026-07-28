@@ -1,4 +1,6 @@
+import AppCore
 import AppKit
+import Carbon.HIToolbox
 
 /// The optional 3-2-1 count-in before recording (M12-T6). A big translucent number on the main
 /// display, counting down one second per step, then `completion` fires and it dismisses — so the
@@ -6,21 +8,34 @@ import AppKit
 /// (`ignoresMouseEvents`, ordered front without key): the whole point is to switch to the target
 /// window during the beat, so the overlay must not hide the screen or swallow clicks. The
 /// `RegionSelectionController` sibling.
+@MainActor
 final class CountInController {
     private var window: NSWindow?
     private var timer: Timer?
+    private let hotkeys: HotkeyCenter
 
-    /// Shows `from` at once, then ticks down one per second; at zero, dismisses and calls `completion`.
+    /// Esc, no modifiers. The overlay never becomes key (it must not steal focus mid-count), so no
+    /// key event reaches it — a Carbon hotkey is the one global route that needs no TCC grant
+    /// (02 §9). It is registered only while a count is live, since it swallows Esc system-wide.
+    private static let escape = Hotkey(keyCode: kVK_Escape, modifiers: 0)
+    private static let escapeHotkeyID: UInt32 = 4
+
+    init(hotkeys: HotkeyCenter) {
+        self.hotkeys = hotkeys
+    }
+
+    /// Shows `from` at once, then ticks down one per second; at zero, dismisses and reports
+    /// `.finished`. Esc dismisses it early and reports `.cancelled`, so nothing is recorded.
     /// A reused instance — a second `run` while one is live is ignored (the `isCountingIn` guard in
     /// AppState already blocks that path). With no main screen, it starts immediately (no count-in).
-    func run(from: Int = 3, completion: @escaping () -> Void) {
+    func run(from: Int = 3, completion: @escaping @MainActor (CountInOutcome) -> Void) {
         guard window == nil else {
             // AppState's `isCountingIn` guard makes this unreachable; assert so a future refactor
             // that broke it surfaces loudly instead of silently wedging Start (dropped completion).
             assertionFailure("count-in re-entered while one is live")
             return
         }
-        guard let screen = NSScreen.main else { completion(); return }
+        guard let screen = NSScreen.main else { completion(.finished); return }
 
         let view = CountInView(frame: NSRect(origin: .zero, size: screen.frame.size))
         view.value = from
@@ -44,14 +59,24 @@ final class CountInController {
                 view.value = remaining
                 view.needsDisplay = true
             } else {
-                self?.dismiss()
-                completion()
+                // The timer is scheduled on RunLoop.main, so this body is already on the main
+                // thread; the isolation is provable, not assumed.
+                MainActor.assumeIsolated {
+                    self?.dismiss()
+                    completion(.finished)
+                }
             }
         }
         // `.common` so opening the menu bar (tracking mode) doesn't freeze the count — the pattern
         // the menu-bar clock already uses (StatusIconView).
         RunLoop.main.add(ticker, forMode: .common)
         timer = ticker
+
+        hotkeys.setHotkey(Self.escape, id: Self.escapeHotkeyID) { [weak self] in
+            guard let self, window != nil else { return }
+            dismiss()
+            completion(.cancelled)
+        }
     }
 
     private func dismiss() {
@@ -59,6 +84,7 @@ final class CountInController {
         timer = nil
         window?.orderOut(nil)
         window = nil
+        hotkeys.setHotkey(nil, id: Self.escapeHotkeyID)   // Esc belongs to everyone else again
     }
 }
 

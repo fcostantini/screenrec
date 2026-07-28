@@ -7,6 +7,37 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-28 (M18-T4):
+  - ✅ **A bare `Esc` works as a Carbon hotkey**, which is the only way to cancel the count-in: the
+    overlay is `canBecomeKey = false` + `ignoresMouseEvents` on purpose, so no key event can reach
+    it, and a global event monitor would need an Accessibility grant this product has never wanted.
+    Measured registering (`status 0`) and *firing* in an accessory app that was not frontmost, with
+    the screen locked. It swallows Esc system-wide while registered, so it lives only for the ~3 s
+    of the count.
+  - ⚠️ **`defaults write domain key 5` stores a STRING.** Without `-int`, the value comes back as
+    `"5"`, so `object(forKey:) as? Int` yields nil while `integer(forKey:)` reads 5. A loader that
+    used the former silently fell back to its default — and docs/06 documents these keys as
+    user-inspectable, so a hand-written value is a real case, not just a test artefact.
+  - ⚠️ **`BitrateModel` is honest but the *disk* is not all yours.** Predicted 4.16 MB/s at High
+    60 fps vs **4.03 measured** on a real 23-minute take (3% conservative; 18–25% at Balanced). But
+    a "room to record" figure must subtract the recording path's 2 GiB fail-stop reserve first:
+    quoting raw free space promised 30 min on a 4 GiB volume for a take that stops at ~15. Measured
+    after the fix: 2.7 GiB free → "about 2 min", 1.2 GiB → "Not enough room".
+  - ⚠️ **Two harness mistakes worth not repeating.** A `swift script.swift` invocation pays a 1–2 s
+    compile, so a "press Esc 1.2 s after clicking Start" test fired the key *before* the count began
+    and recorded the screen instead — compile the drivers first (`swiftc -O`). And a `python`
+    string-replace that doesn't match silently does nothing: a menu row I "added" was never in the
+    file, which only the live dump revealed.
+
+- 2026-07-28 (M18-T4, deploy hygiene): ⚠️ **Stop deploying with `kill -9`; quit through the app's
+  own menu.** `swift tools/menudriver.swift click "Quit"` exits cleanly in ~2 s and **releases the
+  SCK audio tap** (`pmset -g assertions` went 2 taps → 1 the moment it quit). A SIGKILL skips
+  stream teardown entirely, which is precisely how a tap gets stranded — this machine is currently
+  carrying an **18-hour-old** `AudioTap-…` assertion brokered by `replayd` for some earlier client.
+  (That one predates this session, so it isn't ours, and Loom is a second SCK client here — but the
+  mechanism is real and the clean path costs nothing.) The older note below is right that `killall`
+  does *not* terminate the app; the fix is the menu's Quit, not a bigger hammer.
+
 - 2026-07-27 (M18-T3):
   - ⚠️ **`URL` caches resource values per instance, and a menu holds its URLs across opens.** The
     recents cache keys on modification date, and a unit test that touched a file and re-read it

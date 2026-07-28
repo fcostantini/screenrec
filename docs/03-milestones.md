@@ -1567,18 +1567,31 @@ ride the same bump.
       harness); rows rendered their details on the *first* open (`Replay … .mov — 4:30 · 656,9 MB`);
       and the rewired folder row opened `~/Movies` in Finder. 513 tests (+5).
 
-- [ ] M18-T4 **Four small honesties.** (1) **The 3-2-1 count-in can't be cancelled** — once Start
-      fires, `isCountingIn` blocks re-entry and capture begins three seconds later; <kbd>Esc</kbd>
-      does nothing and the Start row is a silent no-op. It is the one moment in the product that
-      can't be taken back, and the overlay is deliberately click-through so there's nothing to click
-      — make <kbd>Esc</kbd> cancel and return to idle. (2) **No "stop after N minutes"** in the app
-      though the CLI has `--duration` — useful for unattended captures and for bounding an accidental
-      all-day recording. (3) **No estimated recording time from free disk space** — the guard only
-      speaks at the 2 GB floor, which is the last possible moment; `BitrateModel` + the volume's free
-      space give a figure the menu could show before you start. (4) **Clicking a recents row whose
-      file vanished** between menu-open and click does nothing visible. **Rulings:** whether (2)
-      belongs in Settings or as a menu row; whether (4) refreshes the list or says something.
-      **Verify:** one per item; (1) and (4) are live checks, (2) and (3) unit + live.
+- [x] M18-T4 **Four small honesties.** **Rulings (Franco, 2026-07-28):** a `Stop After ▸` menu
+      submenu (not Settings — a standing preference that ends every take is a footgun); the disk
+      figure only when it's news; a vanished row says so *and* drops itself. Wall-clock bound kept
+      over recorded-time (the menu states an absolute `Stops at`).
+      **(1)** <kbd>Esc</kbd> cancels the count-in. The overlay is click-through and never key, so no
+      key event can reach it and a global monitor would need a TCC grant this product has never
+      required — measured instead that a **bare-Esc Carbon hotkey registers and fires** in an
+      accessory app, not frontmost (02 §9's mechanism), registered only while the count runs since
+      it swallows Esc system-wide. **(2)** `Stop After` (Off/5/15/30/60) stops via the shipped
+      `.userStopped` path, and the recording menu states `Stops at 2:35 PM` — absolute, never
+      ticking (M6-T10), locale-formatted. **(3)** `Room for about 40 min at High` under Start, below
+      a 2-hour threshold. ⚠️ **Review caught it over-promising by the whole 2 GiB fail-stop
+      reserve** — 4 GiB free would have said 30 min for a take that stops at 15; it now subtracts
+      the reserve and says `Not enough room to record` when there is none. **(4)** Every file action
+      is built through one `fileButton` that checks first, so an unguarded one can't be written;
+      the export receipt is existence-checked at menu open, not only at launch, and the replay
+      receipt is cleared too (it was the one row nothing else dropped).
+      **Verified live on the deployed build:** Esc cancelled twice in a row with no file written and
+      Start immediately reusable; `Stop After: 5 min` persisted and a take begun at 09:30 read
+      `Stops at 9:35`; a 3 GB volume read **2 min** (11 before the reserve fix) and **`Not enough
+      room`** at 1.2 GiB free; a row whose file was deleted under an open menu dropped itself on
+      click. 525 tests (+11). ⚠️ Two harness lessons: `defaults write` stores an untyped value as a
+      **string**, which the first loader silently rejected (fixed to read like its siblings), and a
+      first attempt at the Esc leg raced its own `swift` compile so the key landed before the count.
+
 - [ ] M18-T5 **A region pick can be adjusted.** A drawn region can't be nudged, resized or snapped —
       re-selecting means redrawing from scratch, which is painful when you're trying to frame exactly
       1920×1080 px (the very case M12-T4's `pt · px` badge was added for). **Seams:** the

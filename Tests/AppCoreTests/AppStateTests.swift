@@ -604,4 +604,68 @@ import RecorderCore
         await state.refreshRecentDetails()
         #expect(state.rowTitle(for: recording) == "Take.mov")
     }
+
+    // MARK: - Four small honesties (M18-T4)
+
+    @Test func aCancelledCountInRecordsNothing() async {
+        // The one action that could not be taken back once started. Cancelling must land back in
+        // idle with no session — not merely skip the overlay.
+        let state = makeState()
+        state.countInEnabled = true
+        state.runCountIn = { completion in completion(.cancelled) }
+        await state.start()
+        #expect(state.isSessionActive == false)
+
+        // …and Start is immediately usable again: the count-in guard must not stay latched.
+        var ranAgain = false
+        state.runCountIn = { _ in ranAgain = true }
+        await state.start()
+        #expect(ranAgain)
+    }
+
+    @Test func aVanishedFileReportsItselfInsteadOfDoingNothing() throws {
+        // Rows are stamped at menu open, so a file can go away under them; the click used to be a
+        // silent no-op (M18-T4).
+        let state = makeState()
+        var posted: [RecordingNotification] = []
+        state.notifier = { posted.append($0) }
+        let file = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("gone-\(UUID().uuidString).mov")
+        try Data("x".utf8).write(to: file)
+
+        #expect(state.fileStillExists(file))
+        #expect(posted.isEmpty)
+
+        try FileManager.default.removeItem(at: file)
+        #expect(state.fileStillExists(file) == false)
+        #expect(posted.count == 1)
+        #expect(posted.first?.title == "That file isn't there any more")
+        #expect(posted.first?.fileURL == nil)   // nothing to reveal
+    }
+
+    @Test func aBoundedTakeKnowsWhenItEnds() {
+        // The deadline the recording menu states, without needing a capture session to compute it.
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        #expect(AppState.automaticStopDate(from: start, minutes: 0) == nil)   // Off is the default
+        #expect(AppState.automaticStopDate(from: start, minutes: 30)
+            == start.addingTimeInterval(1800))
+    }
+
+    @Test func theStopAfterPickReadsAsARow() {
+        #expect(MenuHeader.stopAfter(0) == "Off")
+        #expect(MenuHeader.stopAfter(5) == "5 min")
+        #expect(MenuHeader.stopAfter(60) == "1 hour")
+    }
+
+    @Test func aRunningBoundIsStatedAsAClockTimeNotACountdown() throws {
+        // A countdown would have to tick, which the menu never does (M6-T10). And the clock is
+        // locale-formatted: a 24-hour figure on a 12-hour Mac reads like a duration.
+        let utc = try #require(TimeZone(identifier: "UTC"))
+        let at = Date(timeIntervalSince1970: 14 * 3600 + 32 * 60)
+        #expect(MenuHeader.stopsAt(at, locale: Locale(identifier: "en_GB"), timeZone: utc)
+            == "Stops at 14:32")
+        // The formatter separates the meridiem with U+202F (narrow no-break space), not a space.
+        let us = MenuHeader.stopsAt(at, locale: Locale(identifier: "en_US"), timeZone: utc)
+        #expect(us.replacingOccurrences(of: "\u{202F}", with: " ") == "Stops at 2:32 PM")
+    }
 }

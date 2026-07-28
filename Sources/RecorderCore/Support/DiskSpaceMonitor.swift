@@ -6,10 +6,10 @@ import Foundation
 ///
 /// The space probe is injected so tests need no real disk; `check()` is caller-driven, keeping
 /// this free of timers.
-final class DiskSpaceMonitor: @unchecked Sendable {
+public final class DiskSpaceMonitor: @unchecked Sendable {
     /// docs/02 §7. Headroom, not a hard limit: the writer still needs to flush and finalize
     /// after the stop decision, so the floor must exceed what finalizing can cost.
-    static let defaultFloorBytes: Int64 = 2 * 1024 * 1024 * 1024
+    public static let defaultFloorBytes: Int64 = 2 * 1024 * 1024 * 1024
 
     /// Suggested `check()` cadence. Disk fills slowly and reading volume capacity is cheap.
     static let checkInterval: TimeInterval = 2
@@ -46,7 +46,7 @@ final class DiskSpaceMonitor: @unchecked Sendable {
     }
 
     /// Free space on the volume holding `url`, or nil if neither capacity key can be read.
-    static func availableBytes(forVolumeContaining url: URL) -> Int64? {
+    public static func availableBytes(forVolumeContaining url: URL) -> Int64? {
         let values = try? url.resourceValues(forKeys: [
             .volumeAvailableCapacityForImportantUsageKey, .volumeAvailableCapacityKey,
         ])

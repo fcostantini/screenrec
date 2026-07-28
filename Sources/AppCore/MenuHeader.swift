@@ -54,4 +54,25 @@ public enum MenuHeader {
     }
 
     private static let maxFolderDisplayLength = 40
+
+    /// The `Stop After` pick as a row title (M18-T4): `Off`, `5 min`, `1 hour` — through the same
+    /// phrasing the disk row uses, so the two can't drift.
+    public static func stopAfter(_ minutes: Int) -> String {
+        minutes == 0 ? "Off" : RecordingRoom.approximate(Double(minutes) * 60)
+    }
+
+    /// What the recording menu says about a bound already running: an absolute clock time, never a
+    /// countdown — the menu is stamped at open and must not tick (M6-T10). Locale-formatted, so a
+    /// 12-hour Mac reads `Stops at 2:35 PM` rather than a 24-hour figure that could be misread as
+    /// a duration.
+    public static func stopsAt(
+        _ date: Date, locale: Locale = .current, timeZone: TimeZone = .current
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeZone = timeZone
+        formatter.timeStyle = .short
+        formatter.dateStyle = .none
+        return "Stops at \(formatter.string(from: date))"
+    }
 }

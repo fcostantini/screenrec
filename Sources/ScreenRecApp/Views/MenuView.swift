@@ -145,6 +145,21 @@ struct MenuView: View {
             }
         }
 
+        // A bound for the next take (M18-T4): unattended captures, and a ceiling on the all-day
+        // recording nobody stopped.
+        Picker("Stop After: \(MenuHeader.stopAfter(state.stopAfterMinutes))",
+               selection: $state.stopAfterMinutes) {
+            ForEach(Settings.allowedStopAfterMinutes, id: \.self) { minutes in
+                Text(MenuHeader.stopAfter(minutes)).tag(minutes)
+            }
+        }
+
+        // Only when it is news: on a healthy disk this says nothing at all (M18-T4).
+        if let room = RecordingRoom.phrase(
+            seconds: state.recordingRoomSeconds, presetName: state.quality.menuTitle) {
+            Text(room)
+        }
+
         Divider()
 
         // The whole file browser, one level down (M18-T3, docs/06 item 9).
@@ -209,6 +224,12 @@ struct MenuView: View {
 
         replayControls
 
+        // The bound this take is running under (M18-T4), as an absolute time: a countdown would
+        // have to tick, and the menu is stamped at open (M6-T10).
+        if let stopsAt = state.stopsAt {
+            Text(MenuHeader.stopsAt(stopsAt))
+        }
+
         // docs/06: the pickers are hidden while recording, not disabled — this row says why.
         Text("Sources locked while recording")
 
@@ -256,22 +277,34 @@ struct MenuView: View {
         }
     }
 
+    /// A row action that first checks the file is still there; if it isn't, the state layer says
+    /// so and refreshes the rows (M18-T4). Every file action is built through this, so one that
+    /// forgets to check can't be written — the rows are stamped at open, so the race is normal.
+    @ViewBuilder private func fileButton(
+        _ title: String, _ url: URL, _ action: @escaping (URL) -> Void
+    ) -> some View {
+        Button(title) {
+            guard state.fileStillExists(url) else { return }
+            action(url)
+        }
+    }
+
     /// The per-file submenu shared by recents, the replay receipt and the export receipt. Two groups:
     /// act on this file (reveal · Quick Look · Share · Copy, M12-T1), then derive a new one — a
     /// shareable MP4 / looping GIF (blocked while one export runs) or the Trim window.
     @ViewBuilder private func fileActions(_ url: URL) -> some View {
-        Button("Reveal in Finder") { Finder.reveal(url) }
-        Button("Quick Look") { ShareActions.quickLook(url) }
-        Button("Share…") { ShareActions.share(url) }
-        Button("Copy") { ShareActions.copy(url) }
+        fileButton("Reveal in Finder", url, Finder.reveal)
+        fileButton("Quick Look", url, ShareActions.quickLook)
+        fileButton("Share…", url, ShareActions.share)
+        fileButton("Copy", url, ShareActions.copy)
 
         Divider()
 
-        Button("Export as MP4") { state.exportToMP4(url) }
+        fileButton("Export as MP4", url) { state.exportToMP4($0) }
             .disabled(state.exportInProgress != nil)
-        Button("Save as GIF") { state.exportToGIF(url) }
+        fileButton("Save as GIF", url) { state.exportToGIF($0) }
             .disabled(state.exportInProgress != nil)
-        Button("Trim…") {
+        fileButton("Trim…", url) { url in
             state.trimTarget = url
             openWindow(id: trimWindowID)
             NSApplication.shared.activate(ignoringOtherApps: true)
@@ -281,10 +314,14 @@ struct MenuView: View {
 
         // Manage the file (M12-T2). Trash is reversible, so no confirmation; red via an attributed
         // title (the `.menu` bridge drops `role:.destructive` color — the Discard precedent).
-        Button("Rename…") {
+        fileButton("Rename…", url) { url in
             ShareActions.rename(url) { state.rename(url, to: $0) }
         }
-        Button { state.moveToTrash(url) } label: { Text(Self.moveToTrashTitle) }
+        // Not `fileButton`: the title is attributed (red), which a plain Button label can't carry.
+        Button {
+            guard state.fileStillExists(url) else { return }
+            state.moveToTrash(url)
+        } label: { Text(Self.moveToTrashTitle) }
     }
 
     private static let moveToTrashTitle = AttributedString(NSAttributedString(
@@ -367,6 +404,7 @@ struct MenuView: View {
     /// change, so a no-op reopen publishes nothing and the open menu isn't rebuilt (M6-T10).
     private func refreshAtOpen() {
         state.refreshRecentRecordings()
+        state.refreshRecordingRoom()
         Task { await state.refreshRecentDetails() }
         state.expireStaleExportReceipt()   // drop a receipt aged out since a prior session (M12-T3)
         if !state.isSessionActive {

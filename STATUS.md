@@ -7,6 +7,33 @@
 ## Now
 
 
+- **✅ M18-T4 DONE (2026-07-28) — four silences, each now saying what it knows.** Plan artifact
+  (rulings A1/B1/C1 approved): `claude.ai/code/artifact/d3555144-9393-4af5-8e1f-750f470ae5b5`.
+  **525 tests (+11)**, dev loop green, deployed and re-armed.
+  **(1) <kbd>Esc</kbd> cancels the count-in.** The overlay is click-through and never key, so no key
+  event can reach it and a global monitor needs a TCC grant this product has never required —
+  measured that a **bare-Esc Carbon hotkey registers and fires** in an accessory app, not frontmost
+  (02 §9). Registered only while the count runs, since it swallows Esc system-wide.
+  **(2) `Stop After ▸`** (Off/5/15/30/60) stops through the shipped `.userStopped` path; the
+  recording menu states `Stops at 2:35 PM` — absolute, locale-formatted, never ticking.
+  **(3) `Room for about 40 min at High`** under Start, below a 2-hour threshold.
+  **(4)** Every file action is built through one `fileButton` that checks the file first, so an
+  unguarded one can't be written; the export receipt is existence-checked at menu open and the
+  replay receipt is cleared too — it was the one row nothing else dropped.
+  **🔴 Review caught the disk row over-promising by the entire 2 GiB fail-stop reserve** — 4 GiB
+  free would have read "about 30 min" for a take that stops at ~15. It now subtracts the reserve
+  and says `Not enough room to record` when there is none; measured after the fix at 2.7 GiB →
+  **2 min** and 1.2 GiB → **Not enough room**. Review also found three actions (Trim/Rename/Trash)
+  still bypassing the check, and the room figure doing volume I/O on every menu body build through
+  a URL whose cached values never cleared — yesterday's `URL` lesson, repeated.
+  **Verified live:** Esc cancelled twice with no file written and Start immediately reusable; a take
+  begun at 09:30 under a 5-minute bound read `Stops at 9:35`; a row whose file was deleted under an
+  open menu dropped itself on click.
+  ⚠️ **Deploy hygiene changed:** stop using `kill -9` — `menudriver click "Quit"` exits cleanly in
+  ~2 s **and releases the SCK audio tap** (assertions went 2 → 1). A SIGKILL skips stream teardown,
+  which is how a tap gets stranded; this machine carries an unrelated 18-hour-old one.
+  **Next: M18-T5** (a region pick can be adjusted) — plan artifact first. Then G18 and the MINOR.
+
 - **✅ M18-T3 DONE (2026-07-27) — the menu's file browser is one `Recordings ▸` row.** Plan artifact
   (rulings A1/B1 approved): `claude.ai/code/artifact/e6b55bd5-fe54-455a-a06d-f55aa11b8431`.
   **513 tests (+5)**, full dev loop green, deployed and re-armed.

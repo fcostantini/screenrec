@@ -153,6 +153,9 @@ public struct Settings: Sendable, Equatable {
     public var gifFPS: Int
     public var gifWidth: Int
     public var gifMaxSeconds: Int
+    /// Stop a recording automatically after this many minutes (M18-T4), one of
+    /// `allowedStopAfterMinutes`; 0 ⇒ off.
+    public var stopAfterMinutes: Int
     /// The `Export as MP4` width cap (M18-T2), one of `allowedMP4Widths`; `mp4CeilingWidth` means
     /// "as large as the source allows" (see `ExportConfiguration.maxHeight`). The CLI takes its
     /// own flag.
@@ -170,6 +173,7 @@ public struct Settings: Sendable, Equatable {
     /// number (M18-T2).
     public static let mp4CeilingWidth = Exporter.levelSafeBox.width
     public static let allowedMP4Widths = [1280, 1920, 2560, mp4CeilingWidth]
+    public static let allowedStopAfterMinutes = [0, 5, 15, 30, 60]
 
     /// The list member closest to `value` (ties → the lower), so a hand-edited or future-version
     /// plist value snaps to a real picker choice instead of leaving the Picker blank.
@@ -225,6 +229,7 @@ public struct Settings: Sendable, Equatable {
             gifFPS: 15,
             gifWidth: 480,
             gifMaxSeconds: 30,
+            stopAfterMinutes: 0,
             mp4Width: 1920,
             seenReplayBannerWarning: false)
     }
@@ -285,6 +290,7 @@ public enum SettingsStore {
         public static let gifWidth = "gifWidth"
         public static let gifMaxSeconds = "gifMaxSeconds"
         public static let mp4Width = "mp4Width"
+        public static let stopAfterMinutes = "stopAfterMinutes"
         /// The last export's path, for the receipt that survives relaunch (M12-T2). Absent ⇒ no
         /// receipt. Not part of `Settings` (it's a transient pointer, not user config) — its own
         /// load/save below. Dropped on load if the file is gone (moved/trashed).
@@ -423,6 +429,12 @@ public enum SettingsStore {
         if rawMP4Width > 0, let width = Settings.nearest(rawMP4Width, in: Settings.allowedMP4Widths) {
             settings.mp4Width = width
         }
+        // No `> 0` guard, unlike its siblings: 0 is a real pick here (Off) and also the default,
+        // so absent, negative and garbage all land on it through `nearest`.
+        if let minutes = Settings.nearest(
+            defaults.integer(forKey: Key.stopAfterMinutes), in: Settings.allowedStopAfterMinutes) {
+            settings.stopAfterMinutes = minutes
+        }
 
         return settings
     }
@@ -533,5 +545,6 @@ public enum SettingsStore {
         defaults.set(settings.gifWidth, forKey: Key.gifWidth)
         defaults.set(settings.gifMaxSeconds, forKey: Key.gifMaxSeconds)
         defaults.set(settings.mp4Width, forKey: Key.mp4Width)
+        defaults.set(settings.stopAfterMinutes, forKey: Key.stopAfterMinutes)
     }
 }

@@ -127,14 +127,18 @@ public final class ExportModel {
     /// keeps its receipt, short enough that one from an earlier day doesn't resurface.
     static let receiptFreshness: TimeInterval = 3600   // 1 hour
 
-    /// Drops a persisted export receipt (M12-T2) that has aged past `receiptFreshness` (M12-T3), so
-    /// it can't squat above Start from a session hours ago. The file still lives in Recent Exports.
-    /// Called at menu open, riding the same stamp-at-open refresh as the recents (M6-T10).
+    /// Drops a persisted export receipt (M12-T2) that has aged past `receiptFreshness` (M12-T3) or
+    /// whose file has gone. Called at menu open, riding the same stamp-at-open refresh as the
+    /// recents (M6-T10). Existence is checked here, not only at launch: a file deleted mid-session
+    /// would otherwise leave a row whose every action silently does nothing (M18-T4).
     public func expireStaleReceipt() {
-        if let export = lastExport, export.isStale(now: Date(), freshFor: Self.receiptFreshness) {
+        guard let export = lastExport else { return }
+        if export.isStale(now: Date(), freshFor: Self.receiptFreshness)
+            || !FileManager.default.fileExists(atPath: export.url.path) {
             lastExport = nil
         }
     }
+
 
     /// Re-points the receipt after a rename (M12-T2) if it named `oldURL`, keeping the export time —
     /// so a renamed old receipt doesn't become fresh. AppState's rename forwards here.

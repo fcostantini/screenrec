@@ -84,7 +84,7 @@ struct ScreenRecApp: App {
     /// One overlay controller, reused per region pick (M11-T2).
     fileprivate static let regionSelector = RegionSelectionController()
     /// One count-in overlay controller, reused per recording start (M12-T6).
-    fileprivate static let countIn = CountInController()
+    fileprivate static let countIn = CountInController(hotkeys: hotkeys)
 
     var body: some Scene {
         MenuBarExtra {

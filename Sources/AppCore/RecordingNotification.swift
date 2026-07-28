@@ -174,6 +174,15 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
+    /// A menu row outlived its file (M18-T4). The rows are stamped at menu open, so a file can be
+    /// moved or trashed under them; without this the click is a silent no-op.
+    public static func fileMissing(url: URL) -> RecordingNotification {
+        RecordingNotification(
+            title: "That file isn't there any more",
+            body: "“\(url.lastPathComponent)” was moved or deleted. The list is up to date now.",
+            fileURL: nil)
+    }
+
     /// The lossless trim (M10-T4) finished — reveal the clipped copy.
     public static func trimmed(url: URL) -> RecordingNotification {
         RecordingNotification(

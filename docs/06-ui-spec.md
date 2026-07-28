@@ -409,6 +409,17 @@ the old line is simply false above three green ticks.
   `.requiresApproval` status (user disabled it in System Settings) counts as on, with a
   notification pointing them there; a failed register reverts the toggle and notifies.
   **Works for the self-signed dev build — no notarization needed (measured M6-T5).**
+- **Stop After** (M18-T4) — a menu submenu beside Quality, not a Settings row: Off (default) / 5 /
+  15 / 30 / 60 min, persisted `stopAfterMinutes`. Bounds the *next* take; changing it mid-recording
+  would move a deadline the menu has already stated. Wall clock from Start (a long pause eats into
+  it), stopping through the shipped `.userStopped` path. While recording, one row states the
+  deadline as an absolute, locale-formatted clock time — `Stops at 2:35 PM` — never a countdown
+  (M6-T10).
+- **Room to record** (M18-T4) — under Start, and only when it is news: below two hours the menu
+  reads `Room for about 40 min at High`, or `Not enough room to record at High` when the free space
+  is already under the recording path's fail-stop reserve. Above that it says nothing, because
+  "about 50 hours" is noise. The figure counts only space *above* the 2 GiB reserve, since capture
+  stops itself there (02 §7), and `BitrateModel` errs high on cost so it never over-promises.
 - **MP4** (M18-T2) — a section above GIF (the menu orders them that way), one Picker steering
   `Export as MP4`: **Size** — 1280 / 1920 / 2560 px, plus a ceiling row that names what it would
   really produce for the current source, `Largest (3686 × 2304)`. Default 1920, i.e. every export
@@ -453,6 +464,7 @@ moved):
 | `showsMenuBarLevel` | Bool; **absent ⇒ on** (opt-out). The status-item input meter while recording or armed (M16-T5) | M16-T5 |
 | `seenReplayBannerWarning` | Bool; **absent ⇒ false** (not seen). Once true the first-arm banner-suppression alert never fires again (M12-T5) | M12-T5 |
 | `gifFPS` · `gifWidth` · `gifMaxSeconds` | Int; each snaps to its nearest picker choice on load, absent ⇒ 15 / 480 / 30. The `Save as GIF` caps (M10-T3 follow-up) | M10-T3 follow-up |
+| `stopAfterMinutes` | Int; snaps to its nearest picker choice on load, absent ⇒ 0 (Off). Bounds a take (M18-T4) | M18-T4 |
 | `mp4Width` | Int; snaps to its nearest picker choice on load, absent ⇒ 1920. The `Export as MP4` width cap; 4096 means "largest the source allows inside Level 5.2" (M18-T2) | M18-T2 |
 | `lastExportPath` · `lastExportDate` | String path + Date (M12-T2/T3); **absent ⇒ no receipt**. The last export, so its menu receipt survives relaunch — dropped on load if the file is gone (moved/trashed) **or has no date** (a pre-T3 entry), and expired at menu open once the date is **older than one hour** (M12-T3). Not part of `Settings` — a transient pointer, not user config; its own load/save | M12-T2/T3 |
 

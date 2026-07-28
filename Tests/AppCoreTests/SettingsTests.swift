@@ -161,8 +161,8 @@ import RecorderCore
         #expect(Set(written.keys) == [
             "outputDirectory", "qualityPreset", "fpsCap", "capturesSystemAudio",
             "replayArmed", "replaySeconds", "replayHotkey", "showsMenuBarTimer", "showsMenuBarLevel",
-            "gifFPS", "gifWidth", "gifMaxSeconds", "mp4Width", "seenReplayBannerWarning",
-            "countInEnabled",
+            "gifFPS", "gifWidth", "gifMaxSeconds", "mp4Width", "stopAfterMinutes",
+            "seenReplayBannerWarning", "countInEnabled",
         ])
     }
 
@@ -475,6 +475,32 @@ import RecorderCore
         #expect(SettingsStore.load(from: defaults).mp4Width == Settings.mp4CeilingWidth)
         defaults.set(0, forKey: "mp4Width")       // absent/garbage keeps the default
         #expect(SettingsStore.load(from: defaults).mp4Width == 1920)
+    }
+
+    @Test func stopAfterMinutesKeepsAStoredZeroAndSnaps() {
+        // 0 is a real value here (off), not the "absent or garbage" sentinel the other picks use —
+        // a stored Off must survive a relaunch (M18-T4).
+        let (defaults, _) = makeDefaults()
+        #expect(SettingsStore.load(from: defaults).stopAfterMinutes == 0)
+
+        var settings = Settings.standard
+        settings.stopAfterMinutes = 30
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).stopAfterMinutes == 30)
+
+        settings.stopAfterMinutes = 0
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).stopAfterMinutes == 0)
+
+        // A hand-written `defaults write domain key 5` stores a *string* — the loader has to read
+        // it like every other pick does, not reject it into the default.
+        defaults.set("30", forKey: "stopAfterMinutes")
+        #expect(SettingsStore.load(from: defaults).stopAfterMinutes == 30)
+
+        defaults.set(20, forKey: "stopAfterMinutes")     // → 15 (tie → lower)
+        #expect(SettingsStore.load(from: defaults).stopAfterMinutes == 15)
+        defaults.set(-5, forKey: "stopAfterMinutes")     // nonsense keeps the default
+        #expect(SettingsStore.load(from: defaults).stopAfterMinutes == 0)
     }
 
     @Test(arguments: [0, -1])

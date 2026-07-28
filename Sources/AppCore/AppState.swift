@@ -171,6 +171,42 @@ public final class AppState {
         didSet { if mp4Width != oldValue { persist() } }
     }
 
+    /// Stop a recording after this many minutes (M18-T4); 0 ⇒ off. Applies to the *next* start —
+    /// changing it mid-recording would move a deadline the menu has already stated.
+    public var stopAfterMinutes: Int {
+        didSet { if stopAfterMinutes != oldValue { persist() } }
+    }
+
+    /// Seconds of recording the output volume still holds at the current settings (M18-T4), or nil
+    /// when the geometry or the volume can't be read. Stored, not computed: reading it is volume
+    /// I/O, and the menu is stamped at open (M6-T10).
+    public private(set) var recordingRoomSeconds: TimeInterval?
+
+    /// Re-reads the room figure. `URL` caches resource values per instance and `outputDirectory`
+    /// lives as long as the app, so the read is taken through a cleared copy — otherwise the
+    /// figure freezes at whatever the disk held on launch (docs/07, M18-T3).
+    public func refreshRecordingRoom() {
+        var volume = outputDirectory
+        volume.removeAllCachedResourceValues()
+        guard let pixels = capturePixelSize,
+              let free = DiskSpaceMonitor.availableBytes(forVolumeContaining: volume)
+        else {
+            recordingRoomSeconds = nil
+            return
+        }
+        let seconds = RecordingRoom.seconds(
+            freeBytes: free,
+            bitsPerSecond: BitrateModel.averageBitrate(
+                width: pixels.width, height: pixels.height,
+                frameRate: frameRateCap, preset: quality))
+        if recordingRoomSeconds != seconds { recordingRoomSeconds = seconds }
+    }
+
+    /// When the current take will stop itself, or nil when it won't. An absolute time, not a
+    /// remaining count: the menu states it stamped at open and it must never tick (M6-T10).
+    public private(set) var stopsAt: Date?
+    private var automaticStop: Task<Void, Never>?
+
     // MARK: - Instant replay (docs/06 idle item 3, Settings "Instant Replay")
 
     /// Arming starts the rolling buffer (its own capture stream while idle; a recording's
@@ -244,9 +280,10 @@ public final class AppState {
         }
     }
 
-    /// Runs the count-in overlay, calling the completion when it reaches zero (M12-T6). Injected by
-    /// the app (AppKit is banned in AppCore); nil in tests. Guarded by `isCountingIn` against re-entry.
-    public var runCountIn: (@MainActor (@escaping () -> Void) -> Void)?
+    /// Runs the count-in overlay, reporting whether it reached zero or the user cancelled it
+    /// (M12-T6; cancel M18-T4). Injected by the app (AppKit is banned in AppCore); nil in tests.
+    /// Guarded by `isCountingIn` against re-entry.
+    public var runCountIn: (@MainActor (@escaping @MainActor (CountInOutcome) -> Void) -> Void)?
     private var isCountingIn = false
 
     /// Registers/unregisters a global shortcut, reporting whether the system accepted it. Injected by
@@ -468,6 +505,7 @@ public final class AppState {
         gifWidth = settings.gifWidth
         gifMaxSeconds = settings.gifMaxSeconds
         mp4Width = settings.mp4Width
+        stopAfterMinutes = settings.stopAfterMinutes
         hasSeenReplayBannerWarning = settings.seenReplayBannerWarning
         // The export cluster (M14-T1): it seeds its own persisted receipt from `defaults`.
         exports = ExportModel(defaults: defaults)
@@ -521,7 +559,7 @@ public final class AppState {
                 pauseHotkey: pauseHotkey, countInEnabled: countInEnabled,
                 showsMenuBarTimer: showsMenuBarTimer, showsMenuBarLevel: showsMenuBarLevel,
                 gifFPS: gifFPS, gifWidth: gifWidth, gifMaxSeconds: gifMaxSeconds,
-                mp4Width: mp4Width,
+                stopAfterMinutes: stopAfterMinutes, mp4Width: mp4Width,
                 seenReplayBannerWarning: hasSeenReplayBannerWarning),
             to: defaults)
     }
@@ -1063,6 +1101,23 @@ public final class AppState {
     /// Drops a stale export receipt at menu open (M12-T3) — forwards to `exports` (M14-T1).
     public func expireStaleExportReceipt() { exports.expireStaleReceipt() }
 
+    /// True when `url` is still on disk. The menu's rows are stamped at open, so a file can go
+    /// away under them; every action checks first and reports rather than doing nothing (M18-T4).
+    public func fileStillExists(_ url: URL) -> Bool {
+        guard !FileManager.default.fileExists(atPath: url.path) else { return true }
+        forget(url)
+        notifier?(RecordingNotifications.fileMissing(url: url))
+        return false
+    }
+
+    /// Drops every menu pointer to `url`. The replay receipt is the one that otherwise survives —
+    /// it clears only on disarm, so without this a trashed clip keeps its row and re-reports.
+    private func forget(_ url: URL) {
+        exports.clearReceipt(for: url)
+        if lastReplay?.url.isSameFile(as: url) == true { lastReplay = nil }
+        refreshRecentRecordings()
+    }
+
     /// Renames a recording or export in place, extension intact (M12-T2). A blank/unchanged name is
     /// a no-op; a collision resolves like the exporters (` 2`). Re-points the receipt if it named
     /// this file. The source of a derived export is untouched — each acts on its own URL, no cascade.
@@ -1216,11 +1271,13 @@ public final class AppState {
         // zero — the countdown itself isn't recorded. `isCountingIn` blocks a second Start during it.
         if countInEnabled, let runCountIn {
             isCountingIn = true
-            runCountIn { [weak self] in
-                Task { @MainActor in
-                    self?.isCountingIn = false
-                    await self?.beginCapture()
-                }
+            runCountIn { [weak self] outcome in
+                guard let self else { return }
+                // Synchronously, before any hop: Start has to be usable the instant the count ends,
+                // or a cancel-then-Start in the same beat is swallowed by this very guard.
+                isCountingIn = false
+                guard outcome == .finished else { return }   // cancelled: idle, nothing written
+                Task { await self.beginCapture() }
             }
             return
         }
@@ -1269,6 +1326,7 @@ public final class AppState {
         currentOutputURL = outputURL
         elapsedSeconds = 0
         recordedBytes = 0
+        scheduleAutomaticStop()
 
         // `activeMicrophoneName` is what `resolvedMicrophone()` above just resolved to; posting
         // here, after the session commits, keeps a failed start from claiming it began.
@@ -1298,6 +1356,31 @@ public final class AppState {
     /// actually ends the session — see `endSession`.
     public func stop() async {
         await session?.stop()
+    }
+
+    /// Arms the `Stop After` bound for this take (M18-T4), if one is set. Wall clock from the
+    /// start, and it stops the same way the user would — `.userStopped`, so the file finalizes
+    /// through the one path (the CLI's own `--duration` does this too).
+    private func scheduleAutomaticStop() {
+        automaticStop?.cancel()
+        guard let deadline = Self.automaticStopDate(from: Date(), minutes: stopAfterMinutes) else {
+            stopsAt = nil
+            return
+        }
+        let seconds = deadline.timeIntervalSinceNow
+        stopsAt = deadline
+        automaticStop = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            await self?.stop()
+        }
+    }
+
+    /// When a take started at `now` under a `minutes` bound will stop itself; nil ⇒ no bound.
+    /// Pure, so the deadline the menu states is testable without a capture session.
+    static func automaticStopDate(from now: Date, minutes: Int) -> Date? {
+        guard minutes > 0 else { return nil }
+        return now.addingTimeInterval(Double(minutes) * 60)
     }
 
     /// Throw the current take away: the file is removed and the session ends at `.discarded`,
@@ -1442,6 +1525,9 @@ public final class AppState {
                 configuration: replayCaptureConfiguration(), seconds: Double(replaySeconds),
                 outputDirectory: outputDirectory)
         }
+        automaticStop?.cancel()
+        automaticStop = nil
+        stopsAt = nil
         activeMicrophoneName = nil
         activeAppName = nil
         activeRegion = nil
