@@ -267,6 +267,69 @@ import RecorderCore
         }
     }
 
+    // MARK: - Adjusting a region pick (M18-T5)
+
+    @Test func theFlipIsItsOwnInverseSoAPickCanBeReopened() {
+        // Seeding the overlay converts the stored SCK rect back to view points with the same
+        // function the confirm path uses. If that ever stopped round-tripping, a re-opened pick
+        // would appear somewhere other than where it records.
+        let height: CGFloat = 1285
+        for rect in [CGRect(x: 40, y: 60, width: 800, height: 500),
+                     CGRect(x: 0, y: 0, width: 1285, height: 1285)] {
+            let there = RegionSelection.sckRect(fromViewRect: rect, displayHeightPoints: height)
+            #expect(RegionSelection.sckRect(fromViewRect: there, displayHeightPoints: height) == rect)
+        }
+    }
+
+    @Test func nudgingMovesWithoutResizingAndStopsAtTheEdge() {
+        let screen = CGRect(x: 0, y: 0, width: 1000, height: 800)
+        let rect = CGRect(x: 100, y: 100, width: 200, height: 150)
+        let moved = RegionSelection.nudged(rect, dx: 10, dy: -5, in: screen)
+        #expect(moved == CGRect(x: 110, y: 95, width: 200, height: 150))   // size untouched
+
+        // Clamped whole: a nudge at the edge stops rather than pushing the rect off-screen.
+        let atEdge = RegionSelection.nudged(
+            CGRect(x: 800, y: 0, width: 200, height: 150), dx: 50, dy: -50, in: screen)
+        #expect(atEdge == CGRect(x: 800, y: 0, width: 200, height: 150))
+    }
+
+    @Test func resizingMovesTheFarEdgeAndKeepsARecordableSize() {
+        let screen = CGRect(x: 0, y: 0, width: 1000, height: 800)
+        let rect = CGRect(x: 100, y: 100, width: 200, height: 150)
+        // The origin stays put, so the corner the user is watching is the one that moves.
+        #expect(RegionSelection.resized(rect, dx: 10, dy: 10, in: screen)
+            == CGRect(x: 100, y: 100, width: 210, height: 160))
+        // Never below the floor that would make the pick unrecordable (M11-T1)…
+        let tiny = RegionSelection.resized(rect, dx: -500, dy: -500, in: screen)
+        #expect(tiny.width == RegionSelection.minimumSide)
+        #expect(tiny.height == RegionSelection.minimumSide)
+        // …and never past the display's edge.
+        let huge = RegionSelection.resized(rect, dx: 5000, dy: 5000, in: screen)
+        #expect(huge.maxX == screen.maxX)
+        #expect(huge.maxY == screen.maxY)
+    }
+
+    @Test func aDragSnapsToAStandardSizeAndSaysSo() {
+        // The case the badge was added for: 1920 × 1080 px is 960 × 540 pt on a 2× display, and
+        // people were missing it by a few points.
+        let near = CGRect(x: 20, y: 30, width: 956, height: 543)
+        let pulled = RegionSelection.snapped(near, scale: 2)
+        #expect(pulled.snapped)
+        #expect(pulled.rect == CGRect(x: 20, y: 30, width: 960, height: 540))   // origin kept
+        #expect(RegionSelection.badgeText(
+            width: pulled.rect.width, height: pulled.rect.height, scale: 2, snapped: true)
+            == "960 × 540 pt · 1920 × 1080 px · snapped")
+    }
+
+    @Test func aDeliberateSizeIsLeftAlone() {
+        // A magnetic snap that can't be escaped would make odd-but-intended sizes unreachable.
+        let odd = CGRect(x: 0, y: 0, width: 900, height: 400)
+        let pulled = RegionSelection.snapped(odd, scale: 2)
+        #expect(pulled.snapped == false)
+        #expect(pulled.rect == odd)
+        #expect(RegionSelection.badgeText(width: 900, height: 400, scale: 2).hasSuffix("px"))
+    }
+
     // MARK: - Region overlay badge + caveat (M12-T4)
 
     @Test func badgeTextShowsPointsAndPixels() {

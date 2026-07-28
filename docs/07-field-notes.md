@@ -7,6 +7,20 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-28 (M18-T5):
+  - ⚠️ **A deploy can report success and still be stale.** `swift build -c release` + `Scripts/bundle.sh`
+    + `ditto` all succeeded, yet the running app showed the new hint line while missing the new badge
+    suffix from the *same* build. A second round of exactly those three commands fixed it. Verify a
+    deployed behaviour by re-running the leg; `strings` is only conclusive for long literals (Swift
+    inlines short ones, so a missing 11-byte string proves nothing).
+  - ⚠️ **A synthetic menu click doesn't activate the app, so synthetic keys go to whatever *is*
+    frontmost.** Arrow keys aimed at the region overlay went to Firefox until the driver called
+    `NSRunningApplication.activate` first — the overlay draws above everything at `.screenSaver`
+    level, which makes it look focused when it isn't.
+  - ✅ **The SCK↔view flip is its own inverse** (`sckRect(fromViewRect:displayHeightPoints:)`), so
+    re-opening the overlay on a stored pick needs no second conversion — and no second place for a
+    top-left/bottom-left error to hide.
+
 - 2026-07-28 (M18-T4):
   - ✅ **A bare `Esc` works as a Carbon hotkey**, which is the only way to cancel the count-in: the
     overlay is `canBecomeKey = false` + `ignoresMouseEvents` on purpose, so no key event can reach

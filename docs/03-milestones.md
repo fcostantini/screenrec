@@ -1592,26 +1592,26 @@ ride the same bump.
       **string**, which the first loader silently rejected (fixed to read like its siblings), and a
       first attempt at the Esc leg raced its own `swift` compile so the key landed before the count.
 
-- [ ] M18-T5 **A region pick can be adjusted.** A drawn region can't be nudged, resized or snapped —
-      re-selecting means redrawing from scratch, which is painful when you're trying to frame exactly
-      1920×1080 px (the very case M12-T4's `pt · px` badge was added for). **Seams:** the
-      `RegionSelectionOverlay` re-opens seeded with the current rect instead of empty; arrow keys
-      nudge (⇧ for a larger step); optional snap to common sizes while dragging. **Rulings:** whether
-      snapping is automatic or modifier-held. **Verify:** re-open `Select Region…` with a region set
-      → the previous rect is drawn and adjustable; the confirmed rect still round-trips through
-      persistence and records the right pixels (M11 gate unaffected).
-
-- [ ] M18-T6 **The Settings window is too tall to fit.** (Franco, 2026-07-27, on seeing M18-T2's new
-      section.) It is one `Form` with `.fixedSize()`, so it grows without bound — General + Instant
-      Replay + MP4 + GIF now runs past a laptop screen, and every future preference makes it worse.
-      **Seams:** a `TabView` splitting it into **General · Recording · Instant Replay · Sharing**
-      (MP4 + GIF), the standard Mac pattern and the smallest change with the largest effect; the
-      window then sizes to its tallest tab. **Cheaper alternatives if tabs are unwanted:** collapse
-      the long captions (the replay/notifications explainer is six lines), or move that explainer
-      into onboarding, where it is first relevant. **Rulings:** tabs vs sidebar vs collapse-only, and
-      whether the version footer follows General or stays global. **Verify:** the window fits a
-      1440-point-tall screen with every section reachable; each preference still round-trips (the
-      persistence tests are unaffected — this is layout only).
+- [x] M18-T5 **A region pick can be adjusted.** **Rulings (Franco, 2026-07-28):** the drag snaps
+      **magnetically** within ~6 pt and the badge says `· snapped` (a modifier-held snap only helps
+      people who know it exists, and this is for the ones missing 1920×1080 by four pixels); the
+      standard sizes are **1920×1080, 1280×720, 3840×2160, 1080×1080**, compared in pixels.
+      **Two premises measured before building, both cheap:** the SCK↔view coordinate flip is **its
+      own inverse**, so seeding the overlay is the shipped function applied twice — no new geometry;
+      and the overlay is **already a key window with a live `keyDown`**, so arrows are a new `case`,
+      not a new mechanism. **As built:** `present(seededWith:)` draws the stored pick (only when it
+      belongs to this display and still fits — a stale rect starts empty rather than off-screen),
+      arrows nudge 1 pt / ⇧ 10, ⌥+arrows resize from the far edge, all clamped to the display and to
+      M11-T1's floor; the pure arithmetic lives beside `sckRect`/`badgeText` in `RegionSelection`.
+      Keys never snap, so a deliberately odd size stays reachable.
+      **Verified live on the deployed build:** the overlay re-opened with the previous rectangle
+      drawn (`800 × 500 pt · 1600 × 1000 px`); two ⇧→ moved it 100 → **120** with the size untouched;
+      ⌥⇧→ and ⌥⇧↑ gave **810 × 510** (the persisted SCK `y` moving 100 → 90 is right — it is the top
+      edge, and the rect grew upward); Esc discarded an adjustment; a 956 × 543 drag snapped to
+      **`960 × 540 pt · 1920 × 1080 px · snapped`**; and the adjusted region recorded **1620 × 1020
+      px**, so M11's gate is unaffected. 530 tests (+5). ⚠️ The first deploy of this task was
+      **stale despite reporting success** — the badge lacked its new suffix until a second
+      `swift build -c release` + `bundle.sh` + `ditto`; re-run the leg, don't assume the deploy took.
 
 **Gate G18**: a trim states the cut point it will actually make and a precise trim hits the requested
 second exactly; an MP4 export honours a chosen size; the idle menu is materially shorter with every

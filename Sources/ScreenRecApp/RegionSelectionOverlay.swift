@@ -8,12 +8,27 @@ import AppKit
 final class RegionSelectionController {
     private var window: NSWindow?
 
-    /// Opens the overlay on the main display. `completion` fires once, on confirm, with the
-    /// display id and the rect in SCK points (top-left origin, docs/02 §1b); a cancel fires nothing.
-    func present(completion: @escaping (CGDirectDisplayID?, CGRect) -> Void) {
+    /// Opens the overlay on the main display, drawn with `seed` already selected when one is given
+    /// (M18-T5) so an existing pick can be corrected instead of redrawn. `completion` fires once,
+    /// on confirm, with the display id and the rect in SCK points (top-left origin, docs/02 §1b);
+    /// a cancel fires nothing, leaving whatever pick was there.
+    func present(
+        seededWith seed: RegionSelection? = nil,
+        completion: @escaping (CGDirectDisplayID?, CGRect) -> Void
+    ) {
         guard window == nil, let screen = Self.mainScreen() else { return }
         let displayID = Self.displayID(of: screen)
         let view = RegionSelectionView(frame: NSRect(origin: .zero, size: screen.frame.size))
+        // Same flip as the confirm path — it is its own inverse — and only for a pick that belongs
+        // to this display and still fits it: a stale rect from another resolution starts empty
+        // rather than off-screen (M11-T1 fails those loud at start; here we simply don't seed).
+        if let seed, seed.displayID == nil || seed.displayID == displayID {
+            let asView = RegionSelection.sckRect(
+                fromViewRect: seed.rect, displayHeightPoints: screen.frame.height)
+            if NSRect(origin: .zero, size: screen.frame.size).contains(asView) {
+                view.selection = asView
+            }
+        }
         // The badge needs the display's backing scale for pixels; the caveat needs the display count
         // (main-display-only is honest only when there's more than one) — M12-T4.
         view.scale = screen.backingScaleFactor
@@ -78,7 +93,10 @@ private final class RegionSelectionView: NSView {
     var displayCount: Int = 1
 
     /// The provisional selection, or nil before the first drag. Normalized (positive size).
-    private var selection: NSRect?
+    /// Seeded by the controller when the user already had a pick (M18-T5).
+    var selection: NSRect?
+    /// Whether the current selection landed on a standard size, for the badge (M18-T5).
+    private var didSnap = false
     private var dragOrigin: NSPoint?
     private var mouseDownPoint: NSPoint?
 
@@ -114,14 +132,17 @@ private final class RegionSelectionView: NSView {
             border.stroke()
 
             drawBadge(
-                RegionSelection.badgeText(width: selection.width, height: selection.height, scale: scale),
+                RegionSelection.badgeText(
+                    width: selection.width, height: selection.height, scale: scale,
+                    snapped: didSnap),
                 near: selection)
         }
 
         if let caveat = RegionSelection.mainDisplayHint(displayCount: displayCount) {
             drawCaveat(caveat)
         }
-        drawHint("Drag to select a region   ·   Return to confirm   ·   Esc to cancel")
+        drawHint("Drag to select   ·   ← → ↑ ↓ nudge   ·   ⌥ resize   ·   ⇧ ×10"
+            + "   ·   Return to confirm   ·   Esc to cancel")
     }
 
     private func drawBadge(_ text: String, near rect: NSRect) {
@@ -198,8 +219,16 @@ private final class RegionSelectionView: NSView {
             confirmIfValid()
             return
         }
-        selection = Self.normalized(from: dragOrigin ?? point, to: point)
-        if let selection, selection.width < minSide || selection.height < minSide { self.selection = nil }
+        let drawn = Self.normalized(from: dragOrigin ?? point, to: point)
+        // Magnetic within a few points of a standard size, and the badge says so (M18-T5): the
+        // whole reason for this task is people missing 1920 × 1080 by a hair. Keys never snap.
+        let pulled = RegionSelection.snapped(drawn, scale: scale)
+        selection = pulled.rect
+        didSnap = pulled.snapped
+        if let selection, selection.width < minSide || selection.height < minSide {
+            self.selection = nil
+            didSnap = false
+        }
         needsDisplay = true
     }
 
@@ -209,8 +238,28 @@ private final class RegionSelectionView: NSView {
         switch event.keyCode {
         case 53: onCancel?()                    // Escape
         case 36, 76: confirmIfValid()           // Return / keypad Enter
+        case 123, 124, 125, 126: adjust(keyCode: event.keyCode, modifiers: event.modifierFlags)
         default: super.keyDown(with: event)
         }
+    }
+
+    /// Arrow keys move the rectangle, ⌥ resizes it from the far edge, ⇧ makes either coarse
+    /// (M18-T5). Exact by construction — a nudged rect is never pulled onto a standard size, so a
+    /// deliberately odd one stays reachable.
+    private func adjust(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
+        guard let current = selection else { return }
+        let step: CGFloat = modifiers.contains(.shift) ? 10 : 1
+        let (dx, dy): (CGFloat, CGFloat) = switch keyCode {
+        case 123: (-step, 0)     // ←
+        case 124: (step, 0)      // →
+        case 125: (0, -step)     // ↓ (the view is not flipped: down is negative y)
+        default: (0, step)       // ↑
+        }
+        selection = modifiers.contains(.option)
+            ? RegionSelection.resized(current, dx: dx, dy: dy, in: bounds)
+            : RegionSelection.nudged(current, dx: dx, dy: dy, in: bounds)
+        didSnap = false
+        needsDisplay = true
     }
 
     override func cancelOperation(_ sender: Any?) { onCancel?() }

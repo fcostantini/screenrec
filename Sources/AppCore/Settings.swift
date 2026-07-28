@@ -58,16 +58,71 @@ public struct RegionSelection: Hashable, Sendable {
     /// The overlay size badge (M12-T4): points and pixels, e.g. `960 × 540 pt · 1920 × 1080 px` — a
     /// power user framing exactly 1920×1080 px needs the pixel size (points × the display's backing
     /// scale). Pure, so the formatting is unit-tested away from the AppKit drawing.
-    public static func badgeText(width: CGFloat, height: CGFloat, scale: CGFloat) -> String {
+    public static func badgeText(
+        width: CGFloat, height: CGFloat, scale: CGFloat, snapped: Bool = false
+    ) -> String {
         let wpt = Int(width.rounded()), hpt = Int(height.rounded())
         let wpx = Int((width * scale).rounded()), hpx = Int((height * scale).rounded())
-        return "\(wpt) × \(hpt) pt · \(wpx) × \(hpx) px"
+        // The suffix only ever appears on a snap that really happened (M18-T5) — a magnetic pull
+        // the user didn't ask for has to announce itself.
+        return "\(wpt) × \(hpt) pt · \(wpx) × \(hpx) px" + (snapped ? " · snapped" : "")
     }
 
     /// The overlay's honesty caveat (M12-T4): region capture is main-display only (M11), so on a
     /// multi-display Mac the overlay says so; a single display needs no caveat (nil). Pure predicate.
     public static func mainDisplayHint(displayCount: Int) -> String? {
         displayCount > 1 ? "Region capture uses the main display only" : nil
+    }
+
+    // MARK: - Adjusting a pick (M18-T5)
+
+    /// The sizes a drag snaps to, in **pixels** — three video standards and the square. A 2×
+    /// display turns 1920 × 1080 px into a 960 × 540 pt rectangle, so the comparison happens in
+    /// pixels and the tolerance is in points.
+    public static let standardPixelSizes: [CGSize] = [
+        CGSize(width: 1920, height: 1080),
+        CGSize(width: 1280, height: 720),
+        CGSize(width: 3840, height: 2160),
+        CGSize(width: 1080, height: 1080),
+    ]
+
+    /// `rect` moved by `dx`/`dy` points, kept whole inside `bounds`. Pure. Moving, not resizing:
+    /// a nudge that silently changed the size would break the size the user just framed.
+    public static func nudged(_ rect: CGRect, dx: CGFloat, dy: CGFloat, in bounds: CGRect) -> CGRect {
+        var moved = rect.offsetBy(dx: dx, dy: dy)
+        moved.origin.x = min(max(moved.origin.x, bounds.minX), bounds.maxX - moved.width)
+        moved.origin.y = min(max(moved.origin.y, bounds.minY), bounds.maxY - moved.height)
+        return moved
+    }
+
+    /// `rect` grown or shrunk from its far edge by `dx`/`dy` points — the origin stays put, so the
+    /// corner the user is watching is the one that moves. Clamped to `bounds` and to `minimumSide`.
+    public static func resized(
+        _ rect: CGRect, dx: CGFloat, dy: CGFloat, in bounds: CGRect
+    ) -> CGRect {
+        let width = min(max(rect.width + dx, minimumSide), bounds.maxX - rect.minX)
+        let height = min(max(rect.height + dy, minimumSide), bounds.maxY - rect.minY)
+        return CGRect(x: rect.minX, y: rect.minY, width: width, height: height)
+    }
+
+    /// Below this a rectangle is too small to record (M11-T1's floor, in points).
+    public static let minimumSide: CGFloat = 2
+
+    /// A dragged rect pulled onto a standard size when it lands within `tolerance` points of one,
+    /// keeping its origin. Returns the rect unchanged, and `false`, when nothing is close — so a
+    /// deliberately odd size is always reachable, and the badge only claims a snap that happened.
+    public static func snapped(
+        _ rect: CGRect, scale: CGFloat, tolerance: CGFloat = 6
+    ) -> (rect: CGRect, snapped: Bool) {
+        guard scale > 0 else { return (rect, false) }
+        for pixels in standardPixelSizes {
+            let target = CGSize(width: pixels.width / scale, height: pixels.height / scale)
+            guard abs(rect.width - target.width) <= tolerance,
+                  abs(rect.height - target.height) <= tolerance
+            else { continue }
+            return (CGRect(origin: rect.origin, size: target), true)
+        }
+        return (rect, false)
     }
 }
 

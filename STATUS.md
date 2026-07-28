@@ -7,6 +7,27 @@
 ## Now
 
 
+- **✅ M18-T5 DONE (2026-07-28) — a region pick can be corrected instead of redrawn. M18 is one
+  task from complete (T6 only).** Plan artifact (rulings A1/B1 approved):
+  `claude.ai/code/artifact/0929e0e2-113e-4d2e-b09c-c19c1941607c`. **530 tests (+5)**, dev loop green,
+  deployed; Source restored to Entire Screen.
+  **Two premises measured first, both cheap:** the SCK↔view flip is **its own inverse**, so seeding
+  the overlay is the shipped function applied twice; and the overlay is **already a key window with
+  a live `keyDown`**, so arrows are a new `case`, not a new mechanism.
+  **As built:** `present(seededWith:)` (only for a pick that belongs to this display and still fits),
+  arrows nudge 1 pt / ⇧ 10, ⌥+arrows resize from the far edge, and a drag snaps magnetically onto
+  1920×1080 / 1280×720 / 3840×2160 / 1080×1080 **px** within ~6 pt with the badge appending
+  `· snapped`. Keys never snap, so an odd size stays reachable.
+  **Verified live:** the overlay re-opened with `800 × 500 pt · 1600 × 1000 px` drawn; two ⇧→ moved
+  it to **x 120**, size untouched; ⌥⇧ gave **810 × 510**; Esc discarded; a 956 × 543 drag became
+  **`960 × 540 pt · 1920 × 1080 px · snapped`**; the adjusted region recorded **1620 × 1020 px**
+  (M11's gate unaffected).
+  ⚠️ **The first deploy was stale despite reporting success** — the new hint line was in the running
+  app while the new badge suffix wasn't, from the same build; a second build + bundle + ditto fixed
+  it. And a synthetic menu click doesn't activate the app, so synthetic keys went to Firefox until
+  the driver activated ScreenRec first (both in docs/07).
+  **Next: M18-T6** (the Settings window's height — tabs), then **G18** and the MINOR bump.
+
 - **✅ M18-T4 DONE (2026-07-28) — four silences, each now saying what it knows.** Plan artifact
   (rulings A1/B1/C1 approved): `claude.ai/code/artifact/d3555144-9393-4af5-8e1f-750f470ae5b5`.
   **525 tests (+11)**, dev loop green, deployed and re-armed.

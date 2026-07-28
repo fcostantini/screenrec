@@ -49,7 +49,9 @@ struct ScreenRecApp: App {
         // closure is stored on `state`, which the controller must not retain.
         let regionSelector = ScreenRecApp.regionSelector
         state.beginRegionSelection = { [weak state] in
-            regionSelector.present { displayID, rect in state?.setRegion(displayID: displayID, rect: rect) }
+            regionSelector.present(seededWith: state?.selectedRegion) { displayID, rect in
+                state?.setRegion(displayID: displayID, rect: rect)
+            }
         }
         // First-arm banner-suppression alert (M12-T5): AppKit lives here, fired once ever by AppState.
         state.onReplayBannerWarning = { NotificationSettings.showArmedBannerWarning() }
