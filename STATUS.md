@@ -6,6 +6,20 @@
 
 ## Now
 
+- **🔍 FULL REVIEW (2026-07-28) — 18 findings; nothing implemented yet.** Code, architecture and
+  product review of v1.10.0, **driven against the running app** (the 2026-07-24 review's caveat was
+  that it wasn't): `claude.ai/code/artifact/63e7d73a-c519-4498-8f1b-e662f49393c4`.
+  **🔴 The headline is a shipped bug: the disk guard reads free space once and never again** — see
+  docs/07, measured. A long recording can still fill the disk, and the gate that "verified" the
+  guard trips on the first poll so a frozen reading passes it.
+  **The rest, in short:** `AppState` is 1,572 lines / 122 public members (two more extractions
+  along seams that already worked); six units have no test naming them (`WriterDrain` the worst);
+  four `M:SS` formatters and loose hotkey ids; window titles persist in plaintext preferences;
+  nothing prunes `~/Movies` (one take = 5.5 GB); trim→export is two steps where Franco's own recipe
+  is one; and the highest-value missing feature is a **mark-this-moment hotkey**.
+  **Proposed:** M19 (the disk tells the truth · PATCH) → M20 (marks · MINOR) → M21 (one-step
+  sharing · MINOR) → M22 (structure · PATCH). **Franco's call what becomes a milestone.**
+
 - **🎉 v1.10.0 CUT, PUSHED AND INSTALLED (2026-07-28) — M18 (Editing & Menu polish) earns the MINOR.**
   `VERSION` + `CoreInfo.version` → 1.10.0 (pin test green), committed (`9478de3`), cut via
   **`Scripts/release.sh` run in the BACKGROUND** — full gate green (clean tree · version pin · tag

@@ -7,6 +7,20 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-28 (full review): 🔴 **The disk guard has never been able to see the disk filling.**
+  `DiskSpaceMonitor(watching:)` captures one `URL` and polls
+  `availableBytes(forVolumeContaining:)` on that same instance — and `URL` caches resource values
+  per instance, so every poll after the first returns the free space as it was when the recording
+  started. Measured on a 200 MB volume after writing 100 MB into it: the **held** instance still
+  reported **204,754,944** bytes free while a **fresh** one reported **99,897,344**. So the 2 GB
+  fail-stop floor only trips if the disk was already below it at Start, and ADR-007's "never
+  fail-weird" is unmet for the most likely long-take failure.
+  ⚠️ **The gate could not have caught it:** G3 §4.4 verifies the guard with
+  `--test-disk-floor 500000` — a floor above the volume's free space, so it trips on the *first*
+  poll, which a frozen reading satisfies. A test hook built to fire on demand says nothing about
+  whether the thing it fires can observe change. Third instance of this `URL` gotcha in two days
+  (M18-T3's recents, M18-T4's room figure), and the only one on a safety path.
+
 - 2026-07-28 (M18-T6):
   - ⚠️ **`TabView` collapses macOS toolbar tabs into a `»` overflow menu when the window is
     narrow** — at 460 pt all four of ours hid behind a chevron, worse than the tall page it
