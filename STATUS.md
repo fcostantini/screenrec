@@ -6,6 +6,19 @@
 
 ## Now
 
+- **🚫 M19-T2 AND M19-T3 CLOSED "WON'T DO" (2026-07-28, Franco) — the app does not delete the
+  user's files.** Ruled out at the plan gate, before any code: plan artifact
+  `claude.ai/code/artifact/1fb4f5fa-a182-485f-a929-ef11730eed67`. T2 was a GB cap on the recordings
+  folder (swept after finalize, Trash-only); T3 was trashing a recording once its export landed —
+  both out, background policy or per-export offer alike. Cleaning up stays a Finder job.
+  **Worth keeping from the plan:** the real `~/Movies` holds **two clips Franco made himself, and
+  they are the oldest files in it** — so the obvious "trash the oldest `.mov`s over the cap" would
+  have taken his files first. Any future retention idea starts from "only files ScreenRec named".
+  **Consequences:** G19 amended (the cap criterion removed), and **M19 is now a PATCH, not a MINOR**
+  — with retention gone the milestone adds no new capability.
+  **Next: M19-T4** (MP4 picker sizes named by destination, not by pixels) — plan artifact first.
+  Then M19-T5 (a window pick stops storing its title), then G19.
+
 - **✅ M19-T1 DONE (2026-07-28) — the disk guard can finally see the disk filling.** Plan artifact
   (rulings A/B/C/D approved): `claude.ai/code/artifact/59035276-224a-457b-b5e7-089fa5d7c780`.
   **533 tests (+3)**, full dev loop green.

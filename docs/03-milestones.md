@@ -1647,8 +1647,8 @@ for styling the bridge won't carry (docs/06 "Menu text styling").
 The 2 GB fail-stop floor **has never been able to see the disk filling** (A1, measured), nothing ever
 prunes `~/Movies` where one take is 5.5 GB, and a picked window's title is written to preferences in
 plaintext. Everything here is about the app being straight with you regarding disk and privacy.
-Earns a **MINOR** if retention ships as a setting (a new user-facing capability, ADR-013); the guard
-fix alone would be a PATCH.
+**PATCH** (ADR-013): with T2/T3 closed "won't do" the milestone adds no user-facing capability —
+a safety fix, clearer picker labels, and a preference that stops being written.
 
 - [x] M19-T1 **The disk guard can see the disk filling.** ✅ 2026-07-28 — `availableBytes(
       forVolumeAtPath:)` builds its `URL` per poll, so no caller can hold one; `AppState`'s room
@@ -1669,27 +1669,19 @@ fix alone would be a PATCH.
       the only evidence). **Verify:** a unit test driving a *falling* injected sequence (the current
       tests only prove the threshold arithmetic); plus a live leg on a small disk image that actually
       fills **during** a recording → `finished (diskAlmostFull)` and a playable file.
-- [ ] M19-T2 **The recordings folder has a ceiling.** Nothing prunes `~/Movies`; a 23-minute take
-      measured 5.5 GB, and the only disk statement in the product is M18-T4's "Room for about N" row,
-      which appears below two hours' worth. **Seams:** `RecentRecordings.inDirectory` already lists
-      and date-sorts the folder — the selection ("which files are over the cap") is the same pure
-      shape as `newest(_:limit:)` and belongs beside it; the setting is a row in Settings' General
-      tab (M18-T6); deletion goes through the same `moveToTrash` path M12-T2 uses. **Rulings:** keep
-      last N takes, or N GB, or both; and when the sweep runs — at launch, or after each recording
-      finalizes (the launch sweep for orphaned `.partial` files is the precedent, M15-T3). ⚠️ Trash,
-      never delete: reversible actions need no confirmation (M12-T2), irreversible ones do, and this
-      one runs unattended. **Verify:** unit tests for the pure "which files would go" selection
-      (including: never the recording in progress, never a file younger than the newest take); live:
-      exceed the cap, watch the oldest land in the Trash and the recents list update at the next
-      menu open.
-- [ ] M19-T3 **Delete the original when the export lands.** The two-step share workflow leaves the
-      source `.mov` behind, which is the file that costs gigabytes. **Seams:**
-      `ExportModel.performExport`'s success path, where the receipt is already set; the same
-      `moveToTrash` route as M19-T2. **Rulings:** an opt-in setting, or a per-export choice, or an
-      action on the export receipt row (the receipt already carries a submenu, M12-T1); and whether
-      it is offered for GIF at all (a GIF is not a replacement for its source). **Verify:** live,
-      through the app: export, confirm the original is in the Trash and the recents row is gone;
-      confirm a *failed* export never deletes anything.
+- [x] ~~M19-T2 **The recordings folder has a ceiling.**~~ — **CLOSED "won't do" 2026-07-28
+      (Franco): the app does not delete the user's files.** The plan artifact
+      (`claude.ai/code/artifact/1fb4f5fa-a182-485f-a929-ef11730eed67`) proposed a GB cap swept after
+      finalize, Trash-only, restricted to ScreenRec's own file names — that restriction came from
+      inventorying the real `~/Movies`, which holds **two clips Franco made himself and they are the
+      oldest files in it**, so the obvious "trash the oldest `.mov`s" would have taken those first.
+      Ruled out at the plan gate anyway: an unattended deleter is not something this product wants,
+      whatever its safety rules. Cleaning up stays the user's job in Finder. Don't re-file it without
+      a new reason; the 5.5-GB-per-take fact is unchanged and is stated by M18-T4's "Room for about
+      N" row.
+- [x] ~~M19-T3 **Delete the original when the export lands.**~~ — **CLOSED "won't do" 2026-07-28
+      (Franco)**, with M19-T2 and for the same reason: the app deleting a recording is out, whether
+      it is a background policy or a per-export offer. An export leaves its source alone.
 - [ ] M19-T4 **MP4 sizes named by destination, not by pixels.** M18-T2 stops at H.264 Level 5.2 so
       phones can decode it, but the picker still reads `1280 px · 1920 px · 2560 px · Largest`, and
       the largest is far outside what messaging apps accept — the recipe Franco actually uses is
@@ -1707,10 +1699,10 @@ fix alone would be a PATCH.
       plist (no title), relaunch → the row still labels itself from the live list; close the window
       → the row still reads sensibly and Start still fails loud.
 
-**Gate G19**: a recording running on a volume that fills **during the take** stops itself with
-`diskAlmostFull` and leaves a playable file (not just one that started below the floor); the
-recordings folder stays under its cap without ever touching the take in progress; no window title
-appears in the preferences plist; the MP4 picker names what its sizes are for.
+**Gate G19** (amended 2026-07-28, T2/T3 closed "won't do"): a recording running on a volume that
+fills **during the take** stops itself with `diskAlmostFull` and leaves a playable file (not just
+one that started below the floor); no window title appears in the preferences plist; the MP4 picker
+names what its sizes are for.
 
 ## M20 — Marks (from the 2026-07-28 review, finding F1)
 
@@ -1875,6 +1867,9 @@ dozen.** T2 nested the window list inside a single `Window ▸` row rather than 
   disk and get whatever `AVAssetWriter` does when a volume is full. Everything else on this roadmap
   is an improvement; this one can lose a recording that can't be re-recorded. The rest of M19 rides
   along because it is the same subject — the disk, and what the app is willing to say about it.
+  **Amended 2026-07-28:** what it is *not* willing to do is delete your files — T2 (a folder cap)
+  and T3 (trashing an export's source) are both closed "won't do", so M19 says things about the
+  disk and never removes anything from it.
 - **M20 next** because it is the only item that adds capability rather than polish, and because it
   compounds: marks make the long-recording strength usable, and M21-T1's ranged export gets more
   useful once you can find the range.
