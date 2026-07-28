@@ -14,6 +14,16 @@
   floor could only trip on a disk that was *already* too full at Start; the gate that "verified" it
   used a floor above the volume's free space, so it tripped on the first poll and a frozen reading
   passed. 04 §4.4 now rests on a falling volume instead.
+  **CUT AND INSTALLED:** `VERSION` + `CoreInfo.version` → 1.10.1 (pin test green), committed
+  (`50947b5`), `Scripts/release.sh` run in the **background** — full gate green (clean tree · version
+  pin · tag free · build · **539 tests** · encode ×3 · release build · bundle-sign) — tagged
+  **`v1.10.1`**, and main + tag pushed **by hand afterwards** (the background run's `Push? [y/N]`
+  reads N with no terminal — unchanged, and M22-T5 is the fix). **Deployed** to
+  `/Users/Shared/ScreenRec.app`: pid 93702 → **96618**, plist `CFBundleShortVersionString` = 1.10.1,
+  menu **Ready**, replay re-armed unaided, Source Entire Screen.
+  **Next: Franco's call.** The 2026-07-28 review roadmap has **M20 (Marks)** next by the documented
+  order, then M21 (One step from "it happened" to "here it is") and M22 (Structure — which now
+  carries T6, the GitHub release asset).
 
 - **✅ M19-T5 DONE (2026-07-28) — a window pick is an identity, not a title. M19's five tasks are
   all closed (T1/T4/T5 shipped, T2/T3 won't-do).** Plan artifact (rulings A/B/C approved):
