@@ -1670,3 +1670,195 @@ Closed entries, moved verbatim to keep STATUS.md's "Now" readable. Unmaintained.
   SHIPPED.** Tags this arc: v1.6.1 (M13), v1.7.0 (M12), v1.7.1 (M14). **Next: Franco's call — dogfood, or
   scope new work (no planned milestones remain; webcam DECLINED ADR-017, studio/compositing parked
   ADR-015).**
+
+## M18 (Editing & Menu polish), v1.9.0 and v1.10.0 — rotated from STATUS.md 2026-07-28
+
+- **🎉 v1.10.0 CUT, PUSHED AND INSTALLED (2026-07-28) — M18 (Editing & Menu polish) earns the MINOR.**
+  `VERSION` + `CoreInfo.version` → 1.10.0 (pin test green), committed (`9478de3`), cut via
+  **`Scripts/release.sh` run in the BACKGROUND** — full gate green (clean tree · version pin · tag
+  free · build · **530 tests** · encode ×3 · release build · bundle-sign), tagged **`v1.10.0`**.
+  MINOR not PATCH (ADR-013): six user-facing improvements. **0 unpushed; tag on origin**
+  (`v1.10.0` → `9478de3`). ⚠️ As always, **the background run does not push** — its `[y/N]` prompt
+  reads N with no terminal — so main + tag went up manually afterwards.
+  **DEPLOYED to `/Users/Shared/ScreenRec.app`** by the *new* recipe (M18-T4): **`menudriver click
+  "Quit"`, not `kill -9`** — it exits in ~2 s and tears the SCK stream down properly, releasing the
+  audio tap a SIGKILL strands. **pid 73378 → 76580**, plist `CFBundleShortVersionString` = 1.10.0,
+  and the app says so itself: Settings › General reads **`ScreenRec 1.10.0`**. Replay re-armed
+  unaided, Source still Entire Screen, TCC intact across the swap.
+  **Next: Franco's call — dogfood 1.10.0, or scope new work.** The 2026-07-24 review roadmap
+  (M15 Gate & Debt · M16 Honest State · M17 Window capture · M18 Editing & Menu polish) is now
+  **fully shipped**; no planned milestones remain.
+
+
+- **✅ M18-T6 DONE (2026-07-28) — Settings is four tabs; 1137 pt → 437. ALL SIX M18 TASKS ARE
+  DONE.** Plan artifact (rulings A1/B1 approved):
+  `claude.ai/code/artifact/1e6438cb-3c97-49fb-843e-3981ebfa596c`. **530 tests unchanged** (layout
+  only — no binding, key or `AppState` property moved), deployed.
+  **Measured first:** 420 × **1137 pt** against **1260 pt** of usable screen — **90%** — and as one
+  `Form` with `.fixedSize()` it had no ceiling; a 13-inch Air would lose ~200 pt off the bottom.
+  **As built:** **General** (folder, launch at login, menu-bar toggles, version) · **Recording**
+  (quality, frame rate, count-in, both global shortcuts) · **Instant Replay** · **Sharing**
+  (MP4 + GIF). Recording collects what changes what a take *is*.
+  ⚠️ **`TabView` was the wrong mechanism and only a screenshot said so:** at this width SwiftUI
+  collapsed all four toolbar tabs into a **`»` overflow menu** — Franco saw it before I did. A
+  `Picker(.segmented)` over a `Page` enum can't collapse.
+  **Verified live per tab:** General 292 · Recording 289 · Instant Replay 372 · **Sharing 437 pt**
+  (tallest), every row in its intended tab, and a Sharing picker round-tripped (`gifFPS` 15 → 20 →
+  15, restored). **90% → 35% of the usable screen.**
+  🔴 **Also found: a python range-rewrite in the M18-T5 commit silently deleted the filed M18-T6
+  entry from docs/03** — committed and pushed before it was noticed, restored here. Third
+  silent-replace casualty this session (docs/07).
+  **🎉 GATE G18 PASSED (2026-07-28)** — evidence in the table below; its first criterion was
+  **amended**, because M18-T1 measured the premise it was written on to be false (a lossless trim
+  never cut early). **The capture path is untouched: `git diff v1.9.0..HEAD` over
+  `RecorderCore/Capture` and `RecorderCore/Recording` is empty**, and a regression capture is
+  4112×2570 hvc1 + 2 audio tracks.
+  **M18 is six user-facing improvements → MINOR (ADR-013): 1.10.0** (bump
+  `VERSION` + `CoreInfo.version`, then `Scripts/release.sh` **in the background** — never under a
+  short foreground timeout, or it gets SIGTERM'd mid-encode — then push main **and** the tag, which
+  the background run does not do).
+
+- **✅ M18-T5 DONE (2026-07-28) — a region pick can be corrected instead of redrawn.** Plan artifact (rulings A1/B1 approved):
+  `claude.ai/code/artifact/0929e0e2-113e-4d2e-b09c-c19c1941607c`. **530 tests (+5)**, dev loop green,
+  deployed; Source restored to Entire Screen.
+  **Two premises measured first, both cheap:** the SCK↔view flip is **its own inverse**, so seeding
+  the overlay is the shipped function applied twice; and the overlay is **already a key window with
+  a live `keyDown`**, so arrows are a new `case`, not a new mechanism.
+  **As built:** `present(seededWith:)` (only for a pick that belongs to this display and still fits),
+  arrows nudge 1 pt / ⇧ 10, ⌥+arrows resize from the far edge, and a drag snaps magnetically onto
+  1920×1080 / 1280×720 / 3840×2160 / 1080×1080 **px** within ~6 pt with the badge appending
+  `· snapped`. Keys never snap, so an odd size stays reachable.
+  **Verified live:** the overlay re-opened with `800 × 500 pt · 1600 × 1000 px` drawn; two ⇧→ moved
+  it to **x 120**, size untouched; ⌥⇧ gave **810 × 510**; Esc discarded; a 956 × 543 drag became
+  **`960 × 540 pt · 1920 × 1080 px · snapped`**; the adjusted region recorded **1620 × 1020 px**
+  (M11's gate unaffected).
+  ⚠️ **The first deploy was stale despite reporting success** — the new hint line was in the running
+  app while the new badge suffix wasn't, from the same build; a second build + bundle + ditto fixed
+  it. And a synthetic menu click doesn't activate the app, so synthetic keys went to Firefox until
+  the driver activated ScreenRec first (both in docs/07).
+  **Next: M18-T6** (the Settings window's height — tabs), then **G18** and the MINOR bump.
+
+- **✅ M18-T4 DONE (2026-07-28) — four silences, each now saying what it knows.** Plan artifact
+  (rulings A1/B1/C1 approved): `claude.ai/code/artifact/d3555144-9393-4af5-8e1f-750f470ae5b5`.
+  **525 tests (+11)**, dev loop green, deployed and re-armed.
+  **(1) <kbd>Esc</kbd> cancels the count-in.** The overlay is click-through and never key, so no key
+  event can reach it and a global monitor needs a TCC grant this product has never required —
+  measured that a **bare-Esc Carbon hotkey registers and fires** in an accessory app, not frontmost
+  (02 §9). Registered only while the count runs, since it swallows Esc system-wide.
+  **(2) `Stop After ▸`** (Off/5/15/30/60) stops through the shipped `.userStopped` path; the
+  recording menu states `Stops at 2:35 PM` — absolute, locale-formatted, never ticking.
+  **(3) `Room for about 40 min at High`** under Start, below a 2-hour threshold.
+  **(4)** Every file action is built through one `fileButton` that checks the file first, so an
+  unguarded one can't be written; the export receipt is existence-checked at menu open and the
+  replay receipt is cleared too — it was the one row nothing else dropped.
+  **🔴 Review caught the disk row over-promising by the entire 2 GiB fail-stop reserve** — 4 GiB
+  free would have read "about 30 min" for a take that stops at ~15. It now subtracts the reserve
+  and says `Not enough room to record` when there is none; measured after the fix at 2.7 GiB →
+  **2 min** and 1.2 GiB → **Not enough room**. Review also found three actions (Trim/Rename/Trash)
+  still bypassing the check, and the room figure doing volume I/O on every menu body build through
+  a URL whose cached values never cleared — yesterday's `URL` lesson, repeated.
+  **Verified live:** Esc cancelled twice with no file written and Start immediately reusable; a take
+  begun at 09:30 under a 5-minute bound read `Stops at 9:35`; a row whose file was deleted under an
+  open menu dropped itself on click.
+  ⚠️ **Deploy hygiene changed:** stop using `kill -9` — `menudriver click "Quit"` exits cleanly in
+  ~2 s **and releases the SCK audio tap** (assertions went 2 → 1). A SIGKILL skips stream teardown,
+  which is how a tap gets stranded; this machine carries an unrelated 18-hour-old one.
+  **Next: M18-T5** (a region pick can be adjusted) — plan artifact first. Then G18 and the MINOR.
+
+- **✅ M18-T3 DONE (2026-07-27) — the menu's file browser is one `Recordings ▸` row.** Plan artifact
+  (rulings A1/B1 approved): `claude.ai/code/artifact/e6b55bd5-fe54-455a-a06d-f55aa11b8431`.
+  **513 tests (+5)**, full dev loop green, deployed and re-armed.
+  **Measured before designing:** the idle menu is **20 rows** today (3 recordings, no exports) and
+  **32 at worst**; the folder + 5 recents + the `Recent Exports` label + 3 exports are 9 of them.
+  Folding leaves **17 / 23**. Duration per row is affordable — **1–8 ms**, and the 657 MB file was
+  the *fastest* of three (header read, not a scan) — so rows read `<name> — 23:04 · 5.5 GB`, read
+  off the open and cached by modification date (M6-T10).
+  ⚠️ **A test caught a bug review would not have:** `URL` caches resource values per instance and
+  the menu holds its URLs across opens, so a re-recorded file kept its first size forever until the
+  cache check started clearing them.
+  **Verified live:** `menudriver dump` before/after → **20 → 17** rows; every action still present
+  (the only diffs are three window titles that changed between dumps and the intended `Open
+  Recordings Folder` → `Open Folder` rename); open time **0.57–0.60 s** vs the **0.57–0.59 s**
+  baseline — not measurably slower; rows carried their details on the *first* open
+  (`Replay … .mov — 4:30 · 656,9 MB`); the rewired folder row opened `~/Movies` in Finder.
+  **Next: M18-T4** (four small honesties) — plan artifact first. Its item (4) is where the stale
+  export-receipt row Franco hit belongs.
+
+- **✅ M18-T2 DONE (2026-07-27) — `Export as MP4` has a Size, and the ceiling is a decoder's, not
+  an API's.** Plan artifact (rulings A1/B1/C1 approved):
+  `claude.ai/code/artifact/6ded5178-712a-4862-990d-547be5f1a39d`. **508 tests (+6)**, dev loop green,
+  deployed.
+  **🔴 The measurement that bounded the task: docs/02 §3's "AVAssetWriter's H.264 path caps at
+  4096×2304" is false.** The writer encodes **4112×2570** H.264 fine — at **Level 6.0**, which most
+  phone decoders refuse. 4096×2304 is exactly **Level 5.2's** frame size, so the ceiling is a
+  *compatibility* one and **there is no honest "Original"** for a full-screen recording; the largest
+  safe output is **3686 × 2304**. 02 §3 corrected.
+  **As built:** an **MP4** Settings section above GIF with one **Size** picker — `1280 px · 1920 px ·
+  2560 px · Largest (3686 × 2304)`, the ceiling row naming what it would really produce for the
+  current source. Persisted `mp4Width` (absent ⇒ 1920, snap-on-load, the GIF pattern). Bitrate is not
+  a picker: it rises with the output's pixel count from 6 Mbps at 1920×1200 and **never falls below
+  it** — so no existing export gets softer, only larger picks get more. `export --to-mp4 --width` on the CLI.
+  **Verified:** four CLI exports — 1280×800 **L3.2** / 1920×1200 **L5.0** / 2560×1600 **L5.0** /
+  3686×2304 **L5.2**, every one yuv420p + faststart, bitrate up to 19.6 Mbps, 4.9 → 34.5 MB; and
+  live, the real picker set to `Largest (3686 × 2304)` → persisted `mp4Width = 4096` → menu export →
+  **3686 × 2304, High, Level 5.2**. Franco's setting restored to 1920 and the test files deleted.
+  ⚠️ **The review caught a real regression before it shipped:** my first cut scaled *symmetrically*,
+  so a 1280×800 region or window export would have dropped from 6 Mbps to 2.7 — every small share
+  clip quietly softer, at the untouched default setting. Floored at the reference and re-measured
+  (1280×800 → 5.94 Mbps). Also from the review: the Level 5.2 box is now enforced inside
+  `Exporter.fittedSize`, so no configuration can opt out of it, and the ceiling has one definition
+  instead of three literals across three modules.
+  **Next: M18-T3** (the menu diet) — plan artifact first. ⚠️ **Franco flagged the Settings window
+  itself is now too tall** (this task added a section): filed as **M18-T6**, tabs recommended.
+
+- **✅ M18-T1 DONE (2026-07-27) — the defect the task was filed on did not exist; the real one does,
+  and the window now states it.** Revised plan artifact (rulings A1 + B1, approved mid-task):
+  `claude.ai/code/artifact/0fc6e6c3-2d4b-4e14-a8f2-c97218ce6ab4`. **502 tests (+2)**, full dev loop
+  green, deployed to `/Users/Shared/ScreenRec.app` and re-armed.
+  **🔴 The premise was false and only opening a trimmed file said so.** A passthrough trim writes an
+  **edit list**: playback starts *exactly* at the in-point — the first presented frame is
+  **byte-identical** to the source frame there (md5), and ffmpeg agrees independently. "Up to two
+  seconds early" was inferred from "passthrough cuts at a sync sample" and had been in docs, copy and
+  a review finding for two milestones. **What is true: the cut frames stay inside the file**
+  (`ffprobe -ignore_editlist 1` → **13.56 s inside a 10.00 s clip**, decoding 3.43 s before the
+  in-point; video only — audio packets are all sync samples). Mechanism now in **docs/02 §6a**.
+  **🔴 Yesterday's precise path was a no-op.** `AVAssetExportPresetHEVCHighestQuality` + `timeRange`
+  **passes an HEVC source straight through** — **23,578,074 bytes both ways**, 0.1 s. It "preserved"
+  size, codec and both audio tracks because it never touched them; `--precise` would have written the
+  lossless file while printing "precise re-encode". `AVVideoComposition(propertiesOf:)` forces the
+  real encode, and the new unit test **fails without that one line** (verified by removing it).
+  **✅ The `non-monotonic timestamps` blocker was `probe`'s bug**, not the encoder's, and never
+  precise-specific — every trim triggered it, lossless included. Our capture emits B-frames (459 of
+  923 samples step back in PTS; DTS clean) and probe fell back to PTS for the four boundary samples
+  with no DTS, mixing two clocks. It now judges one clock per track; eight files re-probe clean.
+  **As built:** `TrimMode.lossless/.precise` on `Trimmer` (one exhaustive `switch`, so a preset can't
+  drift from its composition), `--precise` on the CLI, and in the window the lead-in line, a
+  **Re-encode** checkbox, <kbd>I</kbd>/<kbd>O</kbd> and **Play Range**.
+  **Live legs (deployed build, driven by AX):** `I`/`O` set In/Out by real key event; the lead-in
+  line reads **`Starts exactly at 0:02 · keeps 0.8 s before it inside the file`**; the toggle's label
+  tracks the range; Play Range starts at the in-point and advances; an app-driven precise Trim & Save
+  produced **hvc1 4112×2570 + 2ch + 1ch, no lead-in, probe clean**.
+  **🔴 Fixed a bug Franco hit mid-session:** closing the Trim window left the preview **playing**
+  (measured 72.22 s → 85.51 s across a 10 s closed window — a `Window` scene keeps its `@State`, and
+  reopening the same clip reused the running player). `.onDisappear` now unloads it; after: reopen
+  reads `pos 0, playing 0`.
+  **Next: M18-T2** (MP4 export options) — plan artifact first. ⚠️ **Also reported by Franco and NOT
+  fixed here (scope):** an export receipt whose file is deleted mid-session keeps its menu row, and
+  every action in it silently does nothing — the receipt is existence-checked only at launch. Same
+  class as M18-T4 item (4); fold it in there or take it as a one-commit fix first.
+
+- **🎉 v1.9.0 CUT, PUSHED AND INSTALLED (2026-07-27) — M17 (Window capture) earns the MINOR.**
+  `VERSION` + `CoreInfo.version` → 1.9.0 (pin test green), committed (`aec7685`), cut via
+  **`Scripts/release.sh` run in the BACKGROUND** — full gate green (clean tree · version pin · build ·
+  495 tests · encode×3 · release build · bundle-sign), tagged **`v1.9.0`**. MINOR not PATCH (ADR-013):
+  a new user-facing capture mode. **0 unpushed; tag on origin** (`v1.9.0` → `aec7685`).
+  ⚠️ **The background run does NOT push** — the script's `Push? [y/N]` prompt reads N with no terminal,
+  so main + tag went up manually afterwards; the tag push runs its own pre-push gate (docs/07).
+  **DEPLOYED to `/Users/Shared/ScreenRec.app`**, by the field-note recipe (`kill -9` the pid, not
+  `killall`, which does not terminate it and leaves the OLD binary running): **pid 8195 → 10819**,
+  plist `CFBundleShortVersionString` = 1.9.0, the M17 fail-loud copy present in the deployed binary
+  (`strings`), replay re-armed unaided, Source back to Entire Screen, TCC intact across the swap.
+  **Next: M18 (Editing & Menu polish)** — the last milestone on the 2026-07-24 review roadmap. Its T3
+  menu diet inherits exactly one extra row from M17-T2, `Window ▸`, not the dozen a flat list would
+  have cost; and M18-T4's “small honesties” is the natural home for the duplicate-label wrinkle a
+  relaunched app produces (a live row and a `(closed)` row with the same text).
