@@ -7,6 +7,27 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-28 (M19-T1): the guard fix, and two dead ends measured on the way.
+  - **The live A/B, at the real 2 GB floor with no test hook** (4 GB APFS image, ~2 GiB of `dd`
+    ballast landing 12 s into a 60 s take, free space crossing to 1.78 GiB): **before**, the take
+    ran all 60 s and reported `finished (userStopped)` — the guard never spoke; **after**,
+    `finished (diskAlmostFull)` at **15.3 s** wall clock, ~3 s after the crossing (2 s poll), and
+    the file probes 14.89 s hvc1 4112×2570 + AAC. That is the whole bug and the whole fix, in two
+    runs. It is now 04 §4.4's evidence; the `--test-disk-floor` hook stays only as a smoke check.
+  - ⚠️ **`setTemporaryResourceValue` cannot poison the volume-capacity keys.** The obvious
+    deterministic unit test — seed a `URL` with "1 byte free", assert the monitor ignores it —
+    does not exist: a URL seeded that way still read the real 752,069,908,356. Don't spend an
+    hour re-deriving it.
+  - ⚠️ **`URL` value copies share one resource-value cache**, so the shipped `var probe = url;
+    probe.removeAllCachedResourceValues()` idiom does not read "through a private copy": clearing
+    the copy also unfroze the **original** (measured — it started returning fresh values too). It
+    works, but it is a shared mutation, which is why the guard rebuilds from a path instead.
+  - **What a unit test *can* see:** the boot volume moves by exactly the bytes you write —
+    64 MiB → **67,108,864**, 5/5 trials, in 12–18 ms, on both capacity keys. So the regression
+    test sets the floor 32 MB under a live reading, writes 64 MiB, and polls again; it fails on
+    the held-`URL` code with "the volume fell below the floor and the guard stayed quiet"
+    (verified by reinstating that code).
+
 - 2026-07-28 (full review): 🔴 **The disk guard has never been able to see the disk filling.**
   `DiskSpaceMonitor(watching:)` captures one `URL` and polls
   `availableBytes(forVolumeContaining:)` on that same instance — and `URL` caches resource values

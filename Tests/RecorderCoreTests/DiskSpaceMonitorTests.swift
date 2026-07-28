@@ -2,7 +2,8 @@ import Foundation
 import Testing
 @testable import RecorderCore
 
-/// The space probe is injected, so every branch runs without touching a real disk.
+/// The space probe is injected, so every branch of the threshold logic runs without touching a
+/// real disk. Two tests deliberately do: only a real volume can show that the reading is fresh.
 @Suite struct DiskSpaceMonitorTests {
 
     private static let floor: Int64 = 2 * 1024 * 1024 * 1024  // 2 GB
@@ -35,6 +36,67 @@ import Testing
         }
     }
 
+    @Test func firesOnASequenceThatFallsThroughTheFloor() async {
+        // Constant readings only prove the arithmetic. This proves `check()` re-reads: a healthy
+        // disk that fills mid-recording is the case the guard exists for.
+        let readings: [Int64] = [Self.floor * 4, Self.floor * 2, Self.floor + 1, Self.floor - 1]
+        let polls = LockedBox<Int>()
+        polls.set(0)
+        await confirmation("low disk reported once the readings fall") { low in
+            let monitor = DiskSpaceMonitor(
+                floorBytes: Self.floor,
+                availableBytes: {
+                    let poll = polls.value ?? 0
+                    polls.set(poll + 1)
+                    return readings[min(poll, readings.count - 1)]
+                },
+                onLow: { low() })
+            for _ in 0..<readings.count { monitor.check() }
+        }
+    }
+
+    @Test func readsTheVolumeOnEveryCheck() {
+        // A cached or memoized reading is the bug this suite missed once: the poll must ask the
+        // filesystem again every time, or a falling disk is invisible.
+        let calls = LockedBox<Int>()
+        calls.set(0)
+        let monitor = DiskSpaceMonitor(
+            floorBytes: Self.floor,
+            availableBytes: {
+                calls.set((calls.value ?? 0) + 1)
+                return Self.floor * 10
+            },
+            onLow: {})
+        for _ in 0..<3 { monitor.check() }
+        #expect(calls.value == 3)
+    }
+
+    @Test func firesWhenTheWatchedVolumeFillsAfterAHealthyFirstPoll() throws {
+        // The shipped bug (docs/07, 2026-07-28): the monitor held one `URL`, which answers from
+        // its own cache, so every poll after the first returned the free space at Start and the
+        // floor could only trip on a disk that was already below it. Fails on that code.
+        let fileManager = FileManager.default
+        let directory = fileManager.temporaryDirectory
+            .appendingPathComponent("diskfill-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: directory) }
+
+        let ballast = 64 * 1024 * 1024
+        let free = try #require(DiskSpaceMonitor.availableBytes(forVolumeAtPath: directory.path))
+        // Floor halfway into the ballast: the first poll sits 32 MB above it, the second 32 MB
+        // below. That margin is the slack against other processes moving the volume meanwhile.
+        let fired = LockedBox<Bool>()
+        let monitor = DiskSpaceMonitor(
+            floorBytes: free - Int64(ballast / 2), watching: directory, onLow: { fired.set(true) })
+
+        monitor.check()
+        #expect(fired.value != true, "fired above the floor")
+
+        try Data(count: ballast).write(to: directory.appendingPathComponent("ballast.bin"))
+        monitor.check()
+        #expect(fired.value == true, "the volume fell below the floor and the guard stayed quiet")
+    }
+
     @Test func doesNotFireWhenCapacityCannotBeRead() async {
         // An unreadable volume is not evidence of a full one — killing a healthy recording over
         // it would be worse than the thing being guarded against.
@@ -51,7 +113,7 @@ import Testing
         // NOTE: this only ever probes the BOOT volume, which is exactly why it cannot catch the
         // external-volume bug below — that is what `reconciles…` exists for.
         let available = try #require(
-            DiskSpaceMonitor.availableBytes(forVolumeContaining: FileManager.default.temporaryDirectory))
+            DiskSpaceMonitor.availableBytes(forVolumeAtPath: FileManager.default.temporaryDirectory.path))
         #expect(available > 0)
     }
 

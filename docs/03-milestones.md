@@ -1650,7 +1650,11 @@ plaintext. Everything here is about the app being straight with you regarding di
 Earns a **MINOR** if retention ships as a setting (a new user-facing capability, ADR-013); the guard
 fix alone would be a PATCH.
 
-- [ ] M19-T1 **The disk guard can see the disk filling.** `DiskSpaceMonitor(watching:)` captures one
+- [x] M19-T1 **The disk guard can see the disk filling.** ✅ 2026-07-28 — `availableBytes(
+      forVolumeAtPath:)` builds its `URL` per poll, so no caller can hold one; `AppState`'s room
+      figure routes through it too (ruling C). Live A/B at the real 2 GB floor: 60 s
+      `userStopped` before → `diskAlmostFull` at 15.3 s + playable 14.89 s file after (docs/07).
+      **Ruling A: the hook stays, demoted** — 04 §4.4 now rests on the falling-volume leg. `DiskSpaceMonitor(watching:)` captures one
       `URL` and polls `availableBytes(forVolumeContaining:)` on that same instance — and `URL` caches
       resource values per instance, so every poll after the first returns the free space as it was
       when the recording started. **Measured 2026-07-28:** after writing 100 MB into a 200 MB volume

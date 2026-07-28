@@ -532,6 +532,12 @@ Consequences for anyone designing mic recovery:
   a shell (the shell keeps running while locked). A running stream is separate: display sleep
   alone kills it with -3815 regardless of lock state.
 - Disk-full: stop cleanly at < 2 GB free with notification (`DiskSpaceMonitor`, M3-T3).
+- ⚠️ **Read the free space through a path, never a held `URL`.** `URL` caches resource values per
+  instance, so a monitor that keeps one polls its own first answer forever — measured 2026-07-28 on
+  a filling 300 MB volume: 312,950,784 held vs 208,093,184 fresh. That shipped: from M3-T3 to
+  M19-T1 the floor could only trip on a disk that was *already* too full at Start. The guard now
+  builds its `URL` inside `availableBytes(forVolumeAtPath:)` on every poll, so no caller can hold
+  one (M19-T1). ⚠️ Injected-probe tests cannot see this class of bug — 04 §4.4 names what can.
 - ⚠️ **Do NOT read `volumeAvailableCapacityForImportantUsage` alone** — an earlier draft of this
   line recommended exactly that, and it is a trap. Measured 2026-07-15 (HFS+/exFAT/FAT32/APFS
   disk images): **every non-boot volume reports it as `0` — not nil — while the volume has

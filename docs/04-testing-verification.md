@@ -89,8 +89,14 @@ Pass criteria:
    - **Lid close (system sleep)** (human): playable 11.2 s file finalized on wake.
    - **Monitor unplug: N/A on this hardware** (built-in display only). Re-run if an external
      display ever exists; it may reveal a code other than -3815 (02 §7).
-4. **Disk guard**: run with `--test-disk-floor <huge>` to trip the monitor. Pass:
-   clean stop + message.
+4. **Disk guard**: the volume must fall below the floor **during** the take — a guard that only
+   trips on a disk already too full at Start passed this criterion for four milestones (M19-T1).
+   - **The evidence**: a 4 GB APFS disk image, the **real 2 GB floor and no test hook**, a
+     recording writing into it, and ~2 GiB of `dd` ballast landing mid-take. Pass:
+     `finished (diskAlmostFull)` within a poll or two of the crossing + a playable file.
+   - `--test-disk-floor <huge>` stays as a smoke check of the stop path (it trips on the first
+     poll), but it is **not** evidence that the guard can see a disk filling. Neither is any test
+     using the injected probe: the freeze lived in the real one.
 
 ## §5 — G4: App & onboarding (human-driven)
 

@@ -6,6 +6,31 @@
 
 ## Now
 
+- **✅ M19-T1 DONE (2026-07-28) — the disk guard can finally see the disk filling.** Plan artifact
+  (rulings A/B/C/D approved): `claude.ai/code/artifact/59035276-224a-457b-b5e7-089fa5d7c780`.
+  **533 tests (+3)**, full dev loop green.
+  **The A/B is the whole story, at the real 2 GB floor with no test hook** — 4 GB APFS image,
+  ~2 GiB of `dd` ballast landing 12 s into a 60 s take, free space crossing to 1.78 GiB:
+  **before**, the take ran all 60 s and said `finished (userStopped)`; **after**,
+  `finished (diskAlmostFull)` at **15.3 s** (~3 s after the crossing, 2 s poll) with a playable
+  **14.89 s** file (hvc1 4112×2570 + AAC).
+  **As built:** `DiskSpaceMonitor.availableBytes(forVolumeAtPath:)` builds the `URL` inside the
+  read, so freshness is structural and no caller can hold a stale one; the `watching:` init keeps
+  the path; `AppState.refreshRecordingRoom` routes through it too (ruling C), which retires the
+  copy-and-clear idiom on the volume probe.
+  ⚠️ **Two dead ends measured before designing** (docs/07): `setTemporaryResourceValue` **cannot**
+  poison the capacity keys, so the obvious deterministic test does not exist; and `URL` copies
+  **share** one cache — clearing the copy unfroze the original, so copy-and-clear was never
+  reading "through a private copy".
+  **The regression test that replaces it** sets the floor 32 MB under a live reading, writes
+  64 MiB (12–18 ms; the boot volume moves by exactly 67,108,864, 5/5 trials) and polls again —
+  **verified to fail on the held-`URL` code** by reinstating it.
+  **Ruling A:** `--test-disk-floor` stays as a smoke check; **04 §4.4 no longer rests on it** —
+  the gate is now the falling-volume leg, since the old criterion tripped on the first poll and a
+  frozen reading satisfied it for four milestones.
+  **Next: M19-T2** (a ceiling on `~/Movies`) — plan artifact first. It carries the milestone's
+  MINOR; T1 alone is a PATCH.
+
 - **🔍 FULL REVIEW (2026-07-28) — 18 findings; nothing implemented yet.** Code, architecture and
   product review of v1.10.0, **driven against the running app** (the 2026-07-24 review's caveat was
   that it wasn't): `claude.ai/code/artifact/63e7d73a-c519-4498-8f1b-e662f49393c4`.

@@ -39,15 +39,19 @@ public final class DiskSpaceMonitor: @unchecked Sendable {
         watching url: URL,
         onLow: @escaping @Sendable () -> Void
     ) {
+        // Keeps the path, not the URL — see `availableBytes(forVolumeAtPath:)`.
+        let path = url.path
         self.init(
             floorBytes: floorBytes,
-            availableBytes: { DiskSpaceMonitor.availableBytes(forVolumeContaining: url) },
+            availableBytes: { DiskSpaceMonitor.availableBytes(forVolumeAtPath: path) },
             onLow: onLow)
     }
 
-    /// Free space on the volume holding `url`, or nil if neither capacity key can be read.
-    public static func availableBytes(forVolumeContaining url: URL) -> Int64? {
-        let values = try? url.resourceValues(forKeys: [
+    /// Free space on the volume holding `path` **as of now**, or nil if neither capacity key can
+    /// be read. ⚠️ Takes a path and builds its own `URL`: `URL` caches resource values per
+    /// instance, so a held one keeps reporting the free space it first read (measured, docs/07).
+    public static func availableBytes(forVolumeAtPath path: String) -> Int64? {
+        let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: [
             .volumeAvailableCapacityForImportantUsageKey, .volumeAvailableCapacityKey,
         ])
         return availableBytes(

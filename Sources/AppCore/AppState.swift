@@ -182,14 +182,10 @@ public final class AppState {
     /// I/O, and the menu is stamped at open (M6-T10).
     public private(set) var recordingRoomSeconds: TimeInterval?
 
-    /// Re-reads the room figure. `URL` caches resource values per instance and `outputDirectory`
-    /// lives as long as the app, so the read is taken through a cleared copy — otherwise the
-    /// figure freezes at whatever the disk held on launch (docs/07, M18-T3).
+    /// Re-reads the room figure. Volume I/O, so the menu calls it at open (M6-T10).
     public func refreshRecordingRoom() {
-        var volume = outputDirectory
-        volume.removeAllCachedResourceValues()
         guard let pixels = capturePixelSize,
-              let free = DiskSpaceMonitor.availableBytes(forVolumeContaining: volume)
+              let free = DiskSpaceMonitor.availableBytes(forVolumeAtPath: outputDirectory.path)
         else {
             recordingRoomSeconds = nil
             return
