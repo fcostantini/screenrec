@@ -6,6 +6,22 @@
 
 ## Now
 
+- **🎉 v1.10.0 CUT, PUSHED AND INSTALLED (2026-07-28) — M18 (Editing & Menu polish) earns the MINOR.**
+  `VERSION` + `CoreInfo.version` → 1.10.0 (pin test green), committed (`9478de3`), cut via
+  **`Scripts/release.sh` run in the BACKGROUND** — full gate green (clean tree · version pin · tag
+  free · build · **530 tests** · encode ×3 · release build · bundle-sign), tagged **`v1.10.0`**.
+  MINOR not PATCH (ADR-013): six user-facing improvements. **0 unpushed; tag on origin**
+  (`v1.10.0` → `9478de3`). ⚠️ As always, **the background run does not push** — its `[y/N]` prompt
+  reads N with no terminal — so main + tag went up manually afterwards.
+  **DEPLOYED to `/Users/Shared/ScreenRec.app`** by the *new* recipe (M18-T4): **`menudriver click
+  "Quit"`, not `kill -9`** — it exits in ~2 s and tears the SCK stream down properly, releasing the
+  audio tap a SIGKILL strands. **pid 73378 → 76580**, plist `CFBundleShortVersionString` = 1.10.0,
+  and the app says so itself: Settings › General reads **`ScreenRec 1.10.0`**. Replay re-armed
+  unaided, Source still Entire Screen, TCC intact across the swap.
+  **Next: Franco's call — dogfood 1.10.0, or scope new work.** The 2026-07-24 review roadmap
+  (M15 Gate & Debt · M16 Honest State · M17 Window capture · M18 Editing & Menu polish) is now
+  **fully shipped**; no planned milestones remain.
+
 
 - **✅ M18-T6 DONE (2026-07-28) — Settings is four tabs; 1137 pt → 437. ALL SIX M18 TASKS ARE
   DONE.** Plan artifact (rulings A1/B1 approved):
