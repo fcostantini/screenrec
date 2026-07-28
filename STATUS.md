@@ -17,8 +17,13 @@
   four `M:SS` formatters and loose hotkey ids; window titles persist in plaintext preferences;
   nothing prunes `~/Movies` (one take = 5.5 GB); trim→export is two steps where Franco's own recipe
   is one; and the highest-value missing feature is a **mark-this-moment hotkey**.
-  **Proposed:** M19 (the disk tells the truth · PATCH) → M20 (marks · MINOR) → M21 (one-step
-  sharing · MINOR) → M22 (structure · PATCH). **Franco's call what becomes a milestone.**
+  **✅ ENCODED IN docs/03 (Franco, 2026-07-28): M19 → M20 → M21 → M22**, with tasks, seams, rulings
+  and gates G19–G22, plus the ordering rationale after the dependency graph. Nothing implemented.
+  **Next: M19-T1** — the disk guard fix — plan artifact first, per the working contract. It is the
+  only item on the roadmap that can lose a recording; the rest is improvement.
+  **Parked from the review:** multi-display regions (the week a second display arrives), an
+  `NSMenu`-backed status item (trigger: the next feature needing custom row rendering), and
+  cursor emphasis / auto-zoom (still behind ADR-015's render stage).
 
 - **🎉 v1.10.0 CUT, PUSHED AND INSTALLED (2026-07-28) — M18 (Editing & Menu polish) earns the MINOR.**
   `VERSION` + `CoreInfo.version` → 1.10.0 (pin test green), committed (`9478de3`), cut via

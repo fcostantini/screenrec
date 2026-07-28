@@ -1642,6 +1642,197 @@ region pick can be adjusted rather than redrawn. No capture-path change anywhere
 (ADR-015 — trim and transcode only); frame-accurate scrubbing UI; re-opening the `.menu` MenuBarExtra
 for styling the bridge won't carry (docs/06 "Menu text styling").
 
+## M19 — The disk tells the truth (from the 2026-07-28 review, findings A1, P2, P3, P4)
+
+The 2 GB fail-stop floor **has never been able to see the disk filling** (A1, measured), nothing ever
+prunes `~/Movies` where one take is 5.5 GB, and a picked window's title is written to preferences in
+plaintext. Everything here is about the app being straight with you regarding disk and privacy.
+Earns a **MINOR** if retention ships as a setting (a new user-facing capability, ADR-013); the guard
+fix alone would be a PATCH.
+
+- [ ] M19-T1 **The disk guard can see the disk filling.** `DiskSpaceMonitor(watching:)` captures one
+      `URL` and polls `availableBytes(forVolumeContaining:)` on that same instance — and `URL` caches
+      resource values per instance, so every poll after the first returns the free space as it was
+      when the recording started. **Measured 2026-07-28:** after writing 100 MB into a 200 MB volume
+      the held instance still read **204,754,944** bytes free where a fresh one read **99,897,344**
+      (docs/07). So the floor only trips if the disk was *already* below it at Start, and ADR-007's
+      "never fail-weird" is unmet for the most likely long-take failure. **Seams:** the fix is the
+      one `RecentRecordings.details` already uses — `removeAllCachedResourceValues()` on a copy, or
+      build the URL per poll; the monitor's injectable `availableBytes` closure is the test seam.
+      ⚠️ **The existing gate cannot catch this:** G3 §4.4 passes `--test-disk-floor 500000`, a floor
+      above the volume's free space, so it trips on the *first* poll and a frozen reading satisfies
+      it. **Rulings:** whether the `--test-disk-floor` hook stays (it should, but it must stop being
+      the only evidence). **Verify:** a unit test driving a *falling* injected sequence (the current
+      tests only prove the threshold arithmetic); plus a live leg on a small disk image that actually
+      fills **during** a recording → `finished (diskAlmostFull)` and a playable file.
+- [ ] M19-T2 **The recordings folder has a ceiling.** Nothing prunes `~/Movies`; a 23-minute take
+      measured 5.5 GB, and the only disk statement in the product is M18-T4's "Room for about N" row,
+      which appears below two hours' worth. **Seams:** `RecentRecordings.inDirectory` already lists
+      and date-sorts the folder — the selection ("which files are over the cap") is the same pure
+      shape as `newest(_:limit:)` and belongs beside it; the setting is a row in Settings' General
+      tab (M18-T6); deletion goes through the same `moveToTrash` path M12-T2 uses. **Rulings:** keep
+      last N takes, or N GB, or both; and when the sweep runs — at launch, or after each recording
+      finalizes (the launch sweep for orphaned `.partial` files is the precedent, M15-T3). ⚠️ Trash,
+      never delete: reversible actions need no confirmation (M12-T2), irreversible ones do, and this
+      one runs unattended. **Verify:** unit tests for the pure "which files would go" selection
+      (including: never the recording in progress, never a file younger than the newest take); live:
+      exceed the cap, watch the oldest land in the Trash and the recents list update at the next
+      menu open.
+- [ ] M19-T3 **Delete the original when the export lands.** The two-step share workflow leaves the
+      source `.mov` behind, which is the file that costs gigabytes. **Seams:**
+      `ExportModel.performExport`'s success path, where the receipt is already set; the same
+      `moveToTrash` route as M19-T2. **Rulings:** an opt-in setting, or a per-export choice, or an
+      action on the export receipt row (the receipt already carries a submenu, M12-T1); and whether
+      it is offered for GIF at all (a GIF is not a replacement for its source). **Verify:** live,
+      through the app: export, confirm the original is in the Trash and the recents row is gone;
+      confirm a *failed* export never deletes anything.
+- [ ] M19-T4 **MP4 sizes named by destination, not by pixels.** M18-T2 stops at H.264 Level 5.2 so
+      phones can decode it, but the picker still reads `1280 px · 1920 px · 2560 px · Largest`, and
+      the largest is far outside what messaging apps accept — the recipe Franco actually uses is
+      1920 wide. **Seams:** `Settings.allowedMP4Widths` + `AppState.mp4SizeLabel(forWidth:)`, both
+      pure and already tested. **Rulings:** the wording (`Message / web (1920 px)` ·
+      `Full quality (3686 × 2304)`), or a caption under the ceiling row instead of renaming.
+      **Verify:** unit (the labels) + the live picker.
+- [ ] M19-T5 **A window pick stops storing its title.** `Key.windowTitle` persists the picked
+      window's title into `dev.fcostantini.screenrec.app.plist` — the menu dumped on 2026-07-28
+      listed a private-browsing window and a Slack DM by name, and any of those becomes a plaintext
+      string on disk. It exists only to label a row: M17-T2's ruling is that the title is never
+      matched on. **Seams:** `Settings`' save/load of `captureWindow`, `WindowSelection.label`, and
+      the menu's `(closed)` row. **Rulings:** what a gone pick's row says with no stored title —
+      `Firefox — (closed)` from the bundle id alone, or the id. **Verify:** pick a window, read the
+      plist (no title), relaunch → the row still labels itself from the live list; close the window
+      → the row still reads sensibly and Start still fails loud.
+
+**Gate G19**: a recording running on a volume that fills **during the take** stops itself with
+`diskAlmostFull` and leaves a playable file (not just one that started below the floor); the
+recordings folder stays under its cap without ever touching the take in progress; no window title
+appears in the preferences plist; the MP4 picker names what its sizes are for.
+
+## M20 — Marks (from the 2026-07-28 review, finding F1)
+
+The product's distinguishing strength is long, crash-safe recordings — and it offers nothing to help
+you find the moment in one afterwards. A hotkey that timestamps the running take is the smallest
+thing that makes that strength usable: hit it when the bug happens, or on each beat of a demo, and
+the marks are how you get back there. **MINOR** (a new user-facing capability). Needs none of the
+render/compositing stage ADR-015 parked.
+
+- [ ] M20-T1 **Mark the moment.** A global shortcut (⌥⌘M by default) records the current position of
+      the running take; nothing happens when idle. **Seams:** `HotkeyCenter` + `AppState`'s
+      `hotkeyRegistrar` already carry three shortcuts and the opt-in/seed/recorder-pill pattern
+      (M9-T4, M12-T6); the position must come from the **recording clock**, not wall clock — a
+      paused take's marks have to land where the content is, which is the same distinction
+      `TimestampRebaser` exists for. **Rulings:** whether the menu shows a mark count while
+      recording (stamped at open, never ticking — M6-T10), and whether a mark can be taken while
+      *paused* (it can't be placed meaningfully — probably ignore, and say so). **Verify:** unit —
+      the pure "mark at recorded position" math across a pause, which is where wall clock and
+      recorded time diverge; live — mark either side of a pause, then check the marks land on the
+      right frames.
+- [ ] M20-T2 **Marks survive the file.** A mark nobody can read later is a note to nobody.
+      **Seams:** two honest options, and this task must pick with a measurement, not a preference —
+      **(a)** a QuickTime **chapter track** written by `MovieRecorder` (visible in QuickTime and
+      preserved by a copy, but it means a second writer input and an association at finalize, on the
+      one path ADR-007 protects most); **(b)** a **sidecar** `.json` beside the `.mov` (trivial and
+      touches no writer, but lost the moment the file is moved or shared). **Rulings:** (a) vs (b) —
+      and if (a), whether it may touch `MovieRecorder` at all, given four milestones have now shipped
+      without changing the capture path. **Verify:** for (a), `probe`/QuickTime shows the chapters
+      and a `kill -9` mid-take still yields a playable file with the marks up to that point; for (b),
+      the sidecar round-trips and its loss is documented in docs/06.
+- [ ] M20-T3 **The Trim window seeks between marks.** **Seams:** `TrimView` already owns the player,
+      the in/out points and `KeyframeIndex`; marks become a list beside the range controls.
+      **Rulings:** the keys (⌥← / ⌥→ alongside M18-T1's `I`/`O`), and whether marks can be *set*
+      from the trim window as well as read. ⚠️ `AVPlayerView`'s own scrubber cannot be annotated, so
+      a list is the honest surface — do not fake a marked timeline. **Verify:** live: a take with
+      three marks, each seek lands within a frame of the mark; and the window still opens on a
+      recording that has none.
+
+**Gate G20**: a mark taken either side of a pause lands on the right frame of the finished file;
+marks survive whatever route T2's ruling chose (a copy of the file, or a documented sidecar);
+the Trim window seeks between them; and the capture path's crash-safety is unchanged — `kill -9`
+mid-take still loses ≤ 10 s (G2 §3.2's bar) with marks present.
+
+## M21 — One step from "it happened" to "here it is" (from the 2026-07-28 review, P1, P5, F2, F3)
+
+The app has every piece of the sharing workflow and none of the joins: trim writes a `.mov`, export
+writes an `.mp4` from it, and the intermediate is the file nobody wants — while the ffmpeg recipe
+this replaced did both in one command. **MINOR.**
+
+- [ ] M21-T1 **Trim exports directly.** **Seams:** no new pipeline — `AVAssetExportSession` takes a
+      `timeRange` (measured in M18-T1) and `Exporter.exportToMP4` already takes an
+      `ExportConfiguration`, so a ranged share export is the existing export path plus a range.
+      **Rulings:** does `Trim & Save` stay as the default (ADR-015 says lossless is the default, so
+      yes) and what the second button says; and whether the range comes from the Trim window only, or
+      also from a `Share ▸` on a recents row. **Verify:** the output's first frame is the requested
+      second (M18-T1's md5/PSNR method), it is H.264 + one AAC track + faststart, and **no
+      intermediate file is written** — that is the whole point.
+- [ ] M21-T2 **Stop &amp; Share.** A second stop action that finalizes, exports to the message-safe
+      profile and puts the result on the pasteboard. **Seams:** the stop path,
+      `ExportModel.performExport`'s one-at-a-time guard, `ShareActions.copy`. **Rulings:** whether it
+      replaces or sits beside `Stop & Save`; what it does when an export is already running (the
+      guard drops the second — that must be *said*, not silent, M17-T2's lesson); whether it also
+      offers Reveal. **Verify:** live, one action from recording to a pasteboard `.mp4` that pastes
+      into Slack.
+- [ ] M21-T3 **Name the take.** Every file is `Recording <date>.mov`; for a bug report the name is
+      the metadata, and by the time you rename it five takes have pushed it out of the recents list.
+      **Seams:** the finalize path and `AppState.rename` (M12-T2) — rename *after* finalize, never
+      block it. **Rulings:** a prompt on stop, or a prefix in Settings, or both (the prompt matches
+      "bug report", the prefix matches "a batch of takes"); and what Esc does (keep the date name).
+      **Verify:** live: name a take, confirm the file, the recents row and the receipt all agree.
+- [ ] M21-T4 **Leave an app's audio out.** Today system audio is all or nothing (ADR-019); the
+      concrete case is demoing while music plays. **Seams:** `SCContentFilter` supports excluding
+      applications from audio capture, and M7/M17 already bind app-scoped filters; the app list is
+      the one `Source ▸` fetches. **Rulings:** menu shape (`Capture System Audio ▸ All · All except…
+      · None`) versus Settings, given M18-T3 just spent a task removing rows; and what happens when
+      an excluded app quits mid-recording (M7's precedent: it must not end the take). **Verify:** the
+      M7-T1 measurement pattern — the excluded app's audio at ≈ −91 dBFS against a control run at
+      ≈ −10 dBFS through the identical filter path, not "sounds right".
+
+**Gate G21**: a recording goes from Stop to a pasteboard-ready `.mp4` in one action, with no
+intermediate file left behind; a named take carries that name through file, recents row and receipt;
+an excluded app's audio is measurably absent while the rest of the system's audio is present.
+
+## M22 — Structure (from the 2026-07-28 review, findings A2, A3, A4, A6)
+
+No user-visible change: the milestone that keeps the next four cheap. **PATCH** (ADR-013).
+
+- [ ] M22-T1 **`AppState` sheds its sources.** 1,572 lines and 122 public members across thirteen
+      `MARK` sections; five of this session's six tasks edited it. **Seams:** `PermissionsModel`
+      (M9-T7) and `ExportModel` (M14-T1) are the pattern and the precedent — a `let` reference to an
+      `@Observable` class, forwarding properties on AppState, tests unchanged. Extract
+      **`SourcesModel`**: displays, capturable apps and windows, the region pick, the missing-pick
+      rows, and the at-open refresh cycle. ⚠️ M15-T2's ruling is the constraint: an `@Observable`
+      **class** keeps per-property granularity, a struct would collapse it to one — do not "simplify"
+      it into a value type. **Verify:** tests pass untouched; the menu's dump is byte-identical
+      before and after.
+- [ ] M22-T2 **`AppState` sheds the session.** Same shape: **`SessionModel`** takes the session
+      lifecycle, the event folding (`apply(_:)`), the clock and the elapsed/bytes counters.
+      **Rulings:** where `lastFailure` lives — it outlives the session deliberately (M17-T2), so it
+      may belong on AppState even after the split. **Verify:** as T1, plus one live recording through
+      the app.
+- [ ] M22-T3 **Six units get a test that names them.** `WriterDrain`, `VideoFrameReader`,
+      `PCMSampleBuffer`, `SampleTiming`, `Polling`, `MediaFile` — no test mentions any of them.
+      `WriterDrain` is shared write-path logic (M14-T2 deduplicated it *because* two writers rely on
+      it) and `SampleTiming`/`PCMSampleBuffer` sit on the sample path, where docs/01's rules are
+      strictest. **Verify:** each named in a test that fails when its logic is broken — the M17-T2
+      standard, not a test that merely runs it.
+- [ ] M22-T4 **One timecode, one hotkey registry.** Four `M:SS` formatters
+      (`KeyframeIndex.timecode`, `AppState.clockPhrase`, `MenuHeader.elapsed`,
+      `RecentRecordings.clock`, plus `shortBufferPhrase`) already shipped one bug between them:
+      M18-T1's window read `In 0:05` above `Starts exactly at 0:04` because two of them rounded
+      differently. Hotkey ids are loose literals — `1/2/3` in `App.swift`, `4` in `CountInOverlay` —
+      with nothing preventing a collision that would silently unregister someone's shortcut.
+      **Rulings:** one type with named formats, or one function with a style parameter.
+      **Verify:** unit tests over the shared type; every existing string unchanged.
+- [ ] M22-T5 **`release.sh` can push.** It must run in the background (a foreground timeout SIGTERMs
+      it mid-encode, the VT lesson) and in the background its `Push? [y/N]` reads N — so every cut
+      "succeeds" with main and the tag still local, and the fix has been "remember to push" twice.
+      **Seams:** the prompt at the end of the script. **Rulings:** a `--push` flag, or skip the
+      prompt when stdin is not a TTY and say so in the summary. **Verify:** a background run pushes
+      main and the tag, and the tag's own pre-push gate still runs.
+
+**Gate G22**: `AppState` is materially smaller with the menu dump unchanged; the six units are named
+by tests that can fail; one timecode type serves every surface; a background release pushes without
+a human. No behaviour change anywhere — the whole suite passes untouched at every step.
+
 ## Dependency graph
 
 ```
@@ -1671,3 +1862,28 @@ window rows to a menu **M18-T3** is shortening), so whichever runs second inheri
 noted in both tasks. **RESOLVED 2026-07-27: M17 shipped first, and it cost M18-T3 one row, not a
 dozen.** T2 nested the window list inside a single `Window ▸` row rather than listing windows flat in
 `Source ▸` (docs/06 item 5), so M18-T3's diet starts from one extra row.
+**🏁 SHIPPED IN FULL 2026-07-28** — v1.7.2 (M15), v1.8.0 (M16), v1.9.0 (M17), v1.10.0 (M18).
+
+**The 2026-07-28 review roadmap — M19 (The disk tells the truth), M20 (Marks), M21 (One step from
+"it happened" to "here it is"), M22 (Structure).** Ordered deliberately, not by size:
+- **M19 first, and it is not negotiable.** M19-T1 is a *shipped bug in a safety mechanism*: the disk
+  guard reads free space once and never again (measured — docs/07), so a long take can still fill the
+  disk and get whatever `AVAssetWriter` does when a volume is full. Everything else on this roadmap
+  is an improvement; this one can lose a recording that can't be re-recorded. The rest of M19 rides
+  along because it is the same subject — the disk, and what the app is willing to say about it.
+- **M20 next** because it is the only item that adds capability rather than polish, and because it
+  compounds: marks make the long-recording strength usable, and M21-T1's ranged export gets more
+  useful once you can find the range.
+- **M21 after it**, since two of its four tasks (T1's join, T2's Stop & Share) are worth more when a
+  take is easy to navigate. It can swap with M20 without cost — nothing in either depends on the
+  other's code, only on its usefulness.
+- **M22 last on purpose.** Structural work has no user-visible payoff, so it is easiest to justify
+  *after* the features that would otherwise have landed in `AppState` — and M20/M21 will show which
+  seams actually need splitting rather than which ones look untidy today.
+
+**Parked, deliberately, from the same review:** multi-display region capture (M11 is main-display
+only and honest about it — worth doing the week a second display is attached, not before); an
+`NSMenu`-backed status item (the `.menu` bridge now carries six documented workarounds — the trigger
+is the next feature that needs custom row rendering, not the count itself); and cursor
+emphasis / auto-zoom, which remain behind ADR-015's parked render stage and are the only levers that
+would change the product's category.
