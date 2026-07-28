@@ -6,6 +6,25 @@
 
 ## Now
 
+- **🎉 GATE G22 PASSED + v1.10.2 (2026-07-28) — M22 (Structure) is complete, and the release cut
+  itself.** Evidence in the gate table. **PATCH (ADR-013):** no user-facing change anywhere.
+  **The cut is the gate's fourth criterion**, so it is worth reading as evidence: `Scripts/release.sh`
+  run in the background printed **`no terminal — pushing (--no-push to stop)`**, then
+  **`✓ push main + v1.10.2`** · **`✓ zipped ScreenRec-1.10.2.zip (988K)`** ·
+  **`✓ github release v1.10.2`** — the first cut in this project's history that needed no human
+  after it started. Verified independently: **0 unpushed**, the tag is on origin, and the release
+  carries `ScreenRec-1.10.2.zip` (1,010,602 B, not a draft).
+  https://github.com/fcostantini/screenrec/releases/tag/v1.10.2
+  **DEPLOYED** to `/Users/Shared/ScreenRec.app`: pid 19088 → **20789**, plist reads 1.10.2, menu
+  **Ready**, Source Entire Screen.
+  ⚠️ **Instant replay is OFF because Franco turned it off** — noted here because the earlier entries
+  in this file record it as normally armed, and a future session should not "restore" it. I re-armed
+  it during this deploy on a wrong inference and turned it straight back off; `replayArmed = 0`.
+  **Next: Franco's call.** The 2026-07-28 roadmap has **M20 (Marks)** and **M21 (One step from "it
+  happened" to "here it is")** left — M22 ran first by his ordering call, and M22-T4's hotkey
+  registry and T3's write-path tests were the two tasks that were meant to land before M20 touches
+  them.
+
 - **✅ M22-T2 DONE (2026-07-28) — `AppState` sheds the session. All six M22 tasks are done; G22 is
   the only thing left in the milestone.** Plan artifact (rulings A/B/C approved):
   `claude.ai/code/artifact/3c800991-74e7-4187-badc-01ef4e61eab0`. **557 tests passed untouched**,
