@@ -424,6 +424,12 @@ public final class AppState {
         get { exports.trimTarget }
         set { exports.trimTarget = newValue }
     }
+    /// Wired by the app (M21-T2): AppKit's pasteboard can't live here, but the export that fills it
+    /// does — so the closure is forwarded to `exports`, which performs it when one completes.
+    public var copyToPasteboard: (@MainActor (URL) -> Void)? {
+        get { exports.copyToPasteboard }
+        set { exports.copyToPasteboard = newValue }
+    }
 
     // MARK: - Onboarding (docs/06 "Onboarding window") — delegated to PermissionsModel (M9-T7)
 
@@ -666,6 +672,24 @@ public final class AppState {
     /// so a surface can state the size an export will really produce (M21-T1).
     public var exportConfiguration: ExportConfiguration {
         ExportConfiguration(maxWidth: mp4Width)
+    }
+
+    /// The `Stop & Copy MP4` row's title (M21-T2), estimate included. Stamped at menu open like
+    /// every other number there (M6-T10), since `elapsedSeconds` is.
+    public var stopAndCopyTitle: String {
+        MenuHeader.stopAndCopy(maximumBytes: maximumShareBytes)
+    }
+
+    /// The most a share export of the take running now can weigh — the Size picker's own rate
+    /// budget (M19-T4) over the elapsed minutes. Nil without display geometry: no figure beats a
+    /// wrong one.
+    private var maximumShareBytes: Int64? {
+        guard let pixels = sources.displayPixelSize, elapsedSeconds > 0 else { return nil }
+        let configuration = exportConfiguration
+        let fitted = Exporter.fittedSize(
+            width: pixels.width, height: pixels.height, configuration: configuration)
+        let perMinute = configuration.bytesPerMinute(forWidth: fitted.width, height: fitted.height)
+        return Int64(Double(perMinute) * elapsedSeconds / 60)
     }
 
     /// The Size picker's label for `width`: the size, then what a minute of it weighs (M19-T4) —
@@ -1150,6 +1174,19 @@ public final class AppState {
     /// actually ends the session — see `endSession`.
     public func stop() async {
         await session.capture?.stop()
+    }
+
+    /// Stop & Copy MP4 (M21-T2): finalize the take, then export it and leave the result on the
+    /// pasteboard. The recording is kept (ADR-004) — the `.mp4` is derived beside it, exactly as
+    /// `Export as MP4` derives one. The in-flight guard is belt and braces: the menu row is
+    /// disabled while an export runs, so the press it would swallow can't be made.
+    public func stopAndShare() async {
+        guard isSessionActive, exportInProgress == nil else { return }
+        let outputURL = session.currentOutputURL
+        await stopAndWaitForFinalize()
+        // A take that fail-stopped or was discarded mid-stop has nothing to share.
+        guard let outputURL, FileManager.default.fileExists(atPath: outputURL.path) else { return }
+        exports.exportAndCopy(outputURL, configuration: exportConfiguration)
     }
 
     /// Arms the `Stop After` bound for this take (M18-T4), if one is set. Wall clock from the

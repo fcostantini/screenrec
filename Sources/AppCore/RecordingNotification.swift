@@ -159,6 +159,15 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
+    /// Stop & Copy MP4 finished (M21-T2). The file is already on the pasteboard, so the next
+    /// keystroke is the point; the click-to-reveal is the fallback for a clipboard since overwritten.
+    public static func copiedToPasteboard(url: URL) -> RecordingNotification {
+        RecordingNotification(
+            title: "Copied — ⌘V to paste",
+            body: "\(url.lastPathComponent) is on the clipboard. Click to reveal it.",
+            fileURL: url)
+    }
+
     /// The GIF (M10-T3) finished — reveal it to drop into a thread.
     public static func savedAsGIF(url: URL) -> RecordingNotification {
         RecordingNotification(

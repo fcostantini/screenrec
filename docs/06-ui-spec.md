@@ -182,6 +182,17 @@ Order and grouping (separators between groups):
    there; the in-menu header stays stamped-at-open. Opt-out via `showsMenuBarTimer`.
 2. **Pause** / **Resume** (swaps by state).
 3. **Stop & Save** — primary.
+3b. **Stop & Copy MP4 · up to 95 MB** (M21-T2) — stops, finalizes, exports at the Settings size and puts
+   the `.mp4` on the pasteboard, so the next keystroke is ⌘V. Sits *beside* Stop & Save, never
+   replacing it: Stop & Save keeps the hotkey and the bold primary, and muscle memory must not start
+   an encode. **Not called "Stop & Share"** — `Share…` means the macOS share sheet everywhere else in
+   this app. The figure is the Size picker's rate budget (M19-T4) over the elapsed minutes, stamped
+   at open (M6-T10) and **omitted** without display geometry (M16-T2). It says **`up to`**, not `≈`:
+   the encoder undershoots the budget badly on a quiet screen (11 MB quoted, 2.2 MB written — docs/07). **Disabled while an export
+   runs** — `performExport` would drop the second one, and the `Exporting …` row immediately above
+   says why (M17-T2: a dropped action must be visible). Ends in **one** notice — `Copied — ⌘V to
+   paste`, which still reveals on click — not an export receipt plus a copy. The `.mov` is kept
+   (ADR-004).
 4. — separator —
 5. Dimmed info rows: when app-scoped, `Recording <app> only` (M7-T2 — the recording menu names
    its subject); when region-scoped, `Recording region <w>×<h>` (M11-T2); active mic +

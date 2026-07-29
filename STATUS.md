@@ -6,6 +6,27 @@
 
 ## Now
 
+- **✅ M21-T2 DONE (2026-07-29) — `Stop & Copy MP4`: one row from recording to clipboard.** Plan
+  artifact (rulings A–D, "go with your picks"):
+  `claude.ai/code/artifact/4847ca05-15d1-4802-b934-de0158f76294`. **566 tests (+4)**, dev loop green,
+  deployed (pid 57391 → **58816**).
+  **As built:** the row sits under `Stop & Save` (which keeps ⌥⌘R and the bold primary), stops and
+  finalizes through `stopAndWaitForFinalize()`, exports at the Settings size through the unchanged
+  `performExport` guard, and hands the file to an injected `copyToPasteboard` — AppKit stays in the
+  app layer (`ShareActions.copy`), the notifier's own pattern. One notice, not two: `Copied — ⌘V to
+  paste`, which still reveals on click.
+  ⚠️ **Named `Stop & Copy MP4`, not the roadmap's "Stop & Share"** — `Share…` means the macOS share
+  sheet everywhere else in this app, and `Copy` is the verb that matches what you press next.
+  **Verified live end to end:** 14 s take → the pasteboard held the `.mp4` **2.0 s** after the press
+  (avc1 1920×1200 + one AAC, 15.47 s), the `.mov` master untouched, one receipt row in the menu.
+  🔴 **The leg caught my own estimate lying:** the row promised `≈11 MB`, the file was **2.2 MB** —
+  the export's rate budget over-quotes a quiet screen ~5× (docs/07). The row now says **`up to`**,
+  re-verified on the deployed build as `Stop & Copy MP4 · up to 3 MB`. The Settings picker keeps `≈`:
+  it compares picks, it doesn't promise a file.
+  ⚠️ **Your clipboard holds a deleted test clip** until you copy anything else. All test files
+  removed from ~/Movies.
+  **Next: M21-T3** (name the take) — its natural home is this same stop moment.
+
 - **✅ M21-T1 DONE (2026-07-29) — the Trim window writes the shareable MP4 itself.** Plan artifact
   (rulings A/B/C approved): `claude.ai/code/artifact/2c0c8b44-a8d0-4f50-8b4e-07e16068e064`.
   **562 tests (+5)**, dev loop green, **deployed** to `/Users/Shared/ScreenRec.app` (pid 56110 →

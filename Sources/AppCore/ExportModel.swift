@@ -45,6 +45,10 @@ public final class ExportModel {
         try await Trimmer.trim(from: $0, to: $1, start: $2, end: $3, mode: $4).url
     }
 
+    /// Puts a finished file on the pasteboard (M21-T2). Injected by the app — `NSPasteboard` is
+    /// AppKit, which AppCore may not import (docs/01).
+    public var copyToPasteboard: (@MainActor (URL) -> Void)?
+
     /// The recording the Trim window is editing (M10-T4), or nil. Set when `Trim…` opens the window;
     /// the view reads it. Transient — not persisted.
     public var trimTarget: URL?
@@ -71,6 +75,24 @@ public final class ExportModel {
             using: { try await export($0, $1, configuration, range) },
             success: { RecordingNotifications.exported(url: $0) },
             failure: RecordingNotifications.exportFailed)
+    }
+
+    /// Exports `source` and leaves the result on the pasteboard (M21-T2) — the same off-main,
+    /// one-at-a-time path, ending in one notice rather than an export receipt plus a copy.
+    public func exportAndCopy(_ source: URL, configuration: ExportConfiguration) {
+        let export = exportFunction  // snapshot; the closure captures no `self`
+        let copy = copyToPasteboard
+        // With no pasteboard injected (tests, or an unwired app) the export still runs, but the
+        // notice must not claim a copy that never happened.
+        let notice = copy == nil
+            ? RecordingNotifications.exported(url:)
+            : RecordingNotifications.copiedToPasteboard(url:)
+        performExport(
+            source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source)),
+            using: { try await export($0, $1, configuration, nil) },
+            success: notice,
+            failure: RecordingNotifications.exportFailed,
+            completion: copy)
     }
 
     /// Saves a recording or clip as a looping GIF (M10-T3), the same off-main, one-at-a-time path.
@@ -104,7 +126,8 @@ public final class ExportModel {
         to output: URL,
         using export: @escaping @Sendable (URL, URL) async throws -> URL,
         success: @escaping (URL) -> RecordingNotification,
-        failure: @escaping () -> RecordingNotification
+        failure: @escaping () -> RecordingNotification,
+        completion: (@MainActor (URL) -> Void)? = nil
     ) {
         guard exportInProgress == nil else { return }
         exportInProgress = source.lastPathComponent
@@ -114,6 +137,7 @@ public final class ExportModel {
                 guard let self else { return }
                 exportInProgress = nil
                 lastExport = LastExport(url: url, date: Date())
+                completion?(url)      // before the notice, so "Copied" is true when it is read
                 notify?(success(url))
             } catch {
                 guard let self else { return }

@@ -55,6 +55,9 @@ struct ScreenRecApp: App {
         }
         // First-arm banner-suppression alert (M12-T5): AppKit lives here, fired once ever by AppState.
         state.onReplayBannerWarning = { NotificationSettings.showArmedBannerWarning() }
+        // Stop & Copy MP4 (M21-T2): the pasteboard is AppKit, so the app performs the copy the
+        // export path asks for — the same write the per-file `Copy` row does.
+        state.copyToPasteboard = { ShareActions.copy($0) }
         // Global shortcuts (M9-T4): map each intent to a Carbon hotkey id + the action it fires.
         // Carbon lives here; AppCore stays framework-free. Weak captures — the closure is stored on
         // `state`, which owns it.

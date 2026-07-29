@@ -12,6 +12,15 @@ public enum MenuHeader {
         return "\(size) · HEVC"
     }
 
+    /// The `Stop & Copy MP4` row (M21-T2): the cost is stated before the click, not discovered
+    /// after it. **`up to`, not `≈`** — the figure is the encoder's rate budget, and VideoToolbox
+    /// spends far less on a quiet screen (measured 2.2 MB against this row's 11, docs/07). Without
+    /// the geometry to compute one the row is the action alone (M16-T2).
+    public static func stopAndCopy(maximumBytes: Int64?) -> String {
+        guard let maximumBytes, maximumBytes > 0 else { return "Stop & Copy MP4" }
+        return "Stop & Copy MP4 · up to \(ApproximateBytes.formatted(maximumBytes))"
+    }
+
     /// The idle header's right-hand status: `Ready`, or the blocking condition.
     ///
     /// Every non-ready verdict collapses to one short phrase; `RecordingReadiness.blocked`'s

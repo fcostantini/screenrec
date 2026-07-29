@@ -183,6 +183,57 @@ private final class Box<Value>: @unchecked Sendable {
         #expect(recordedOutput.value?.lastPathComponent == "Clip.mp4")
     }
 
+    @Test func stopAndCopyLeavesTheExportOnThePasteboardAndPostsOneNotice() async {
+        // M21-T2: one action, one notice — not an export receipt plus a copy.
+        let state = makeState()
+        var posted: [RecordingNotification] = []
+        state.notifier = { posted.append($0) }
+        let copied = Box<URL>()
+        state.copyToPasteboard = { copied.value = $0 }
+        state.exports.exportFunction = { _, output, _, _ in output }
+
+        state.exports.exportAndCopy(
+            URL(fileURLWithPath: "/tmp/Take.mov"), configuration: ExportConfiguration())
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(copied.value?.lastPathComponent == "Take.mp4")
+        #expect(state.lastExport?.url == copied.value)      // the receipt still points at it
+        #expect(posted.count == 1)
+        #expect(posted.first?.title == "Copied — ⌘V to paste")
+        #expect(posted.first?.fileURL == copied.value)      // …and a click still reveals it
+    }
+
+    @Test func afailedStopAndCopyLeavesThePasteboardAlone() async {
+        let state = makeState()
+        var posted: [RecordingNotification] = []
+        state.notifier = { posted.append($0) }
+        let copied = Box<URL>()
+        state.copyToPasteboard = { copied.value = $0 }
+        state.exports.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
+
+        state.exports.exportAndCopy(
+            URL(fileURLWithPath: "/tmp/Take.mov"), configuration: ExportConfiguration())
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(copied.value == nil)                        // nothing was copied…
+        #expect(posted.first?.title == "Couldn't export to MP4")   // …and nothing claims otherwise
+    }
+
+    @Test func withoutAPasteboardTheNoticeDoesNotClaimACopy() async {
+        // The app always injects one; a notice that says "Copied" when nothing was is the failure
+        // this guards — the export itself is still worth keeping.
+        let state = makeState()
+        var posted: [RecordingNotification] = []
+        state.notifier = { posted.append($0) }
+        state.exports.exportFunction = { _, output, _, _ in output }
+
+        state.exports.exportAndCopy(
+            URL(fileURLWithPath: "/tmp/Take.mov"), configuration: ExportConfiguration())
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(posted.first?.title == "Exported to MP4")
+    }
+
     @Test func theSizePickerStatesWhatEachPickCosts() {
         // Every pick plays anywhere (M18-T2), so weight is what actually decides between them —
         // and "Largest" is a fit, not a number, so the row says what it means for this source.

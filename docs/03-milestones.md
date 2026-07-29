@@ -1777,7 +1777,18 @@ this replaced did both in one command. **MINOR.**
       also from a `Share ▸` on a recents row. **Verify:** the output's first frame is the requested
       second (M18-T1's md5/PSNR method), it is H.264 + one AAC track + faststart, and **no
       intermediate file is written** — that is the whole point.
-- [ ] M21-T2 **Stop &amp; Share.** A second stop action that finalizes, exports to the message-safe
+- [x] M21-T2 **Stop &amp; Share** — shipped as **`Stop & Copy MP4`**. ✅ 2026-07-29 — one row stops the
+      take, exports at the Settings size and leaves the `.mp4` on the pasteboard. **566 tests (+4)**,
+      dev loop green, deployed. **Rulings (Franco, "go with your picks"): A** — not "Stop & Share":
+      `Share…` means the macOS share sheet everywhere else here, and `Copy` is the verb that matches
+      the ⌘V. **B** — beside `Stop & Save`, which keeps ⌥⌘R and the bold primary. **C** — disabled
+      while an export runs, under the `Exporting …` row that says why (M17-T2). **D** — no length
+      limit; the row states the cost. **Verified live:** the row read `Stop & Copy MP4 · up to 11 MB`
+      on a 14 s take, and **2.0 s after the press the pasteboard held the `.mp4`** (avc1 1920×1200 +
+      one AAC, 15.47 s), the `.mov` master untouched beside it, one receipt row in the menu.
+      🔴 **The live leg caught the estimate lying**: `≈11 MB` quoted, **2.2 MB** written — the budget
+      over-quotes a quiet screen ~5× (docs/07), so the row now says **`up to`**. Re-verified on the
+      deployed build: `Stop & Copy MP4 · up to 3 MB`. **Seams:** the stop path,
       profile and puts the result on the pasteboard. **Seams:** the stop path,
       `ExportModel.performExport`'s one-at-a-time guard, `ShareActions.copy`. **Rulings:** whether it
       replaces or sits beside `Stop & Save`; what it does when an export is already running (the

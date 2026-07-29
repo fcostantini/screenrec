@@ -15,6 +15,17 @@ import RecorderCore
         #expect(MenuHeader.recordingDetail(bytes: -1) == MenuHeader.recordingDetail(bytes: 0))
     }
 
+    @Test func stopAndCopyBoundsWhatTheShareCopyCanWeigh() {
+        // M21-T2 ruling D: the cost is on the row, before the click — and as a ceiling, since the
+        // encoder undershoots its budget on quiet content by as much as 5x (measured, docs/07).
+        #expect(MenuHeader.stopAndCopy(maximumBytes: 95_000_000).hasPrefix("Stop & Copy MP4 · up to "))
+        #expect(MenuHeader.stopAndCopy(maximumBytes: 95_000_000).contains("MB"))
+        // No geometry (or a take with no elapsed time yet) ⇒ the action alone, never a made-up
+        // figure (M16-T2).
+        #expect(MenuHeader.stopAndCopy(maximumBytes: nil) == "Stop & Copy MP4")
+        #expect(MenuHeader.stopAndCopy(maximumBytes: 0) == "Stop & Copy MP4")
+    }
+
     @Test func readyReadsReady() {
         #expect(MenuHeader.idleStatus(.ready) == "Ready")
     }

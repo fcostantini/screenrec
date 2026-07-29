@@ -7,6 +7,16 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-29 (M21-T2): 🔴 **The export's rate budget over-quotes a quiet screen by ~5×, so a row
+  built on it must say `up to`, not `≈`.** `Stop & Copy MP4` first shipped its estimate as
+  `≈11 MB` for a 14 s take; the file it wrote was **2.2 MB**. The model isn't wrong — it is
+  `ExportConfiguration.bytesPerMinute`, whose own doc calls it a budget, and M19-T4 measured
+  45.1 MB/min against 46 quoted **on busy content**. On a static desktop VideoToolbox spends a
+  fraction of it (docs/07's earlier 12.9 vs 22.1 Mbps entry, same effect). The Settings picker can
+  keep `≈` — it quotes what a minute *costs at these settings*, a comparison between picks — but a
+  row promising what *this take* will weigh has to be a ceiling. Found by the live leg, which is
+  the only place the two numbers meet.
+
 - 2026-07-29 (M21-T1):
   - ✅ **`AVAssetReader.timeRange` clips exactly at the requested time, whatever the keyframes do.**
     In-point 30.000 s on a real capture whose preceding sync sample sits at 28.100 (1.900 s back):
