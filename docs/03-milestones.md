@@ -1795,7 +1795,19 @@ this replaced did both in one command. **MINOR.**
       guard drops the second — that must be *said*, not silent, M17-T2's lesson); whether it also
       offers Reveal. **Verify:** live, one action from recording to a pasteboard `.mp4` that pastes
       into Slack.
-- [ ] M21-T3 **Name the take.** Every file is `Recording <date>.mov`; for a bug report the name is
+- [x] M21-T3 **Name the take.** ✅ 2026-07-29 — an opt-in prompt the moment a take stops, straight
+      into M12-T2's rename. **570 tests (+4)**, dev loop green, deployed. **Rulings (Franco, "go with
+      your picks"): A** — the prompt, not a Settings prefix (a prefix groups, it can't say what *this*
+      take was). **B** — off by default, beside `Count in before recording`. **C** — Esc, Cancel, a
+      blank or unchanged name all keep the date name. **Two orderings carry the design:** it runs
+      *after* teardown, so a dialog left open can't delay re-arming replay; and *before* the share
+      export, so `Stop & Copy MP4` copies the **named** `.mp4`. 🔴 **The quality pass caught that
+      second one being wrong** — the share path looked the take up by its pre-rename URL, which no
+      longer existed, so it would have silently exported nothing; `lastFinishedRecording` now records
+      where the take actually landed. **Verified live, three legs:** a named take → `Bug-1204
+      repro.mov` with the recents row agreeing; Esc → `Recording 2026-07-29 at 16.25.59.mov` kept;
+      and `Stop & Copy MP4` + a name → `Demo for Ana.mov` + `Demo for Ana.mp4`, receipt row
+      `Exported to MP4 · Demo for Ana.mp4`, that same file on the pasteboard. Every file is `Recording <date>.mov`; for a bug report the name is
       the metadata, and by the time you rename it five takes have pushed it out of the recents list.
       **Seams:** the finalize path and `AppState.rename` (M12-T2) — rename *after* finalize, never
       block it. **Rulings:** a prompt on stop, or a prefix in Settings, or both (the prompt matches

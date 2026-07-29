@@ -6,6 +6,28 @@
 
 ## Now
 
+- **✅ M21-T3 DONE (2026-07-29) — a take can be named the moment it stops.** Plan artifact (rulings
+  A–C, "go with your picks"): `claude.ai/code/artifact/b0de032c-ec0d-4cfe-8528-c679a6e93fcf`.
+  **570 tests (+4)**, dev loop green, deployed (pid 73163 → **74408**).
+  **As built:** opt-in (`Settings → Recording → Ask for a name when a recording stops`, **off by
+  default**, beside Count in). A finished take raises the `Rename…` alert with take-time copy —
+  *Name this recording* / *0:10 · Esc keeps the date name* — and the answer goes straight into
+  M12-T2's `rename`, collisions and receipt re-pointing included.
+  **Two orderings carry the design:** it runs **after teardown** (a dialog left open can't delay
+  re-arming replay or cancelling the stop timer) and **before the share export** (so Stop & Copy MP4
+  copies the *named* `.mp4`).
+  🔴 **The quality pass caught the second one broken:** the share path looked the take up by its
+  pre-rename URL, which no longer existed — it would have silently exported nothing.
+  `lastFinishedRecording` now records where the take actually landed.
+  **Verified live, three legs:** named → `Bug-1204 repro.mov`, recents row agreeing; Esc →
+  `Recording 2026-07-29 at 16.25.59.mov` kept; Stop & Copy MP4 + a name → `Demo for Ana.mov` +
+  `Demo for Ana.mp4`, receipt `Exported to MP4 · Demo for Ana.mp4`, that file on the pasteboard.
+  ⚠️ **The setting is back OFF** (as Franco had it) and all four test files are deleted.
+  ⚠️ **A synthetic keystroke can't answer this app's modal alert** — it goes to whatever is frontmost,
+  and an unanswered alert leaves the app modal, which swallowed the *next* run's Start. Drive alerts
+  through AX (docs/07).
+  **Next: M21-T4** (leave an app's audio out) — the last task in M21, then G21.
+
 - **✅ M21-T2 DONE (2026-07-29) — `Stop & Copy MP4`: one row from recording to clipboard.** Plan
   artifact (rulings A–D, "go with your picks"):
   `claude.ai/code/artifact/4847ca05-15d1-4802-b934-de0158f76294`. **566 tests (+4)**, dev loop green,

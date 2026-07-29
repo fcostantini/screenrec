@@ -165,6 +165,10 @@ struct SettingsView: View {
             // M12-T6: a 3-2-1 beat before capture to switch to the target window. The countdown
             // isn't in the recording.
             Toggle("Count in before recording (3-2-1)", isOn: $state.countInEnabled)
+
+            // M21-T3: the one moment the name is still in your head. Off by default — a modal
+            // after every stop is the wrong default for the quick takes that are most of them.
+            Toggle("Ask for a name when a recording stops", isOn: $state.namesTakeOnStop)
         }
         .formStyle(.grouped)
     }

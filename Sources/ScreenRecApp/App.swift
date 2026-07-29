@@ -58,6 +58,8 @@ struct ScreenRecApp: App {
         // Stop & Copy MP4 (M21-T2): the pasteboard is AppKit, so the app performs the copy the
         // export path asks for — the same write the per-file `Copy` row does.
         state.copyToPasteboard = { ShareActions.copy($0) }
+        // Naming a take as it stops (M21-T3): the same `NSAlert` the Rename… row uses.
+        state.promptForTakeName = { ShareActions.nameTake($0, duration: $1) }
         // Global shortcuts (M9-T4): map each intent to a Carbon hotkey id + the action it fires.
         // Carbon lives here; AppCore stays framework-free. Weak captures — the closure is stored on
         // `state`, which owns it.

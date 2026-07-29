@@ -71,6 +71,65 @@ import RecorderCore
         #expect(FileManager.default.fileExists(atPath: source.path))
     }
 
+    // MARK: - Naming a take as it stops (M21-T3)
+
+    @Test func namingAStoppedTakeRenamesTheFileAndReportsWhereItLanded() throws {
+        let directory = try makeFixture(["Recording 2026-07-29 at 16.09.44.mov"])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let take = directory.appendingPathComponent("Recording 2026-07-29 at 16.09.44.mov")
+
+        let state = AppState(defaults: makeDefaults())
+        state.namesTakeOnStop = true
+        var asked: (url: URL, duration: TimeInterval)?
+        state.promptForTakeName = { url, duration in
+            asked = (url, duration)
+            return "Bug-1204 repro"
+        }
+
+        let landed = state.nameTakeIfAsked(take, duration: 15)
+
+        #expect(asked?.url == take)
+        #expect(asked?.duration == 15)      // the prompt can label the take without opening it
+        #expect(landed == directory.appendingPathComponent("Bug-1204 repro.mov"))
+        #expect(FileManager.default.fileExists(atPath: landed?.path ?? ""))
+        #expect(!FileManager.default.fileExists(atPath: take.path))
+    }
+
+    @Test func aDeclinedPromptKeepsTheDateName() throws {
+        let directory = try makeFixture(["Recording 2026-07-29 at 16.09.44.mov"])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let take = directory.appendingPathComponent("Recording 2026-07-29 at 16.09.44.mov")
+
+        let state = AppState(defaults: makeDefaults())
+        state.namesTakeOnStop = true
+        state.promptForTakeName = { _, _ in nil }   // Esc / Cancel
+
+        #expect(state.nameTakeIfAsked(take, duration: 15) == nil)
+        #expect(FileManager.default.fileExists(atPath: take.path))
+    }
+
+    @Test func aTakeIsNeverAskedAboutWhenTheSettingIsOff() throws {
+        let directory = try makeFixture(["Recording 2026-07-29 at 16.09.44.mov"])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let take = directory.appendingPathComponent("Recording 2026-07-29 at 16.09.44.mov")
+
+        let state = AppState(defaults: makeDefaults())   // the default: off
+        var asked = false
+        state.promptForTakeName = { _, _ in asked = true; return "Never" }
+
+        #expect(state.nameTakeIfAsked(take, duration: 15) == nil)
+        #expect(!asked)
+        #expect(FileManager.default.fileExists(atPath: take.path))
+    }
+
+    @Test func theNamePromptSettingSurvivesRelaunch() {
+        let defaults = makeDefaults()
+        let state = AppState(defaults: defaults)
+        #expect(!state.namesTakeOnStop)     // off unless asked for
+        state.namesTakeOnStop = true
+        #expect(AppState(defaults: defaults).namesTakeOnStop)
+    }
+
     @Test func renameResolvesACollisionRatherThanOverwriting() throws {
         let directory = try makeFixture(["a.mp4", "b.mp4"])
         defer { try? FileManager.default.removeItem(at: directory) }

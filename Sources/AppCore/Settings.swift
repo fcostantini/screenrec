@@ -206,6 +206,9 @@ public struct Settings: Sendable, Equatable {
     public var pauseHotkey: Hotkey?
     /// Whether Start runs a 3-2-1 count-in first (M12-T6). Default off.
     public var countInEnabled: Bool
+    /// Whether a finished take asks to be named (M21-T3). Default off — a modal after every stop
+    /// is the wrong default for the quick takes that are most of them.
+    public var namesTakeOnStop: Bool
     /// Whether the menu-bar label shows the live elapsed clock while recording (M9-T3). Default on.
     public var showsMenuBarTimer: Bool
     /// Whether the label shows the live input meter while recording or armed (M16-T5). Default on.
@@ -289,6 +292,7 @@ public struct Settings: Sendable, Equatable {
             recordHotkey: nil,
             pauseHotkey: nil,
             countInEnabled: false,
+            namesTakeOnStop: false,
             showsMenuBarTimer: true,
             showsMenuBarLevel: true,
             gifFPS: 15,
@@ -340,6 +344,7 @@ public enum SettingsStore {
         public static let pauseHotkey = "pauseHotkey"
         /// Absent ⇒ no count-in (M12-T6).
         public static let countInEnabled = "countInEnabled"
+        public static let namesTakeOnStop = "namesTakeOnStop"
         /// `replayHotkey`/`recordHotkey` are Dicts (docs/06): these are their inner keys.
         public static let hotkeyKeyCode = "keyCode"
         public static let hotkeyModifiers = "modifiers"
@@ -463,6 +468,7 @@ public enum SettingsStore {
         settings.recordHotkey = hotkey(from: defaults.dictionary(forKey: Key.recordHotkey))
         settings.pauseHotkey = hotkey(from: defaults.dictionary(forKey: Key.pauseHotkey))
         settings.countInEnabled = defaults.bool(forKey: Key.countInEnabled)
+        settings.namesTakeOnStop = defaults.bool(forKey: Key.namesTakeOnStop)
 
         // Opt-out, so absent means on (the `.standard` default holds); only an explicit stored
         // value overrides it.
@@ -604,6 +610,7 @@ public enum SettingsStore {
             defaults.removeObject(forKey: Key.pauseHotkey)
         }
         defaults.set(settings.countInEnabled, forKey: Key.countInEnabled)
+        defaults.set(settings.namesTakeOnStop, forKey: Key.namesTakeOnStop)
         defaults.set(settings.showsMenuBarTimer, forKey: Key.showsMenuBarTimer)
         defaults.set(settings.capturesSystemAudio, forKey: Key.capturesSystemAudio)
         defaults.set(settings.showsMenuBarLevel, forKey: Key.showsMenuBarLevel)

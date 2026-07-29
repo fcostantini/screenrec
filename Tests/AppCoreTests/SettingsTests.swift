@@ -162,7 +162,7 @@ import RecorderCore
             "outputDirectory", "qualityPreset", "fpsCap", "capturesSystemAudio",
             "replayArmed", "replaySeconds", "replayHotkey", "showsMenuBarTimer", "showsMenuBarLevel",
             "gifFPS", "gifWidth", "gifMaxSeconds", "mp4Width", "stopAfterMinutes",
-            "seenReplayBannerWarning", "countInEnabled",
+            "seenReplayBannerWarning", "countInEnabled", "namesTakeOnStop",
         ])
     }
 

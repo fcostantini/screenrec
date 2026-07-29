@@ -1,5 +1,6 @@
 import AppKit
 import Quartz
+import RecorderCore
 
 /// The AppKit share/preview edges for the per-file submenu (M12-T1). Siblings of `Finder`: they live
 /// here because AppCore may not import AppKit (docs/01), and the menu view — already in this layer —
@@ -27,13 +28,35 @@ enum ShareActions {
     }
 
     /// Prompts for a new base name (M12-T2) with a modal `NSAlert` + text field — an LSUIElement
-    /// app has no window to host a rename, so the alert is it. The extension is fixed (informative
-    /// text); the field pre-fills the current base name. `newBaseName` fires only on confirm.
+    /// app has no window to host a rename, so the alert is it. `newBaseName` fires only on confirm.
     @MainActor static func rename(_ url: URL, newBaseName: (String) -> Void) {
+        guard let chosen = askForBaseName(
+            of: url, title: "Rename “\(url.lastPathComponent)”",
+            message: "The extension stays the same.", confirm: "Rename")
+        else { return }
+        newBaseName(chosen)
+    }
+
+    /// Asks what to call a take that just stopped (M21-T3), labelled with its length so the choice
+    /// can be made without opening the file. Nil unless a name was confirmed — Esc and Cancel keep
+    /// the date name.
+    @MainActor static func nameTake(_ url: URL, duration: TimeInterval) -> String? {
+        askForBaseName(
+            of: url, title: "Name this recording",
+            message: "\(Timecode.length(duration)) · Esc keeps the date name. "
+                + "The extension stays the same.",
+            confirm: "Name")
+    }
+
+    /// The modal both prompts are: a text field pre-filled with `url`'s base name, confirm and
+    /// Cancel. Nil unless the confirm button was the one pressed.
+    @MainActor private static func askForBaseName(
+        of url: URL, title: String, message: String, confirm: String
+    ) -> String? {
         let alert = NSAlert()
-        alert.messageText = "Rename “\(url.lastPathComponent)”"
-        alert.informativeText = "The extension stays the same."
-        alert.addButton(withTitle: "Rename")
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: confirm)
         alert.addButton(withTitle: "Cancel")
 
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
@@ -42,8 +65,8 @@ enum ShareActions {
         alert.window.initialFirstResponder = field
 
         NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        newBaseName(field.stringValue)
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return field.stringValue
     }
 
     @MainActor private static let anchor = AnchorWindow()

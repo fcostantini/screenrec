@@ -291,6 +291,14 @@ public final class AppState {
         }
     }
 
+    /// Whether a finished take asks to be named (M21-T3). Off by default. Persisted.
+    public var namesTakeOnStop: Bool = false {
+        didSet {
+            guard namesTakeOnStop != oldValue else { return }
+            persist()
+        }
+    }
+
     /// Runs the count-in overlay, reporting whether it reached zero or the user cancelled it
     /// (M12-T6; cancel M18-T4). Injected by the app (AppKit is banned in AppCore); nil in tests.
     /// Guarded by `isCountingIn` against re-entry.
@@ -424,6 +432,15 @@ public final class AppState {
         get { exports.trimTarget }
         set { exports.trimTarget = newValue }
     }
+    /// Where the last finished take ended up — after any rename (M21-T3), so Stop & Copy MP4
+    /// shares the file under the name it was just given. Cleared when the next take starts.
+    private(set) var lastFinishedRecording: URL?
+
+    /// Asks what to call a take that just stopped (M21-T3), pre-filled with its date name; nil ⇒ keep
+    /// that name. Wired by the app: an `NSAlert` is the only surface an `LSUIElement` app has for a
+    /// text field, and AppKit doesn't belong here.
+    public var promptForTakeName: (@MainActor (_ url: URL, _ duration: TimeInterval) -> String?)?
+
     /// Wired by the app (M21-T2): AppKit's pasteboard can't live here, but the export that fills it
     /// does — so the closure is forwarded to `exports`, which performs it when one completes.
     public var copyToPasteboard: (@MainActor (URL) -> Void)? {
@@ -502,6 +519,7 @@ public final class AppState {
         recordHotkey = settings.recordHotkey
         pauseHotkey = settings.pauseHotkey
         countInEnabled = settings.countInEnabled
+        namesTakeOnStop = settings.namesTakeOnStop
         showsMenuBarTimer = settings.showsMenuBarTimer
         showsMenuBarLevel = settings.showsMenuBarLevel
         gifFPS = settings.gifFPS
@@ -577,6 +595,7 @@ public final class AppState {
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey, recordHotkey: recordHotkey,
                 pauseHotkey: pauseHotkey, countInEnabled: countInEnabled,
+                namesTakeOnStop: namesTakeOnStop,
                 showsMenuBarTimer: showsMenuBarTimer, showsMenuBarLevel: showsMenuBarLevel,
                 gifFPS: gifFPS, gifWidth: gifWidth, gifMaxSeconds: gifMaxSeconds,
                 stopAfterMinutes: stopAfterMinutes, mp4Width: mp4Width,
@@ -1006,8 +1025,9 @@ public final class AppState {
     /// Renames a recording or export in place, extension intact (M12-T2). A blank/unchanged name is
     /// a no-op; a collision resolves like the exporters (` 2`). Re-points the receipt if it named
     /// this file. The source of a derived export is untouched — each acts on its own URL, no cascade.
-    public func rename(_ url: URL, to newBaseName: String) {
-        guard let preferred = RenameTarget.compute(for: url, newBaseName: newBaseName) else { return }
+    @discardableResult
+    public func rename(_ url: URL, to newBaseName: String) -> URL? {
+        guard let preferred = RenameTarget.compute(for: url, newBaseName: newBaseName) else { return nil }
         // Try the requested name first: a case-only rename (`Clip` → `clip`) must land exactly, not
         // read as colliding with itself on a case-insensitive volume. Only a genuine collision — a
         // different file already at that name, which `moveItem` refuses to overwrite — falls to ` 2`.
@@ -1020,7 +1040,7 @@ public final class AppState {
                 try FileManager.default.moveItem(at: url, to: target)
             } catch {
                 Self.log.error("rename failed: \(error.localizedDescription, privacy: .public)")
-                return
+                return nil
             }
         }
         exports.renameReceipt(from: url, to: target)   // re-points the export receipt if it named this
@@ -1028,6 +1048,7 @@ public final class AppState {
             lastReplay = LastReplay(url: target, seconds: replay.seconds)
         }
         refreshRecentRecordings()
+        return target
     }
 
     /// Moves a recording or export to the Trash (M12-T2) — reversible, so no confirmation. Clears a
@@ -1141,6 +1162,7 @@ public final class AppState {
             return
         }
 
+        lastFinishedRecording = nil   // a new take supersedes whatever the last one was named
         session.attach(
             capture, outputURL: outputURL, microphoneName: microphone.name,
             appName: selectedAppBundleID.map(appName(for:)), region: selectedRegion?.rect.size)
@@ -1165,7 +1187,15 @@ public final class AppState {
         session.consumeTask = Task { [weak self] in
             guard let self else { return }
             await consume(events)
+            // Read before the teardown clears it, act after: the prompt (M21-T3) must not hold up
+            // re-arming replay or cancelling the stop timer, and it must not run at all for a
+            // discard or a start that left no file.
+            let finished = session.finishedRecording
             endSession()
+            if let finished {
+                lastFinishedRecording =
+                    nameTakeIfAsked(finished.url, duration: finished.duration) ?? finished.url
+            }
         }
         await capture.start()
     }
@@ -1176,17 +1206,32 @@ public final class AppState {
         await session.capture?.stop()
     }
 
+    /// Asks what to call the take that just finished, if the user opted in (M21-T3), and renames it.
+    /// A prompt that returns nil — Esc, Cancel, a blank or unchanged name — keeps the date name: the
+    /// file is already safe, and naming is decoration on top of that.
+    ///
+    /// Internal, not private, so the naming policy is testable without a capture session.
+    @discardableResult
+    func nameTakeIfAsked(_ url: URL, duration: TimeInterval) -> URL? {
+        guard namesTakeOnStop, let prompt = promptForTakeName else { return nil }
+        guard let chosen = prompt(url, duration) else { return nil }
+        return rename(url, to: chosen)
+    }
+
     /// Stop & Copy MP4 (M21-T2): finalize the take, then export it and leave the result on the
     /// pasteboard. The recording is kept (ADR-004) — the `.mp4` is derived beside it, exactly as
     /// `Export as MP4` derives one. The in-flight guard is belt and braces: the menu row is
     /// disabled while an export runs, so the press it would swallow can't be made.
     public func stopAndShare() async {
         guard isSessionActive, exportInProgress == nil else { return }
-        let outputURL = session.currentOutputURL
         await stopAndWaitForFinalize()
-        // A take that fail-stopped or was discarded mid-stop has nothing to share.
-        guard let outputURL, FileManager.default.fileExists(atPath: outputURL.path) else { return }
-        exports.exportAndCopy(outputURL, configuration: exportConfiguration)
+        // `lastFinishedRecording` is where the take actually ended up: the naming prompt (M21-T3)
+        // runs inside the same task, so the `.mp4` inherits the chosen name instead of landing
+        // beside it under the date. Nil ⇒ the take left no file (a discard, a start that failed).
+        guard let finished = lastFinishedRecording,
+              FileManager.default.fileExists(atPath: finished.path)
+        else { return }
+        exports.exportAndCopy(finished, configuration: exportConfiguration)
     }
 
     /// Arms the `Stop After` bound for this take (M18-T4), if one is set. Wall clock from the

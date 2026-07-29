@@ -539,6 +539,26 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   them, takes longer and can produce a larger file. The original is kept either way; this saves a
   new ' trimmed' file."*
 
+## Naming a take (M21-T3)
+
+Opt-in, off by default: **Settings → Recording → `Ask for a name when a recording stops`**, beside
+`Count in before recording` — its sibling, another beat the user chooses to add. When on, a finished
+take raises the `Rename…` alert with take-time copy: **`Name this recording`** over
+**`0:10 · Esc keeps the date name. The extension stays the same.`**, the field pre-filled with the
+date name and selected, buttons **`Name`** / `Cancel`.
+
+- It runs **after the session has torn down** — the stop timer is cancelled and an armed replay has
+  re-armed — so an alert left on screen can't hold the app's next state. The file is already safe
+  on disk before anything is asked; naming is decoration on top of that.
+- It runs **before the share export**, so `Stop & Copy MP4` puts the *named* `.mp4` on the clipboard
+  rather than a date-named sibling.
+- Esc, Cancel, a blank field and an unchanged name all keep the date name (`RenameTarget`'s existing
+  rules); a collision steps to ` 2` exactly as `Rename…` does.
+- Nothing is asked when there's nothing to name: a discarded take, a start that failed, a fail-stop
+  that left no file.
+- Replay clips are never named this way — the save happens mid-take, and a modal there would
+  interrupt what is being recorded.
+
 ## Copy rules
 
 - Verbs on buttons: `Start Recording`, `Stop & Save`, `Pause`, `Grant…`. No "OK".

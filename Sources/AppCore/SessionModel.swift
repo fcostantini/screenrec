@@ -55,6 +55,9 @@ public final class SessionModel {
     /// The live `RecordingSession`. Internal: `AppState`'s actions pause, stop and finalize it.
     private(set) var capture: RecordingSession?
     private(set) var currentOutputURL: URL?
+    /// The file the last `.finished` carried, with its duration — read once the session has torn
+    /// down, then cleared with the rest of it (M21-T3).
+    private(set) var finishedRecording: (url: URL, duration: TimeInterval)?
     /// Captures `self` weakly and is awaited by `AppState.stopAndWaitForFinalize()`. Nothing
     /// cancels it in `deinit` (nonisolated, can't touch this) and nothing needs to: the loop exits
     /// when the session's stream finishes, which `RecordingSession` guarantees after
@@ -92,6 +95,7 @@ public final class SessionModel {
     func clear() {
         capture = nil
         currentOutputURL = nil
+        finishedRecording = nil
         consumeTask = nil
         activeMicrophoneName = nil
         activeAppName = nil
@@ -122,7 +126,13 @@ public final class SessionModel {
         case .paused:
             recordingClock?.bankAndFreeze(now: Date())
             statusIcon = .paused
-        case .stopped, .finished, .discarded:
+        case .finished(let url, _, _):
+            // What the take left behind, for the step that runs after teardown (M21-T3). A discard
+            // never lands here, and neither does a start that produced no file. The length is the
+            // last polled elapsed — it labels the take in the prompt, it isn't a measurement.
+            finishedRecording = (url, elapsedSeconds)
+            fallthrough
+        case .stopped, .discarded:
             // Every ending is the same to the icon, including fail-stops (ADR-007 successes with
             // a cause) and discards. The cause, if any, reaches the user as a notification.
             recordingClock = nil

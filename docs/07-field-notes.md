@@ -7,6 +7,20 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-29 (M21-T3):
+  - 🔴 **A synthetic keystroke never reaches an `LSUIElement` app's modal alert — it goes to whatever
+    is actually frontmost.** The alert renders and looks focused enough in a screenshot, but its
+    buttons and text are drawn *inactive* (that greyed look is the tell). `NSApp.activate` inside the
+    app doesn't help: a synthetic press confers no activation, which is menudriver's own documented
+    caveat, one layer further along. My typed name and its Return went to the terminal instead, and —
+    worse — **the un-answered alert left the app modal**, so the next run's `Start Recording` was
+    queued behind it and the menu just sat idle. Drive an alert through AX instead:
+    `AXUIElementSetAttributeValue(field, kAXValue…)` then `AXPress` the button by title. Unlike a
+    SwiftUI window, an `NSAlert`'s controls *do* carry `AXTitle`.
+  - ⚠️ The alert is a **layer-8** window (`NSModalPanelWindowLevel`), so a `CGWindowList` sweep
+    filtered to layer 0 misses it entirely, and one that ignores layer grabs the open *menu* (101)
+    instead.
+
 - 2026-07-29 (M21-T2): 🔴 **The export's rate budget over-quotes a quiet screen by ~5×, so a row
   built on it must say `up to`, not `≈`.** `Stop & Copy MP4` first shipped its estimate as
   `≈11 MB` for a 14 s take; the file it wrote was **2.2 MB**. The model isn't wrong — it is
