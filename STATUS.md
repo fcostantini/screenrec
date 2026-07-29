@@ -8,8 +8,8 @@
 
 - **✅ M21-T1 DONE (2026-07-29) — the Trim window writes the shareable MP4 itself.** Plan artifact
   (rulings A/B/C approved): `claude.ai/code/artifact/2c0c8b44-a8d0-4f50-8b4e-07e16068e064`.
-  **562 tests (+5)**, dev loop green. ⏳ **Live leg still to run** (needs Franco — it opens the menu
-  and the Trim window on his desktop).
+  **562 tests (+5)**, dev loop green, **deployed** to `/Users/Shared/ScreenRec.app` (pid 56110 →
+  **24242**) and driven live.
   **As built:** `Export as MP4` sits between Play Range and Trim & Save, with `Trim & Save` keeping
   Return (ADR-015). The range travels `TrimView → AppState → ExportModel → Exporter` as an
   `ExportRange`, riding the unchanged `performExport` path — same one-at-a-time guard, receipt and
@@ -33,6 +33,15 @@
   hard-kill leftover, here after a clean export (1 of 5 runs; long and rangeless ones never did).
   A ranged export is short by design, so it went from rare to routine: swept after finalize, by our
   own scratch prefix only. That is the task's "no intermediate file" criterion, so it is in scope.
+  **Verified live on the deployed build:** the window drove through <kbd>I</kbd>/<kbd>O</kbd> to
+  **In 0:03 · Out 0:06 · Trimmed length ≈ 0:03**, `Export as MP4` wrote **3.04 s, avc1 1920×1200 +
+  one AAC**, the menu showed **`Exported to MP4 · Recording … trimmed.mp4`**, and ~/Movies gained
+  exactly that one file — no `.mov`, no `.partial`, no `.sb-`. The take records its own menu bar, so
+  the file checked itself: the export's first frame and the source at 3.05 s both read
+  **`00:00:02`**. Test file deleted afterwards.
+  ⚠️ **PSNR is useless on a real screen recording here** — same scene, one page-scroll apart, scores
+  12–17 dB either way; that's why the frame-exactness proof is the synthetic clock clip and the live
+  proof is the burned-in menu-bar clock (docs/07).
   **Next: M21-T2** (Stop & Share) — it reuses this path with no range.
 
 - **🚫 M20 (Marks) CLOSED "won't do" 2026-07-28 (Franco) — and M20-T1's shipped code was reverted.**

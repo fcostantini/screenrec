@@ -29,6 +29,12 @@ file every session is required to read.
     burns its own timestamp into every frame, with keyframes 5 s apart, answers it outright:
     **52.4 dB** at the requested 27.30 s against **8.8 dB** at the keyframe 3.3 s earlier, and the
     frame simply reads `27.30 s`. Build the source that can fail the test, or the test is decoration.
+  - ⚠️ **The Trim window's buttons carry no `AXTitle` — the label is in `AXDescription`.** A search
+    for `role == .button && title == "Export as MP4"` finds *nothing* in that window, while its
+    static texts read fine; the same walk shows `AXButton title= desc=Export as MP4`. `AVPlayerView`'s
+    own controls behave the same way (`desc=mute/unmute`). Match on the description when driving a
+    SwiftUI window, and keep a coordinate click as the fallback. The <kbd>I</kbd>/<kbd>O</kbd>
+    shortcuts, by contrast, drive it perfectly once the window is key.
   - ⚠️ Pre-existing, untouched: the CLI's export line prints **`+ AAC` unconditionally**, so a
     recording made with both audio sources off (legal under ADR-019) reports an audio track it
     doesn't have. Fixing it means `ExportResult` carrying whether audio was written.
