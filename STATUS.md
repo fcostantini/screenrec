@@ -6,7 +6,29 @@
 
 ## Now
 
-- **✅ M20-T1 DONE (2026-07-28) — ⌥⌘M marks the running take.** Plan artifact (rulings A/B/C
+- **🚫 M20 (Marks) CLOSED "won't do" 2026-07-28 (Franco) — and M20-T1's shipped code was reverted.**
+  Plan artifacts: T1 `claude.ai/code/artifact/17df26d2-c25d-4671-a12f-91248a3b9168`, T2
+  `claude.ai/code/artifact/cf022a1e-a02d-42f3-b4b7-5de3e64ad237`. **557 tests** — exactly the
+  pre-marks count.
+  🔴 **The measurement that ended it: a sparse extra track disables fragmented writing, and with it
+  crash safety.** `AVAssetWriter` emits a fragment only when *every* input has data up to the
+  boundary, so a chapter track fed once per mark starves it. **Mid-write — the only state a crash
+  sees — no track → 3 `moof` atoms · track never marked → 0 · track + one mark → 0.** End to end:
+  two takes, same build, same `kill -9`, **marks off recovered as a playable 10.99 s file; marks on
+  was unreadable**. A 40-minute take would have been total loss.
+  **Every other route was measured and closed:** movie metadata can't be set after writing starts;
+  a sidecar `.json` works but Franco won't have a companion file beside every recording; post-hoc
+  atom surgery on a multi-GB take is not worth entertaining. Franco: *"if there's no better
+  alternative i'd just discard the entire marks feature"* — there isn't.
+  ⚠️ **The generalised trap is in docs/07 and outlives the feature:** anything that ever adds a
+  track to `MovieRecorder` must be measured *while writing*, by counting `moof` atoms on disk before
+  finalize. A clean `finishWriting` and a readable output prove nothing about the crash case — that
+  is exactly what fooled my first harness.
+  **Kept:** the menu-bar clock alignment fix (`ab59095`), which was independent.
+  **Next: Franco's call.** The roadmap has **M21** left (One step from "it happened" to "here it
+  is") — T1's ranged export, T2's Stop &amp; Share, T3's named takes, T4's per-app audio exclusion.
+
+- **~~M20-T1 (reverted)~~ — ⌥⌘M marks the running take.** Plan artifact (rulings A/B/C
   approved): `claude.ai/code/artifact/17df26d2-c25d-4671-a12f-91248a3b9168`. **564 tests (+7)**,
   dev loop green, deployed (pid 23380).
   **As built:** opt-in shortcut seeded ⌥⌘M (the M9-T4 pattern), a ~2 s menu-bar **bookmark badge**

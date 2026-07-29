@@ -50,33 +50,6 @@ public final class SessionModel {
     /// Drives the menu's Pause/Resume swap.
     public var isPaused: Bool { statusIcon == .paused }
 
-    /// Positions the user marked in this take, in **recorded** seconds — pause-corrected, so a
-    /// mark names the frame it was taken at rather than the wall-clock moment (M20-T1). Ordered by
-    /// construction: the clock only moves forward.
-    public private(set) var marks: [TimeInterval] = []
-
-    /// Marks the current position, returning it, or nil when there is nothing to mark.
-    ///
-    /// Reads `RecordingClock`, not the writer's `recordedDuration`: the clock is the number the
-    /// menu bar is showing when the key is pressed, and a mark that landed anywhere else would
-    /// contradict what the user just read (M20-T1 ruling A).
-    ///
-    /// ⚠️ A paused take has no current moment — every press would stack on the frozen timestamp —
-    /// so pausing declines marks rather than piling them on one frame (ruling B).
-    /// Places the clock at a known point so a test can mark across a pause without waiting out
-    /// real seconds. Tests only — production drives it through `apply(_:)`.
-    func setClockForTesting(_ clock: RecordingClock) {
-        recordingClock = clock
-    }
-
-    @discardableResult
-    func addMark(now: Date = Date()) -> TimeInterval? {
-        guard let clock = recordingClock, clock.runningSince != nil else { return nil }
-        let at = clock.elapsed(now: now)
-        marks.append(at)
-        return at
-    }
-
     // MARK: - The capture it is driving
 
     /// The live `RecordingSession`. Internal: `AppState`'s actions pause, stop and finalize it.
@@ -125,7 +98,6 @@ public final class SessionModel {
         activeRegion = nil
         elapsedSeconds = 0
         recordedBytes = 0
-        marks = []
     }
 
     // MARK: - Event folding

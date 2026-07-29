@@ -1717,59 +1717,38 @@ fills **during the take** stops itself with `diskAlmostFull` and leaves a playab
 one that started below the floor); no window title appears in the preferences plist; the MP4 picker
 names what its sizes are for.
 
-## M20 — Marks (from the 2026-07-28 review, finding F1)
+## M20 — Marks — **CLOSED "won't do" 2026-07-28 (Franco)**
 
-The product's distinguishing strength is long, crash-safe recordings — and it offers nothing to help
-you find the moment in one afterwards. A hotkey that timestamps the running take is the smallest
-thing that makes that strength usable: hit it when the bug happens, or on each beat of a demo, and
-the marks are how you get back there. **MINOR** (a new user-facing capability). Needs none of the
-render/compositing stage ADR-015 parked.
+🔴 **The feature is discarded, and the reason is a measurement worth keeping.** Marks were only
+useful if they reached the Trim window (Franco: "markers are good to have mostly for trimming the
+recording"), and every route to getting them there costs more than the feature returns:
 
-- [x] M20-T1 **Mark the moment.** ✅ 2026-07-28 — ⌥⌘M (opt-in, seeded, the M9-T4 pattern) marks the
-      running take; a menu-bar bookmark flashes ~2 s (the `replaySavedFlash` shape) and the recording
-      menu carries `N marks · last at M:SS`, stamped at open. **Ruling A: the position comes from
-      `RecordingClock`**, not the writer's `recordedDuration` — the clock is the number the menu bar
-      is *showing* when the key is pressed. **Ruling B: a paused take declines the mark**, since
-      every press would land on the same frozen frame. **First shortcut on M22-T4's typed registry**
-      (`case addMark = 5`, a collision now being a compile error). **564 tests (+7).**
-      **Live:** ⌥⌘M fired from another process (genuinely global) → menu read `1 mark · last at
-      0:05`; paused, a press was declined (still 1 mark); resumed → `2 marks · last at 0:29`; the
-      file was 33 s with the pause absent. **The take recorded its own menu bar**, so the marked
-      frames were checked against the clock they came from: **00:00:05** at the 0:05 mark and
-      **00:00:28** at 0:29 — within the label's 1 Hz tick. ⚠️ **Marks do not survive the take yet
-      — that is T2**, and until then this is a proven mechanism rather than a usable workflow. A global shortcut (⌥⌘M by default) records the current position of
-      the running take; nothing happens when idle. **Seams:** `HotkeyCenter` + `AppState`'s
-      `hotkeyRegistrar` already carry three shortcuts and the opt-in/seed/recorder-pill pattern
-      (M9-T4, M12-T6); the position must come from the **recording clock**, not wall clock — a
-      paused take's marks have to land where the content is, which is the same distinction
-      `TimestampRebaser` exists for. **Rulings:** whether the menu shows a mark count while
-      recording (stamped at open, never ticking — M6-T10), and whether a mark can be taken while
-      *paused* (it can't be placed meaningfully — probably ignore, and say so). **Verify:** unit —
-      the pure "mark at recorded position" math across a pause, which is where wall clock and
-      recorded time diverge; live — mark either side of a pause, then check the marks land on the
-      right frames.
-- [ ] M20-T2 **Marks survive the file.** A mark nobody can read later is a note to nobody.
-      **Seams:** two honest options, and this task must pick with a measurement, not a preference —
-      **(a)** a QuickTime **chapter track** written by `MovieRecorder` (visible in QuickTime and
-      preserved by a copy, but it means a second writer input and an association at finalize, on the
-      one path ADR-007 protects most); **(b)** a **sidecar** `.json` beside the `.mov` (trivial and
-      touches no writer, but lost the moment the file is moved or shared). **Rulings:** (a) vs (b) —
-      and if (a), whether it may touch `MovieRecorder` at all, given four milestones have now shipped
-      without changing the capture path. **Verify:** for (a), `probe`/QuickTime shows the chapters
-      and a `kill -9` mid-take still yields a playable file with the marks up to that point; for (b),
-      the sidecar round-trips and its loss is documented in docs/06.
-- [ ] M20-T3 **The Trim window seeks between marks.** **Seams:** `TrimView` already owns the player,
-      the in/out points and `KeyframeIndex`; marks become a list beside the range controls.
-      **Rulings:** the keys (⌥← / ⌥→ alongside M18-T1's `I`/`O`), and whether marks can be *set*
-      from the trim window as well as read. ⚠️ `AVPlayerView`'s own scrubber cannot be annotated, so
-      a list is the honest surface — do not fake a marked timeline. **Verify:** live: a take with
-      three marks, each seek lands within a frame of the mark; and the window still opens on a
-      recording that has none.
+- **A chapter track written live (option a)** — implemented, then rejected. It works in isolation:
+  a fragmented `.mov` with a text track associated `chapterList` finalizes cleanly, and QuickTime
+  and ffmpeg both read the chapters back. 🔴 **But it silently disables fragmentation.**
+  `AVAssetWriter` emits a fragment only when *every* input has data up to the boundary, so a text
+  track fed once per mark — or never — starves it. **Measured mid-write, which is the only state a
+  crash sees: no track → 3 fragments · track never marked → 0 · track + one mark → 0.** End to end
+  through the app: two takes, same build, same `kill -9`, marks off recovered as a **playable
+  10.99 s file** and marks on was **unreadable** ("moov atom not found"). That is the exact loss
+  ADR-007 exists to prevent, on a path where a 40-minute take is at stake.
+- **Movie metadata written at finalize** — impossible: `AVAssetWriter.setMetadata` throws once
+  writing has started ("Cannot call method when status is 1"), so it must be fixed before the first
+  frame, when no marks exist.
+- **A sidecar `.json` (option b)** — works and is crash-safe, **rejected by Franco**: a companion
+  file beside every recording isn't worth it, and it orphans on any Finder move or rename.
+- **Post-hoc atom surgery** on the finished file — hand-rolled MP4 rewriting on the user's only
+  copy of a multi-GB take. Not entertained.
 
-**Gate G20**: a mark taken either side of a pause lands on the right frame of the finished file;
-marks survive whatever route T2's ruling chose (a copy of the file, or a documented sidecar);
-the Trim window seeks between them; and the capture path's crash-safety is unchanged — `kill -9`
-mid-take still loses ≤ 10 s (G2 §3.2's bar) with marks present.
+**M20-T1 (the ⌥⌘M shortcut) shipped and was then reverted** — without persistence it left nothing
+behind, and this repo doesn't keep scaffolding. The measurements live in `docs/07`; the
+fragment-starvation one is a trap for **anything** that ever adds a track to `MovieRecorder`.
+
+- [x] ~~M20-T1 **Mark the moment.**~~ — built, shipped, reverted with the milestone.
+- [x] ~~M20-T2 **Marks survive the file.**~~ — the task that killed the feature; see above.
+- [x] ~~M20-T3 **The Trim window seeks between marks.**~~ — nothing to seek between.
+
+**Gate G20**: n/a — closed unbuilt.
 
 ## M21 — One step from "it happened" to "here it is" (from the 2026-07-28 review, P1, P5, F2, F3)
 

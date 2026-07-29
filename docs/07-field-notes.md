@@ -27,6 +27,34 @@ file every session is required to read.
     font and the ink colour: a non-template image can't be tinted by the menu bar, so the colour
     follows `NSApp.effectiveAppearance` (the trade the meter already makes).
 
+- 2026-07-28 (M20-T2, the note that closed the milestone): 🔴 **a sparse extra track silently
+  disables `AVAssetWriter`'s fragmented output — and with it, crash safety.**
+  `movieFragmentInterval` emits a fragment only when **every** input has data up to the boundary,
+  so an input that receives a sample rarely (a chapter track: once per mark) or never holds the
+  boundary forever and **nothing is ever flushed**. The finished file looks perfect — fragments
+  appear at `finishWriting` — so only a mid-write inspection shows it.
+  **Measured mid-write, the only state a crash sees:** no extra track → **3** `moof` atoms · a
+  chapter track never marked → **0** · a chapter track plus one mark → **0**. End to end through
+  the app: two takes, same build, same `kill -9`, marks off recovered as a **playable 10.99 s
+  file**, marks on was **unreadable** (`moov atom not found`, `mdat` length 0, no `moof`).
+  ⚠️ **This applies to any future track**, not just chapters — timed metadata, captions, anything
+  added to `MovieRecorder` that isn't fed continuously. If a track must be added, measure fragments
+  *while writing* (count `moof` in the file on disk before finalize); a passing `finishWriting` and
+  a readable output prove nothing about the crash case.
+  - **What a chapter track needs, in case one is ever attempted again:** the association is owned
+    by the **video** track (`video.addTrackAssociation(withTrackOf: text, type: .chapterList)`; the
+    reverse throws); a bare `CMFormatDescriptionCreate` for `'text'` writes fine then fails
+    `finishWriting` with **−12712**, and only a hand-assembled 59-byte big-endian QuickTime
+    `TextDescription` works; and without `languageCode` on the track,
+    `loadChapterMetadataGroups(bestMatchingPreferredLanguages:)` returns **0** chapters though the
+    track is plainly present.
+  - **Metadata is not an escape hatch:** `AVAssetWriter.setMetadata` throws once writing has begun
+    ("Cannot call method when status is 1"), so a movie's metadata is fixed before the first frame.
+  - **Portability, since it came up:** QuickTime and `ffprobe`/libavformat both read these chapters
+    (`TAG:title=Mark 1` with exact ranges); **VLC 3.0.23 parses the `chap` box but emits no
+    seekpoints**; and **our own MP4 export drops them entirely** — `Exporter` writes the video and
+    audio tracks by name, so a text track never reaches a shared clip.
+
 - 2026-07-28 (M20-T1): verifying a timestamp against the recording itself.
   - **A full-screen take records its own menu-bar clock**, so a mark's frame can be checked against
     the number the user was looking at when they pressed the key: the frame at the 0:05 mark read

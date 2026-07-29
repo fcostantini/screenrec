@@ -192,11 +192,6 @@ struct MenuView: View {
              + MenuHeader.recordingDetail(bytes: state.recordedBytes))
             .modifier(RefreshOnMenuOpen(refresh: refreshAtOpen))
 
-        // The marks taken so far (M20-T1) — absent until there is one, since "0 marks" is noise.
-        if let marks = state.marksMenuLabel {
-            Text(marks)
-        }
-
         Divider()
 
         exportStatusRow

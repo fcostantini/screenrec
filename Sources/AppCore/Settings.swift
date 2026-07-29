@@ -25,10 +25,6 @@ public struct Hotkey: Sendable, Equatable {
     /// ⌥⌘P: the combo seeded when the user first enables the pause/resume shortcut (M12-T6).
     /// kVK_ANSI_P with optionKey | cmdKey.
     public static let pauseDefault = Hotkey(keyCode: 35, modifiers: 2048 | 256)
-
-    /// ⌥⌘M: the combo seeded when the user first enables the mark shortcut (M20-T1).
-    /// kVK_ANSI_M with optionKey | cmdKey.
-    public static let markDefault = Hotkey(keyCode: 46, modifiers: 2048 | 256)
 }
 
 /// The user's microphone pick, before resolution to a concrete device (docs/06 item 6):
@@ -208,8 +204,6 @@ public struct Settings: Sendable, Equatable {
     public var recordHotkey: Hotkey?
     /// The optional global pause/resume shortcut (M12-T6). Nil ⇒ off — opt-in like `recordHotkey`.
     public var pauseHotkey: Hotkey?
-    /// Marks the current position of a running take (M20-T1); nil ⇒ off, like its three siblings.
-    public var markHotkey: Hotkey?
     /// Whether Start runs a 3-2-1 count-in first (M12-T6). Default off.
     public var countInEnabled: Bool
     /// Whether the menu-bar label shows the live elapsed clock while recording (M9-T3). Default on.
@@ -294,7 +288,6 @@ public struct Settings: Sendable, Equatable {
             replayHotkey: .standard,
             recordHotkey: nil,
             pauseHotkey: nil,
-            markHotkey: nil,
             countInEnabled: false,
             showsMenuBarTimer: true,
             showsMenuBarLevel: true,
@@ -345,8 +338,6 @@ public enum SettingsStore {
         public static let recordHotkey = "recordHotkey"
         /// Absent ⇒ the pause/resume shortcut is off (M12-T6). Same Dict shape as `replayHotkey`.
         public static let pauseHotkey = "pauseHotkey"
-        /// Absent ⇒ the mark shortcut is off (M20-T1). Same Dict shape as `replayHotkey`.
-        public static let markHotkey = "markHotkey"
         /// Absent ⇒ no count-in (M12-T6).
         public static let countInEnabled = "countInEnabled"
         /// `replayHotkey`/`recordHotkey` are Dicts (docs/06): these are their inner keys.
@@ -471,7 +462,6 @@ public enum SettingsStore {
         // Absent or malformed ⇒ the start/stop shortcut stays off (M9-T4).
         settings.recordHotkey = hotkey(from: defaults.dictionary(forKey: Key.recordHotkey))
         settings.pauseHotkey = hotkey(from: defaults.dictionary(forKey: Key.pauseHotkey))
-        settings.markHotkey = hotkey(from: defaults.dictionary(forKey: Key.markHotkey))
         settings.countInEnabled = defaults.bool(forKey: Key.countInEnabled)
 
         // Opt-out, so absent means on (the `.standard` default holds); only an explicit stored
@@ -612,14 +602,6 @@ public enum SettingsStore {
                 forKey: Key.pauseHotkey)
         } else {
             defaults.removeObject(forKey: Key.pauseHotkey)
-        }
-
-        if let markHotkey = settings.markHotkey {
-            defaults.set(
-                [Key.hotkeyKeyCode: markHotkey.keyCode, Key.hotkeyModifiers: markHotkey.modifiers],
-                forKey: Key.markHotkey)
-        } else {
-            defaults.removeObject(forKey: Key.markHotkey)
         }
         defaults.set(settings.countInEnabled, forKey: Key.countInEnabled)
         defaults.set(settings.showsMenuBarTimer, forKey: Key.showsMenuBarTimer)
