@@ -128,6 +128,26 @@ import Testing
         }
     }
 
+    @Test func rejectsARangeThatKeepsNothing() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("export-range-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let input = dir.appendingPathComponent("Rec.mov")
+        FileManager.default.createFile(atPath: input.path, contents: Data("x".utf8))
+        let output = dir.appendingPathComponent("Rec.mp4")
+
+        for range in [ExportRange(start: 5, end: 5), ExportRange(start: 9, end: 3),
+                      ExportRange(start: -1, end: 3)] {
+            await #expect(throws: ExportError.emptyRange) {
+                _ = try await Exporter.exportToMP4(from: input, to: output, range: range)
+            }
+        }
+        // Refused before any writing, so a bad range can't leave a file behind.
+        #expect(!FileManager.default.fileExists(atPath: output.path))
+    }
+
     // MARK: - Integration
 
     /// One transcode covering the whole contract, downscaling via a small target config (not a
@@ -183,6 +203,33 @@ import Testing
         #expect(moov < mdat)
     }
 
+    /// A ranged export writes the range and nothing else (M21-T1) — including when the range runs
+    /// off the end of the recording, which the Trim window's out-point can do on a clip whose last
+    /// frame lands early. Gated with the transcode above: same hardware encoder.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["SCREENREC_HW_ENCODE_TESTS"] == "1"))
+    func exportsOnlyTheRequestedRange() async throws {
+        let source = try await Self.makeThreeTrackMov(width: 320, height: 180, frames: 90)  // 3 s
+        defer { try? FileManager.default.removeItem(at: source) }
+        let directory = FileManager.default.temporaryDirectory
+        let inside = directory.appendingPathComponent("export-range-in-\(UUID().uuidString).mp4")
+        let overrun = directory.appendingPathComponent("export-range-over-\(UUID().uuidString).mp4")
+        defer {
+            try? FileManager.default.removeItem(at: inside)
+            try? FileManager.default.removeItem(at: overrun)
+        }
+
+        let middle = try await Exporter.exportToMP4(
+            from: source, to: inside, range: ExportRange(start: 1, end: 2))
+        #expect(abs(middle.duration - 1) < 0.05)
+        let written = try await AVURLAsset(url: inside).load(.duration).seconds
+        #expect(abs(written - 1) < 0.15)
+
+        // An out-point past the end is clamped to the media that exists, not refused.
+        let tail = try await Exporter.exportToMP4(
+            from: source, to: overrun, range: ExportRange(start: 2.5, end: 99))
+        #expect(abs(tail.duration - 0.5) < 0.15)
+    }
+
     // MARK: - Fixtures
 
     private static let fps = 30
@@ -192,7 +239,9 @@ import Testing
 
     /// A real 3-track HEVC `.mov` (screen + system + mic) via MovieRecorder — the fixture path
     /// MovieRecorderTests exercises, reused here as the Exporter's input.
-    private static func makeThreeTrackMov(width: Int, height: Int) async throws -> URL {
+    private static func makeThreeTrackMov(
+        width: Int, height: Int, frames: Int = frameCount
+    ) async throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("export-src-\(UUID().uuidString).mov")
         try? FileManager.default.removeItem(at: url)
@@ -205,7 +254,7 @@ import Testing
         // Prime the lazy mic input pre-epoch (dropped), as the recorder suite does.
         recorder.consume(makeAudioSampleBuffer(format: micFormat, frames: 800, pts: .zero), type: .microphone)
 
-        for index in 0..<frameCount {
+        for index in 0..<frames {
             let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(fps))
             recorder.consume(
                 makeVideoSampleBuffer(

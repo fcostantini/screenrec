@@ -129,6 +129,27 @@ import Testing
         #expect(second.lastPathComponent == "Recording A 2.mov")
     }
 
+    @Test func writerScratchIsSweptWithoutTouchingAnythingElse() throws {
+        let fileManager = FileManager.default
+        let dir = fileManager.temporaryDirectory.appendingPathComponent("scratch-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: dir) }
+
+        let partial = dir.appendingPathComponent("Clip.mp4.partial")
+        let names = [
+            "Clip.mp4.partial.sb-126a974a-UEUn4Q",  // the writer's temp, as macOS names it
+            "Clip.mp4.partial",                     // the export in flight
+            "Clip.mp4",                             // an earlier export
+            "Other.mp4.partial.sb-99999999-ZZZZZZ", // another export's temp, not ours to remove
+        ]
+        for name in names { try Data("x".utf8).write(to: dir.appendingPathComponent(name)) }
+
+        OutputLocation.removeWriterScratch(beside: partial)
+
+        let left = Set(try fileManager.contentsOfDirectory(atPath: dir.path))
+        #expect(left == ["Clip.mp4.partial", "Clip.mp4", "Other.mp4.partial.sb-99999999-ZZZZZZ"])
+    }
+
     @Test func recoverySalvagesOrphansAndSweepsPlaceholders() throws {
         let fileManager = FileManager.default
         let dir = fileManager.temporaryDirectory.appendingPathComponent("recover-\(UUID().uuidString)")

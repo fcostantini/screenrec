@@ -29,6 +29,8 @@ private func exportErrorMessage(_ error: Error) -> String {
         return "Couldn't export: that file has no video track."
     case ExportError.outputCollidesWithInput, GifExportError.outputCollidesWithInput:
         return "The output path matches the input — choose a different name."
+    case ExportError.emptyRange:
+        return "Couldn't export: the time range is empty."
     case GifExportError.noFrames:
         return "Couldn't export: the clip has no frames to encode."
     default:
@@ -37,8 +39,8 @@ private func exportErrorMessage(_ error: Error) -> String {
 }
 
 /// `export (--to-mp4 | --to-gif) <in> [<out>]` — derive a shareable file from a recording (ADR-016,
-/// M10-T3). Default output is the input's `.mp4`/`.gif` sibling, collision-resolved; the source is
-/// only read.
+/// M10-T3). `--to-mp4` also takes `--from`/`--to`, writing only that range (M21-T1). Default output
+/// is the input's `.mp4`/`.gif` sibling, collision-resolved; the source is only read.
 func runExport(_ args: [String]) async {
     var toMP4 = false
     var toGIF = false
@@ -46,6 +48,8 @@ func runExport(_ args: [String]) async {
     var gifFPS: Int?
     var width: Int?
     var gifSeconds: Double?
+    var from: Double?
+    var to: Double?
 
     var index = 0
     func value(after flag: String) -> String {
@@ -64,6 +68,16 @@ func runExport(_ args: [String]) async {
         case "--width":
             width = max(1, Int(parsePositive(value(after: "--width"), flag: "--width", unit: "pixels", max: 4096).rounded()))
         case "--seconds": gifSeconds = parsePositive(value(after: "--seconds"), flag: "--seconds", max: 900)
+        case "--from":
+            guard let parsed = parseTimecode(value(after: "--from")) else {
+                die("--from must be M:SS or seconds (≥ 0)")
+            }
+            from = parsed
+        case "--to":
+            guard let parsed = parseTimecode(value(after: "--to")) else {
+                die("--to must be M:SS or seconds (≥ 0)")
+            }
+            to = parsed
         case let flag where flag.hasPrefix("--"): die("Unknown export option: \(flag)")
         default: positionals.append(args[index])
         }
@@ -73,6 +87,9 @@ func runExport(_ args: [String]) async {
     guard !toMP4 || (gifFPS == nil && gifSeconds == nil) else {
         die("--fps/--seconds only apply to --to-gif")
     }
+    guard !toGIF || (from == nil && to == nil) else { die("--from/--to only apply to --to-mp4") }
+    guard (from == nil) == (to == nil) else { die("a range needs both --from and --to") }
+    if let from, let to { guard to > from else { die("--to must be after --from") } }
     guard let inputPath = positionals.first else { die("export needs an input path") }
     guard positionals.count <= 2 else { die("Unexpected extra argument: \(positionals[2])") }
 
@@ -91,24 +108,37 @@ func runExport(_ args: [String]) async {
                 input: input, explicitOutput: explicitOutput,
                 fps: gifFPS, width: width, seconds: gifSeconds)
         } else {
-            try await runMP4(input: input, explicitOutput: explicitOutput, width: width)
+            let range: ExportRange? = if let from, let to {
+                ExportRange(start: from, end: to)
+            } else {
+                nil
+            }
+            try await runMP4(
+                input: input, explicitOutput: explicitOutput, width: width, range: range)
         }
     } catch {
         die(exportErrorMessage(error), code: 70)
     }
 }
 
-private func runMP4(input: URL, explicitOutput: URL?, width: Int?) async throws {
-    let output = explicitOutput ?? Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: input))
+private func runMP4(
+    input: URL, explicitOutput: URL?, width: Int?, range: ExportRange?
+) async throws {
+    let output = explicitOutput
+        ?? Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: input, range: range))
     let progress = ProgressPrinter()
     let configuration = width.map { ExportConfiguration(maxWidth: $0) } ?? ExportConfiguration()
+    if let range {
+        print("Range     \(Timecode.cutPoint(range.start)) – \(Timecode.cutPoint(range.end))")
+    }
     let result = try await Exporter.exportToMP4(
-        from: input, to: output, configuration: configuration, progress: { progress.report($0) })
+        from: input, to: output, configuration: configuration, range: range,
+        progress: { progress.report($0) })
     progress.finish()
     print(
         String(
-            format: "Wrote     %@  (H.264 %d×%d + AAC, %.1f MB)",
-            result.url.lastPathComponent, result.width, result.height,
+            format: "Wrote     %@  (H.264 %d×%d + AAC, %.2fs, %.1f MB)",
+            result.url.lastPathComponent, result.width, result.height, result.duration,
             Double(result.byteCount) / 1_000_000))
 }
 

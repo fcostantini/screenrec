@@ -7,6 +7,32 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-29 (M21-T1):
+  - ✅ **`AVAssetReader.timeRange` clips exactly at the requested time, whatever the keyframes do.**
+    In-point 30.000 s on a real capture whose preceding sync sample sits at 28.100 (1.900 s back):
+    the first delivered video PTS is **30.000**, and the mixed audio's is **30.000** too. The reader
+    decodes from the sync sample internally and hands back clipped samples, so a ranged export needs
+    no retiming — and, unlike a lossless trim (02 §6a), the output holds **only** the range. This is
+    why the MP4 export's range rides the reader rather than `AVAssetExportSession`, which is the
+    trim's engine and would give up the mixed AAC track, the size fit and faststart.
+  - 🔴 **A short export can outrun `AVAssetWriter`'s own cleanup and strand its `.sb-<hex>` temp** —
+    the file M15-T3 recorded as a *hard-kill* leftover, here after a clean, successful export.
+    Measured: a 5 s ranged export stranded one on the first run, then not in three repeats; a 110 s
+    ranged export and a 5 s rangeless one never did. It is a race with process exit, not a property
+    of the range — but a ranged export from the Trim window is short **by design**, so this went
+    from rare to routine and is now swept after finalize (only names carrying our own scratch
+    path's prefix; a miss is a no-op, since the convention is Apple's and undocumented).
+  - ⚠️ **A real screen recording usually can't verify a frame-exact cut.** Comparing the export's
+    first frame against source frames at 28.1 / 29.0 / 29.5 / 30.0 / 30.5 / 31.0 s scored
+    **38.1–38.6 dB across all six** — the content (a mostly static browser window) barely changes,
+    so the "right" frame won by 0.4 dB and the measurement proved nothing. A synthetic clip that
+    burns its own timestamp into every frame, with keyframes 5 s apart, answers it outright:
+    **52.4 dB** at the requested 27.30 s against **8.8 dB** at the keyframe 3.3 s earlier, and the
+    frame simply reads `27.30 s`. Build the source that can fail the test, or the test is decoration.
+  - ⚠️ Pre-existing, untouched: the CLI's export line prints **`+ AAC` unconditionally**, so a
+    recording made with both audio sources off (legal under ADR-019) reports an audio track it
+    doesn't have. Fixing it means `ExportResult` carrying whether audio was written.
+
 - 2026-07-28 (menu-bar clock alignment): 🔴 **the `.menu` MenuBarExtra hands a label's `Text` to the
   status item as its AppKit *title* and throws away every SwiftUI modifier on it.** Franco saw the
   elapsed clock sitting high beside the icon; measured, its ink centre was **22.0 against the icon's

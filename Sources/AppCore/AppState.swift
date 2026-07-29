@@ -647,8 +647,8 @@ public final class AppState {
 
     // Export/trim actions forward to `exports` (M14-T1). AppState owns the persisted export prefs,
     // so it builds each configuration and passes it in.
-    public func exportToMP4(_ source: URL) {
-        exports.exportToMP4(source, configuration: exportConfiguration)
+    public func exportToMP4(_ source: URL, range: ExportRange? = nil) {
+        exports.exportToMP4(source, configuration: exportConfiguration, range: range)
     }
     public func exportToGIF(_ source: URL) { exports.exportToGIF(source, configuration: gifConfiguration) }
     public func trim(_ source: URL, from start: Double, to end: Double, mode: TrimMode = .lossless) {
@@ -662,8 +662,9 @@ public final class AppState {
     }
 
     /// The `Export as MP4` size as an `ExportConfiguration` (M18-T2). Only the width is a setting —
-    /// the height ceiling is a decoder limit, not a taste (`ExportConfiguration.maxHeight`).
-    var exportConfiguration: ExportConfiguration {
+    /// the height ceiling is a decoder limit, not a taste (`ExportConfiguration.maxHeight`). Public
+    /// so a surface can state the size an export will really produce (M21-T1).
+    public var exportConfiguration: ExportConfiguration {
         ExportConfiguration(maxWidth: mp4Width)
     }
 

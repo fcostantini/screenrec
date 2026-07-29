@@ -35,8 +35,8 @@ public final class ExportModel {
 
     /// The transcode and the GIF encode, injected so tests exercise the wiring without the hardware
     /// codecs. Each returns where it wrote. Default to the production `Exporter`/`GifExporter`/`Trimmer`.
-    public var exportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: ExportConfiguration) async throws -> URL = {
-        try await Exporter.exportToMP4(from: $0, to: $1, configuration: $2).url
+    public var exportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: ExportConfiguration, _ range: ExportRange?) async throws -> URL = {
+        try await Exporter.exportToMP4(from: $0, to: $1, configuration: $2, range: $3).url
     }
     public var gifExportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: GifConfiguration) async throws -> URL = {
         try await GifExporter.exportGIF(from: $0, to: $1, configuration: $2).url
@@ -59,13 +59,16 @@ public final class ExportModel {
 
     // MARK: - Actions
 
-    /// Transcodes a recording or saved clip to a shareable `.mp4` (M10-T2). The size comes from
-    /// Settings (M18-T2) — AppState builds the `configuration`, as it does for GIF.
-    public func exportToMP4(_ source: URL, configuration: ExportConfiguration) {
+    /// Transcodes a recording or saved clip to a shareable `.mp4` (M10-T2), or just `range` of it
+    /// (M21-T1). The size comes from Settings (M18-T2) — AppState builds the `configuration`, as it
+    /// does for GIF.
+    public func exportToMP4(
+        _ source: URL, configuration: ExportConfiguration, range: ExportRange? = nil
+    ) {
         let export = exportFunction  // snapshot; the closure captures no `self`
         performExport(
-            source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source)),
-            using: { try await export($0, $1, configuration) },
+            source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source, range: range)),
+            using: { try await export($0, $1, configuration, range) },
             success: { RecordingNotifications.exported(url: $0) },
             failure: RecordingNotifications.exportFailed)
     }

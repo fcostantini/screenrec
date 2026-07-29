@@ -509,6 +509,14 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
 - **Trim & Save** runs the trim (`AppState.trim`, off-main via `performExport`, the
   one-at-a-time/receipt/notification path) and dismisses. Disabled for a <0.1 s range or while an
   export runs.
+- **Export as MP4** (M21-T1) writes the shareable `.mp4` of that range directly — no `.mov` in
+  between — through the same path, and dismisses; same disabled rule. `Trim & Save` keeps the
+  Return key (ADR-015: lossless is the default). The file is the ` trimmed` sibling's `.mp4`, so a
+  clip can't be mistaken for an export of the whole take. A caption states what it will produce:
+  *"Export as MP4 writes only the range — H.264 1920 × 1200, ready to paste into a message."* The
+  size is this recording's own fitted through the Settings width, and is omitted until the source's
+  geometry has loaded (M16-T2). Unlike a lossless trim, this holds only the range: a ranged read
+  clips at the in-point (docs/07), so no lead-in caveat applies.
 - **Re-encode** (M18-T1, unchecked by default — ADR-015 keeps lossless the default): *"Re-encode —
   the clip will contain only M:SS – M:SS"*. Both modes start exactly at the in-point; lossless also
   keeps the frames back to the previous keyframe inside the file (docs/02 §6a), which the window

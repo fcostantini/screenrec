@@ -234,6 +234,20 @@ public struct OutputLocation: Sendable {
         return final
     }
 
+    /// Removes the writer's own scratch companion beside `url`, if one is still there. Under
+    /// `shouldOptimizeForNetworkUse` an `AVAssetWriter` writes `<url>.sb-<hex>` and usually clears
+    /// it at finalize — a short export can outrun that (docs/07, M21-T1). Only names carrying our
+    /// own scratch path's prefix are touched, and a miss is a no-op: the convention is Apple's and
+    /// undocumented, so it may simply stop matching one day.
+    static func removeWriterScratch(beside url: URL) {
+        let directory = url.deletingLastPathComponent()
+        let prefix = url.lastPathComponent + ".sb-"
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        for name in names where name.hasPrefix(prefix) {
+            try? FileManager.default.removeItem(at: directory.appendingPathComponent(name))
+        }
+    }
+
     /// The inner extension of a `… .<ext>.partial` name — what the file will be once finalized.
     private static func intendedExtension(of name: String) -> String {
         URL(fileURLWithPath: name).deletingPathExtension().pathExtension.lowercased()

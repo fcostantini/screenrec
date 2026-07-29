@@ -8,8 +8,22 @@ public enum ExportError: Error, Equatable {
     case unreadable(String)
     case noVideoTrack
     case outputCollidesWithInput
+    case emptyRange
     case readerFailed(String)
     case writerFailed(String)
+}
+
+/// The part of a recording to export, in seconds from the start of the file (M21-T1). A struct
+/// rather than a `ClosedRange`, which traps on construction — an inverted range has to reach
+/// `exportToMP4` to be refused as `emptyRange` instead of crashing its caller.
+public struct ExportRange: Sendable, Equatable {
+    public var start: Double
+    public var end: Double
+
+    public init(start: Double, end: Double) {
+        self.start = start
+        self.end = end
+    }
 }
 
 /// Knobs for a "share" transcode. Defaults are the messaging profile (ADR-016): H.264 High +
@@ -83,6 +97,13 @@ public enum Exporter {
         input.deletingPathExtension().appendingPathExtension("mp4")
     }
 
+    /// Where a share export of `input` belongs: its `.mp4` sibling, or the ` trimmed` one when only
+    /// `range` is written (M21-T1) — a clip must not sit in the folder looking like an export of the
+    /// whole take. One rule, so the app and the CLI can't name the same export differently.
+    public static func mp4Sibling(of input: URL, range: ExportRange?) -> URL {
+        mp4Sibling(of: range == nil ? input : Trimmer.trimmedSibling(of: input))
+    }
+
     /// `preferred` if free, else the first ` 2`, ` 3`… variant that doesn't exist — so a repeat
     /// export never clobbers an earlier one.
     public static func availableURL(basedOn preferred: URL) -> URL {
@@ -127,19 +148,25 @@ public enum Exporter {
     /// so the CLI flag, the Settings list and the encode can't drift apart.
     public static let levelSafeBox = (width: 4096, height: 2304)
 
-    /// Transcodes `input` to `output`. `progress` (0…1, on a background queue) tracks the video
-    /// pass. Blocking work runs off the cooperative pool. Throws before writing on a bad input,
-    /// leaving no partial file.
+    /// Transcodes `input` to `output`, or just `range` of it (M21-T1). `progress` (0…1, on a
+    /// background queue) tracks the video pass. Blocking work runs off the cooperative pool. Throws
+    /// before writing on a bad input, leaving no partial file.
     public static func exportToMP4(
         from input: URL,
         to output: URL,
         configuration: ExportConfiguration = ExportConfiguration(),
+        range: ExportRange? = nil,
         progress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> ExportResult {
         // Identity, not string equality: a symlink, the /tmp→/private/tmp alias, or a
         // case-insensitive volume can make two different paths the same file, and the pre-write
         // delete would then destroy the input recording.
         guard !sameFile(output, input) else { throw ExportError.outputCollidesWithInput }
+        // Judged before the asset loads, and not covered by the clamp below: a negative start would
+        // clamp to the first sample and quietly export a range nobody asked for.
+        if let range {
+            guard range.start >= 0, range.end > range.start else { throw ExportError.emptyRange }
+        }
 
         let asset = AVURLAsset(url: input)
         let tracks: [AVAssetTrack]
@@ -161,34 +188,51 @@ public enum Exporter {
             height: Int(naturalSize.height.rounded()),
             configuration: configuration)
 
+        // What to write, in asset time: the whole file, or the requested range clamped to the media
+        // that exists. A ranged read starts wherever it is asked to — the reader decodes from the
+        // preceding sync sample and clips the samples it hands back (measured, docs/07) — so no
+        // frames from before the in-point reach the file.
+        let clipStart = range.map {
+            CMTimeMaximum(CMTime(seconds: $0.start, preferredTimescale: 600), videoRange.start)
+        } ?? videoRange.start
+        let clipEnd = range.map {
+            CMTimeMinimum(CMTime(seconds: $0.end, preferredTimescale: 600), assetDuration)
+        } ?? assetDuration
+        guard CMTimeCompare(clipEnd, clipStart) > 0 else { throw ExportError.emptyRange }
+        let clipDuration = CMTimeSubtract(clipEnd, clipStart)
+        // Only a ranged export narrows the read; a whole-file one keeps the reader's own default,
+        // so its behaviour is untouched.
+        let readRange = range == nil ? nil : CMTimeRange(start: clipStart, end: clipEnd)
+
         // Write to the `.partial` companion and rename only once the file is complete (M15-T3, the
         // recording path's discipline): a crash or quit mid-export then leaves nothing at the final
         // name for the menu's Recent Exports to offer as a finished file.
         let scratch = OutputLocation.partialURL(for: output)
         let plan = try TranscodePlan(
             asset: asset, videoTrack: videoTrack, audioTracks: audioTracks,
-            output: scratch, target: target, sessionStart: videoRange.start,
-            configuration: configuration)
+            output: scratch, target: target, sessionStart: clipStart,
+            readRange: readRange, configuration: configuration)
 
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 transcodeQueue.async {
                     continuation.resume(with: Result {
-                        try plan.run(durationSeconds: assetDuration.seconds, progress: progress)
+                        try plan.run(durationSeconds: clipDuration.seconds, progress: progress)
                     })
                 }
             }
         } catch {
             try? FileManager.default.removeItem(at: scratch)  // no torn file on failure
+            OutputLocation.removeWriterScratch(beside: scratch)
             throw error
         }
 
+        OutputLocation.removeWriterScratch(beside: scratch)
         let output = try OutputLocation.finalizePartial(scratch)
         let bytes = (try? FileManager.default.attributesOfItem(atPath: output.path))
             .flatMap { $0[.size] as? Int } ?? 0
-        // The file is rebased to zero from `sessionStart`, so the clip's duration is what remains
-        // after it — identical to the source when the recording starts at PTS 0, as ours do.
-        let clip = CMTimeSubtract(assetDuration, videoRange.start).seconds
+        // The file is rebased to zero from `sessionStart`, so what it holds is the span written.
+        let clip = clipDuration.seconds
         return ExportResult(
             url: output, width: target.width, height: target.height,
             duration: clip.isFinite ? max(0, clip) : 0, byteCount: bytes)
@@ -232,9 +276,11 @@ private struct TranscodePlan {
         output: URL,
         target: (width: Int, height: Int),
         sessionStart: CMTime,
+        readRange: CMTimeRange?,
         configuration: ExportConfiguration
     ) throws {
         reader = try AVAssetReader(asset: asset)
+        if let readRange { reader.timeRange = readRange }  // must precede `startReading`
         // A pixel-format hint forces decode (nil would pass compressed HEVC through). The writer
         // then re-encodes; the encoder scales the source frames to the input's configured size.
         videoOutput = AVAssetReaderTrackOutput(

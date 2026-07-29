@@ -23,7 +23,7 @@ private final class Box<Value>: @unchecked Sendable {
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
         let written = URL(fileURLWithPath: "/tmp/Clip.mp4")
-        state.exports.exportFunction = { _, _, _ in written }
+        state.exports.exportFunction = { _, _, _, _ in written }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
         #expect(state.exportInProgress == "Clip.mov")   // set before the background task runs
@@ -42,7 +42,7 @@ private final class Box<Value>: @unchecked Sendable {
         let state = makeState()
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
-        state.exports.exportFunction = { _, _, _ in throw ExportError.writerFailed("nope") }
+        state.exports.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
         while state.exportInProgress != nil { await Task.yield() }
@@ -57,13 +57,13 @@ private final class Box<Value>: @unchecked Sendable {
         let state = makeState()
         state.notifier = { _ in }
         let firstURL = URL(fileURLWithPath: "/tmp/A.mp4")
-        state.exports.exportFunction = { _, _, _ in firstURL }
+        state.exports.exportFunction = { _, _, _, _ in firstURL }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/A.mov"))
         while state.exportInProgress != nil { await Task.yield() }
         #expect(state.lastExport?.url == firstURL)
 
-        state.exports.exportFunction = { _, _, _ in throw ExportError.writerFailed("nope") }
+        state.exports.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
         state.exportToMP4(URL(fileURLWithPath: "/tmp/B.mov"))
         while state.exportInProgress != nil { await Task.yield() }
         #expect(state.lastExport?.url == firstURL)   // A's pointer isn't erased by B's failure
@@ -73,7 +73,7 @@ private final class Box<Value>: @unchecked Sendable {
         let state = makeState()
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
-        state.exports.exportFunction = { _, output, _ in output }
+        state.exports.exportFunction = { _, output, _, _ in output }
 
         // No suspension point between the two calls, so the first export's task hasn't run yet —
         // the guard sees `exportInProgress` set and drops the second.
@@ -130,7 +130,7 @@ private final class Box<Value>: @unchecked Sendable {
         state.notifier = { _ in }
         state.mp4Width = 2560
         let recorded = Box<ExportConfiguration>()
-        state.exports.exportFunction = { _, output, configuration in
+        state.exports.exportFunction = { _, output, configuration, _ in
             recorded.value = configuration
             return output
         }
@@ -142,6 +142,45 @@ private final class Box<Value>: @unchecked Sendable {
         // The height ceiling is not a preference: it is what keeps the output inside H.264
         // Level 5.2 (docs/02 §3), so every pick carries it.
         #expect(recorded.value?.maxHeight == 2304)
+    }
+
+    @Test func aRangedExportCarriesItsRangeAndTakesTheTrimmedName() async {
+        // M21-T1's whole point: the Trim window's in/out reach the exporter, and the output can't
+        // be mistaken for an export of the whole take.
+        let state = makeState()
+        state.notifier = { _ in }
+        let recordedRange = Box<ExportRange>()
+        let recordedOutput = Box<URL>()
+        state.exports.exportFunction = { _, output, _, range in
+            recordedRange.value = range
+            recordedOutput.value = output
+            return output
+        }
+
+        state.exportToMP4(
+            URL(fileURLWithPath: "/tmp/Clip.mov"), range: ExportRange(start: 30, end: 35))
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(recordedRange.value == ExportRange(start: 30, end: 35))
+        #expect(recordedOutput.value?.lastPathComponent == "Clip trimmed.mp4")
+    }
+
+    @Test func aWholeFileExportPassesNoRange() async {
+        let state = makeState()
+        state.notifier = { _ in }
+        let recordedRange = Box<ExportRange>()
+        let recordedOutput = Box<URL>()
+        state.exports.exportFunction = { _, output, _, range in
+            recordedRange.value = range
+            recordedOutput.value = output
+            return output
+        }
+
+        state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(recordedRange.value == nil)
+        #expect(recordedOutput.value?.lastPathComponent == "Clip.mp4")
     }
 
     @Test func theSizePickerStatesWhatEachPickCosts() {
@@ -170,7 +209,7 @@ private final class Box<Value>: @unchecked Sendable {
     @Test func oneExportAtATimeAcrossFormats() async {
         let state = makeState()
         state.notifier = { _ in }
-        state.exports.exportFunction = { _, output, _ in output }
+        state.exports.exportFunction = { _, output, _, _ in output }
         state.exports.gifExportFunction = { _, output, _ in output }
 
         // An MP4 in flight blocks a GIF (they share one guard); no await between, so the MP4

@@ -38,6 +38,7 @@ struct TrimView: View {
     @State private var inSeconds = 0.0
     @State private var outSeconds = 0.0
     @State private var durationSeconds = 0.0
+    @State private var sourceSize: CGSize?
     @State private var reencodes = false
     /// What a lossless trim would keep before the in-point, or nil when nothing would be hidden.
     @State private var leadInText: String?
@@ -45,6 +46,20 @@ struct TrimView: View {
 
     /// A range worth acting on; below this, Trim & Save and Play Range are meaningless.
     private var hasRange: Bool { outSeconds - inSeconds >= 0.1 }
+
+    /// What `Export as MP4` will produce (M21-T1). The size is this recording's own, fitted through
+    /// the width in Settings; it is left out until the geometry loads rather than quoting a figure
+    /// that can't be computed yet (M16-T2).
+    private var exportNote: String {
+        var profile = "H.264"
+        if let sourceSize {
+            let fitted = Exporter.fittedSize(
+                width: Int(sourceSize.width.rounded()), height: Int(sourceSize.height.rounded()),
+                configuration: state.exportConfiguration)
+            profile += " \(fitted.width) × \(fitted.height)"
+        }
+        return "Export as MP4 writes only the range — \(profile), ready to paste into a message."
+    }
 
     var body: some View {
         Group {
@@ -99,6 +114,11 @@ struct TrimView: View {
                 Spacer()
                 Button("Play Range") { playRange() }
                     .disabled(!hasRange)
+                Button("Export as MP4") {
+                    state.exportToMP4(url, range: ExportRange(start: inSeconds, end: outSeconds))
+                    dismiss()
+                }
+                .disabled(!hasRange || state.exportInProgress != nil)
                 Button("Trim & Save") {
                     state.trim(url, from: inSeconds, to: outSeconds,
                                mode: reencodes ? .precise : .lossless)
@@ -115,6 +135,11 @@ struct TrimView: View {
                 + "also keeps the frames back to the previous keyframe inside the file; re-encoding "
                 + "drops them, takes longer and can produce a larger file. The original is kept "
                 + "either way; this saves a new “ trimmed” file.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(exportNote)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -201,13 +226,20 @@ struct TrimView: View {
         inSeconds = 0
         outSeconds = 0
         durationSeconds = 0
+        sourceSize = nil
         leadInText = nil
         reencodes = false
         Task {
-            let duration = (try? await item.asset.load(.duration).seconds) ?? 0
+            let asset = item.asset
+            let duration = (try? await asset.load(.duration).seconds) ?? 0
+            var size: CGSize?
+            if let track = try? await asset.loadTracks(withMediaType: .video).first {
+                size = try? await track.load(.naturalSize)
+            }
             guard loadedURL == url else { return }
             durationSeconds = duration.isFinite ? max(0, duration) : 0
             outSeconds = durationSeconds
+            sourceSize = size
         }
     }
 }

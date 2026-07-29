@@ -6,6 +6,35 @@
 
 ## Now
 
+- **✅ M21-T1 DONE (2026-07-29) — the Trim window writes the shareable MP4 itself.** Plan artifact
+  (rulings A/B/C approved): `claude.ai/code/artifact/2c0c8b44-a8d0-4f50-8b4e-07e16068e064`.
+  **562 tests (+5)**, dev loop green. ⏳ **Live leg still to run** (needs Franco — it opens the menu
+  and the Trim window on his desktop).
+  **As built:** `Export as MP4` sits between Play Range and Trim & Save, with `Trim & Save` keeping
+  Return (ADR-015). The range travels `TrimView → AppState → ExportModel → Exporter` as an
+  `ExportRange`, riding the unchanged `performExport` path — same one-at-a-time guard, receipt and
+  notification. The CLI gained `export --to-mp4 --from <t> --to <t>` (ruling C), which is what made
+  the verification headless. Output is `<take> trimmed.mp4` (ruling B).
+  ⚠️ **The task's own seam sentence was wrong and the entry says so:** docs/03 put the range on
+  `AVAssetExportSession` — that is the *trim*'s engine. The MP4 export must stay a reader/writer
+  pipeline (one mixed AAC track, the size fit, faststart), so the range lands on
+  **`AVAssetReader.timeRange`**.
+  **Measured before building, and it settled the design:** a ranged read **clips exactly at the
+  in-point** — 1.900 s past the preceding keyframe, first delivered PTS **30.000**, audio identical
+  — so no retiming, and the lossless trim's "keeps N s before it inside the file" caveat simply
+  doesn't apply here.
+  **Verified headlessly:** avc1 1920×1200 + **one** AAC, `moov` before `mdat`, **5.00 s**, and the
+  folder holds exactly one new file — no `.mov`, no `.partial`. First-frame identity needed a source
+  that could fail the test: a real recording scored **38.1–38.6 dB against all six candidate
+  frames** (static content), so a clip that burns its timestamp into every frame was used instead —
+  the export's first frame reads **27.30 s**, **52.4 dB** against the source there against
+  **8.8 dB** against the keyframe 3.3 s earlier.
+  🔴 **A fast export can strand `AVAssetWriter`'s `.sb-` temp** — the file M15-T3 filed as a
+  hard-kill leftover, here after a clean export (1 of 5 runs; long and rangeless ones never did).
+  A ranged export is short by design, so it went from rare to routine: swept after finalize, by our
+  own scratch prefix only. That is the task's "no intermediate file" criterion, so it is in scope.
+  **Next: M21-T2** (Stop & Share) — it reuses this path with no range.
+
 - **🚫 M20 (Marks) CLOSED "won't do" 2026-07-28 (Franco) — and M20-T1's shipped code was reverted.**
   Plan artifacts: T1 `claude.ai/code/artifact/17df26d2-c25d-4671-a12f-91248a3b9168`, T2
   `claude.ai/code/artifact/cf022a1e-a02d-42f3-b4b7-5de3e64ad237`. **557 tests** — exactly the

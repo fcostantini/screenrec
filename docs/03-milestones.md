@@ -1756,7 +1756,20 @@ The app has every piece of the sharing workflow and none of the joins: trim writ
 writes an `.mp4` from it, and the intermediate is the file nobody wants — while the ffmpeg recipe
 this replaced did both in one command. **MINOR.**
 
-- [ ] M21-T1 **Trim exports directly.** **Seams:** no new pipeline — `AVAssetExportSession` takes a
+- [x] M21-T1 **Trim exports directly.** ✅ 2026-07-29 — the Trim window's **Export as MP4** writes the
+      range straight to a shareable `.mp4`; `Trim & Save` keeps Return (ADR-015). **562 tests (+5)**,
+      dev loop green. **The range rides `AVAssetReader.timeRange`, not `AVAssetExportSession`** (the
+      seam below names the trim's engine): the export must stay a reader/writer pipeline for its one
+      mixed AAC track, its size fit and faststart. ⚠️ **Measured first, and it settles the design: a
+      ranged read clips exactly at the in-point** — 1.900 s past a keyframe, first delivered PTS
+      30.000, audio the same — so no retiming, and none of the lossless trim's lead-in caveat.
+      **Verified** on a clip whose every frame states its own timestamp (the real recordings can't
+      discriminate — 28–31 s of one scored ~38 dB against everything): the export's first frame reads
+      **27.30 s**, PSNR **52.4 dB** against the source at 27.30 vs **8.8 dB** against the keyframe at
+      24.00. Output named `<take> trimmed.mp4` (ruling B). 🔴 **A fast export can strand
+      `AVAssetWriter`'s own `.sb-` temp** (1 in 5 runs; long and rangeless exports never did) — swept
+      now, since "no intermediate file" is this task's whole point (docs/07). **Seams:** no new
+      pipeline — `AVAssetExportSession` takes a
       `timeRange` (measured in M18-T1) and `Exporter.exportToMP4` already takes an
       `ExportConfiguration`, so a ranged share export is the existing export path plus a range.
       **Rulings:** does `Trim & Save` stay as the default (ADR-015 says lossless is the default, so

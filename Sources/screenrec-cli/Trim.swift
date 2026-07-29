@@ -4,7 +4,8 @@ import RecorderCore
 
 /// `M:SS` or a plain, non-negative seconds value; nil if neither. `"0:12"` → 12, `"12"` → 12,
 /// `"1:05.5"` → 65.5. Rejects negatives so a bad value fails as invalid, not as an empty range.
-private func parseTimecode(_ text: String) -> Double? {
+/// Shared with `export`'s range flags (M21-T1), which spell them the same way.
+func parseTimecode(_ text: String) -> Double? {
     let trimmed = text.trimmingCharacters(in: .whitespaces)
     let value: Double
     if trimmed.contains(":") {
