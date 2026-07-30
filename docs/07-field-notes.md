@@ -22,8 +22,11 @@ file every session is required to read.
   `CFPreferencesAppSynchronize` + `unlink` cleaned a full run **once**, then leaked **154 of ~600**
   on the next two — it is a race with a daemon that outlives us, and one clean run is not evidence
   of a fix. ⚠️ **Don't trust a single green measurement on a race.** What actually works is giving
-  up on winning it: sweep leftovers **on the way in** as well, so residue is bounded to one run
-  rather than cumulative, with an age floor so a concurrent run's live suites are never touched.
+  up on winning it: sweep leftovers **on the way in** as well, with an age floor so a concurrent
+  run's live suites are never touched. Measured across three runs — **154 → 308** growing before the
+  entry sweep, then **308 → 308** holding, then **616 → 308** after a deliberate backlog. So it is
+  self-correcting rather than merely bounded: the steady state is one run's residue (~150), and any
+  backlog is reclaimed by the next run rather than needing a human with `rm`.
 
 - 2026-07-30 (M23-T2, live): ⚠️ **The export's rate budget over-quoted a real take by 3.7×, and the
   strict fit check refused a job that would have fitted.** Measured through the deployed menu: a

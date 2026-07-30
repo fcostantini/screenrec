@@ -37,7 +37,9 @@
   files, 302 MB → 109 MB**. Cause fixed by `TestDefaults`, which records every throwaway suite and
   sweeps on the way **in** as well as out. ⚠️ **The exit sweep cannot be made reliable** — it races
   `cfprefsd`, and a single clean run fooled me before two later runs leaked 154 each; the entry sweep
-  is what bounds it. Residue is now one run's worth, self-healing, never cumulative.
+  is what bounds it. Measured over three runs — **154 → 308** (growing, pre-fix), **308 → 308**
+  (holding), **616 → 308** (a backlog reclaimed). Steady state is one run's residue (~150), and it
+  self-corrects rather than needing a human with `rm`.
 
 - **✅ M23-T1 SHIPPED (2026-07-30) — the write path can no longer lie about a take.** The recorder
   checks `input.append`'s `Bool`, confirms `writer.status == .failed`, and stops the session with a
