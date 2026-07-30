@@ -247,6 +247,15 @@ import RecorderCore
         #expect(n?.title == "Recording saved · 00:00:00")
     }
 
+    @Test func anUnexcludableAppSaysNothingWasLeftOut() {
+        // M21-T4: an app with nothing on screen can't be excluded, so the take records it. The
+        // notice has to name that, or the user believes an exclusion happened (ADR-007).
+        let n = notification(.excludedAppUnavailable(bundleID: "com.spotify.client"))
+        #expect(n?.title == "Recording started · nothing left out")
+        #expect(n?.body.contains("com.spotify.client") == true)
+        #expect(n?.body.contains("will be in this recording") == true)
+    }
+
     @Test func aMicrophoneDroppedAtStartSaysNoMicrophone() {
         // M13-T4: a resolved-but-slow mic that missed its grace — closes M9-T1's resolved-device gap.
         let n = notification(.microphoneDroppedAtStart)

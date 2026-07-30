@@ -46,6 +46,16 @@ public final class SourcesModel {
             onPickChanged?()
         }
     }
+    /// The app left out of a whole-screen recording (docs/06 item 5, M21-T4); nil ⇒ nothing is.
+    /// Neither its windows nor its audio are captured — SCK's filter governs both. Persisted, and
+    /// like every other pick it survives the app's absence: a start then records without the
+    /// exclusion and says so, since losing the take over it would be the worse outcome.
+    public var excludedAppBundleID: String? {
+        didSet {
+            guard excludedAppBundleID != oldValue, !isRehoming else { return }
+            onPickChanged?()
+        }
+    }
     /// The Source pick when it's a region (docs/06 item 5, M11-T2); nil ⇒ not a region. Set via the
     /// drag overlay through `setRegion`; persisted, and — like the app pick — it survives its display
     /// vanishing (a start then fails loud, never a silent whole-screen fallback).
@@ -162,6 +172,15 @@ public final class SourcesModel {
         return CapturableApp(bundleID: bundleID, name: appName(for: bundleID))
     }
 
+    /// The excluded pick's bundle id while that app has nothing on screen — the state SCK can't
+    /// act on (M21-T4, measured: a minimised app leaves `SCShareableContent` entirely). The pick
+    /// stays, like every other absent pick; the start records without the exclusion and says so.
+    public var missingExcludedApp: CapturableApp? {
+        guard let bundleID = excludedAppBundleID,
+              !capturableApps.contains(where: { $0.bundleID == bundleID }) else { return nil }
+        return CapturableApp(bundleID: bundleID, name: appName(for: bundleID))
+    }
+
     /// The picked window while it isn't in the live list — closed, or its id now belongs to another
     /// app. The menu shows it checkmarked and marked gone, so the pick stays visible without lying
     /// (the `(not running)` app precedent); Start then fails loud.
@@ -192,11 +211,16 @@ public final class SourcesModel {
         }
         if let region = selectedRegion { return "Region \(Self.regionLabel(region.rect.size))" }
         if let bundleID = selectedAppBundleID { return appName(for: bundleID) }
+        let screenLabel: String
         if displays.count > 1,
            let screen = displays.first(where: { $0.id == selectedDisplayID }) {
-            return "Entire Screen (\(screen.name))"
+            screenLabel = "Entire Screen (\(screen.name))"
+        } else {
+            screenLabel = "Entire Screen"
         }
-        return "Entire Screen"
+        // The exclusion rides the whole-screen pick rather than replacing it (M21-T4).
+        guard let excluded = excludedAppBundleID else { return screenLabel }
+        return "\(screenLabel) except \(appName(for: excluded))"
     }
 
     /// "<w>×<h>" for a region's size in points, e.g. the picker's `Region 820×512` row. The
@@ -214,7 +238,9 @@ public final class SourcesModel {
         get {
             if let window = selectedWindow { return .window(window) }
             if let region = selectedRegion { return .region(display: region.displayID, rect: region.rect) }
-            return selectedAppBundleID.map { .app(bundleID: $0) } ?? .display(selectedDisplayID)
+            if let bundleID = selectedAppBundleID { return .app(bundleID: bundleID) }
+            if let excluded = excludedAppBundleID { return .displayExcluding(bundleID: excluded) }
+            return .display(selectedDisplayID)
         }
         set {
             guard newValue != sourceChoice else { return }
@@ -224,19 +250,29 @@ public final class SourcesModel {
                 selectedAppBundleID = nil
                 selectedRegion = nil
                 selectedWindow = nil
+                excludedAppBundleID = nil
                 selectedDisplayID = id
             case .app(let bundleID):
                 selectedAppBundleID = bundleID
                 selectedRegion = nil
                 selectedWindow = nil
+                excludedAppBundleID = nil
             case .region(let displayID, let rect):
                 selectedAppBundleID = nil
                 selectedWindow = nil
+                excludedAppBundleID = nil
                 selectedRegion = RegionSelection(displayID: displayID, rect: rect)
             case .window(let window):
                 selectedAppBundleID = nil
                 selectedRegion = nil
+                excludedAppBundleID = nil
                 selectedWindow = window
+            case .displayExcluding(let bundleID):
+                // Still a whole-screen pick — the display choice survives it.
+                selectedAppBundleID = nil
+                selectedRegion = nil
+                selectedWindow = nil
+                excludedAppBundleID = bundleID
             }
             isRehoming = false
             onPickChanged?()

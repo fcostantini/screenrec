@@ -362,6 +362,54 @@ import RecorderCore
         #expect(state.captureConfiguration.content == .display(.id(42)))
     }
 
+    @Test func excludingAnAppIsAWholeScreenPickWithAHole() {
+        // M21-T4: the exclusion rides the display pick rather than replacing it, so the display
+        // choice has to survive it — and `Nothing` (a plain display tag) has to undo it.
+        let state = makeState()
+        state.selectedDisplayID = 42
+        state.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
+
+        #expect(state.sourceChoice == .displayExcluding(bundleID: "com.spotify.client"))
+        #expect(state.selectedDisplayID == 42)
+        #expect(state.captureConfiguration.content
+            == .displayExcluding(.id(42), bundleID: "com.spotify.client"))
+
+        state.sourceChoice = .display(42)
+        #expect(state.captureConfiguration.content == .display(.id(42)))
+        #expect(state.excludedAppName == nil)
+    }
+
+    @Test func pickingAnotherSourceDropsTheExclusion() {
+        // An app- or window-scoped take is already narrowed; a leftover exclusion would silently
+        // ride along in `captureConfiguration`.
+        let state = makeState()
+        state.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
+        state.sourceChoice = .app(bundleID: "com.example.app")
+        #expect(state.captureConfiguration.content == .app(bundleID: "com.example.app"))
+
+        state.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
+        state.sourceChoice = .window(WindowSelection(id: 7, bundleID: "com.example.app"))
+        #expect(state.captureConfiguration.content
+            == .window(id: 7, ownerBundleID: "com.example.app"))
+    }
+
+    @Test func anExcludedAppWithNothingOnScreenIsKeptAndFlagged() {
+        // The state the measurement found (M21-T4): a minimised app isn't in SCK's list, so it
+        // cannot be excluded. The pick survives — absence never re-homes one — and the menu says so.
+        let state = makeState()
+        state.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
+        state.refreshApps([CapturableApp(bundleID: "com.other", name: "Other")], excluding: nil)
+
+        #expect(state.sourceChoice == .displayExcluding(bundleID: "com.spotify.client"))
+        #expect(state.missingExcludedApp
+            == CapturableApp(bundleID: "com.spotify.client", name: "com.spotify.client"))
+
+        state.refreshApps(
+            [CapturableApp(bundleID: "com.spotify.client", name: "Spotify")], excluding: nil)
+        #expect(state.missingExcludedApp == nil)
+        #expect(state.excludedAppName == "Spotify")
+    }
+
     @Test func anAbsentPickedAppIsKeptAndShownAsNotRunning() {
         // The mic rule (docs/06): a pick survives absence — never re-homed to Entire Screen.
         // The menu shows it through `missingPickedApp`; a start while absent fails loud (M7-T1).

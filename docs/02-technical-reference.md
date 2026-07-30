@@ -68,6 +68,27 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   `SCStreamFrameInfo.status == .complete` via attachments; `.idle`/incomplete frames are
   skipped (but see tail-frame patch).
 
+## 1a-ii. Per-app *exclusion* (`SCContentFilter(display:excludingApplications:)`) — measured 2026-07-29, M21-T4
+
+- **The excluded app's audio is digital silence**, through the identical path: a 440 Hz tone at
+  −9 dBFS playing in QuickTime read **peak 0.3500 / −9.1 dBFS** on a plain display filter and
+  **peak 0.0000 / −∞ dBFS** when that app was excluded. Audio buffers keep arriving (426 in 8 s), so
+  the stream is healthy — it is silent, not stalled.
+- 🔴 **Exclusion is not audio-only: the app's windows leave the frame too.** The filter defines
+  *content*; SCK has no audio-scoped exclusion. Measured by comparing the same screen region across
+  both runs — QuickTime's window is present in one, absent in the other, with what's behind it
+  showing through.
+- 🔴 **An app with nothing on screen cannot be excluded at all.** Minimise it and it disappears from
+  `SCShareableContent.applications` (the §1a listing rule, from the other direction) — while its
+  audio still lands in a normal capture at full level (measured: −9.1 dBFS, minimised). So the
+  "background music" case, which is the one worth excluding, is the one the API can't reach. The app
+  records without the exclusion and reports `excludedAppUnavailable` rather than implying otherwise.
+- **Frame delivery is the display path's** (frame-on-change), not `.app`'s continuous rate — an
+  excluding filter is a display capture with a hole in it, so it keeps the StallWatchdog.
+- For true audio-only exclusion the route is Core Audio process taps
+  (`AudioHardwareCreateProcessTap` + `CATapDescription(excludeProcesses:)`, macOS 14.2+), which is a
+  separate system-audio source, not a filter change. Parked, not attempted.
+
 ## 1a. Per-app capture (`SCContentFilter(display:including:)`) — measured 2026-07-20, M7-T1
 
 - **Geometry:** an `including:` filter's `contentRect`/`pointPixelScale` are the *display's*

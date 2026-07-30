@@ -111,11 +111,35 @@ struct MenuView: View {
                 } label: { EmptyView() }
                     .pickerStyle(.inline)
             }
+            // The whole screen minus one app (M21-T4), nested like Window ▸ for the same reason.
+            // "Nothing" is how the exclusion is undone without leaving the submenu.
+            Menu("Everything Except") {
+                Picker(selection: $state.sourceChoice) {
+                    Text("Nothing").tag(SourceChoice.display(state.selectedDisplayID))
+                    Divider()
+                    ForEach(state.capturableApps, id: \.bundleID) { app in
+                        Text(app.name).tag(SourceChoice.displayExcluding(bundleID: app.bundleID))
+                    }
+                    // A picked app with nothing on screen can't be excluded at capture — the pick
+                    // stays (absence never re-homes one), and the start says what didn't happen.
+                    if let missing = state.missingExcludedApp {
+                        Text("\(missing.name) (not on screen)")
+                            .tag(SourceChoice.displayExcluding(bundleID: missing.bundleID))
+                    }
+                } label: { EmptyView() }
+                    .pickerStyle(.inline)
+            }
             // No explicit Divider here: the inline Picker already renders a trailing separator, so
             // Select Region… is cleanly set apart from the options (a second divider would double up).
 
             // Opens the drag-to-select overlay (M11-T2) — an action, not a picker tag.
             Button("Select Region…") { state.beginRegionSelection?() }
+        }
+
+        // docs/06 item 5 (M21-T4): the exclusion takes the picture as well as the sound, and nobody
+        // should discover that by watching the file. One row, only when something is excluded.
+        if let excluded = state.excludedAppName {
+            Text("\(excluded) won't be seen or heard")
         }
 
         // Reads through `presentMicrophonePreference`: the checkmark sits on None while a picked

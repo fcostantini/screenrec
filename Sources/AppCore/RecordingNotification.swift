@@ -80,6 +80,16 @@ public enum RecordingNotifications {
                 body: "The microphone didn't start in time, so this recording has no microphone track.",
                 fileURL: nil)
 
+        case .excludedAppUnavailable(let bundleID):
+            // The app to leave out had nothing on screen, so SCK couldn't name it and the take
+            // records everything — including whatever that app plays (M21-T4, measured). Saying so
+            // is the whole point: the user asked for it to be absent.
+            return RecordingNotification(
+                title: "Recording started · nothing left out",
+                body: "\(bundleID) has no window on screen, so it couldn't be excluded. "
+                    + "Anything it plays will be in this recording.",
+                fileURL: nil)
+
         case .recordingFileRestored:
             // Same not-an-ending family as microphoneLost: lead with "still recording".
             return RecordingNotification(

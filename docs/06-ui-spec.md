@@ -86,6 +86,16 @@ Order and grouping (separators between groups):
    **`<App> (closed)`** — the app is all that can be said without a title, and the marker is what
    keeps it distinct from an app-scoped pick, in the row and in the `Source:` header alike. The
    `(not running)` app rule; Start then fails loud.
+   **Everything Except (M21-T4):** a nested `Everything Except ▸` row (the `Window ▸` pattern, for
+   the same reason — it must not lengthen the idle menu) listing the same on-screen apps, plus
+   **`Nothing`** to undo it. The pick reads in the header as `Source: Entire Screen except Slack`, and
+   one dimmed row follows the Source row: **`Slack won't be seen or heard`** — the exclusion takes the
+   picture as well as the sound (SCK has no audio-only exclusion, docs/02 §1a-ii), and nobody should
+   discover that by watching the file. Zero extra rows when nothing is excluded. A picked app with
+   nothing on screen **cannot be excluded** (docs/02 §1a-ii): it stays listed as
+   `<name> (not on screen)`, and the recording starts anyway with a notice — *"Recording started ·
+   nothing left out"* — because losing the take over it would be worse. An excluded app quitting
+   mid-recording is a non-event: there is simply nothing left to leave out.
    **Region (M11-T2):** below the app rows, when a region is set, a checkmarked `Region <w>×<h>`
    row (point size) shows the current pick — re-selectable, and it survives its display's absence
    like the app pick (a start against a vanished display fails loud, M11-T1). **M12-T4** moved

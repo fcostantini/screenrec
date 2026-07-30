@@ -10,6 +10,9 @@ import os
 public enum SourceChoice: Hashable, Sendable {
     case display(CGDirectDisplayID?)
     case app(bundleID: String)
+    /// The whole screen minus one app (M21-T4): it is neither seen nor heard. The display stays
+    /// whatever `selectedDisplayID` says — this is a whole-screen pick with a hole in it.
+    case displayExcluding(bundleID: String)
     /// A rectangle of a display (M11-T2). `rect` is SCK `sourceRect` points (top-left, docs/02 §1b);
     /// `display` nil ⇒ main. Chosen via the overlay, not typed — the picker only shows/re-picks it.
     case region(display: CGDirectDisplayID?, rect: CGRect)
@@ -81,6 +84,11 @@ public final class AppState {
         set { sources.appDisplayName = newValue }
     }
     public var missingPickedApp: CapturableApp? { sources.missingPickedApp }
+    /// The excluded app's name for the menu's honesty row (M21-T4), or nil when nothing is excluded.
+    public var excludedAppName: String? { sources.excludedAppBundleID.map(appName(for:)) }
+    /// The excluded pick when it isn't on screen to be excluded — the row says so, and the start
+    /// will too (M21-T4).
+    public var missingExcludedApp: CapturableApp? { sources.missingExcludedApp }
     public var missingPickedWindow: WindowSelection? { sources.missingPickedWindow }
     public var sourceMenuLabel: String { sources.sourceMenuLabel }
     public func appName(for bundleID: String) -> String { sources.appName(for: bundleID) }
@@ -511,6 +519,7 @@ public final class AppState {
         // ⚠️ Seeded before `sources.onPickChanged` is wired below, so restoring a pick can't
         // persist it back or rebuild an armed stream that doesn't exist yet.
         sources.selectedAppBundleID = settings.captureAppBundleID
+        sources.excludedAppBundleID = settings.excludedAppBundleID
         sources.selectedRegion = settings.captureRegion
         sources.selectedWindow = settings.captureWindow
         isReplayArmed = settings.replayArmed
@@ -590,6 +599,7 @@ public final class AppState {
                 microphonePreference: microphonePreference,
                 capturesSystemAudio: capturesSystemAudio,
                 captureAppBundleID: sources.selectedAppBundleID,
+                excludedAppBundleID: sources.excludedAppBundleID,
                 captureRegion: sources.selectedRegion,
                 captureWindow: sources.selectedWindow,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
@@ -1078,6 +1088,9 @@ public final class AppState {
             content = .region(display: region.displayID.map(DisplaySelection.id) ?? .main, rect: region.rect)
         } else if let bundleID = selectedAppBundleID {
             content = .app(bundleID: bundleID)
+        } else if let excluded = sources.excludedAppBundleID {
+            content = .displayExcluding(
+                selectedDisplayID.map(DisplaySelection.id) ?? .main, bundleID: excluded)
         } else {
             content = .display(selectedDisplayID.map(DisplaySelection.id) ?? .main)
         }

@@ -61,6 +61,9 @@ func printUsage() {
       --preset <name>    efficient | balanced | high   (default: balanced)
       --app <bundle-id>  Record one app instead of the whole screen — its windows and
                          its audio only (see list-apps)
+      --exclude-app <bundle-id>  Record the whole screen except one app: its windows and its
+                         audio are both left out (SCK has no audio-only exclusion). An app with
+                         nothing on screen can't be excluded — the run says so and records it.
       --region <x,y,w,h> Record a rectangle of the main display (display points, top-left
                          origin). Off-screen/empty fails.
       --window <id>      Record one window and nothing else — the capture follows it as it
@@ -142,12 +145,15 @@ func parseWindowID(_ value: String?) -> CGWindowID {
 
 /// Builds the capture content from the mutually-exclusive source flags: a window, or a region or
 /// an app on the main display, else the whole main screen. The caller rejects combinations.
-func contentSelection(appBundleID: String?, region: CGRect?, windowID: CGWindowID?) -> ContentSelection {
+func contentSelection(
+    appBundleID: String?, region: CGRect?, windowID: CGWindowID?, excludedBundleID: String? = nil
+) -> ContentSelection {
     // The CLI lists and binds in one breath, so there is no stale-pick hazard to guard
     // against — the owner check exists for picks restored from disk (docs/02 §1c).
     if let windowID { return .window(id: windowID, ownerBundleID: nil) }
     if let region { return .region(display: .main, rect: region) }
     if let appBundleID { return .app(bundleID: appBundleID) }
+    if let excludedBundleID { return .displayExcluding(.main, bundleID: excludedBundleID) }
     return .display(.main)
 }
 
@@ -227,6 +233,7 @@ func describe(_ event: EngineEvent) -> String {
     case .microphoneSilent: return "microphoneSilent"
     case .microphoneAudible: return "microphoneAudible"
     case .microphoneDroppedAtStart: return "microphoneDroppedAtStart"
+    case .excludedAppUnavailable(let bundleID): return "excludedAppUnavailable(\(bundleID))"
     case .recordingFileRestored: return "recordingFileRestored"
     case .stopped(let reason): return "stopped(\(describe(reason)))"
     case .finished(let url, let reason, let dropped):
@@ -346,6 +353,7 @@ struct RecordOptions {
     var duration: Double?
     var preset: QualityPreset = .balanced
     var appBundleID: String?
+    var excludedBundleID: String?
     var region: CGRect?
     var windowID: CGWindowID?
     var micID: String?
@@ -391,6 +399,11 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
         case "--app":
             guard let value = iterator.next() else { die("--app needs a bundle id (see list-apps)") }
             options.appBundleID = value
+        case "--exclude-app":
+            guard let value = iterator.next() else {
+                die("--exclude-app needs a bundle id (see list-apps)")
+            }
+            options.excludedBundleID = value
         case "--region":
             options.region = parseRegion(iterator.next())
         case "--window":
@@ -627,7 +640,8 @@ func performRecording(_ options: RecordOptions) async {
     let mic = resolveMicrophone(micEnabled: options.micEnabled, preferredID: options.micID)
     if let unavailable = mic.unavailable { print("(no microphone: \(unavailable))") }
     let content = contentSelection(
-        appBundleID: options.appBundleID, region: options.region, windowID: options.windowID)
+        appBundleID: options.appBundleID, region: options.region, windowID: options.windowID,
+        excludedBundleID: options.excludedBundleID)
     let configuration = CaptureConfiguration(
         content: content, microphone: mic.selection,
         microphoneRecovery: mic.recovery, capturesSystemAudio: options.systemAudioEnabled,

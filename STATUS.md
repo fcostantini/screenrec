@@ -6,6 +6,29 @@
 
 ## Now
 
+- **✅ M21-T4 DONE (2026-07-30) — `Source ▸ Everything Except ▸`. All four M21 tasks are done; G21 is
+  the only thing left in the milestone.** Plan artifact (measurement first, three directions, Franco
+  took the recommendation): `claude.ai/code/artifact/4f5cd208-0781-4bb3-a4a8-cf491614e0f7`.
+  **576 tests (+6)**, dev loop green, deployed (pid 74408 → **91541**).
+  ⚠️ **The task's premise moved under measurement.** SCK's exclusion is not audio-only: it removes the
+  app's **picture** too, and it **cannot touch an app with nothing on screen** — the "music in the
+  background" case F3 actually named. So it shipped as what it is: `Entire Screen except Slack`, with
+  a dimmed `Slack won't be seen or heard` row. The true audio-only route (Core Audio process taps,
+  `AudioHardwareCreateProcessTap`) is written up in **docs/02 §1a-ii** as its own future milestone,
+  not attempted here.
+  **Verified twice over:** raw SCK **−9.1 → −∞ dBFS** (buffers still flowing — silent, not stalled),
+  the app's window present in one frame and absent in the other; then the shipped path,
+  `record --exclude-app` → **−∞ dBFS** full-length system-audio track vs a **−8.3 dBFS** control, and
+  the same through a menu-driven take.
+  🔴 **The honesty path is measured, not assumed:** with the app minimised the take ran, the menu read
+  **"The app to leave out wasn't on screen — nothing was excluded."**, and the file's system audio came
+  back at **−9.0 dBFS**. A new `EngineEvent.excludedAppUnavailable` carries it (the
+  `microphoneDroppedAtStart` shape) — degraded, never silent (ADR-007).
+  ⚠️ **The mic still hears an excluded app through the speakers** (−35.2 dBFS on the mic track while
+  system audio was −∞) — docs/07.
+  **Everything restored:** Source back to Entire Screen, QuickTime quit, all test files deleted.
+  **Next: G21** — the gate, then the **MINOR** cut (T1–T4 are all user-facing features).
+
 - **✅ M21-T3 DONE (2026-07-29) — a take can be named the moment it stops.** Plan artifact (rulings
   A–C, "go with your picks"): `claude.ai/code/artifact/b0de032c-ec0d-4cfe-8528-c679a6e93fcf`.
   **570 tests (+4)**, dev loop green, deployed (pid 73163 → **74408**).

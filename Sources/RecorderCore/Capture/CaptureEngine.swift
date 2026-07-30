@@ -340,6 +340,22 @@ public actor CaptureEngine {
             }
             return .ok(CaptureScope(
                 filter: SCContentFilter(display: display, excludingWindows: []), owningApp: nil))
+        case .displayExcluding(let selection, let bundleID):
+            guard let display = resolveDisplay(selection, from: content) else {
+                return .fail(Self.noDisplayMatchedMessage)
+            }
+            // An app that isn't listed can't be excluded, and losing the whole take over it would
+            // be the worse outcome (the ADR-012 trade): record everything and report the gap.
+            guard let app = content.applications.first(where: { $0.bundleIdentifier == bundleID })
+            else {
+                continuation.yield(.excludedAppUnavailable(bundleID: bundleID))
+                return .ok(CaptureScope(
+                    filter: SCContentFilter(display: display, excludingWindows: []), owningApp: nil))
+            }
+            return .ok(CaptureScope(
+                filter: SCContentFilter(
+                    display: display, excludingApplications: [app], exceptingWindows: []),
+                owningApp: nil))
         }
     }
 
@@ -373,7 +389,7 @@ public actor CaptureEngine {
     /// display at all, and a substitute one would not contain it.
     static func allowsDisplayFallback(for content: ContentSelection) -> Bool {
         switch content {
-        case .display, .app: true
+        case .display, .app, .displayExcluding: true
         case .region, .window: false
         }
     }
@@ -470,7 +486,9 @@ public actor CaptureEngine {
     /// follows `.app`.
     static func attachesStallWatchdog(to content: ContentSelection) -> Bool {
         switch content {
-        case .display, .region: true
+        // An excluding filter is the display path with a hole in it: same frame-on-change
+        // delivery, so the same watchdog (docs/02 §1a's `.app` continuous rate doesn't apply).
+        case .display, .region, .displayExcluding: true
         case .app, .window: false
         }
     }

@@ -154,6 +154,10 @@ public final class SessionModel {
             reportFailure?("Microphone is silent — still recording.", false)
         case .microphoneAudible:
             reportFailure?(nil, false)
+        case .excludedAppUnavailable:
+            // Degraded, not failed: the take runs, and the menu says what didn't happen. The
+            // notification above carries the name; this row outlives nothing (M21-T4).
+            reportFailure?("The app to leave out wasn't on screen — nothing was excluded.", false)
         case .microphoneDroppedAtStart:
             // The wanted mic never started (M13-T4); the recording continues without it. Say so in
             // the menu, or the active-mic-name row would name a mic that isn't in the take.

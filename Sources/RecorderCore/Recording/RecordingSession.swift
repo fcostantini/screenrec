@@ -179,7 +179,7 @@ public final class RecordingSession: @unchecked Sendable {
                 case .started:
                     continuation.yield(.started)
                 case .paused, .resumed, .microphoneLost, .microphoneRecovered,
-                     .microphoneSilent, .microphoneAudible:
+                     .microphoneSilent, .microphoneAudible, .excludedAppUnavailable:
                     continuation.yield(event)
                 case .failed(let message):
                     startFailure = message

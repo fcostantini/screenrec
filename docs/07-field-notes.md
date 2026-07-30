@@ -7,6 +7,14 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-30 (M21-T4, live leg): ⚠️ **Excluding an app silences the system-audio track, not the
+  room.** Under `Everything Except ▸ QuickTime`, the recorded system-audio track measured
+  **−∞ dBFS** while the **microphone** track measured **−35.2 dBFS** — the mic hearing the tone
+  through the speakers. No filter can fix that, and it is worth knowing before someone reports the
+  exclusion as broken: with a mic in the take, an excluded app is inaudible only if the sound never
+  leaves the machine (headphones, or the app muted). The menu's `won't be seen or heard` line is
+  about what the app *captures*, which is the honest thing it can promise.
+
 - 2026-07-29 (M21-T3):
   - 🔴 **A synthetic keystroke never reaches an `LSUIElement` app's modal alert — it goes to whatever
     is actually frontmost.** The alert renders and looks focused enough in a screenshot, but its

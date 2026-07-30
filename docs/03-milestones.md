@@ -1813,7 +1813,26 @@ this replaced did both in one command. **MINOR.**
       block it. **Rulings:** a prompt on stop, or a prefix in Settings, or both (the prompt matches
       "bug report", the prefix matches "a batch of takes"); and what Esc does (keep the date name).
       **Verify:** live: name a take, confirm the file, the recents row and the receipt all agree.
-- [ ] M21-T4 **Leave an app's audio out.** Today system audio is all or nothing (ADR-019); the
+- [x] M21-T4 **Leave an app's audio out** — shipped as **`Source ▸ Everything Except ▸`**.
+      ✅ 2026-07-30 — **576 tests (+6)**, dev loop green, deployed. ⚠️ **Measured before planning, and
+      the premise moved:** SCK's exclusion silences an app *and removes it from the picture* (its
+      filter governs content, not audio), and **cannot touch an app with nothing on screen** — which
+      is the "music in the background" case F3 named. Plan artifact laid out three directions;
+      Franco took the recommendation: **ship it as what it is** (`Entire Screen except Slack`, with
+      a dimmed `Slack won't be seen or heard` row), leaving the true audio-only route (Core Audio
+      process taps) parked in docs/02 §1a-ii as its own future milestone.
+      **Verified, twice over.** Raw SCK: **−9.1 dBFS** control vs **−∞ dBFS** excluded, with audio
+      buffers still flowing (silent, not stalled), and the app's window present in one frame and
+      absent in the other. Then the *shipped* path: `record --exclude-app` wrote a **−∞ dBFS**
+      full-length system-audio track against a **−8.3 dBFS** control, and a menu-driven take under
+      the pick did the same.
+      🔴 **The honesty path is measured, not assumed:** with the app minimised, the take ran, the
+      recording menu read **"The app to leave out wasn't on screen — nothing was excluded."**, and
+      the file's system audio came back at **−9.0 dBFS** — the app told the truth rather than
+      implying an exclusion. An excluded app quitting mid-take is a non-event (nothing left to leave
+      out), so no `AppTerminationWatch` — the `.app` precedent doesn't transfer.
+      ⚠️ **The mic still hears it through the speakers** (−35.2 dBFS on the mic track while system
+      audio was −∞): docs/07. Today system audio is all or nothing (ADR-019); the
       concrete case is demoing while music plays. **Seams:** `SCContentFilter` supports excluding
       applications from audio capture, and M7/M17 already bind app-scoped filters; the app list is
       the one `Source ▸` fetches. **Rulings:** menu shape (`Capture System Audio ▸ All · All except…

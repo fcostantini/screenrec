@@ -152,6 +152,20 @@ import RecorderCore
         #expect(defaults.object(forKey: SettingsStore.Key.lastExportDate) == nil)
     }
 
+    @Test func anExcludedAppSurvivesRelaunchAndClearsCleanly() {
+        // M21-T4, the app-pick rule: absence never re-homes it, so it has to come back on launch.
+        let (defaults, _) = makeDefaults()
+        var settings = Settings.standard
+        settings.excludedAppBundleID = "com.spotify.client"
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).excludedAppBundleID == "com.spotify.client")
+
+        settings.excludedAppBundleID = nil
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).excludedAppBundleID == nil)
+        #expect(defaults.object(forKey: SettingsStore.Key.excludedAppBundleID) == nil)
+    }
+
     @Test func savesUnderExactlyThoseKeysAndNoOthers() {
         // `defaults read` is how docs/03's verify inspects this, so what lands in our domain has
         // to be the documented keys and nothing else — no @AppStorage prefix, no stray extras.

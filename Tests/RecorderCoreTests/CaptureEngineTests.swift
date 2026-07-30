@@ -142,6 +142,11 @@ import Testing
         #expect(!CaptureEngine.attachesStallWatchdog(to: .app(bundleID: "com.example.app")))
         #expect(CaptureEngine.attachesStallWatchdog(
             to: .region(display: .main, rect: CGRect(x: 0, y: 0, width: 100, height: 100))))
+        // An excluding filter is the display path with a hole in it (M21-T4): frame-on-change
+        // delivery, so the watchdog's premise holds and a fallback display is acceptable.
+        let excluding = ContentSelection.displayExcluding(.main, bundleID: "com.example.noisy")
+        #expect(CaptureEngine.attachesStallWatchdog(to: excluding))
+        #expect(CaptureEngine.allowsDisplayFallback(for: excluding))
     }
 
     // MARK: region content (M11-T1) — the pure resolveRegion decision (docs/02 §1b).

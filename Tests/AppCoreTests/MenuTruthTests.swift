@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import Testing
 @testable import AppCore
+import RecorderCore
 
 /// M12-T3 "the menu tells the truth": the pure label strings the submenu titles carry, and the
 /// staleness that expires a persisted export receipt.
@@ -27,6 +28,16 @@ import Testing
             DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
         ])
         #expect(state.sourceMenuLabel == "Entire Screen (Built-in Retina Display)")
+    }
+
+    @Test func sourceLabelNamesWhatIsLeftOut() {
+        // M21-T4: the pick is still whole-screen, so the label says so and then what's missing.
+        let state = makeState()
+        state.refreshSources(displays: [DisplayOption(id: 1, name: "Built-in", isMain: true)])
+        state.refreshApps(
+            [CapturableApp(bundleID: "com.spotify.client", name: "Spotify")], excluding: nil)
+        state.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
+        #expect(state.sourceMenuLabel == "Entire Screen except Spotify")
     }
 
     @Test func sourceLabelIsTheAppNameForAScopedPick() {

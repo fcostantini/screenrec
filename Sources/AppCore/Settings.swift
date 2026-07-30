@@ -187,6 +187,8 @@ public struct Settings: Sendable, Equatable {
     /// Nil ⇒ entire screen. Not validated against running apps at load — the pick survives the
     /// app being closed; a start while it's away fails loud (never a silent whole-screen fallback).
     public var captureAppBundleID: String?
+    /// The app left out of a whole-screen recording (M21-T4); nil ⇒ nothing is excluded.
+    public var excludedAppBundleID: String?
     /// The Source pick when it's a region (docs/06 item 5, M11-T2). Nil ⇒ not a region pick. Like
     /// the app pick, not validated against the current displays at load — a start against a vanished
     /// display fails loud (M11-T1).
@@ -284,6 +286,7 @@ public struct Settings: Sendable, Equatable {
             microphonePreference: .none,
             capturesSystemAudio: true,
             captureAppBundleID: nil,
+            excludedAppBundleID: nil,
             captureRegion: nil,
             captureWindow: nil,
             replayArmed: false,
@@ -319,6 +322,7 @@ public enum SettingsStore {
         public static let microphoneAutomatic = "microphoneAutomatic"
         /// Absent ⇒ entire screen (M7-T2).
         public static let captureAppBundleID = "captureAppBundleID"
+        public static let excludedAppBundleID = "excludedAppBundleID"
         /// Absent ⇒ not a region pick (M11-T2). A Dict of the inner keys below.
         public static let captureRegion = "captureRegion"
         /// Inner keys of `captureRegion` — the display id and the rect (SCK points, docs/02 §1b).
@@ -435,6 +439,9 @@ public enum SettingsStore {
         // Like the mic: no running-app validation — the pick survives the app being closed.
         if let bundleID = defaults.string(forKey: Key.captureAppBundleID), !bundleID.isEmpty {
             settings.captureAppBundleID = bundleID
+        }
+        if let bundleID = defaults.string(forKey: Key.excludedAppBundleID), !bundleID.isEmpty {
+            settings.excludedAppBundleID = bundleID
         }
 
         // Like the app pick: no display validation at load — a vanished display fails loud at start.
@@ -571,6 +578,7 @@ public enum SettingsStore {
         }
         // `set(_:Any?)` removes the key for nil — absent ⇒ entire screen, per the table.
         defaults.set(settings.captureAppBundleID, forKey: Key.captureAppBundleID)
+        defaults.set(settings.excludedAppBundleID, forKey: Key.excludedAppBundleID)
         if let region = settings.captureRegion {
             var dict: [String: Any] = [
                 Key.regionX: Double(region.rect.origin.x), Key.regionY: Double(region.rect.origin.y),

@@ -37,6 +37,9 @@ public enum EngineEvent: Sendable, Equatable {
     /// recorder's start grace, so the recording has no mic track (M13-T4). Session-emitted (the
     /// recorder detects it), like `.discarded`; distinct from `.microphoneLost` (which had a track).
     case microphoneDroppedAtStart
+    /// The app to leave out (M21-T4) had nothing on screen at start, so it could not be excluded:
+    /// the recording runs, and everything it plays is in the file. Degraded, not failed (ADR-007).
+    case excludedAppUnavailable(bundleID: String)
     /// The in-progress file was moved (Trash included) and the sentinel renamed it back;
     /// recording continues. Deletion is not an event — it fails the session.
     case recordingFileRestored
