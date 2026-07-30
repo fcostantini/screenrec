@@ -1856,6 +1856,124 @@ by tests that can fail; one timecode type serves every surface; a background rel
 a human and leaves a downloadable, still-signed build behind it. No behaviour change anywhere — the
 whole suite passes untouched at every step.
 
+## M23 — The write path tells the truth (from the 2026-07-30 review)
+
+The recorder never checks whether its writes land, exports never check whether they fit, and work in
+flight is invisible from the menu bar. M16's thesis — the state stops lying — applied to the three
+places it hasn't been. **PATCH** (ADR-013): no new capability, unless T3's signal turns into a real
+affordance.
+
+- [ ] M23-T1 **The writer says when it fails.** `MovieRecorder.append` discards
+      `input.append(retimed)`'s `Bool`, and nothing watches `writer.status` during a session — the
+      poll checks free space, not the writer. Once an `AVAssetWriter` goes `.failed` every append
+      no-ops silently and the icon, the clock and the byte counter all keep claiming a recording; the
+      user learns at Stop, which on a long take is up to forty minutes late. This is M19-T1's shape:
+      a mechanism that cannot see the thing it exists to catch. **Seams:** the discarded result at
+      `MovieRecorder.swift:235`; `EndReason` already carries the fail-stop vocabulary the disk guard
+      uses (ADR-007: a fail-stop is a success with a cause); `ReplayMuxer` line 277 discards the same
+      call and takes the same rule. ⚠️ `isReadyForMoreMediaData` is checked *before* the append, so a
+      `false` return here is a real failure, not backpressure. **Rulings:** a new `EndReason` case
+      (`.writeFailed`) versus reusing `.streamError`; and whether one refused append ends the session
+      or it confirms against `writer.status` first. **Verify:** a *real* failure, M19-T1's standard —
+      a volume that goes away mid-take, not a mock — leaving `finished(<cause>)` and a playable file
+      holding everything written up to the failure; plus a unit test over the decision.
+- [ ] M23-T2 **An export checks that it fits, and quitting says what's in flight.** A recording stops
+      itself at the 2 GB floor; an export has no check at all and writes ≈46 MB/min (the Size
+      picker's own figure), so a 40-minute take is ~1.8 GB and a full disk surfaces as "check the
+      output folder is writable" — the wrong sentence. Separately `applicationShouldTerminate` waits
+      for a *recording* to finalize but not for an export: quit during one and the task dies with the
+      process. Nothing is corrupted (the `.partial` discipline holds) but the work is gone silently,
+      and with Stop & Copy MP4 the clipboard simply never arrives. **Seams:**
+      `DiskSpaceMonitor.availableBytes` + `ExportConfiguration.bytesPerMinute` (the estimate already
+      exists and is honest about being a ceiling); `ExportModel.performExport`'s one entry point;
+      `AppDelegate.applicationShouldTerminate`. **Rulings:** refuse-before-start versus stop-midway
+      (a recording can't know its length, an export can, so refusing up front is the honest shape);
+      and what quit does — wait, warn, or cancel and say so. **Verify:** a small volume + a long
+      export → refused before writing, with the reason naming the disk; quit mid-export → the chosen
+      behaviour, observed.
+- [ ] M23-T3 **Work in flight is visible without opening the menu.** `StatusIcon` has three states —
+      idle, recording, paused — so a multi-minute export is invisible; the menu's `Exporting …` row
+      is stamped at open and never updates (the `.menu` bridge, M6-T10). And because banners are
+      suppressed while replay is armed (M9-T2), **stopping a recording while armed is completely
+      silent**: no banner, no receipt row, no flash — while a replay *save* gets all three.
+      **Seams:** `StatusIconView` already composites the clock and the level meter into the icon
+      image, so a fourth state is a drawing change, not an architecture one; `replaySavedFlash` is
+      the badge shape; `exportInProgress` is the state to read. **Rulings:** a fourth icon state
+      versus a small badge; whether a finished take flashes always or only when banners are
+      suppressed. **Verify:** pixel-diff the rendered states (M16-T5's method), and the armed-then-stop
+      case observed live.
+- [ ] M23-T4 **`SessionModel` and `ExportModel` get tests that name them.** The two models M22
+      extracted are the two units nothing tests by name — exercised only through `AppState`, which is
+      how "557 tests passed untouched" was achieved and is a real property worth keeping, but M22-T3's
+      own standard was a test per unit that can fail. **Seams:** both are `@Observable` `@MainActor`
+      classes with injected closures; no capture hardware needed. **Verify:** the M22-T3 standard —
+      break each unit, watch its test fail (the fold's clock/icon transitions; the one-at-a-time
+      guard and receipt policy).
+- [ ] M23-T5 **Collapse `AppState`'s forwarding layer.** *Optional, and last.* M22 cut `AppState`
+      1,572 → 1,288 keeping 18 forwarding properties so no view or test had to move; one feature
+      milestone put it back to **1,382 / 127 public members**, because every feature now pays twice —
+      once in the sub-model, once in the forward. The scaffolding did its job. **Seams:** the
+      sub-models are already `public`, so views can read `state.sources.selectedDisplayID` directly;
+      the change is mechanical and the compiler finds every site. The replay cluster (360 lines in
+      `AppState` on top of a 354-line `ReplayController`) and the self-test (188) are the next
+      extractions if this is worth continuing. **Rulings:** whether to do it at all now, or leave it
+      until a feature milestone touches those files anyway. **Verify:** tests and the deployed menu
+      dump unchanged — M22's own bar.
+
+**Gate G23**: a recording that cannot be written stops itself with a stated cause and keeps what it
+wrote; an export that cannot fit refuses before it starts and names the disk; an export in flight is
+visible without opening the menu, and a take that stops while replay is armed is never silent; both
+extracted models have tests that fail when their logic is broken.
+
+## M24 — Finish the share loop (from the 2026-07-30 review)
+
+M21 made "it happened → here it is" one action from the menu. It is still not one action from the
+keyboard, and the window whose whole job is producing a shareable clip is the one place that won't
+hand it to you. **MINOR.**
+
+- [ ] M24-T1 **The Trim window hands you the clip.** `Export as MP4` writes the ranged `.mp4` and
+      leaves you to find it: back to the menu, into the receipt row, `Copy`. Stop & Copy MP4 already
+      proves the ending. **Seams:** `ExportModel.exportAndCopy` and `ExportRange` both exist — this is
+      the two of them meeting; `TrimView`'s button row. **Rulings:** whether `Export as MP4` simply
+      always copies (one button, the Stop & Copy precedent) or a second button appears; and what the
+      notice says when it does both. **Verify:** live — set a range, one press, ⌘V pastes the clip.
+- [ ] M24-T2 **Stop and copy from the keyboard.** The start/stop shortcut stops *and saves* a `.mov`,
+      so the keyboard path stops one step short of the thing you wanted; the menu is still required
+      for the last move. **Seams:** `HotkeyID` has been a typed registry since M22-T4, so a second id
+      is cheap; `AppState.stopAndShare()` is the action. **Rulings:** a separate shortcut versus a
+      setting on the existing one ("when it stops: save · save and copy"); and what it does when an
+      export is already running — the menu row is disabled there, but a hotkey has to *say* something
+      (M17-T2's lesson). **Verify:** fired from another app; the file lands on the clipboard and one
+      notice is posted.
+- [ ] M24-T3 **The take you just made is one click away.** A replay save gets a top-level receipt row
+      *and* a menu-bar flash; the recording you just stopped gets neither — it is two levels down
+      under `Recordings ▸`, identified by timestamp. **Seams:** `lastReplay`'s row and
+      `replaySavedFlash` are the shapes to mirror; `RecentRecordings` already refreshes on finalize.
+      **Rulings:** how long the receipt lives (the export receipt expires after an hour — same rule?);
+      and whether the flash is always or only when banners are suppressed. ⚠️ Coordinate with
+      **M23-T3**, which touches the same two mechanisms. **Verify:** stop with replay armed → the row
+      and the flash both appear; clicking reveals the file.
+- [ ] M24-T4 **Find the moment without scrubbing blind.** The Trim window offers a 480×300 player,
+      Set In/Set Out and nothing else: no filmstrip, no waveform, no frame stepping. docs/06 calls the
+      window "spare by design" and that is right — but ←/→ and thumbnails are *navigation*, not
+      editing, and finding 20 seconds in a 3-minute take is the step that costs the most. **Seams:**
+      `VideoFrameReader` already extracts frames off the main thread; `AVPlayer.step(byCount:)` is the
+      stepping primitive. **Rulings:** how dense the strip is and what it costs on a 40-minute take
+      (needs a measured budget before it ships — M18-T1's cursor walk was 0.0–0.9 ms, frame extraction
+      is far heavier); whether ←/→ step frames or seconds. **Verify:** measure strip build time on a
+      long take; a step lands on the adjacent PTS (`probe`), not "looks right".
+- [ ] M24-T5 **An `.mp4` stays an `.mp4`.** `Trimmer.trimmedSibling` hard-codes `.mov`, so trimming
+      the `.mp4` you just made for Slack hands back the container you were converting away from. The
+      per-file submenu is generic too: it offers `Export as MP4` on an `.mp4` and `Save as GIF` on a
+      GIF, quietly re-encoding something already encoded. **Seams:** `trimmedSibling`;
+      `AVAssetExportSession.export(to:as:)` writes either container; `MenuView.fileActions`.
+      **Rulings:** hide the redundant derive-actions or disable them with a reason. **Verify:** trim
+      an `.mp4` → an `.mp4` out, probe clean; the submenu on an export no longer offers to re-derive it.
+
+**Gate G24**: from a finished take, a chosen range reaches the clipboard in one action without the
+mouse; the take you just recorded is actionable from the top of the menu; the Trim window can find a
+moment without blind scrubbing; and deriving from an export never silently re-encodes it.
+
 ## Dependency graph
 
 ```
@@ -1898,9 +2016,36 @@ The one lesson worth carrying forward: three of M21's four tasks were filed on a
 measurement moved (docs/02 §1a-ii, docs/07) — check the API's actual behaviour before designing
 around a roadmap sentence.
 
-**Parked, deliberately, from the same review:** multi-display region capture (M11 is main-display
-only and honest about it — worth doing the week a second display is attached, not before); an
-`NSMenu`-backed status item (the `.menu` bridge now carries six documented workarounds — the trigger
-is the next feature that needs custom row rendering, not the count itself); and cursor
-emphasis / auto-zoom, which remain behind ADR-015's parked render stage and are the only levers that
-would change the product's category.
+**The 2026-07-30 review roadmap — M23 (The write path tells the truth), M24 (Finish the share
+loop).** Review artifact: `claude.ai/code/artifact/38dcfad1-b8d9-4029-9a96-e7f9ec4544fc`.
+**M23 first**, on the same logic that put M19 ahead of its roadmap: T1 is the only finding that can
+cost a recording, and the rest of M23 is honesty about work already in flight. **M24 second** because
+every one of its tasks is small and each one pays back daily — but none of them matters if a take
+can be lost quietly. M23-T5 (collapsing `AppState`'s forwards) is deliberately last and optional: it
+is structure, and M22's lesson is that structure is easiest to justify after the features that would
+otherwise land on top of it.
+
+**Parked, with the trigger that would un-park each (updated 2026-07-30):**
+- **Multi-display region capture** — M11 is main-display only and honest about it. Trigger: a second
+  display is attached.
+- **An `NSMenu`-backed status item** — ⚠️ **its trigger has arguably been met.** It was "the next
+  feature that needs custom row rendering"; it now blocks three separate wants at once — thumbnails
+  in the recents rows, a progress row that updates while the menu is open (M23-T3), and a recents
+  list longer than five. Worth costing the next time one of those is asked for.
+- **Audio-only per-app exclusion via Core Audio process taps** (`AudioHardwareCreateProcessTap` +
+  `CATapDescription(excludeProcesses:)`, macOS 14.2+) — the honest answer to F3, which M21-T4 could
+  not deliver: SCK's filter takes the picture with the sound and cannot see an app with no window
+  (docs/02 §1a-ii). A milestone, not a task: a second system-audio source, an aggregate device, its
+  own clock alignment into `SampleRouter`, and a new way for a take to lose audio.
+- **Crop on export** — 🔴 **needs a ruling before anyone builds it.** Franco crops recordings by hand
+  today (his own notes carry an ffmpeg cropping recipe for letterboxed stream captures, where
+  `cropdetect` fails because the bars are luma 62–66). Region capture only helps for what you record
+  yourself. The export path already scales frames, so a source rect is a small addition and *not* a
+  render stage — but ADR-015 admits "trim and format export" and crop is neither.
+- **Cursor emphasis / auto-zoom** — behind ADR-015's parked render stage; still the only levers that
+  would change the product's category.
+- **Swift 6 language mode** — measured 2026-07-30: **7 error sites in `RecorderCore`** (two static
+  formatters, three non-`Sendable` captures in the export/GIF plans, one `SCShareableContent` hop, one
+  closure in `MicrophoneRescue`). `Package.swift` is already tools-version 6.0 with targets pinned to
+  v5. The value is that the compiler starts checking the concurrency rules docs/01 asks agents to hold
+  in their heads.

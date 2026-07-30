@@ -6,6 +6,31 @@
 
 ## Now
 
+- **🔍 REVIEW (2026-07-30) — 15 findings; M23 and M24 encoded in docs/03, nothing implemented.**
+  Artifact: `claude.ai/code/artifact/38dcfad1-b8d9-4029-9a96-e7f9ec4544fc`. Code, architecture and
+  product pass over v1.11.0, read against the source and the running app.
+  🔴 **The headline is a reliability gap: the recording write path never checks whether the write
+  succeeded.** `MovieRecorder.append` discards `input.append()`'s `Bool` and nothing watches
+  `writer.status` during a session, so a failed `AVAssetWriter` keeps a pulsing icon and a ticking
+  clock until Stop — up to forty minutes late on a long take. M19-T1's shape exactly. The *export*
+  path checks the same call, so the discipline exists; it just isn't on the path that matters.
+  **The rest, in short:** exports have no disk guard and quitting mid-export loses them silently;
+  `AppState` regrew **1,288 → 1,382 / 127 public members** because M22's forwarding scaffolding taxes
+  every feature twice; `SessionModel` and `ExportModel` are the two units nothing tests by name;
+  Swift 6 is **7 error sites** away in RecorderCore; the keyboard path stops one step short of the
+  clipboard; the Trim window won't hand you the clip it just made; and a take that stops while replay
+  is armed is **completely silent** (banner suppressed, no receipt row, no flash).
+  ✅ **ENCODED IN docs/03 (2026-07-30): M23 → M24**, with tasks, seams, rulings and gates G23/G24,
+  plus the ordering rationale and a refreshed parked list (the `NSMenu` item's trigger has arguably
+  been met; **crop on export needs Franco's ruling**; Core Audio taps written up as their own
+  milestone). **Nothing implemented.**
+  ⚠️ **Every code finding is read-from-source, not reproduced** — M23-T1 in particular wants a real
+  injected failure before anyone calls it fixed.
+  **Next: M23-T1** — plan artifact first, per the working contract.
+  ℹ️ Worth knowing: Franco's saved WhatsApp ffmpeg recipe is now **redundant** — 1920 scale, both
+  audio tracks mixed to one, H.264 VideoToolbox 6 Mbps, AAC 160k, faststart is exactly what
+  `Export as MP4` does today.
+
 - **Shipped and in daily use: M0–M22, v1.11.0** (2026-07-30). **576 tests**, dev loop green.
   **Deployed** at `/Users/Shared/ScreenRec.app` — pid 94518, plist 1.11.0, signature valid, menu
   **Ready**. Release: https://github.com/fcostantini/screenrec/releases/tag/v1.11.0
