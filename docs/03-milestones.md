@@ -1841,9 +1841,10 @@ this replaced did both in one command. **MINOR.**
       M7-T1 measurement pattern — the excluded app's audio at ≈ −91 dBFS against a control run at
       ≈ −10 dBFS through the identical filter path, not "sounds right".
 
-**Gate G21**: a recording goes from Stop to a pasteboard-ready `.mp4` in one action, with no
-intermediate file left behind; a named take carries that name through file, recents row and receipt;
-an excluded app's audio is measurably absent while the rest of the system's audio is present.
+**Gate G21** ✅ **PASSED 2026-07-30** (evidence in STATUS): a recording goes from Stop to a
+pasteboard-ready `.mp4` in one action, with no intermediate file left behind; a named take carries
+that name through file, recents row and receipt; an excluded app's audio is measurably absent while
+the rest of the system's audio is present.
 
 ## M22 — Structure (from the 2026-07-28 review, findings A2, A3, A4, A6)
 

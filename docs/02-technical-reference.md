@@ -85,6 +85,14 @@ sources during the 2026-07 research pass. Items marked ⚠️ were live bugs we 
   records without the exclusion and reports `excludedAppUnavailable` rather than implying otherwise.
 - **Frame delivery is the display path's** (frame-on-change), not `.app`'s continuous rate — an
   excluding filter is a display capture with a hole in it, so it keeps the StallWatchdog.
+- ⚠️ **"System audio" is not literally every process — and the rule isn't established.** A tone played
+  by `afplay` (a bare CLI binary, no bundle, no window) **never appeared** in the captured track:
+  −∞ dBFS with no exclusion at all, and again with an unrelated app excluded. Yet a **minimised**
+  QuickTime — also windowless on screen — *was* captured at −9.0 dBFS. So it is not "windows on
+  screen" that decides it; the distinguishing factor (bundled app vs bare process, audio API used,
+  something else) is **unmeasured**. Consequence for tests: verify system audio with a real windowed
+  app, never with `afplay`, or a passing measurement can mean nothing was playing (G21 nearly
+  recorded a false negative this way).
 - For true audio-only exclusion the route is Core Audio process taps
   (`AudioHardwareCreateProcessTap` + `CATapDescription(excludeProcesses:)`, macOS 14.2+), which is a
   separate system-audio source, not a filter change. Parked, not attempted.
