@@ -7,6 +7,28 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-30 (M23-T3): 🔴 **A reaction added to `AppState.apply` ran in every test and in no real
+  session.** Production hands the event stream to `consume`, which forwarded straight to
+  `session.consume` → `session.apply`; `AppState.apply` was only ever called *by tests*. So the new
+  stop-flash had a green unit test and did nothing live — caught by the leg, not the suite, and only
+  because the icon's width never grew. `consume` now drives the loop itself
+  (`for await event in events { apply(event) }`) so the two routes are one, with a test that fails if
+  they diverge again. ⚠️ **Generalises:** when a type both *forwards* a stream and *exposes* a
+  per-item hook for tests, the hook is a lie unless the forward goes through it. Third variant of
+  today's theme — a test can only prove the code it actually runs.
+
+- 2026-07-30 (M23-T3): 🔴 **Pixel-diffing the menu bar in situ is not reliable on this machine, and
+  M16-T5's clean numbers were luck of a quiet neighbourhood.** Franco's menu bar carries live
+  third-party widgets (network KB/s, CPU) that resize constantly, and our item slides a point
+  whenever one does. Worse: `kAXExtrasMenuBarAttribute` **reported the same frame `1397,0,27,24` for
+  two captures whose contents were visibly offset** — a neighbour's purple indicator entered one crop
+  and not the other. Since the menu bar is translucent, a crop that moved even a point changes nearly
+  every pixel: measured **99.96% differing, delta 186**, all of it background. A frame-verified pair
+  with nothing changing gives a true `identical: 2592 px`, so the method works when the layout holds
+  still — it just cannot be trusted to hold still. **Use magnified visual captures as the evidence
+  and treat a pixel count as corroboration**, not proof. `tools/itemframe.swift` compiled with
+  `swiftc` costs ~0 vs ~1 s per `swift tools/...` run, which matters inside a 2 s flash window.
+
 - 2026-07-30 (M23-T4): 🔴 **A test that compares two values which are both ~0 pins nothing, and
   reads as if it does.** `pauseFreezesTheClockAndResumeKeepsWhatWasBanked` asserted
   `accumulated == banked` after a pause/resume — but the whole test runs in microseconds, so

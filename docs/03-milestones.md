@@ -1891,7 +1891,7 @@ affordance.
       and what quit does — wait, warn, or cancel and say so. **Verify:** a small volume + a long
       export → refused before writing, with the reason naming the disk; quit mid-export → the chosen
       behaviour, observed.
-- [ ] M23-T3 **Work in flight is visible without opening the menu.** `StatusIcon` has three states —
+- [x] M23-T3 **Work in flight is visible without opening the menu.** `StatusIcon` has three states —
       idle, recording, paused — so a multi-minute export is invisible; the menu's `Exporting …` row
       is stamped at open and never updates (the `.menu` bridge, M6-T10). And because banners are
       suppressed while replay is armed (M9-T2), **stopping a recording while armed is completely

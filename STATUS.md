@@ -6,6 +6,29 @@
 
 ## Now
 
+- **✅ M23-T3 SHIPPED (2026-07-30) — the menu bar stops hiding work, and a silent stop stops being
+  silent. M23 is complete; G23 is next.** An export in flight now draws a **second dot, top-trailing**
+  (Franco's ruling), composited like the armed badge rather than added as a fourth `StatusIcon` case —
+  an export is orthogonal to the session, so an enum couldn't say "recording *and* exporting".
+  **636 tests**, dev loop green, plan artifact
+  `claude.ai/code/artifact/871b879f-7e8e-4dc0-a387-267c9f944810`.
+  🔴 **The flash it was told to mirror had never rendered.** M9-T3 put it in the label's `HStack` as a
+  second `Image`, and a `MenuBarExtra` draws only the first — M16-T5 measured exactly that and left it
+  out of scope. So VoiceOver has been announcing a tick nobody could see, since M9-T3. Now composited;
+  **captured rendering for the first time** (icon width 39 → 51 at the stop, tick visible, back to 39
+  after the window).
+  🔴 **And the live leg caught a second one that the unit tests could not.** The stop-flash hook went
+  into `AppState.apply`, which **production never calls** — `consume` forwarded the stream straight to
+  `session.consume`. Green test, dead code. `consume` now drives the loop through `apply`, with a test
+  that fails if they diverge. Third variant of today's theme: a test only proves the code it runs.
+  ✅ **Live evidence, magnified captures:** idle; idle + export dot (top-trailing, gap ring notching
+  the circle like the armed one); **armed + exporting — both dots, no collision, meter intact**; and
+  the tick on a stop-while-armed. Franco's replay setting was armed for the leg and **set back to off**.
+  ⚠️ **Pixel-diffing the menu bar is not trustworthy here** and M16-T5's clean numbers were a quiet
+  neighbourhood: live third-party widgets slide our item a point, and `kAXExtrasMenuBarAttribute`
+  reported an *identical* frame for two visibly-offset crops. Translucency turns a one-point slip into
+  99.96% differing pixels. Visual captures are the evidence; a pixel count is corroboration (docs/07).
+
 - **✅ M23-T4 SHIPPED (2026-07-30) — the two extracted models now fail as themselves.**
   `SessionModelTests` (18) and `ExportModelTests` (15) construct the models **directly** — confirmed
   while planning that neither class was built once in the whole suite; both were reached only through
@@ -86,13 +109,10 @@
   `onCannotBeginWriting` now it has a sibling; a `.writeFailed` take is **not** offered for naming or
   Stop & Copy (writing to the volume that just refused a write is the wrong next move); no `VERSION`
   bump until the M23 cut.
-  **Next: M23-T3** — the last task standing between M23 and **G23**; T5 is optional and explicitly
-  last. T3 owns both "an export in flight is visible without opening the menu" and "a take that stops
-  while replay is armed is never silent". ⚠️ Its premise is **already measured and holds**: macOS
-  suppresses banners whenever the display is captured, and armed replay means it always is (M5-T5,
-  docs/07) — `.timeSensitive` is set in `Notifier.swift` but **inert**, since the entitlement makes
-  AMFI refuse a self-signed build. So no re-measurement is needed before designing. Coordinate with
-  **M24-T3**, which touches the same two mechanisms. Plan artifact first, per the contract.
+  **Next: G23** — every task M23 filed is done (T5 is optional and explicitly last, and Franco has not
+  asked for it). The gate's four criteria are each already evidenced above; running G23 means
+  re-checking them **against one release build** and pasting the result into the table below.
+  Then **M24**, whose T3 mirrors the flash this task fixed — it inherits one that works.
 
 - **🔍 REVIEW (2026-07-30) — 15 findings; M23 and M24 encoded in docs/03, T1 done.**
   Artifact: `claude.ai/code/artifact/38dcfad1-b8d9-4029-9a96-e7f9ec4544fc`. Code, architecture and

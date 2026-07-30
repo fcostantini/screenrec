@@ -18,52 +18,60 @@ enum StatusIconImage {
     /// The status item's accessible name. `Image(nsImage:)` doesn't adopt an `NSImage`'s
     /// `accessibilityDescription` and a label-based `MenuBarExtra` has no title, so the view must
     /// apply this explicitly.
-    static func label(for icon: StatusIcon, isReplayArmed: Bool) -> String {
+    static func label(
+        for icon: StatusIcon, isReplayArmed: Bool, isExporting: Bool = false
+    ) -> String {
         let base = switch icon {
         case .idle: "ScreenRec: ready"
         case .recording: "ScreenRec: recording"
         case .paused: "ScreenRec: paused"
         }
-        return isReplayArmed ? base + ", replay armed" : base
+        var label = isReplayArmed ? base + ", replay armed" : base
+        if isExporting { label += ", exporting" }
+        return label
     }
 
     // Built once each; the pulse would otherwise redo the lookup and palette render every frame.
+    // Only the bare glyphs are cached — badges are two filled ovals, far cheaper than a symbol
+    // lookup, and caching every combination of them would be six images to keep in step.
     private static let idleImage = template("record.circle")
     private static let recordingImage = tinted("record.circle.fill", .systemRed)
     private static let pausedImage = tinted("circle.lefthalf.filled", .systemOrange)
-    private static let idleArmedImage = badged(template("record.circle"))
-    private static let recordingArmedImage = badged(tinted("record.circle.fill", .systemRed))
-    private static let pausedArmedImage = badged(tinted("circle.lefthalf.filled", .systemOrange))
+
+    private static func glyph(for icon: StatusIcon) -> NSImage {
+        switch icon {
+        case .idle: idleImage
+        case .recording: recordingImage
+        case .paused: pausedImage
+        }
+    }
 
     static func image(
-        for icon: StatusIcon, isReplayArmed: Bool = false, levelBars: Int? = nil
+        for icon: StatusIcon, isReplayArmed: Bool = false, isExporting: Bool = false,
+        levelBars: Int? = nil
     ) -> NSImage {
-        let base = switch (icon, isReplayArmed) {
-        case (.idle, false): idleImage
-        case (.recording, false): recordingImage
-        case (.paused, false): pausedImage
-        case (.idle, true): idleArmedImage
-        case (.recording, true): recordingArmedImage
-        case (.paused, true): pausedArmedImage
-        }
+        let base = badged(glyph(for: icon), armed: isReplayArmed, exporting: isExporting)
         guard let levelBars else { return base }
         return withMeter(base, bars: levelBars)
     }
 
     /// The recording icon faded for the pulse; `alpha` comes from `pulseAlpha(atPhase:)`.
-    /// The armed badge does not fade — armed is a steady state, only recording breathes.
+    /// Badges do not fade — armed and exporting are steady states, only recording breathes.
     static func recordingImage(
-        fadedTo alpha: Double, isReplayArmed: Bool = false, levelBars: Int? = nil
+        fadedTo alpha: Double, isReplayArmed: Bool = false, isExporting: Bool = false,
+        levelBars: Int? = nil
     ) -> NSImage {
         let base = recordingImage
         guard alpha < 1 else {
-            return image(for: .recording, isReplayArmed: isReplayArmed, levelBars: levelBars)
+            return image(
+                for: .recording, isReplayArmed: isReplayArmed, isExporting: isExporting,
+                levelBars: levelBars)
         }
         // `NSImage(size:flipped:)` re-renders per representation, so the fade survives a scale
         // change between Retina and non-Retina displays.
         let faded = NSImage(size: base.size, flipped: false) { rect in
-            base.draw(in: rect, from: .zero, operation: .sourceOver, fraction: alpha)
-            if isReplayArmed { drawBadge(in: rect, onTemplate: false) }
+            base.draw(in: rect, from: rect, operation: .sourceOver, fraction: alpha)
+            drawBadges(in: rect, armed: isReplayArmed, exporting: isExporting, onTemplate: false)
             return true
         }
         faded.isTemplate = base.isTemplate
@@ -71,23 +79,43 @@ enum StatusIconImage {
         return withMeter(faded, bars: levelBars)
     }
 
-    /// docs/06 status-item row 4: a small filled dot, bottom-trailing. Template bases keep the
-    /// badge in the mask (it adapts with the bar); colored bases get a white dot with a clear
-    /// gap so it reads against red and amber alike.
-    private static func badged(_ base: NSImage) -> NSImage {
+    /// Which corner a badge sits in. Two overlays share the glyph, so they cannot share a corner:
+    /// armed keeps the one it has shipped in since M5, and exporting takes the other.
+    private enum BadgeCorner {
+        case bottomTrailing   // replay armed (docs/06 status-item row 6)
+        case topTrailing      // an export in flight (M23-T3)
+    }
+
+    /// docs/06 status-item rows 6–7: small filled dots. Template bases keep the badge in the mask
+    /// (it adapts with the bar); colored bases get a white dot with a clear gap so it reads against
+    /// red and amber alike.
+    private static func badged(_ base: NSImage, armed: Bool, exporting: Bool) -> NSImage {
+        guard armed || exporting else { return base }
         let image = NSImage(size: base.size, flipped: false) { rect in
             base.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
-            drawBadge(in: rect, onTemplate: base.isTemplate)
+            drawBadges(
+                in: rect, armed: armed, exporting: exporting, onTemplate: base.isTemplate)
             return true
         }
         image.isTemplate = base.isTemplate
         return image
     }
 
-    private static func drawBadge(in rect: NSRect, onTemplate: Bool) {
+    private static func drawBadges(
+        in rect: NSRect, armed: Bool, exporting: Bool, onTemplate: Bool
+    ) {
+        if armed { drawBadge(in: rect, corner: .bottomTrailing, onTemplate: onTemplate) }
+        if exporting { drawBadge(in: rect, corner: .topTrailing, onTemplate: onTemplate) }
+    }
+
+    private static func drawBadge(in rect: NSRect, corner: BadgeCorner, onTemplate: Bool) {
         let diameter = rect.width * 0.38
+        let y = switch corner {
+        case .bottomTrailing: rect.minY
+        case .topTrailing: rect.maxY - diameter
+        }
         let badgeRect = NSRect(
-            x: rect.maxX - diameter, y: rect.minY, width: diameter, height: diameter)
+            x: rect.maxX - diameter, y: y, width: diameter, height: diameter)
         // The gap ring separates the dot from the glyph; in a template it's punched out of the
         // mask, on a colored base it clears whatever is behind.
         NSGraphicsContext.current?.cgContext.setBlendMode(.destinationOut)
@@ -149,13 +177,9 @@ enum StatusIconImage {
     static func withClock(_ base: NSImage, text: String) -> NSImage {
         let font = NSFont.monospacedDigitSystemFont(
             ofSize: NSFont.systemFontSize(for: .regular), weight: .regular)
-        // A non-template image can't be tinted by the menu bar, so the ink follows the effective
-        // appearance — the same trade the meter already makes.
-        let ink: NSColor = base.isTemplate
-            ? .black
-            : (NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                ? .white : .black)
-        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ink]
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font, .foregroundColor: adaptiveInk(onTemplate: base.isTemplate),
+        ]
         let string = NSAttributedString(string: text, attributes: attributes)
         let textSize = string.size()
         let gap: CGFloat = 4
@@ -173,6 +197,50 @@ enum StatusIconImage {
         }
         image.isTemplate = base.isTemplate
         return image
+    }
+
+    /// The save confirmation (M9-T3), composited to the right of everything else — which is where
+    /// the original `HStack` put it, and where it never rendered: a `MenuBarExtra` label draws only
+    /// its first `Image` (measured, docs/07). Same fix the armed badge and the meter already had.
+    static func withSavedMark(_ base: NSImage) -> NSImage {
+        let gap: CGFloat = 3
+        let diameter = min(base.size.height, base.size.width) * 0.62
+        let size = NSSize(width: base.size.width + gap + diameter, height: base.size.height)
+        let image = NSImage(size: size, flipped: false) { _ in
+            base.draw(
+                in: NSRect(origin: .zero, size: base.size),
+                from: .zero, operation: .sourceOver, fraction: 1)
+            let box = NSRect(
+                x: base.size.width + gap, y: (size.height - diameter) / 2,
+                width: diameter, height: diameter)
+            drawCheck(in: box, onTemplate: base.isTemplate)
+            return true
+        }
+        image.isTemplate = base.isTemplate
+        return image
+    }
+
+    /// A tick, stroked rather than a filled symbol: at menu-bar size a glyph's own padding leaves
+    /// it visibly smaller than the record circle beside it.
+    private static func drawCheck(in rect: NSRect, onTemplate: Bool) {
+        let ink = adaptiveInk(onTemplate: onTemplate)
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: rect.minX + rect.width * 0.14, y: rect.midY))
+        path.line(to: NSPoint(x: rect.minX + rect.width * 0.40, y: rect.minY + rect.height * 0.24))
+        path.line(to: NSPoint(x: rect.minX + rect.width * 0.88, y: rect.maxY - rect.height * 0.20))
+        path.lineWidth = max(1.5, rect.width * 0.16)
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        ink.setStroke()
+        path.stroke()
+    }
+
+    /// Ink for anything drawn beside the glyph. A template is masked by the menu bar, which tints
+    /// it; a colored image isn't, so its ink has to follow the effective appearance itself.
+    private static func adaptiveInk(onTemplate: Bool) -> NSColor {
+        guard !onTemplate else { return .black }
+        return NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? .white : .black
     }
 
     /// Maps the pulse's phase in [0,1) to an alpha: a raised cosine, so it eases at both ends.
@@ -210,6 +278,9 @@ enum StatusIconImage {
 struct StatusIconView: View {
     let icon: StatusIcon
     var isReplayArmed = false
+    /// An export or trim is running (M23-T3) — orthogonal to the session, like `isReplayArmed`,
+    /// so it is a flag rather than a `StatusIcon` case: a take can be recording and exporting.
+    var isExporting = false
     var recordingClock: RecordingClock? = nil
     var showsTimer = true
     var replaySavedFlash = false
@@ -228,12 +299,7 @@ struct StatusIconView: View {
         every: 1, tolerance: 0.1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        HStack(spacing: 4) {
-            iconImage
-            if replaySavedFlash {
-                Image(systemName: "checkmark.circle.fill")
-            }
-        }
+        iconImage
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
         .onReceive(MenuBarLevelMeter.ticker) { _ in
@@ -253,13 +319,23 @@ struct StatusIconView: View {
     @ViewBuilder private var iconImage: some View {
         if icon == .recording && !reduceMotion {
             PulsingRecordingIcon(
-                label: StatusIconImage.label(for: icon, isReplayArmed: isReplayArmed),
-                isReplayArmed: isReplayArmed, levelBars: shownBars, clock: clockText)
+                label: accessibilityLabel, isReplayArmed: isReplayArmed, isExporting: isExporting,
+                levelBars: shownBars, clock: clockText, showsSavedMark: replaySavedFlash)
         } else {
             let base = StatusIconImage.image(
-                for: icon, isReplayArmed: isReplayArmed, levelBars: shownBars)
-            Image(nsImage: clockText.map { StatusIconImage.withClock(base, text: $0) } ?? base)
+                for: icon, isReplayArmed: isReplayArmed, isExporting: isExporting,
+                levelBars: shownBars)
+            Image(nsImage: Self.decorated(
+                base, clock: clockText, showsSavedMark: replaySavedFlash))
         }
+    }
+
+    /// The clock and the save mark, in the order the label used to stack them: glyph, then time,
+    /// then the tick furthest right.
+    static func decorated(_ base: NSImage, clock: String?, showsSavedMark: Bool) -> NSImage {
+        var image = clock.map { StatusIconImage.withClock(base, text: $0) } ?? base
+        if showsSavedMark { image = StatusIconImage.withSavedMark(image) }
+        return image
     }
 
     /// Nil when the meter is off, which is what tells the drawing to omit it entirely.
@@ -268,11 +344,12 @@ struct StatusIconView: View {
     /// The whole item as one VoiceOver element: the icon state, plus elapsed time and a
     /// just-saved note when shown.
     private var accessibilityLabel: String {
-        var label = StatusIconImage.label(for: icon, isReplayArmed: isReplayArmed)
+        var label = StatusIconImage.label(
+            for: icon, isReplayArmed: isReplayArmed, isExporting: isExporting)
         if showsTimer, let recordingClock {
             label += ", " + Timecode.clock(recordingClock.elapsed(now: Date()))
         }
-        if replaySavedFlash { label += ", replay saved" }
+        if replaySavedFlash { label += ", saved" }
         return label
     }
 }
@@ -296,9 +373,11 @@ private struct PulsingRecordingIcon: View {
 
     let label: String
     let isReplayArmed: Bool
+    let isExporting: Bool
     let levelBars: Int?
     /// Drawn into the image beside the glyph — see `StatusIconImage.withClock`.
     let clock: String?
+    let showsSavedMark: Bool
 
     @State private var phase: Double = 0
 
@@ -309,8 +388,9 @@ private struct PulsingRecordingIcon: View {
     var body: some View {
         let faded = StatusIconImage.recordingImage(
             fadedTo: StatusIconImage.pulseAlpha(atPhase: phase), isReplayArmed: isReplayArmed,
-            levelBars: levelBars)
-        Image(nsImage: clock.map { StatusIconImage.withClock(faded, text: $0) } ?? faded)
+            isExporting: isExporting, levelBars: levelBars)
+        Image(nsImage: StatusIconView.decorated(
+            faded, clock: clock, showsSavedMark: showsSavedMark))
             .accessibilityLabel(label)
             .onReceive(ticker) { _ in
                 phase = (phase + 1 / Self.framesPerCycle).truncatingRemainder(dividingBy: 1)

@@ -374,8 +374,21 @@ public final class AppState {
     public var activeRegion: CGSize? { session.activeRegion }
     public var isSessionActive: Bool { session.isActive }
     public var isPaused: Bool { session.isPaused }
-    public func consume(_ events: AsyncStream<EngineEvent>) async { await session.consume(events) }
-    func apply(_ event: EngineEvent) { session.apply(event) }
+    /// Drives the fold event by event rather than handing the stream to `session`, so everything
+    /// `apply` adds on top of it runs in production and not only under test.
+    public func consume(_ events: AsyncStream<EngineEvent>) async {
+        for await event in events { apply(event) }
+    }
+    func apply(_ event: EngineEvent) {
+        session.apply(event)
+        // A take that ends while replay is armed has no banner to announce it (M5-T5), so without
+        // this the stop is completely silent — the M23-T3 gap. Read here rather than in the fold:
+        // `isReplayArmed` is AppState's, and so is the flash.
+        if case .finished(_, let reason, _) = event,
+           Self.stopNeedsFlash(isReplayArmed: isReplayArmed, reason: reason) {
+            flashSaved()
+        }
+    }
     public func refreshProgress() { session.refreshProgress() }
 
     /// Permissions/onboarding, split out (M9-T7): AppState owns this sub-model and forwards to it.
@@ -424,9 +437,25 @@ public final class AppState {
 
     /// A brief menu-bar confirmation the label shows on a save (M9-T3): visible without opening
     /// the menu, unlike `lastReplay`'s row. Set on save success, auto-cleared after `flashDuration`.
+    /// Since M23-T3 a finished *recording* raises it too, when its banner can't render.
     public private(set) var replaySavedFlash = false
     private var flashTask: Task<Void, Never>?
     private static let flashDuration: Duration = .seconds(2)
+
+    /// Whether a take that just ended needs the menu-bar flash to say so. Pure, so the policy is
+    /// asserted rather than inferred from a live capture.
+    ///
+    /// Only when replay is armed: an armed stream keeps the display captured, which is exactly when
+    /// macOS suppresses banners (M5-T5), so a stop there is otherwise completely silent. An ordinary
+    /// stop already gets a banner, and flashing as well would confirm the same thing twice.
+    /// ⚠️ A proxy, not a certainty — the toggle that governs suppression has no public API (M12-T5),
+    /// which is why the shipped copy says banners "may" be hidden.
+    static func stopNeedsFlash(isReplayArmed: Bool, reason: EndReason) -> Bool {
+        // A write failure leaves a file, but its notice is a problem to read, not a confirmation
+        // to glance at — and `SessionModel` already withholds it from the naming prompt (M23-T1).
+        guard reason != .writeFailed else { return false }
+        return isReplayArmed
+    }
 
     /// The export/trim cluster (M14-T1), the `PermissionsModel` pattern: AppState owns it and
     /// forwards the public surface below, so the view/CLI/test surface is unchanged. Its receipt
@@ -657,7 +686,7 @@ public final class AppState {
                     // The in-app receipt (M9-T2): the notification below is banner-suppressed while
                     // armed, so the menu row is what actually reaches the user.
                     lastReplay = LastReplay(url: saved.url, seconds: Int(saved.duration.rounded()))
-                    flashReplaySaved()             // and a signal without opening the menu (M9-T3)
+                    flashSaved()                   // and a signal without opening the menu (M9-T3)
                     notifier?(RecordingNotifications.replaySaved(url: saved.url, duration: saved.duration))
                     refreshRecentRecordings()      // the new clip belongs at the top
                 case .failure(let error):
@@ -670,7 +699,7 @@ public final class AppState {
 
     /// Shows the menu-bar save confirmation, then clears it after `flashDuration` (M9-T3). A new
     /// save restarts the window rather than stacking.
-    private func flashReplaySaved() {
+    func flashSaved() {
         replaySavedFlash = true
         flashTask?.cancel()
         flashTask = Task { @MainActor [weak self] in

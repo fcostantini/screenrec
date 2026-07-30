@@ -569,6 +569,21 @@ import RecorderCore
         #expect(state.lastFailure != nil)            // …but never silently
     }
 
+    @Test func theStreamPathRunsEverythingTheEventPathDoes() async {
+        // ⚠️ Production hands the stream to `consume`; only tests call `apply` directly. When those
+        // were two different routes, a reaction added to `apply` ran in every test and in no real
+        // session (M23-T3, measured live — the flash never appeared). Pinned so they can't diverge.
+        let state = makeState()
+        state.isReplayArmed = true
+        let (events, continuation) = AsyncStream.makeStream(of: EngineEvent.self)
+        continuation.yield(.started)
+        continuation.yield(.finished(url: Self.outputURL, reason: .userStopped, droppedFrames: 0))
+        continuation.finish()
+
+        await state.consume(events)
+        #expect(state.replaySavedFlash)      // the thing `apply` adds, reached through the stream
+    }
+
     @Test func consumesAWholeSessionFromItsEventStream() async {
         // The production path: RecordingSession hands over a stream, not loose events. It ends
         // by finishing the stream, so `consume` must return rather than hang the caller.
@@ -604,6 +619,42 @@ import RecorderCore
             state.apply(.finished(url: Self.outputURL, reason: reason, droppedFrames: 0))
             #expect(state.session.finishedRecording?.url == Self.outputURL)
         }
+    }
+
+    // MARK: - The menu-bar flash when a take ends (M23-T3)
+
+    @Test func aStopWhileArmedFlashesBecauseItsBannerCannotRender() {
+        // Armed replay keeps the display captured, which is exactly when macOS suppresses banners
+        // (M5-T5) — so without this the stop is completely silent on every channel.
+        #expect(AppState.stopNeedsFlash(isReplayArmed: true, reason: .userStopped))
+    }
+
+    @Test func anOrdinaryStopDoesNotFlashBecauseItsBannerWorks() {
+        // Capture has ended by the time the notification posts, so a flash too would confirm the
+        // same event twice.
+        #expect(!AppState.stopNeedsFlash(isReplayArmed: false, reason: .userStopped))
+    }
+
+    @Test func everyFailStopStillFlashesWhenArmedExceptTheOneThatIsBadNews() {
+        for reason in Self.endReasons where reason != .writeFailed {
+            #expect(AppState.stopNeedsFlash(isReplayArmed: true, reason: reason))
+        }
+        // A write failure leaves a file, but its notice is a problem to read — not a tick to
+        // glance at and move on from.
+        #expect(!AppState.stopNeedsFlash(isReplayArmed: true, reason: .writeFailed))
+    }
+
+    @Test func aFinishedTakeRaisesTheFlagOnlyWhenTheRuleSaysSo() async {
+        let armed = makeState()
+        armed.isReplayArmed = true
+        armed.apply(.started)
+        armed.apply(.finished(url: Self.outputURL, reason: .userStopped, droppedFrames: 0))
+        #expect(armed.replaySavedFlash)
+
+        let plain = makeState()
+        plain.apply(.started)
+        plain.apply(.finished(url: Self.outputURL, reason: .userStopped, droppedFrames: 0))
+        #expect(!plain.replaySavedFlash)
     }
 
     @Test func refreshProgressPublishesOnlyOnRealChange() {

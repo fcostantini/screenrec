@@ -172,6 +172,7 @@ private struct StatusIconLabel: View {
         StatusIconView(
             icon: state.statusIcon,
             isReplayArmed: state.isReplayArmed,
+            isExporting: state.exportInProgress != nil,
             recordingClock: state.recordingClock,
             showsTimer: state.showsMenuBarTimer,
             replaySavedFlash: state.replaySavedFlash,
