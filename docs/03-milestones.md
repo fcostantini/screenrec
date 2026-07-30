@@ -1902,7 +1902,7 @@ affordance.
       versus a small badge; whether a finished take flashes always or only when banners are
       suppressed. **Verify:** pixel-diff the rendered states (M16-T5's method), and the armed-then-stop
       case observed live.
-- [ ] M23-T4 **`SessionModel` and `ExportModel` get tests that name them.** The two models M22
+- [x] M23-T4 **`SessionModel` and `ExportModel` get tests that name them.** The two models M22
       extracted are the two units nothing tests by name — exercised only through `AppState`, which is
       how "557 tests passed untouched" was achieved and is a real property worth keeping, but M22-T3's
       own standard was a test per unit that can fail. **Seams:** both are `@Observable` `@MainActor`

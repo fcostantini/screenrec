@@ -4,11 +4,6 @@ import Testing
 @testable import AppCore
 import RecorderCore
 
-/// Records what an injected export/trim was handed (the closures are `@Sendable`).
-private final class Box<Value>: @unchecked Sendable {
-    var value: Value?
-}
-
 /// AppState → Exporter wiring, with the transcode injected — the real `Exporter` runs the
 /// hardware encoder (that's `ExporterTests`' job), so the wiring is tested on a fake.
 @MainActor

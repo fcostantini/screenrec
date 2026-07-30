@@ -1,0 +1,228 @@
+import Foundation
+import Testing
+@testable import AppCore
+import RecorderCore
+
+/// The export/trim sub-model split from AppState (M14-T1), tested by name (M23-T4).
+///
+/// `ExportWiringTests` drives the same model through `AppState` and keeps doing so; these assert
+/// the model's own rules one layer down, so a break reports as `ExportModelTests`. The real
+/// transcode is injected throughout — `ExporterTests` owns the hardware encoder.
+@MainActor
+@Suite struct ExportModelTests {
+
+    private static let source = URL(fileURLWithPath: "/tmp/Clip.mov")
+
+    private func makeModel() -> ExportModel {
+        ExportModel(defaults: TestDefaults.make())
+    }
+
+    private func settle(_ model: ExportModel) async {
+        while model.exportInProgress != nil { await Task.yield() }
+    }
+
+    // MARK: - One export at a time (M10-T2)
+
+    @Test func inProgressIsSetSynchronouslyBeforeTheTaskRuns() async {
+        // Set inside the Task instead, and the menu offers a second export in the gap — which the
+        // guard below then can't see.
+        let model = makeModel()
+        model.exportFunction = { _, output, _, _ in output }
+        model.exportToMP4(Self.source, configuration: ExportConfiguration())
+        #expect(model.exportInProgress == "Clip.mov")
+        await settle(model)
+    }
+
+    @Test func aSecondExportWhileOneRunsIsDroppedAndPostsNothing() async {
+        let model = makeModel()
+        var posted: [RecordingNotification] = []
+        model.notify = { posted.append($0) }
+        model.exportFunction = { _, output, _, _ in output }
+
+        // No suspension point between the calls, so the first task hasn't run yet.
+        model.exportToMP4(Self.source, configuration: ExportConfiguration())
+        model.exportToMP4(URL(fileURLWithPath: "/tmp/Other.mov"), configuration: ExportConfiguration())
+        #expect(model.exportInProgress == "Clip.mov")
+
+        await settle(model)
+        #expect(posted.count == 1)          // exactly one export ran
+    }
+
+    @Test func inProgressClearsOnFailureSoTheNextExportIsNotWedged() async {
+        // Clearing only on success wedges every later export behind one failure.
+        let model = makeModel()
+        model.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
+        model.exportToMP4(Self.source, configuration: ExportConfiguration())
+        await settle(model)
+        #expect(model.exportInProgress == nil)
+
+        model.exportFunction = { _, output, _, _ in output }
+        model.exportToMP4(Self.source, configuration: ExportConfiguration())
+        #expect(model.exportInProgress == "Clip.mov")   // the next one is accepted
+        await settle(model)
+    }
+
+    @Test func inProgressClearsWhenAnExportIsRefusedForRoom() async {
+        let model = makeModel()
+        model.availableBytes = { _ in 0 }
+        let ran = Box<Bool>()
+        model.trimFunction = { _, output, _, _, _ in ran.value = true; return output }
+
+        let file = try? sizedFile(bytes: 2048)
+        defer { file.map { try? FileManager.default.removeItem(at: $0) } }
+        model.trim(file ?? Self.source, from: 0, to: 1, mode: .lossless)
+        await settle(model)
+
+        #expect(model.exportInProgress == nil)
+        #expect(ran.value != true)
+    }
+
+    // MARK: - Receipt policy (M12-T2/T3)
+
+    @Test func onlyASuccessSetsTheReceipt() async {
+        let model = makeModel()
+        let written = URL(fileURLWithPath: "/tmp/Clip.mp4")
+        model.exportFunction = { _, _, _, _ in written }
+        model.exportToMP4(Self.source, configuration: ExportConfiguration())
+        await settle(model)
+        #expect(model.lastExport?.url == written)
+    }
+
+    @Test func aFailureLeavesNoReceiptAtAll() async {
+        // A receipt here points the menu at a file that was never written.
+        let model = makeModel()
+        model.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
+        model.exportToMP4(Self.source, configuration: ExportConfiguration())
+        await settle(model)
+        #expect(model.lastExport == nil)
+    }
+
+    @Test func aFailedReExportKeepsThePriorReceipt() async {
+        // The "Exporting…" row shadows the receipt while running; a failure must restore it rather
+        // than destroy a good pointer.
+        let model = makeModel()
+        let first = URL(fileURLWithPath: "/tmp/First.mp4")
+        model.exportFunction = { _, _, _, _ in first }
+        model.exportToMP4(Self.source, configuration: ExportConfiguration())
+        await settle(model)
+
+        model.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
+        model.exportToMP4(Self.source, configuration: ExportConfiguration())
+        await settle(model)
+        #expect(model.lastExport?.url == first)
+    }
+
+    @Test func aReceiptExpiresOnAgeEvenWhenItsFileIsThere() throws {
+        let file = try sizedFile(bytes: 16)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let defaults = TestDefaults.make()
+        SettingsStore.saveLastExport(
+            LastExport(url: file, date: Date(timeIntervalSinceNow: -7200)), to: defaults)
+
+        let model = ExportModel(defaults: defaults)
+        model.expireStaleReceipt()
+        #expect(model.lastExport == nil)
+    }
+
+    @Test func aReceiptExpiresWhenItsFileIsGoneEvenWhenFresh() throws {
+        // Checked at menu open, not only at launch: a file trashed mid-session would otherwise
+        // leave a row whose every action silently does nothing (M18-T4).
+        let file = try sizedFile(bytes: 16)
+        let defaults = TestDefaults.make()
+        SettingsStore.saveLastExport(LastExport(url: file, date: Date()), to: defaults)
+        let model = ExportModel(defaults: defaults)
+        #expect(model.lastExport != nil)
+
+        try FileManager.default.removeItem(at: file)
+        model.expireStaleReceipt()
+        #expect(model.lastExport == nil)
+    }
+
+    @Test func aFreshReceiptWithItsFilePresentSurvives() throws {
+        // The negative control: expiring everything would pass both tests above.
+        let file = try sizedFile(bytes: 16)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let defaults = TestDefaults.make()
+        SettingsStore.saveLastExport(LastExport(url: file, date: Date()), to: defaults)
+
+        let model = ExportModel(defaults: defaults)
+        model.expireStaleReceipt()
+        #expect(model.lastExport?.url == file)
+    }
+
+    @Test func renamingRePointsTheReceiptAndKeepsItsOriginalTime() throws {
+        // Stamping `Date()` here would make a renamed old receipt fresh again and resurface it.
+        let file = try sizedFile(bytes: 16)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let exportedAt = Date(timeIntervalSinceNow: -600)
+        let defaults = TestDefaults.make()
+        SettingsStore.saveLastExport(LastExport(url: file, date: exportedAt), to: defaults)
+        let model = ExportModel(defaults: defaults)
+
+        let renamed = file.deletingLastPathComponent().appendingPathComponent("Renamed.mp4")
+        model.renameReceipt(from: file, to: renamed)
+        #expect(model.lastExport?.url == renamed)
+        #expect(model.lastExport?.date == exportedAt)
+    }
+
+    @Test func trashingClearsTheReceiptAndAnotherFileDoesNot() throws {
+        let file = try sizedFile(bytes: 16)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let defaults = TestDefaults.make()
+        SettingsStore.saveLastExport(LastExport(url: file, date: Date()), to: defaults)
+        let model = ExportModel(defaults: defaults)
+
+        model.clearReceipt(for: URL(fileURLWithPath: "/tmp/Unrelated.mp4"))
+        #expect(model.lastExport != nil)          // someone else's trash must not clear it
+        model.clearReceipt(for: file)
+        #expect(model.lastExport == nil)
+    }
+
+    // MARK: - Quit seams (M23-T2)
+
+    @Test func waitingReturnsOnlyAfterTheWorkSettles() async {
+        // The whole point: quit must not be able to outrun the export it promised to wait for.
+        let model = makeModel()
+        let finished = Box<Bool>()
+        model.exportFunction = { _, output, _, _ in
+            try await Task.sleep(for: .milliseconds(30))
+            finished.value = true
+            return output
+        }
+        model.exportToMP4(Self.source, configuration: ExportConfiguration())
+        await model.waitForExportToFinish()
+        #expect(finished.value == true)
+        #expect(model.exportInProgress == nil)
+    }
+
+    @Test func waitingWithNothingRunningReturnsAtOnce() async {
+        await makeModel().waitForExportToFinish()     // must not hang
+    }
+
+    @Test func abandoningClearsInFlightStateSynchronously() async {
+        // `Quit Anyway` calls `terminate`, whose delegate waits for an export in flight — so the
+        // clear must be visible before that check runs, or the button waits like the one beside it.
+        let model = makeModel()
+        model.exportFunction = { _, output, _, _ in
+            try await Task.sleep(for: .seconds(10))
+            return output
+        }
+        model.exportToMP4(Self.source, configuration: ExportConfiguration())
+        #expect(model.exportInProgress == "Clip.mov")
+
+        model.cancelExport()
+        #expect(model.exportInProgress == nil)        // no await between — that is the requirement
+        await model.waitForExportToFinish()           // and quit's wait is now a no-op
+        #expect(model.lastExport == nil)              // an abandoned export leaves no receipt
+    }
+
+    // MARK: - Fixtures
+
+    /// A real file of a known size, for the estimate paths that read one.
+    private func sizedFile(bytes: Int) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("exportmodel-\(UUID().uuidString).mp4")
+        try Data(count: bytes).write(to: url)
+        return url
+    }
+}

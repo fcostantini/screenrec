@@ -7,6 +7,16 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-30 (M23-T4): 🔴 **A test that compares two values which are both ~0 pins nothing, and
+  reads as if it does.** `pauseFreezesTheClockAndResumeKeepsWhatWasBanked` asserted
+  `accumulated == banked` after a pause/resume — but the whole test runs in microseconds, so
+  `banked` was ~0, and the break it exists to catch (*resume restarts the clock at zero*) satisfied
+  `0 == 0` and stayed **green**. Only the break matrix found it: 11 of 12 breaks went red, and this
+  one didn't. The fix is a 30 ms sleep before the pause plus an explicit `banked > 0` — there has to
+  be something to lose before "it wasn't lost" means anything. **Second time this shape has bitten**
+  (M22-T3's `Polling` test passed against broken code), and the lesson is the same one: writing the
+  test is not the check; **breaking the code and watching it fail is the check**.
+
 - 2026-07-30 (M23-T2, found while reading the app's own preferences): 🔴 **The test suites had
   leaked 49,668 preference plists — 194 MB, and 99.3% of every file in `~/Library/Preferences`.**
   The per-test `UserDefaults(suiteName: "screenrec-tests-\(UUID())")` idiom exists for a good reason

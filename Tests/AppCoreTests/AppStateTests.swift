@@ -9,14 +9,6 @@ import RecorderCore
 @MainActor
 @Suite struct AppStateTests {
 
-    /// A thread-safe latch for `withObservationTracking`'s `@Sendable onChange`.
-    final class Flag: @unchecked Sendable {
-        private let lock = NSLock()
-        private var raised = false
-        var isRaised: Bool { lock.lock(); defer { lock.unlock() }; return raised }
-        func raise() { lock.lock(); raised = true; lock.unlock() }
-    }
-
     private static let outputURL = URL(fileURLWithPath: "/tmp/screenrec-test.mov")
 
     /// Every way a session can end. All of them are `finished` — the fail-stops are ADR-007

@@ -6,6 +6,25 @@
 
 ## Now
 
+- **✅ M23-T4 SHIPPED (2026-07-30) — the two extracted models now fail as themselves.**
+  `SessionModelTests` (18) and `ExportModelTests` (15) construct the models **directly** — confirmed
+  while planning that neither class was built once in the whole suite; both were reached only through
+  `AppState`. **631 tests** (598 → 631), **no source change**, and the 90 existing
+  `AppStateTests`/`ExportWiringTests` are **unedited** — M22's "passed untouched" property is what
+  caught two inverted guards, so the new tests sit beside it, not instead of it. Plan artifact:
+  `claude.ai/code/artifact/c11a6c3a-2bd1-4a0f-8547-3a24e1641c69`.
+  ✅ **Bar met the M22-T3 way: 12 breaks applied, 12 turned the right suite red** — and each named
+  `SessionModelTests`/`ExportModelTests`, not somebody else's. The matrix is in the plan artifact;
+  the script is throwaway.
+  🔴 **11 of 12 on the first pass — and the twelfth is the point of doing this.**
+  `pauseFreezesTheClockAndResumeKeepsWhatWasBanked` compared two values that were **both ~0** (the
+  test runs in microseconds), so "resume restarts the clock at zero" satisfied it and stayed green.
+  Fixed with a 30 ms wait and an explicit `banked > 0`; the break now fails it `0.0 == 0.032`.
+  **Second time this shape has bitten** (M22-T3's `Polling`) — docs/07.
+  ⚠️ One honest limit: `notify(about:)` reads duration off a live `capture`, which a bare model has
+  none of, so these pin *which* notification is posted, not its clock. That stays
+  `RecordingSessionTests`' territory.
+
 - **✅ M23-T2 SHIPPED (2026-07-30) — an export refuses what can't land, and quit no longer eats one.**
   The fit check sits at `ExportModel.performExport` (the one funnel) with an **injected estimate**,
   because the four actions have different size models: MP4 uses `ExportConfiguration.projectedBytes`
@@ -67,8 +86,13 @@
   `onCannotBeginWriting` now it has a sibling; a `.writeFailed` take is **not** offered for naming or
   Stop & Copy (writing to the volume that just refused a write is the wrong next move); no `VERSION`
   bump until the M23 cut.
-  **Next: M23-T3** — work in flight visible from the menu bar; also owns the "a take that stops while
-  replay is armed is completely silent" half. Plan artifact first, per the contract.
+  **Next: M23-T3** — the last task standing between M23 and **G23**; T5 is optional and explicitly
+  last. T3 owns both "an export in flight is visible without opening the menu" and "a take that stops
+  while replay is armed is never silent". ⚠️ Its premise is **already measured and holds**: macOS
+  suppresses banners whenever the display is captured, and armed replay means it always is (M5-T5,
+  docs/07) — `.timeSensitive` is set in `Notifier.swift` but **inert**, since the entitlement makes
+  AMFI refuse a self-signed build. So no re-measurement is needed before designing. Coordinate with
+  **M24-T3**, which touches the same two mechanisms. Plan artifact first, per the contract.
 
 - **🔍 REVIEW (2026-07-30) — 15 findings; M23 and M24 encoded in docs/03, T1 done.**
   Artifact: `claude.ai/code/artifact/38dcfad1-b8d9-4029-9a96-e7f9ec4544fc`. Code, architecture and
