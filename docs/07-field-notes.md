@@ -7,6 +7,27 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-30 (M23-T5): 🔴 **The two extractions M23-T5 filed as "the real weight" are a third of the
+  size the task states, and the sizing was never checked.** docs/03 says the replay cluster is
+  **360 lines** in `AppState` on top of `ReplayController`, and the self-test **188**. Measured by
+  attributing every line to the member that owns it: **replay 143, self-test 35 — 178, not 548.**
+  I repeated the 548 figure into a plan artifact and recommended a scope on the strength of it;
+  Franco chose that scope, and it was wrong. ⚠️ **A roadmap's numbers are a claim, not a measurement**
+  — the same lesson M21 filed about its API premises, one level up. Count before you scope.
+  Also worth knowing before anyone re-files it: extracting replay is not mechanical the way the
+  forwards were. Its 14 members reach settings persistence, the capture configuration, the hotkey
+  registrar, `sources`, `session` and `notifier` — and since M23-T3 the save flash is **shared** with
+  a take that stops while armed, so it is not replay-only state any more. The injected surface would
+  be larger than the code moved.
+
+- 2026-07-30 (M23-T5): ⚠️ **Ten of the 47 "forwards" were not forwards.** A grep for
+  `{ sub.member }` counts adapters that supply an input only `AppState` holds —
+  `refreshOnboarding`/`requestScreenRecording`/`readiness` inject `microphoneRequired`,
+  `exportToMP4`/`exportToGIF`/`trim` inject a configuration. Deleting those would have copied the
+  rule (`microphonePreference != .none`) to every call site. Classify by *what the body does with its
+  arguments*, not by shape. Also: **SwiftUI will not write a binding through a `let`** — the source
+  Pickers needed `Bindable(state.sources)` rather than `$state.sources.sourceChoice`.
+
 - 2026-07-30 (M23-T3): 🔴 **A reaction added to `AppState.apply` ran in every test and in no real
   session.** Production hands the event stream to `consume`, which forwarded straight to
   `session.consume` → `session.apply`; `AppState.apply` was only ever called *by tests*. So the new

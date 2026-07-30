@@ -1909,7 +1909,12 @@ affordance.
       classes with injected closures; no capture hardware needed. **Verify:** the M22-T3 standard —
       break each unit, watch its test fail (the fold's clock/icon transitions; the one-at-a-time
       guard and receipt policy).
-- [ ] M23-T5 **Collapse `AppState`'s forwarding layer.** *Optional, and last.* M22 cut `AppState`
+- [x] M23-T5 **Collapse `AppState`'s forwarding layer.** ✅ Done 2026-07-30: **130 → 95 public
+      members, 1,420 → 1,355 lines**, verified to M22's bar. ⚠️ **The follow-on extractions named
+      below were measured and the figures here are wrong** — replay is **143** lines in `AppState`,
+      not 360; the self-test **35**, not 188. 178 total, not 548, and extracting replay would inject
+      a larger surface than it moves (docs/07). Not done, and not worth filing again on these
+      numbers. *Optional, and last.* M22 cut `AppState`
       1,572 → 1,288 keeping 18 forwarding properties so no view or test had to move; one feature
       milestone put it back to **1,382 / 127 public members**, because every feature now pays twice —
       once in the sub-model, once in the forward. The scaffolding did its job. **Seams:** the

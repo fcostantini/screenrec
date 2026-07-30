@@ -6,6 +6,25 @@
 
 ## Now
 
+- **✅ M23-T5 DONE (2026-07-30) — `AppState` is 130 → 95 public members, 1,420 → 1,355 lines.**
+  Views and tests read `state.sources.x` / `state.session.x` / `state.exports.x` /
+  `state.permissions.x` directly; the scaffolding M22 left is gone. **636 tests green**, and the
+  deployed menu dumped identical — M22's own bar — bar live window titles retitling between dumps
+  (which M22 also saw) and the mic list gaining AirPods Pro, which connected between the two.
+  Plan artifact: `claude.ai/code/artifact/5e82d5c8-e490-448d-9516-655d516c1401`.
+  🔴 **The second half of the agreed scope was abandoned on measurement, and the fault is mine.**
+  I proposed extracting the replay and self-test clusters because docs/03 called them **548 lines**;
+  Franco picked that scope on my recommendation. Counted properly they are **178** — replay 143,
+  self-test 35. Extracting replay would also inject a bigger surface than it moves: its 14 members
+  reach settings persistence, the capture configuration, the hotkey registrar, `sources`, `session`
+  and `notifier`, and since M23-T3 the save flash is **shared** with a take stopping while armed, so
+  it is not replay-only state. **T5 as filed is complete** — its title and its Verify are the
+  forwards; the extractions were the task's own conditional "if this is worth continuing", and on
+  the true numbers it isn't.
+  ⚠️ **Ten of the 47 "forwards" were adapters, not scaffolding** — they inject `microphoneRequired`
+  or an export configuration, inputs only `AppState` holds. They stay, and say why in-line. Also:
+  SwiftUI won't write a binding through a `let`, so the source Pickers take `Bindable(state.sources)`.
+
 - **✅ M23-T3 SHIPPED (2026-07-30) — the menu bar stops hiding work, and a silent stop stops being
   silent. M23 is complete; G23 is next.** An export in flight now draws a **second dot, top-trailing**
   (Franco's ruling), composited like the armed badge rather than added as a fourth `StatusIcon` case —
