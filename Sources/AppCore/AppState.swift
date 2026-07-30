@@ -1220,10 +1220,8 @@ public final class AppState {
     }
 
     /// Asks what to call the take that just finished, if the user opted in (M21-T3), and renames it.
-    /// A prompt that returns nil — Esc, Cancel, a blank or unchanged name — keeps the date name: the
-    /// file is already safe, and naming is decoration on top of that.
-    ///
-    /// Internal, not private, so the naming policy is testable without a capture session.
+    /// A nil answer — Esc, Cancel, a blank or unchanged name — keeps the date name.
+    /// Internal, not private, so the policy is testable without a capture session.
     @discardableResult
     func nameTakeIfAsked(_ url: URL, duration: TimeInterval) -> URL? {
         guard namesTakeOnStop, let prompt = promptForTakeName else { return nil }

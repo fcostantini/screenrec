@@ -400,14 +400,12 @@ file every session is required to read.
     that `MovieRecorder` never emits, and harmless in a player — but every prior gate recorded
     "probe monotonic-clean", so it must be settled before precise mode ships.
 
-- 2026-07-27 (v1.9.0 cut): ⚠️ **`Scripts/release.sh` and the run-it-in-the-background rule fight each
-  other, and the script silently loses.** It ends with an interactive `Push v1.9.0 to origin? [y/N]`;
-  in the background stdin is not a terminal, so it reads N every time and prints `Not pushed`. The cut
-  itself is fine — gate, tag and signed bundle all complete — but **main and the tag stay local**, and
-  the run otherwise looks like a success. The background rule is not optional (a foreground timeout
-  SIGTERMs it mid-encode — the VT lesson), so **every cut needs `git push origin main && git push
-  origin <tag>` afterwards**, and the tag push runs its own pre-push gate, arriving a few seconds
-  after main's. Check `git ls-remote --tags origin` before believing the tag shipped.
+- 2026-07-27 (v1.9.0 cut) — ✅ **FIXED by M22-T5; kept because the shape recurs.**
+  `Scripts/release.sh` ended with an interactive `Push? [y/N]`, and the run-it-in-the-background rule
+  (a foreground timeout SIGTERMs a cut mid-encode) meant stdin was never a terminal: it read N every
+  time, printed `Not pushed`, and otherwise looked like a success while main and the tag stayed local.
+  **The lesson that outlives it:** a prompt is a silent failure in any non-interactive path — decide
+  by capability (`[ -t 0 ]` ⇒ ask, else act and say so), never by asking into the void.
 
 - 2026-07-27 (M17-T2): **A fix can be green in tests, correct in review, and still inert — and the
   only thing that says so is running it.** The idle menu never rendered `lastFailure`, so a Start
@@ -552,7 +550,7 @@ file every session is required to read.
     the fast check; the former tells you who really holds it.
   - **UNMEASURED, worth one run when a display-sleep lever is allowed** (out of scope for M16-T1, and
     invisible on this machine, which is set to `displaysleep 0`): nothing prevents *display* sleep
-    while armed, and 02 §11 records that starting a capture against a slept display **wakes it**. If
+    while armed, and 02 §7 records that starting a capture against a slept display **wakes it**. If
     those compose, `ReplayController`'s 5 s retry loop would bounce the display back on every five
     seconds after it sleeps — louder than the assertion ever was. Two facts, no measurement joining
     them yet.

@@ -4,6 +4,11 @@ How we know each milestone is actually done. Agents: run the relevant section as
 milestone's exit gate and paste results into STATUS.md. `tools/probe.swift` is the file
 inspector (tracks, codecs, dimensions, duration): `swift tools/probe.swift <file.mov>`.
 
+⚠️ **Scope: §1–§7 are the v1 gates (G0–G6).** Every gate after them (G7 onward) is specified in
+`docs/03-milestones.md` under its own milestone, and its evidence lives in STATUS.md's gate table —
+the two places to look for "how was that verified". This file holds the v1 checks plus the standing
+environment rules and unit-test targets below, which apply to every gate.
+
 Environment notes for agents:
 - The dev terminal already holds Screen Recording + Microphone TCC grants; CLI capture
   runs work from Claude Code Bash. GUI/TCC-onboarding tests (§5) need the human.

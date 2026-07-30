@@ -34,11 +34,9 @@ public enum ContentSelection: Sendable, Equatable {
     /// window's owner and a mismatch fails loud. A stored pick must pass it; a freshly-listed id
     /// (the CLI, which lists and binds in one breath) passes nil.
     case window(id: CGWindowID, ownerBundleID: String?)
-    /// Everything on the display **except** one app — neither its windows nor its audio (M21-T4).
-    /// Measured: the excluded app's audio is digital silence (−∞ dBFS against a −9.1 dBFS control)
-    /// and its windows are absent from the frame; SCK has no audio-only exclusion. An app with
-    /// nothing on screen cannot be excluded — it isn't in `SCShareableContent` to name — so the
-    /// engine records without the exclusion and says so rather than pretending (docs/07).
+    /// Everything on the display **except** one app — neither its windows nor its audio: SCK has no
+    /// audio-only exclusion, and an app with nothing on screen can't be excluded at all, so the engine
+    /// records without it and reports `excludedAppUnavailable` (measured, docs/02 §1a-ii).
     case displayExcluding(DisplaySelection, bundleID: String)
 }
 

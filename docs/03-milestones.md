@@ -1654,21 +1654,7 @@ a safety fix, clearer picker labels, and a preference that stops being written.
       forVolumeAtPath:)` builds its `URL` per poll, so no caller can hold one; `AppState`'s room
       figure routes through it too (ruling C). Live A/B at the real 2 GB floor: 60 s
       `userStopped` before → `diskAlmostFull` at 15.3 s + playable 14.89 s file after (docs/07).
-      **Ruling A: the hook stays, demoted** — 04 §4.4 now rests on the falling-volume leg. `DiskSpaceMonitor(watching:)` captures one
-      `URL` and polls `availableBytes(forVolumeContaining:)` on that same instance — and `URL` caches
-      resource values per instance, so every poll after the first returns the free space as it was
-      when the recording started. **Measured 2026-07-28:** after writing 100 MB into a 200 MB volume
-      the held instance still read **204,754,944** bytes free where a fresh one read **99,897,344**
-      (docs/07). So the floor only trips if the disk was *already* below it at Start, and ADR-007's
-      "never fail-weird" is unmet for the most likely long-take failure. **Seams:** the fix is the
-      one `RecentRecordings.details` already uses — `removeAllCachedResourceValues()` on a copy, or
-      build the URL per poll; the monitor's injectable `availableBytes` closure is the test seam.
-      ⚠️ **The existing gate cannot catch this:** G3 §4.4 passes `--test-disk-floor 500000`, a floor
-      above the volume's free space, so it trips on the *first* poll and a frozen reading satisfies
-      it. **Rulings:** whether the `--test-disk-floor` hook stays (it should, but it must stop being
-      the only evidence). **Verify:** a unit test driving a *falling* injected sequence (the current
-      tests only prove the threshold arithmetic); plus a live leg on a small disk image that actually
-      fills **during** a recording → `finished (diskAlmostFull)` and a playable file.
+      **Ruling A: the hook stays, demoted** — 04 §4.4 now rests on the falling-volume leg.
 - [x] ~~M19-T2 **The recordings folder has a ceiling.**~~ — **CLOSED "won't do" 2026-07-28
       (Franco): the app does not delete the user's files.** The plan artifact
       (`claude.ai/code/artifact/1fb4f5fa-a182-485f-a929-ef11730eed67`) proposed a GB cap swept after
@@ -1687,13 +1673,7 @@ a safety fix, clearer picker labels, and a preference that stops being written.
       play anywhere; **`1280 px` was dropped**, measured to weigh 1% *more* than 1920 for 2.25×
       fewer pixels (the M18-T2 rate floor). Live: the deployed picker reads the new row and a menu
       export landed at **45.1 MB/min** against its promised ≈46. Destination words were ruled out —
-      they promise an acceptance that clip length governs (docs/07, docs/06). M18-T2 stops at H.264 Level 5.2 so
-      phones can decode it, but the picker still reads `1280 px · 1920 px · 2560 px · Largest`, and
-      the largest is far outside what messaging apps accept — the recipe Franco actually uses is
-      1920 wide. **Seams:** `Settings.allowedMP4Widths` + `AppState.mp4SizeLabel(forWidth:)`, both
-      pure and already tested. **Rulings:** the wording (`Message / web (1920 px)` ·
-      `Full quality (3686 × 2304)`), or a caption under the ceiling row instead of renaming.
-      **Verify:** unit (the labels) + the live picker.
+      they promise an acceptance that clip length governs (docs/07, docs/06).
 - [x] M19-T5 **A window pick stops storing its title.** ✅ 2026-07-28 — `WindowSelection` is
       identity only (`id` + `bundleID`); the plist entry has exactly those two keys, and a legacy
       `title` is ignored on load and erased by the next save. A gone pick reads **`Firefox
@@ -1702,15 +1682,8 @@ a safety fix, clearer picker labels, and a preference that stops being written.
       tags rows with the selection, so a *retitled* window stopped matching its own row and lost its
       checkmark — dropping the field fixes it. Live: pick → plist `{bundleID, id}` only, folder
       renamed → `✓ Finder — T5-after` still marked, window closed → `✓ Finder (closed)` + Start
-      failed loud. `Key.windowTitle` persists the picked
-      window's title into `dev.fcostantini.screenrec.app.plist` — the menu dumped on 2026-07-28
-      listed a private-browsing window and a Slack DM by name, and any of those becomes a plaintext
-      string on disk. It exists only to label a row: M17-T2's ruling is that the title is never
-      matched on. **Seams:** `Settings`' save/load of `captureWindow`, `WindowSelection.label`, and
-      the menu's `(closed)` row. **Rulings:** what a gone pick's row says with no stored title —
-      `Firefox — (closed)` from the bundle id alone, or the id. **Verify:** pick a window, read the
-      plist (no title), relaunch → the row still labels itself from the live list; close the window
-      → the row still reads sensibly and Start still fails loud.
+      failed loud.
+
 
 **Gate G19** (amended 2026-07-28, T2/T3 closed "won't do"): a recording running on a volume that
 fills **during the take** stops itself with `diskAlmostFull` and leaves a playable file (not just
@@ -1757,89 +1730,54 @@ writes an `.mp4` from it, and the intermediate is the file nobody wants — whil
 this replaced did both in one command. **MINOR.**
 
 - [x] M21-T1 **Trim exports directly.** ✅ 2026-07-29 — the Trim window's **Export as MP4** writes the
-      range straight to a shareable `.mp4`; `Trim & Save` keeps Return (ADR-015). **562 tests (+5)**,
-      dev loop green. **The range rides `AVAssetReader.timeRange`, not `AVAssetExportSession`** (the
-      seam below names the trim's engine): the export must stay a reader/writer pipeline for its one
-      mixed AAC track, its size fit and faststart. ⚠️ **Measured first, and it settles the design: a
-      ranged read clips exactly at the in-point** — 1.900 s past a keyframe, first delivered PTS
-      30.000, audio the same — so no retiming, and none of the lossless trim's lead-in caveat.
-      **Verified** on a clip whose every frame states its own timestamp (the real recordings can't
-      discriminate — 28–31 s of one scored ~38 dB against everything): the export's first frame reads
-      **27.30 s**, PSNR **52.4 dB** against the source at 27.30 vs **8.8 dB** against the keyframe at
-      24.00. Output named `<take> trimmed.mp4` (ruling B). 🔴 **A fast export can strand
-      `AVAssetWriter`'s own `.sb-` temp** (1 in 5 runs; long and rangeless exports never did) — swept
-      now, since "no intermediate file" is this task's whole point (docs/07). **Seams:** no new
-      pipeline — `AVAssetExportSession` takes a
-      `timeRange` (measured in M18-T1) and `Exporter.exportToMP4` already takes an
-      `ExportConfiguration`, so a ranged share export is the existing export path plus a range.
-      **Rulings:** does `Trim & Save` stay as the default (ADR-015 says lossless is the default, so
-      yes) and what the second button says; and whether the range comes from the Trim window only, or
-      also from a `Share ▸` on a recents row. **Verify:** the output's first frame is the requested
-      second (M18-T1's md5/PSNR method), it is H.264 + one AAC track + faststart, and **no
-      intermediate file is written** — that is the whole point.
+      chosen range straight to a shareable `.mp4`, no intermediate `.mov`; `Trim & Save` keeps Return
+      (ADR-015), output is `<take> trimmed.mp4`. **562 tests.**
+      The range rides **`AVAssetReader.timeRange`**, not `AVAssetExportSession` — the export must stay
+      a reader/writer pipeline for its one mixed AAC track, size fit and faststart.
+      **Measured, and it settled the design:** a ranged read clips exactly at the in-point (first PTS
+      30.000 with the preceding keyframe 1.900 s back, audio the same), so no retiming and none of the
+      lossless trim's lead-in caveat. Verified on a clip that burns its timestamp into every frame —
+      first frame reads `27.30 s`, PSNR 52.4 dB there vs 8.8 dB at the keyframe (a real recording
+      scored ~38 dB against every candidate, so it could not have failed).
+      🔴 A fast export can strand `AVAssetWriter`'s `.sb-` temp (1 in 5 runs) — swept after finalize,
+      since "no intermediate file" is the point (docs/07).
 - [x] M21-T2 **Stop &amp; Share** — shipped as **`Stop & Copy MP4`**. ✅ 2026-07-29 — one row stops the
-      take, exports at the Settings size and leaves the `.mp4` on the pasteboard. **566 tests (+4)**,
-      dev loop green, deployed. **Rulings (Franco, "go with your picks"): A** — not "Stop & Share":
-      `Share…` means the macOS share sheet everywhere else here, and `Copy` is the verb that matches
-      the ⌘V. **B** — beside `Stop & Save`, which keeps ⌥⌘R and the bold primary. **C** — disabled
-      while an export runs, under the `Exporting …` row that says why (M17-T2). **D** — no length
-      limit; the row states the cost. **Verified live:** the row read `Stop & Copy MP4 · up to 11 MB`
-      on a 14 s take, and **2.0 s after the press the pasteboard held the `.mp4`** (avc1 1920×1200 +
-      one AAC, 15.47 s), the `.mov` master untouched beside it, one receipt row in the menu.
-      🔴 **The live leg caught the estimate lying**: `≈11 MB` quoted, **2.2 MB** written — the budget
-      over-quotes a quiet screen ~5× (docs/07), so the row now says **`up to`**. Re-verified on the
-      deployed build: `Stop & Copy MP4 · up to 3 MB`. **Seams:** the stop path,
-      profile and puts the result on the pasteboard. **Seams:** the stop path,
-      `ExportModel.performExport`'s one-at-a-time guard, `ShareActions.copy`. **Rulings:** whether it
-      replaces or sits beside `Stop & Save`; what it does when an export is already running (the
-      guard drops the second — that must be *said*, not silent, M17-T2's lesson); whether it also
-      offers Reveal. **Verify:** live, one action from recording to a pasteboard `.mp4` that pastes
-      into Slack.
-- [x] M21-T3 **Name the take.** ✅ 2026-07-29 — an opt-in prompt the moment a take stops, straight
-      into M12-T2's rename. **570 tests (+4)**, dev loop green, deployed. **Rulings (Franco, "go with
-      your picks"): A** — the prompt, not a Settings prefix (a prefix groups, it can't say what *this*
-      take was). **B** — off by default, beside `Count in before recording`. **C** — Esc, Cancel, a
-      blank or unchanged name all keep the date name. **Two orderings carry the design:** it runs
-      *after* teardown, so a dialog left open can't delay re-arming replay; and *before* the share
-      export, so `Stop & Copy MP4` copies the **named** `.mp4`. 🔴 **The quality pass caught that
-      second one being wrong** — the share path looked the take up by its pre-rename URL, which no
-      longer existed, so it would have silently exported nothing; `lastFinishedRecording` now records
-      where the take actually landed. **Verified live, three legs:** a named take → `Bug-1204
-      repro.mov` with the recents row agreeing; Esc → `Recording 2026-07-29 at 16.25.59.mov` kept;
-      and `Stop & Copy MP4` + a name → `Demo for Ana.mov` + `Demo for Ana.mp4`, receipt row
-      `Exported to MP4 · Demo for Ana.mp4`, that same file on the pasteboard. Every file is `Recording <date>.mov`; for a bug report the name is
-      the metadata, and by the time you rename it five takes have pushed it out of the recents list.
-      **Seams:** the finalize path and `AppState.rename` (M12-T2) — rename *after* finalize, never
-      block it. **Rulings:** a prompt on stop, or a prefix in Settings, or both (the prompt matches
-      "bug report", the prefix matches "a batch of takes"); and what Esc does (keep the date name).
-      **Verify:** live: name a take, confirm the file, the recents row and the receipt all agree.
+      take, exports at the Settings size and leaves the `.mp4` on the pasteboard; one notice, not two.
+      **566 tests.**
+      **Rulings:** *not* "Stop & Share" (`Share…` means the macOS share sheet everywhere else here);
+      beside `Stop & Save`, which keeps ⌥⌘R; disabled while an export runs, under the `Exporting …`
+      row that says why (M17-T2); no length limit, but the row states the cost.
+      **Verified live:** 2.0 s from press to a pasteboard `.mp4` (avc1 1920×1200 + one AAC, 15.47 s),
+      the `.mov` master untouched.
+      🔴 The live leg caught the cost estimate lying — `≈11 MB` quoted, 2.2 MB written, because the
+      rate budget over-quotes a quiet screen ~5× (docs/07). The row says **`up to`** now.
+- [x] M21-T3 **Name the take.** ✅ 2026-07-29 — an opt-in prompt (Settings → Recording, off by
+      default) the moment a take stops, feeding M12-T2's `rename`. **570 tests.**
+      **Rulings:** the prompt, not a Settings prefix (a prefix groups, it can't say what *this* take
+      was); off by default; Esc, Cancel, a blank or unchanged name all keep the date name.
+      **Two orderings carry it:** *after* teardown, so a dialog left open can't delay re-arming
+      replay; *before* the share export, so `Stop & Copy MP4` copies the **named** `.mp4`.
+      🔴 The quality pass caught the second one broken — the share path looked the take up by its
+      pre-rename URL and would have exported nothing. `lastFinishedRecording` records where it landed.
+      **Verified live:** named → `Bug-1204 repro.mov` with the recents row agreeing; Esc → the date
+      name kept; named + Stop & Copy MP4 → both files, receipt and pasteboard carrying the name.
 - [x] M21-T4 **Leave an app's audio out** — shipped as **`Source ▸ Everything Except ▸`**.
-      ✅ 2026-07-30 — **576 tests (+6)**, dev loop green, deployed. ⚠️ **Measured before planning, and
-      the premise moved:** SCK's exclusion silences an app *and removes it from the picture* (its
-      filter governs content, not audio), and **cannot touch an app with nothing on screen** — which
-      is the "music in the background" case F3 named. Plan artifact laid out three directions;
-      Franco took the recommendation: **ship it as what it is** (`Entire Screen except Slack`, with
-      a dimmed `Slack won't be seen or heard` row), leaving the true audio-only route (Core Audio
-      process taps) parked in docs/02 §1a-ii as its own future milestone.
-      **Verified, twice over.** Raw SCK: **−9.1 dBFS** control vs **−∞ dBFS** excluded, with audio
-      buffers still flowing (silent, not stalled), and the app's window present in one frame and
-      absent in the other. Then the *shipped* path: `record --exclude-app` wrote a **−∞ dBFS**
-      full-length system-audio track against a **−8.3 dBFS** control, and a menu-driven take under
-      the pick did the same.
-      🔴 **The honesty path is measured, not assumed:** with the app minimised, the take ran, the
-      recording menu read **"The app to leave out wasn't on screen — nothing was excluded."**, and
-      the file's system audio came back at **−9.0 dBFS** — the app told the truth rather than
-      implying an exclusion. An excluded app quitting mid-take is a non-event (nothing left to leave
-      out), so no `AppTerminationWatch` — the `.app` precedent doesn't transfer.
-      ⚠️ **The mic still hears it through the speakers** (−35.2 dBFS on the mic track while system
-      audio was −∞): docs/07. Today system audio is all or nothing (ADR-019); the
-      concrete case is demoing while music plays. **Seams:** `SCContentFilter` supports excluding
-      applications from audio capture, and M7/M17 already bind app-scoped filters; the app list is
-      the one `Source ▸` fetches. **Rulings:** menu shape (`Capture System Audio ▸ All · All except…
-      · None`) versus Settings, given M18-T3 just spent a task removing rows; and what happens when
-      an excluded app quits mid-recording (M7's precedent: it must not end the take). **Verify:** the
-      M7-T1 measurement pattern — the excluded app's audio at ≈ −91 dBFS against a control run at
-      ≈ −10 dBFS through the identical filter path, not "sounds right".
+      ✅ 2026-07-30 — the whole screen minus one app, `Entire Screen except Slack` with a dimmed
+      `Slack won't be seen or heard` row. **576 tests.**
+      ⚠️ **The premise moved under measurement** (docs/02 §1a-ii): SCK's exclusion is not audio-only —
+      it removes the app's picture too — and it cannot touch an app with nothing on screen, which is
+      the background-music case this task was filed for. Shipped as what it is; the audio-only route
+      (Core Audio process taps) is parked as its own future milestone.
+      **Verified twice:** raw SCK −9.1 → **−∞ dBFS** (buffers still flowing, so silent not stalled),
+      the app's window present in one frame and absent in the other; then the shipped path,
+      `record --exclude-app` → −∞ dBFS against a −8.3 dBFS control, and the same menu-driven.
+      🔴 **The honesty path is measured, not assumed:** with the app minimised the take ran, the menu
+      read *"The app to leave out wasn't on screen — nothing was excluded."*, and the file's system
+      audio came back at −9.0 dBFS. A new `EngineEvent.excludedAppUnavailable` carries it — degraded,
+      never silent (ADR-007). An excluded app quitting mid-take is a non-event, so no
+      `AppTerminationWatch`: the `.app` precedent doesn't transfer.
+      ⚠️ The mic still hears an excluded app through the speakers (−35.2 dBFS while system audio was
+      −∞) — docs/07.
 
 **Gate G21** ✅ **PASSED 2026-07-30** (evidence in STATUS): a recording goes from Stop to a
 pasteboard-ready `.mp4` in one action, with no intermediate file left behind; a named take carries
@@ -1862,15 +1800,7 @@ No user-visible change: the milestone that keeps the next four cheap. **PATCH** 
       quality, frame rate, both menu-bar toggles, GIF/MP4 and Stop-After all lived under it and are
       *settings*; they stayed, under a new `// MARK: - Settings`. `regionLabel` moved with the model
       (3 call sites renamed). **Ruling A: the microphone stayed** — its presentation is entangled
-      with the session's live mic events, so it belongs to T2's question. 1,572 lines and 122 public members across thirteen
-      `MARK` sections; five of this session's six tasks edited it. **Seams:** `PermissionsModel`
-      (M9-T7) and `ExportModel` (M14-T1) are the pattern and the precedent — a `let` reference to an
-      `@Observable` class, forwarding properties on AppState, tests unchanged. Extract
-      **`SourcesModel`**: displays, capturable apps and windows, the region pick, the missing-pick
-      rows, and the at-open refresh cycle. ⚠️ M15-T2's ruling is the constraint: an `@Observable`
-      **class** keeps per-property granularity, a struct would collapse it to one — do not "simplify"
-      it into a value type. **Verify:** tests pass untouched; the menu's dump is byte-identical
-      before and after.
+      with the session's live mic events, so it belongs to T2's question.
 - [x] M22-T2 **`AppState` sheds the session.** ✅ 2026-07-28 — `SessionModel` (187 lines) owns the
       capture handle, the counters, the clock, the `active*` facts and the fold; **the actions
       stayed**, because `start()` needs the count-in, permissions, the output location and replay,
@@ -1883,11 +1813,7 @@ No user-visible change: the milestone that keeps the next four cheap. **PATCH** 
       `session` stopped being optional (`session == nil` on a non-optional, and `session != nil ||
       isReplayArmed`) — the suite caught both, which is exactly what "tests pass untouched" is for.
       **Live:** menu dump identical, and a Start → Pause → Resume → Stop cycle froze the clock at
-      `00:00:06` across three seconds, resumed to `00:00:10`, and wrote an 11.90 s 3-track file. Same shape: **`SessionModel`** takes the session
-      lifecycle, the event folding (`apply(_:)`), the clock and the elapsed/bytes counters.
-      **Rulings:** where `lastFailure` lives — it outlives the session deliberately (M17-T2), so it
-      may belong on AppState even after the split. **Verify:** as T1, plus one live recording through
-      the app.
+      `00:00:06` across three seconds, resumed to `00:00:10`, and wrote an 11.90 s 3-track file.
 - [x] M22-T3 **Six units get a test that names them.** ✅ 2026-07-28 — six suites, **557 tests
       (+17)**, each verified by **breaking its unit and watching the test fail**: `WriterDrain`
       (never leave the group → the deadlock, caught by a bounded `wait`), `SampleTiming` (drop the
@@ -1897,12 +1823,7 @@ No user-visible change: the milestone that keeps the next four cheap. **PATCH** 
       against broken code — swallowing cancellation costs exactly one extra tick and the assertion
       tolerated one. Rewritten to check a window shorter than the interval (docs/07).
       `VideoFrameReader`'s subsample test needs the encoder, so it is gated and **added to both the
-      pre-push hook and `release.sh`** — a gated test nothing runs is not a test. `WriterDrain`, `VideoFrameReader`,
-      `PCMSampleBuffer`, `SampleTiming`, `Polling`, `MediaFile` — no test mentions any of them.
-      `WriterDrain` is shared write-path logic (M14-T2 deduplicated it *because* two writers rely on
-      it) and `SampleTiming`/`PCMSampleBuffer` sit on the sample path, where docs/01's rules are
-      strictest. **Verify:** each named in a test that fails when its logic is broken — the M17-T2
-      standard, not a test that merely runs it.
+      pre-push hook and `release.sh`** — a gated test nothing runs is not a test.
 - [x] M22-T4 **One timecode, one hotkey registry.** ✅ 2026-07-28 — `Timecode.cutPoint` (floored,
       a point you can cut at) · `.clock` (`HH:MM:SS`, truncated, NaN-safe) · `.length` (rounded, a
       finished thing's label) in `RecorderCore/Support`, replacing five renderers with three
@@ -1911,27 +1832,14 @@ No user-visible change: the milestone that keeps the next four cheap. **PATCH** 
       now types `setHotkey`, so the four ids can't collide — **duplicate raw values don't compile**,
       which is the guarantee. ⚠️ **Correction to the entry below: the `In 0:05` / `0:04` bug was
       already fixed** by M18-T1 (both surfaces call the same renderer); what remained was the
-      condition, and M20's mark list would have been the sixth caller. **Verify:** 540 tests, the 14
+      condition (M20's mark list would have been the sixth caller, before that milestone closed). **Verify:** 540 tests, the 14
       pinned strings moved to `TimecodeTests` unchanged, and the deployed menu dumps **byte-identical**
       before/after (90 rows; the only diff was a live Slack window retitling between dumps).
-      ~~Four `M:SS` formatters~~
-      (`KeyframeIndex.timecode`, `AppState.clockPhrase`, `MenuHeader.elapsed`,
-      `RecentRecordings.clock`, plus `shortBufferPhrase`) already shipped one bug between them:
-      M18-T1's window read `In 0:05` above `Starts exactly at 0:04` because two of them rounded
-      differently. Hotkey ids are loose literals — `1/2/3` in `App.swift`, `4` in `CountInOverlay` —
-      with nothing preventing a collision that would silently unregister someone's shortcut.
-      **Rulings:** one type with named formats, or one function with a style parameter.
-      **Verify:** unit tests over the shared type; every existing string unchanged.
 - [x] M22-T5 **`release.sh` can push.** ✅ 2026-07-28 — **no terminal ⇒ push**, announced in the
       output, with `--no-push` to opt out; an interactive run keeps its `[y/N]` prompt unchanged.
       A `--push` flag was rejected: same failure mode as today, since you have to remember it.
       Verified five ways through the shipped block (no-TTY, no-TTY + `--no-push`, pty + `y`, pty +
-      `n`, pty + Return, plus a bad flag → usage/64). It must run in the background (a foreground timeout SIGTERMs
-      it mid-encode, the VT lesson) and in the background its `Push? [y/N]` reads N — so every cut
-      "succeeds" with main and the tag still local, and the fix has been "remember to push" twice.
-      **Seams:** the prompt at the end of the script. **Rulings:** a `--push` flag, or skip the
-      prompt when stdin is not a TTY and say so in the summary. **Verify:** a background run pushes
-      main and the tag, and the tag's own pre-push gate still runs.
+      `n`, pty + Return, plus a bad flag → usage/64).
 - [x] M22-T6 **A tag carries a downloadable build.** ✅ 2026-07-28 — `publish_release` zips the
       signed bundle with `ditto` and creates the GitHub release; a `gh` failure **warns** with the
       re-run command instead of failing a cut whose irreversible half (main + tag) is already
@@ -1940,29 +1848,8 @@ No user-visible change: the milestone that keeps the next four cheap. **PATCH** 
       `ScreenRec-1.10.1.zip` (992,374 B) attached, downloaded back, quarantined, and after
       `ditto -x -k` the app **inherits the quarantine** and still reads **`valid on disk` ·
       `satisfies its Designated Requirement`** (`spctl` rejects it, `origin=screenrec-dev` — exactly
-      what the install note is for). Every release is a bare tag today; handing the
-      app to someone means building it for them or copying a bundle by hand, and ADR-014's sharing
-      path assumes they receive a signed `.app`. **Do it in the same edit as M22-T5** — same file,
-      same end-of-script region, and the release only exists once the tag is pushed. **Seams:** the
-      push branch of `Scripts/release.sh`; `bundle.sh` already leaves the signed bundle at
-      `dist/ScreenRec.app`; **`gh` is installed and authenticated** as `fcostantini` (keyring, ssh —
-      checked 2026-07-28), so no new dependency. Shape:
-      `ditto -c -k --sequesterRsrc --keepParent dist/ScreenRec.app dist/ScreenRec-$VERSION.zip`
-      then `gh release create "$TAG" --title … --generate-notes "$ZIP"`. ⚠️ **`ditto`, not `zip`** —
-      `zip -r` mangles a bundle's symlinks and extended attributes and can invalidate the signature.
-      ⚠️ **A downloaded zip is quarantined**, and ADR-014's build is self-signed and deliberately not
-      notarized, so on macOS 15 it will not open until the recipient uses **System Settings → Privacy
-      & Security → Open Anyway** (the right-click→Open shortcut is gone) or runs
-      `xattr -dr com.apple.quarantine`. **That instruction has to ride with the download**, or the
-      release is a trap. Notarization stays closed per ADR-014 — do not reopen it here; note only
-      that `notarytool` and `stapler` *are* present in the Command Line Tools (measured, in case a
-      future decision revisits it). **Rulings:** whether the notes are `--generate-notes` (the commit
-      log is the per-task audit trail) or a hand-written summary plus the Gatekeeper paragraph; and
-      whether a failed `gh` call fails the cut or just warns, given the tag is already pushed by
-      then. **Verify:** a real cut leaves a GitHub release with the zip attached; download it,
-      confirm `xattr -p com.apple.quarantine` reports the attribute, unzip, and confirm the app
-      still passes `codesign --verify --strict` — i.e. the round trip preserved the signature the
-      TCC grants are keyed to (M0-T3).
+      what the install note is for).
+
 
 **Gate G22**: `AppState` is materially smaller with the menu dump unchanged; the six units are named
 by tests that can fail; one timecode type serves every surface; a background release pushes without
@@ -1981,7 +1868,7 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3 ──▶ M4 ──▶ M6 ──┬─
 M5-T1..T4 (core replay, CLI-driven) can proceed in parallel with M3/M4 if two agents
 work simultaneously — they touch disjoint files by design.
 
-The graph above is the v1 (M0–M6) core. **M7–M18 are independent post-v1 milestones**, each building
+The graph above is the v1 (M0–M6) core. **M7–M22 are independent post-v1 milestones**, each building
 only on shipped work: M7 (per-app), M8 (mic recovery), M9 (post-review polish/debt), M10 (share export
 + basic editing), M11 (region), then the v1.6.0-review roadmap — **M12 (Share & Surface), M13
 (Hardening), M14 (Cleanup)**. M12 and M13 are independent of each other; M14 is pure cleanup best done
@@ -2000,33 +1887,16 @@ dozen.** T2 nested the window list inside a single `Window ▸` row rather than 
 `Source ▸` (docs/06 item 5), so M18-T3's diet starts from one extra row.
 **🏁 SHIPPED IN FULL 2026-07-28** — v1.7.2 (M15), v1.8.0 (M16), v1.9.0 (M17), v1.10.0 (M18).
 
-**The 2026-07-28 review roadmap — M19 (The disk tells the truth), M20 (Marks), M21 (One step from
-"it happened" to "here it is"), M22 (Structure).** Ordered deliberately, not by size:
-- **M19 first, and it is not negotiable.** M19-T1 is a *shipped bug in a safety mechanism*: the disk
-  guard reads free space once and never again (measured — docs/07), so a long take can still fill the
-  disk and get whatever `AVAssetWriter` does when a volume is full. Everything else on this roadmap
-  is an improvement; this one can lose a recording that can't be re-recorded. The rest of M19 rides
-  along because it is the same subject — the disk, and what the app is willing to say about it.
-  **Amended 2026-07-28:** what it is *not* willing to do is delete your files — T2 (a folder cap)
-  and T3 (trashing an export's source) are both closed "won't do", so M19 says things about the
-  disk and never removes anything from it.
-- **M20 next** because it is the only item that adds capability rather than polish, and because it
-  compounds: marks make the long-recording strength usable, and M21-T1's ranged export gets more
-  useful once you can find the range.
-- **M21 after it**, since two of its four tasks (T1's join, T2's Stop & Share) are worth more when a
-  take is easy to navigate. It can swap with M20 without cost — nothing in either depends on the
-  other's code, only on its usefulness.
-- **M22 last on purpose.** Structural work has no user-visible payoff, so it is easiest to justify
-  *after* the features that would otherwise have landed in `AppState` — and M20/M21 will show which
-  seams actually need splitting rather than which ones look untidy today.
-  **↳ AMENDED 2026-07-28 (Franco): M22 runs BEFORE M20/M21.** No dependency clashes — M22 touches
-  only units that exist today — and two of its tasks actively protect the next milestone: **T4**
-  (one hotkey registry) lands before M20-T1 adds a fourth global shortcut to ids that are still bare
-  literals, and **T3** (tests naming `WriterDrain`/`SampleTiming`) lands before M20-T2 might touch
-  `MovieRecorder`, the path four milestones have left alone. The argument above still holds for
-  **T1/T2** specifically (the `AppState` extractions), which may run last within M22 if the seam
-  information is worth waiting for. **T5+T6 went first**, so every later cut pushes itself and
-  leaves a download.
+**The 2026-07-28 review roadmap — M19, M20, M21, M22. 🏁 SHIPPED IN FULL 2026-07-30** —
+v1.10.1 (M19), v1.10.2 (M22), v1.11.0 (M21); **M20 (Marks) closed "won't do"** on the
+fragmentation measurement above. Ordering, as it actually ran: **M19 first** (its T1 was a shipped
+bug in a safety mechanism — the disk guard could not see a disk filling, and that is the only item
+on the roadmap that can lose a recording); then **M22 by Franco's call**, because T4's hotkey
+registry and T3's write-path tests were meant to protect the milestone that touched them; then
+**M20**, which measurement closed; then **M21**.
+The one lesson worth carrying forward: three of M21's four tasks were filed on a premise that
+measurement moved (docs/02 §1a-ii, docs/07) — check the API's actual behaviour before designing
+around a roadmap sentence.
 
 **Parked, deliberately, from the same review:** multi-display region capture (M11 is main-display
 only and honest about it — worth doing the week a second display is attached, not before); an

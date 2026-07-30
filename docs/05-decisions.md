@@ -173,6 +173,11 @@ present-but-empty: system audio off means `MovieRecorder` never adds the input, 
 receives no buffer still writes an empty AAC track. Default on (`capturesSystemAudio` absent ⇒ on), so
 existing installs are unchanged. A silent recording (both sources off) is legitimate, and the menu says
 so before you start rather than after.
+**Still true after M21-T4:** system audio remains all-or-nothing *per source*. `Everything Except ▸`
+drops one app from the capture entirely — picture and sound together, because `SCContentFilter` governs
+content — which is not the same thing as scoping audio, and it cannot reach an app with nothing on
+screen (docs/02 §1a-ii). Audio-only exclusion would need a Core Audio process tap: a new ADR when it
+happens, not an extension of this one.
 
 ## ADR-018 ✅ Armed replay keeps the Mac awake, deliberately — and the assertion says so (Franco, 2026-07-27)
 The 2026-07-24 review filed armed replay's sleep assertion as a bug (M16-T1): arm once and the machine

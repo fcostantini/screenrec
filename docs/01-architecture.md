@@ -14,30 +14,40 @@ screenrec-app/
 │   │   ├── Recording/        # RecordingSession (engine+recorder seam), MovieRecorder,
 │   │   │                     #   TimestampRebaser, BitrateModel, AudioEncodingSettings
 │   │   ├── Replay/           # ReplayEncoder (VTCompressionSession), RingBuffer,
-│   │   │                     #   ReplayAudioRing, ReplayMuxer (passthrough)
-│   │   ├── Export/           # Exporter (H.264 MP4), GifExporter, Trimmer, VideoFrameReader (M10)
+│   │   │                     #   ReplayAudioRing, ReplayMuxer (passthrough), ReplayFootprint
+│   │   ├── Export/           # Exporter (H.264 MP4, ranged), GifExporter, Trimmer,
+│   │   │                     #   KeyframeIndex, VideoFrameReader (M10/M18/M21)
 │   │   └── Support/          # OutputLocation, DiskSpaceMonitor, Polling, SleepGuard,
-│   │   │                     #   RecordingFileSentinel (M6), ResampledMicInput (M8), CoreInfo
+│   │   │                     #   RecordingFileSentinel (M6), ResampledMicInput (M8), CoreInfo,
+│   │   │                     #   Timecode (M22), MediaFile, SampleTiming, WriterDrain,
+│   │   │                     #   PCMSampleBuffer, AudioFormatIdentity, ApproximateBytes
 │   ├── screenrec-cli/         # Dev harness (ADR-011). main + Export/Trim/ReplayArm/ProbeStream
 │   ├── AppCore/               # Library. App state + view models. No AppKit/SwiftUI (M4-T1).
-│   │   │                     #   AppState (@Observable, MainActor; folds EngineEvents),
-│   │   │                     #   Settings (+ Hotkey), PermissionsModel, OnboardingModel,
-│   │   │                     #   ReplayController, RecordingNotification, RecordingClock,
-│   │   │                     #   StatusIcon, DisplayOption, LoginItem, MenuHeader,
-│   │   │                     #   LastExport, LastReplay, RecentRecordings
+│   │   │                     #   AppState (@Observable, MainActor; owns the sub-models below),
+│   │   │                     #   SourcesModel + SessionModel (M22), PermissionsModel (M9),
+│   │   │                     #   ExportModel (M14), ReplayController, RecordingRoom,
+│   │   │                     #   Settings (+ Hotkey), OnboardingModel, RecordingNotification,
+│   │   │                     #   RecordingClock, MicrophoneLevel, StatusIcon, DisplayOption,
+│   │   │                     #   LoginItem, MenuHeader, CountInOutcome, RenameTarget,
+│   │   │                     #   FileIdentity, LastExport, LastReplay, RecentRecordings
 │   └── ScreenRecApp/          # Menu-bar app. SwiftUI + AppKit. Depends on AppCore.
 │       │                     #   App (@main, MenuBarExtra + AppDelegate), Notifier, Relaunch,
 │       │                     #   HotkeyCenter (Carbon), RegionSelectionOverlay (M11),
-│       └── Views/            #   StatusIconView, MenuView, SettingsView, OnboardingView, TrimView
+│       │                     #   CountInOverlay (M12), NotificationSettings, LoginItem
+│       └── Views/            #   StatusIconView, MenuView, SettingsView, OnboardingView, TrimView,
+│                             #   ShareActions (pasteboard/share sheet/alerts), Finder,
+│                             #   HotkeyRecorderButton
 ├── Scripts/                   # bundle.sh, devsign.sh, release.sh, smoke.sh (M13), hooks/pre-push
 ├── Tests/                     # RecorderCoreTests + AppCoreTests (pure-decision + integration)
-├── tools/                     # probe, frames, menudriver, settingsdriver, hoverprobe, axdump
+├── tools/                     # probe, frames, menudriver, settingsdriver, hoverprobe, axdump,
+│                              #   busyscene (load stimulus), makeicon
 └── docs/                      # you are here
 ```
 
 **Rule for agents:** `RecorderCore` must never import AppKit/SwiftUI (CoreGraphics is
-fine). Everything testable lives there. The CLI is the primary dev/verification surface
-until M4 — build UI last.
+fine), and `AppCore` never imports either. Everything testable lives there. The CLI stays the
+headless verification surface (ADR-011) — most gate evidence is easier to get through it than
+through the menu.
 
 ## Runtime dataflow
 
@@ -59,7 +69,7 @@ until M4 — build UI last.
                   │  in: video HEVC │        │        → RingBuffer (60 s)   │
                   │  in: sysaudio   │        │ sysaudio → RingBuffer (PCM)  │
                   │  in: mic        │        │ mic      → RingBuffer (PCM)  │
-                  │ fragments @10 s │        └──────────┬───────────────────┘
+                  │ fragments @1 s  │        └──────────┬───────────────────┘
                   └───────┬─────────┘                   │ hotkey
                           ▼                             ▼
                     ~/Movies/*.mov              ReplayMuxer (passthrough)

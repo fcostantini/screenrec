@@ -10,6 +10,7 @@ crash-safe long recordings, pause/resume, instant replay. Apple frameworks only.
 2. **`docs/03-milestones.md`** — the task you'll pick, its checklist and exit gate.
 3. **`docs/02-technical-reference.md`** — REQUIRED reading before touching capture,
    writing, timing, or TCC code. It encodes bugs we already hit; do not rediscover them.
+   §1a/§1a-ii are the ones a "the API surely does X" assumption keeps breaking on.
 4. **`docs/07-field-notes.md`** — what SCK/VideoToolbox/AVFoundation *actually* do, measured.
    Skim before any capture/encode/test-harness work; most entries cost hours to learn.
 5. `docs/01-architecture.md` (module map, concurrency rules), `docs/05-decisions.md`
@@ -22,8 +23,8 @@ Reference implementation: `~/code/screenrec-poc` (our working Tier-1; same autho
 
 ## Working contract
 
-- Work milestone-order (M0→M6; M5 core may parallel M3/M4 — see dependency graph).
-  One task (Mx-Ty) at a time; tick the checkbox in 03-milestones.md when done.
+- **M0–M22 are shipped** (v1.11.0). New work comes from a review or from Franco: add the milestone
+  to 03-milestones.md, then work it one task (Mx-Ty) at a time, ticking each box as it lands.
 - A milestone is DONE only when its gate in 04-testing passes. Paste gate evidence
   (commands + output) into STATUS.md. Gates marked (human) — flag them in STATUS.md
   under "Needs Franco" instead of skipping silently.

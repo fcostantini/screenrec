@@ -234,11 +234,9 @@ public struct OutputLocation: Sendable {
         return final
     }
 
-    /// Removes the writer's own scratch companion beside `url`, if one is still there. Under
-    /// `shouldOptimizeForNetworkUse` an `AVAssetWriter` writes `<url>.sb-<hex>` and usually clears
-    /// it at finalize — a short export can outrun that (docs/07, M21-T1). Only names carrying our
-    /// own scratch path's prefix are touched, and a miss is a no-op: the convention is Apple's and
-    /// undocumented, so it may simply stop matching one day.
+    /// Removes the writer's own `<url>.sb-<hex>` scratch companion, which a short faststart export can
+    /// outrun the OS in clearing (docs/07). Only our own scratch prefix is matched, and a miss is a
+    /// no-op — the naming convention is Apple's and undocumented.
     static func removeWriterScratch(beside url: URL) {
         let directory = url.deletingLastPathComponent()
         let prefix = url.lastPathComponent + ".sb-"

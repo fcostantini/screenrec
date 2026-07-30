@@ -36,7 +36,7 @@ demos, bug reports, and meetings" — not streamers, not video editors.
 
 ## Goals (v1)
 
-1. **Record** the full screen (later: window/app) with system audio + mic to a single
+1. **Record** the full screen (app, window and region followed in M7/M17/M11) with system audio + mic to a single
    `.mov`, mic on its own track, at quality ≥ Tier-1 PoC with files ~2–4× smaller.
 2. **Survive anything**: SIGKILL/power loss mid-recording loses ≤ 10 seconds.
 3. **Pause/resume** mid-recording with monotonic timestamps and perfect A/V sync.
@@ -55,7 +55,8 @@ demos, bug reports, and meetings" — not streamers, not video editors.
   backgrounds) stays a non-goal pending a deliberate future decision.
 - Webcam capture/overlay. **Settled no (ADR-017, 2026-07-22)** — screenrec stays a *screen* recorder.
   (Architecture still *leaves room* — it would be a 4th source — but that's a fact, not an intention.)
-- Streaming, sharing, cloud anything.
+- Streaming, cloud anything. (Handing a file *off locally* — the share sheet, the clipboard — is in;
+  uploading it somewhere is not.)
 - App Store distribution / sandboxing (see ADR-006). Windows. macOS < 15 (see ADR-001).
 - Echo cancellation (document "use headphones"; see 02-technical-reference §8).
 
@@ -63,9 +64,10 @@ demos, bug reports, and meetings" — not streamers, not video editors.
 
 (Adjudicated by M6-T1's acceptance run, 2026-07-16/17 — evidence in STATUS.md.)
 
-- [ ] 2-hour recording on battery: no dropped-frame visible stutter, in-sync audio at the
+- [x] 2-hour recording on battery: no dropped-frame visible stutter, in-sync audio at the
       2 h mark (clap test §4 of 04-testing), file playable after `kill -9` at 1:59.
-      *Satisfied by M6-T2's soak — one run counts for both (Franco, 2026-07-16).*
+      *Met by the G6 soak, 2026-07-17 — 2 h/19.5 GB, tracks ≤110 ms apart, Franco: "no desync";
+      the kill leg ran at 1 h by his amendment and lost 0.47 s. Evidence: STATUS's G6 row.*
 - [x] Output for typical desktop work meaningfully smaller than Tier-1 at "Balanced",
       full Retina — met: ≈5.7 Mbps over a 30-min active-screen real-usage run vs Tier-1's
       ~34 Mbps (≈6×; goal 1's 2–4× exceeded). *Amended from "≤ 1.5 GB/hour" 2026-07-17
