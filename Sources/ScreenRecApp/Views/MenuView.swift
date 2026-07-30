@@ -10,10 +10,14 @@ import SwiftUI
 struct MenuView: View {
     @Bindable var state: AppState
 
+    /// The source pickers bind into `SourcesModel`, and `state.sources` is a `let` — so the binding
+    /// is taken on the sub-model itself rather than through a path SwiftUI can't write.
+    private var sources: Bindable<SourcesModel> { Bindable(state.sources) }
+
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        if state.isSessionActive {
+        if state.session.isActive {
             recordingItems
         } else {
             idleItems
@@ -66,24 +70,24 @@ struct MenuView: View {
         // as a stray top-level row. Screens above the divider, running apps below; a picked app that
         // isn't running stays listed and checkmarked (its Start fails loud instead). The title
         // carries the current pick (M12-T3), so a glance tells the truth without opening it.
-        Menu("Source: \(state.sourceMenuLabel)") {
-            Picker(selection: $state.sourceChoice) {
-                ForEach(state.displays) { screen in
-                    Text(state.displays.count == 1 ? "Entire Screen" : "Entire Screen (\(screen.name))")
+        Menu("Source: \(state.sources.sourceMenuLabel)") {
+            Picker(selection: sources.sourceChoice) {
+                ForEach(state.sources.displays) { screen in
+                    Text(state.sources.displays.count == 1 ? "Entire Screen" : "Entire Screen (\(screen.name))")
                         .tag(SourceChoice.display(screen.id))
                 }
                 Divider()
-                ForEach(state.capturableApps, id: \.bundleID) { app in
+                ForEach(state.sources.capturableApps, id: \.bundleID) { app in
                     Text(app.name).tag(SourceChoice.app(bundleID: app.bundleID))
                 }
-                if let missing = state.missingPickedApp {
+                if let missing = state.sources.missingPickedApp {
                     Text("\(missing.name) (not running)")
                         .tag(SourceChoice.app(bundleID: missing.bundleID))
                         .disabled(true)
                 }
                 // The current region as a checkmarked, re-selectable tag (M11-T2); redraw via
                 // Select Region… below. Its tag matches `sourceChoice`'s region case.
-                if let region = state.selectedRegion {
+                if let region = state.sources.selectedRegion {
                     Divider()
                     Text("Region \(SourcesModel.regionLabel(region.rect.size))")
                         .tag(SourceChoice.region(display: region.displayID, rect: region.rect))
@@ -96,16 +100,16 @@ struct MenuView: View {
             // Its own inline Picker over the same `sourceChoice` binding keeps the checkmark
             // wherever the pick actually is.
             Menu("Window") {
-                Picker(selection: $state.sourceChoice) {
-                    ForEach(state.capturableWindows, id: \.id) { window in
+                Picker(selection: sources.sourceChoice) {
+                    ForEach(state.sources.capturableWindows, id: \.id) { window in
                         Text(WindowSelection.label(appName: window.appName, title: window.title))
                             .tag(SourceChoice.window(WindowSelection(
                                 id: window.id, bundleID: window.bundleID)))
                     }
                     // A picked window that is gone stays listed and checkmarked — the pick survives
                     // absence (the `(not running)` app rule); Start then fails loud.
-                    if let missing = state.missingPickedWindow {
-                        Text(WindowSelection.goneLabel(appName: state.appName(for: missing.bundleID)))
+                    if let missing = state.sources.missingPickedWindow {
+                        Text(WindowSelection.goneLabel(appName: state.sources.appName(for: missing.bundleID)))
                             .tag(SourceChoice.window(missing))
                     }
                 } label: { EmptyView() }
@@ -114,15 +118,15 @@ struct MenuView: View {
             // The whole screen minus one app (M21-T4), nested like Window ▸ for the same reason.
             // "Nothing" is how the exclusion is undone without leaving the submenu.
             Menu("Everything Except") {
-                Picker(selection: $state.sourceChoice) {
-                    Text("Nothing").tag(SourceChoice.display(state.selectedDisplayID))
+                Picker(selection: sources.sourceChoice) {
+                    Text("Nothing").tag(SourceChoice.display(state.sources.selectedDisplayID))
                     Divider()
-                    ForEach(state.capturableApps, id: \.bundleID) { app in
+                    ForEach(state.sources.capturableApps, id: \.bundleID) { app in
                         Text(app.name).tag(SourceChoice.displayExcluding(bundleID: app.bundleID))
                     }
                     // A picked app with nothing on screen can't be excluded at capture — the pick
                     // stays (absence never re-homes one), and the start says what didn't happen.
-                    if let missing = state.missingExcludedApp {
+                    if let missing = state.sources.missingExcludedApp {
                         Text("\(missing.name) (not on screen)")
                             .tag(SourceChoice.displayExcluding(bundleID: missing.bundleID))
                     }
@@ -212,8 +216,8 @@ struct MenuView: View {
     @ViewBuilder private var recordingItems: some View {
         // Header values stamp per open and hold: a publish rebuilds the open menu's AppKit
         // rows and garbles hover (M6-T10), so nothing may tick while it's up.
-        Text("\(Timecode.clock(state.elapsedSeconds)) — "
-             + MenuHeader.recordingDetail(bytes: state.recordedBytes))
+        Text("\(Timecode.clock(state.session.elapsedSeconds)) — "
+             + MenuHeader.recordingDetail(bytes: state.session.recordedBytes))
             .modifier(RefreshOnMenuOpen(refresh: refreshAtOpen))
 
         Divider()
@@ -222,7 +226,7 @@ struct MenuView: View {
         lastReplayRow
 
         // Pause/Resume advertise the opt-in pause shortcut (M12-T6), Stop the start/stop one (M12-T3).
-        if state.isPaused {
+        if state.session.isPaused {
             shortcutRow("Resume", hotkey: state.pauseHotkey) { Task { await state.resume() } }
         } else {
             shortcutRow("Pause", hotkey: state.pauseHotkey) { Task { await state.pause() } }
@@ -232,7 +236,7 @@ struct MenuView: View {
         // Disabled while an export runs — `performExport` would drop the second one, and a dropped
         // action must be visible rather than silent (M17-T2). The row above it says what's running.
         Button(state.stopAndCopyTitle) { Task { await state.stopAndShare() } }
-            .disabled(state.exportInProgress != nil)
+            .disabled(state.exports.exportInProgress != nil)
 
         Divider()
 
@@ -240,13 +244,13 @@ struct MenuView: View {
             Text(failure)
         } else {
             // docs/06 recording item 5 (M7-T2/M11-T2): a scoped recording names its subject.
-            if let app = state.activeAppName {
+            if let app = state.session.activeAppName {
                 Text("Recording \(app) only")
             }
-            if let region = state.activeRegion {
+            if let region = state.session.activeRegion {
                 Text("Recording region \(SourcesModel.regionLabel(region))")
             }
-            if let microphone = state.activeMicrophoneName {
+            if let microphone = state.session.activeMicrophoneName {
                 Text("\(microphone) · separate track")
             }
         }
@@ -289,10 +293,10 @@ struct MenuView: View {
     /// submenu over the export (M12-T1: share/copy/Quick Look it too). The `.mov`-only recents list
     /// never shows the export, so this is its pointer.
     @ViewBuilder private var exportStatusRow: some View {
-        if let name = state.exportInProgress {
+        if let name = state.exports.exportInProgress {
             Text("Exporting \(name)…")
             Divider()
-        } else if let last = state.lastExport {
+        } else if let last = state.exports.lastExport {
             Menu(last.menuTitle) { fileActions(last.url) }
             Divider()
         }
@@ -330,11 +334,11 @@ struct MenuView: View {
         Divider()
 
         fileButton("Export as MP4", url) { state.exportToMP4($0) }
-            .disabled(state.exportInProgress != nil)
+            .disabled(state.exports.exportInProgress != nil)
         fileButton("Save as GIF", url) { state.exportToGIF($0) }
-            .disabled(state.exportInProgress != nil)
+            .disabled(state.exports.exportInProgress != nil)
         fileButton("Trim…", url) { url in
-            state.trimTarget = url
+            state.exports.trimTarget = url
             openWindow(id: trimWindowID)
             NSApplication.shared.activate(ignoringOtherApps: true)
         }
@@ -435,15 +439,15 @@ struct MenuView: View {
         state.refreshRecentRecordings()
         state.refreshRecordingRoom()
         Task { await state.refreshRecentDetails() }
-        state.expireStaleExportReceipt()   // drop a receipt aged out since a prior session (M12-T3)
-        if !state.isSessionActive {
+        state.exports.expireStaleReceipt()   // drop a receipt aged out since a prior session (M12-T3)
+        if !state.session.isActive {
             state.refreshSources(displays: DisplayOption.liveScreens())
             // Async because SCShareableContent takes ~a second; on the first open the app rows
             // land a beat late, like the recents. Publishes only on a real change.
             Task { await state.refreshCapturableApps() }
             Task { await state.refreshCapturableWindows() }
         }
-        state.refreshProgress()
+        state.session.refreshProgress()
     }
 
     /// Runs a modal confirmation, reporting whether the **first** button was chosen. Every caller
@@ -467,7 +471,7 @@ struct MenuView: View {
     /// docs/06 item 12: quitting mid-recording confirms, then finalizes before exit (ADR-007).
     /// An export in flight confirms too (M23-T2) — quitting through it loses work silently.
     private func quit() {
-        if state.isSessionActive {
+        if state.session.isActive {
             guard Self.confirm(
                 "Stop recording and quit?", "Your recording will be saved first.",
                 first: "Stop & Quit", second: "Keep Recording")
@@ -479,7 +483,7 @@ struct MenuView: View {
             return
         }
 
-        guard state.exportInProgress != nil else { return NSApplication.shared.terminate(nil) }
+        guard state.exports.exportInProgress != nil else { return NSApplication.shared.terminate(nil) }
 
         guard Self.confirm(
             "An export is still running.",
@@ -488,12 +492,12 @@ struct MenuView: View {
         else {
             // Abandon it first: `terminate` runs `applicationShouldTerminate`, which waits for an
             // export in flight — so without this, "Quit Anyway" would wait like the other button.
-            state.cancelExport()
+            state.exports.cancelExport()
             return NSApplication.shared.terminate(nil)
         }
 
         Task {
-            await state.waitForExportToFinish()
+            await state.exports.waitForExportToFinish()
             NSApplication.shared.terminate(nil)
         }
     }
@@ -505,7 +509,7 @@ struct MenuView: View {
     /// docs/06 recording item 9: discarding confirms first — the safe choice is the default, so a
     /// reflexive Return can't destroy a take — then drops the file and returns to Ready.
     private func discardRecording() {
-        guard state.isSessionActive else { return }
+        guard state.session.isActive else { return }
 
         // Keeping is first, so Return keeps — a reflexive press can't destroy a take.
         guard !Self.confirm(

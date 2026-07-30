@@ -11,7 +11,7 @@ public enum SourceChoice: Hashable, Sendable {
     case display(CGDirectDisplayID?)
     case app(bundleID: String)
     /// The whole screen minus one app (M21-T4): it is neither seen nor heard. The display stays
-    /// whatever `selectedDisplayID` says — this is a whole-screen pick with a hole in it.
+    /// whatever `sources.selectedDisplayID` says — this is a whole-screen pick with a hole in it.
     case displayExcluding(bundleID: String)
     /// A rectangle of a display (M11-T2). `rect` is SCK `sourceRect` points (top-left, docs/02 §1b);
     /// `display` nil ⇒ main. Chosen via the overlay, not typed — the picker only shows/re-picks it.
@@ -51,47 +51,11 @@ public final class AppState {
 
     public private(set) var microphones: [AudioInputDevice] = []
 
-    public var displays: [DisplayOption] { sources.displays }
-    public var capturableApps: [CapturableApp] { sources.capturableApps }
-    public var capturableWindows: [CapturableWindow] { sources.capturableWindows }
 
-    public var selectedDisplayID: CGDirectDisplayID? {
-        get { sources.selectedDisplayID }
-        set { sources.selectedDisplayID = newValue }
-    }
-    public var selectedAppBundleID: String? {
-        get { sources.selectedAppBundleID }
-        set { sources.selectedAppBundleID = newValue }
-    }
-    public var selectedRegion: RegionSelection? {
-        get { sources.selectedRegion }
-        set { sources.selectedRegion = newValue }
-    }
-    public var selectedWindow: WindowSelection? {
-        get { sources.selectedWindow }
-        set { sources.selectedWindow = newValue }
-    }
-    public var sourceChoice: SourceChoice {
-        get { sources.sourceChoice }
-        set { sources.sourceChoice = newValue }
-    }
-    public var recordableAppsFilter: (([CapturableApp]) -> [CapturableApp])? {
-        get { sources.recordableAppsFilter }
-        set { sources.recordableAppsFilter = newValue }
-    }
-    public var appDisplayName: ((String) -> String?)? {
-        get { sources.appDisplayName }
-        set { sources.appDisplayName = newValue }
-    }
-    public var missingPickedApp: CapturableApp? { sources.missingPickedApp }
     /// The excluded app's name for the menu's honesty row (M21-T4), or nil when nothing is excluded.
-    public var excludedAppName: String? { sources.excludedAppBundleID.map(appName(for:)) }
+    public var excludedAppName: String? { sources.excludedAppBundleID.map(sources.appName(for:)) }
     /// The excluded pick when it isn't on screen to be excluded — the row says so, and the start
     /// will too (M21-T4).
-    public var missingExcludedApp: CapturableApp? { sources.missingExcludedApp }
-    public var missingPickedWindow: WindowSelection? { sources.missingPickedWindow }
-    public var sourceMenuLabel: String { sources.sourceMenuLabel }
-    public func appName(for bundleID: String) -> String { sources.appName(for: bundleID) }
     public func refreshCapturableApps() async { await sources.refreshCapturableApps() }
     public func refreshCapturableWindows() async { await sources.refreshCapturableWindows() }
     public func setRegion(displayID: CGDirectDisplayID?, rect: CGRect) {
@@ -365,15 +329,6 @@ public final class AppState {
     /// replay, none of which belong to a session's state.
     public let session = SessionModel()
 
-    public var statusIcon: StatusIcon { session.statusIcon }
-    public var elapsedSeconds: TimeInterval { session.elapsedSeconds }
-    public var recordedBytes: Int64 { session.recordedBytes }
-    public var recordingClock: RecordingClock? { session.recordingClock }
-    public var activeMicrophoneName: String? { session.activeMicrophoneName }
-    public var activeAppName: String? { session.activeAppName }
-    public var activeRegion: CGSize? { session.activeRegion }
-    public var isSessionActive: Bool { session.isActive }
-    public var isPaused: Bool { session.isPaused }
     /// Drives the fold event by event rather than handing the stream to `session`, so everything
     /// `apply` adds on top of it runs in production and not only under test.
     public func consume(_ events: AsyncStream<EngineEvent>) async {
@@ -389,13 +344,12 @@ public final class AppState {
             flashSaved()
         }
     }
-    public func refreshProgress() { session.refreshProgress() }
 
     /// Permissions/onboarding, split out (M9-T7): AppState owns this sub-model and forwards to it.
     /// It needs one input, `microphoneRequired`, supplied from the mic pick; observation propagates
     /// through the nested `@Observable`, so views read `state.readiness`/`state.onboardingRows`/…
     /// unchanged.
-    private let permissions = PermissionsModel()
+    public let permissions = PermissionsModel()
 
     /// The one input the model needs: whether a mic is required (i.e. one is picked).
     private var microphoneRequired: Bool { microphonePreference != .none }
@@ -406,9 +360,6 @@ public final class AppState {
     public var readiness: RecordingReadiness {
         permissions.readiness(microphoneRequired: microphoneRequired)
     }
-
-    public var screenWasGrantedAtLaunch: Bool { permissions.screenWasGrantedAtLaunch }
-    public var needsRelaunchForScreenGrant: Bool { permissions.needsRelaunchForScreenGrant }
 
     /// Set when a recording didn't survive its own start, or degraded on the way. ADR-007
     /// forbids the silent version of either.
@@ -460,15 +411,11 @@ public final class AppState {
     /// The export/trim cluster (M14-T1), the `PermissionsModel` pattern: AppState owns it and
     /// forwards the public surface below, so the view/CLI/test surface is unchanged. Its receipt
     /// persistence uses `defaults`; its notifications forward to `notifier` (both wired in `init`).
-    /// `internal` (not `private`) so `ExportModelTests` can inject the export-function spies.
-    let exports: ExportModel
+    /// Public so views read `state.exports.lastExport` directly (M23-T5) — the forwards that
+    /// stood in for that are gone. The action methods above it stay: they supply the export
+    /// configuration, which only AppState holds.
+    public let exports: ExportModel
 
-    public var exportInProgress: String? { exports.exportInProgress }
-    public var lastExport: LastExport? { exports.lastExport }
-    public var trimTarget: URL? {
-        get { exports.trimTarget }
-        set { exports.trimTarget = newValue }
-    }
     /// Where the last finished take ended up — after any rename (M21-T3), so Stop & Copy MP4
     /// shares the file under the name it was just given. Cleared when the next take starts.
     private(set) var lastFinishedRecording: URL?
@@ -478,22 +425,15 @@ public final class AppState {
     /// text field, and AppKit doesn't belong here.
     public var promptForTakeName: (@MainActor (_ url: URL, _ duration: TimeInterval) -> String?)?
 
-    /// Wired by the app (M21-T2): AppKit's pasteboard can't live here, but the export that fills it
-    /// does — so the closure is forwarded to `exports`, which performs it when one completes.
-    public var copyToPasteboard: (@MainActor (URL) -> Void)? {
-        get { exports.copyToPasteboard }
-        set { exports.copyToPasteboard = newValue }
-    }
-
     // MARK: - Onboarding (docs/06 "Onboarding window") — delegated to PermissionsModel (M9-T7)
 
     /// Whether the setup window has anything to say: first launch or any missing permission,
     /// never once satisfied (docs/06).
     public var needsOnboarding: Bool { readiness != .ready }
-    public var hasAskedForScreenRecording: Bool { permissions.hasAskedForScreenRecording }
-    public var notificationState: PermissionState { permissions.notificationState }
-    public var onboardingRows: [OnboardingRow] { permissions.onboardingRows }
 
+    // The five members below are NOT scaffolding and stay: each supplies `microphoneRequired`,
+    // which only AppState knows (it reads the mic pick). Deleting them would copy that rule to
+    // every call site. What went was the pure pass-throughs — read those off `permissions`.
     public func refreshOnboarding() {
         permissions.refreshOnboarding(microphoneRequired: microphoneRequired)
     }
@@ -653,7 +593,7 @@ public final class AppState {
     public func activateReplayIfArmed() {
         guard isReplayArmed,
               Permissions.screenRecordingState() == .granted,
-              !needsRelaunchForScreenGrant else { return }
+              !permissions.needsRelaunchForScreenGrant else { return }
         syncReplayArming()
     }
 
@@ -733,7 +673,7 @@ public final class AppState {
     }
 
     /// The `Stop & Copy MP4` row's title (M21-T2), estimate included. Stamped at menu open like
-    /// every other number there (M6-T10), since `elapsedSeconds` is.
+    /// every other number there (M6-T10), since `session.elapsedSeconds` is.
     public var stopAndCopyTitle: String {
         MenuHeader.stopAndCopy(maximumBytes: maximumShareBytes)
     }
@@ -742,9 +682,9 @@ public final class AppState {
     /// budget (M19-T4) over the elapsed minutes. Nil without display geometry: no figure beats a
     /// wrong one.
     private var maximumShareBytes: Int64? {
-        guard let pixels = sources.displayPixelSize, elapsedSeconds > 0 else { return nil }
+        guard let pixels = sources.displayPixelSize, session.elapsedSeconds > 0 else { return nil }
         return exportConfiguration.projectedBytes(
-            sourceWidth: pixels.width, sourceHeight: pixels.height, seconds: elapsedSeconds)
+            sourceWidth: pixels.width, sourceHeight: pixels.height, seconds: session.elapsedSeconds)
     }
 
     /// The Size picker's label for `width`: the size, then what a minute of it weighs (M19-T4) —
@@ -1039,18 +979,13 @@ public final class AppState {
     }
 
     /// Drops a stale export receipt at menu open (M12-T3) — forwards to `exports` (M14-T1).
-    public func expireStaleExportReceipt() { exports.expireStaleReceipt() }
-    /// Lets quit wait for an export instead of killing it with the process (M23-T2).
-    public func waitForExportToFinish() async { await exports.waitForExportToFinish() }
-    /// Abandons an in-flight export, for a user who chose to quit through it (M23-T2).
-    public func cancelExport() { exports.cancelExport() }
 
     /// Settles everything a quit must not kill: a recording finalizes (ADR-007), then an export
     /// finishes (M23-T2). One definition, so the menu's Quit and `applicationShouldTerminate`
     /// can't drift on what "safe to exit" means. Returns at once when nothing is in flight.
     public func finishWorkInFlight() async {
-        if isSessionActive { await stopAndWaitForFinalize() }
-        await waitForExportToFinish()
+        if session.isActive { await stopAndWaitForFinalize() }
+        await exports.waitForExportToFinish()
     }
 
     /// True when `url` is still on disk. The menu's rows are stamped at open, so a file can go
@@ -1119,18 +1054,18 @@ public final class AppState {
     /// without starting anything.
     public var captureConfiguration: CaptureConfiguration {
         let content: ContentSelection
-        if let window = selectedWindow {
+        if let window = sources.selectedWindow {
             // The owner travels with the id so capture can refuse a reused one (docs/02 §1c).
             content = .window(id: window.id, ownerBundleID: window.bundleID)
-        } else if let region = selectedRegion {
+        } else if let region = sources.selectedRegion {
             content = .region(display: region.displayID.map(DisplaySelection.id) ?? .main, rect: region.rect)
-        } else if let bundleID = selectedAppBundleID {
+        } else if let bundleID = sources.selectedAppBundleID {
             content = .app(bundleID: bundleID)
         } else if let excluded = sources.excludedAppBundleID {
             content = .displayExcluding(
-                selectedDisplayID.map(DisplaySelection.id) ?? .main, bundleID: excluded)
+                sources.selectedDisplayID.map(DisplaySelection.id) ?? .main, bundleID: excluded)
         } else {
-            content = .display(selectedDisplayID.map(DisplaySelection.id) ?? .main)
+            content = .display(sources.selectedDisplayID.map(DisplaySelection.id) ?? .main)
         }
         return CaptureConfiguration(
             content: content,
@@ -1151,7 +1086,7 @@ public final class AppState {
     // MARK: - Actions (docs/06 "Menu — idle/recording state", items 2–3)
 
     public func start() async {
-        // See `isSessionActive`: the menu is clickable again before the first frame lands.
+        // See `session.isActive`: the menu is clickable again before the first frame lands.
         guard !session.isActive, !isCountingIn else { return }
 
         lastFailure = nil
@@ -1216,13 +1151,13 @@ public final class AppState {
         lastFinishedRecording = nil   // a new take supersedes whatever the last one was named
         session.attach(
             capture, outputURL: outputURL, microphoneName: microphone.name,
-            appName: selectedAppBundleID.map(appName(for:)), region: selectedRegion?.rect.size)
+            appName: sources.selectedAppBundleID.map(sources.appName(for:)), region: sources.selectedRegion?.rect.size)
         scheduleAutomaticStop()
 
-        // `activeMicrophoneName` is what `resolvedMicrophone()` above just resolved to; posting
+        // `session.activeMicrophoneName` is what `resolvedMicrophone()` above just resolved to; posting
         // here, after the session commits, keeps a failed start from claiming it began.
         if let notice = RecordingNotifications.recordingStart(
-            microphonePreference: microphonePreference, resolvedMicName: activeMicrophoneName) {
+            microphonePreference: microphonePreference, resolvedMicName: session.activeMicrophoneName) {
             notifier?(notice)
         }
 
@@ -1272,7 +1207,7 @@ public final class AppState {
     /// `Export as MP4` derives one. The in-flight guard is belt and braces: the menu row is
     /// disabled while an export runs, so the press it would swallow can't be made.
     public func stopAndShare() async {
-        guard isSessionActive, exportInProgress == nil else { return }
+        guard session.isActive, exports.exportInProgress == nil else { return }
         await stopAndWaitForFinalize()
         // `lastFinishedRecording` is where the take actually ended up: the naming prompt (M21-T3)
         // runs inside the same task, so the `.mp4` inherits the chosen name instead of landing
@@ -1326,7 +1261,7 @@ public final class AppState {
     /// stops and saves; otherwise a ready app starts, and a blocked one says why. Never a silent
     /// no-op — the shortcut advertised an action.
     public func toggleRecording() async {
-        switch Self.recordToggleAction(isSessionActive: isSessionActive, isReady: readiness == .ready) {
+        switch Self.recordToggleAction(isSessionActive: session.isActive, isReady: readiness == .ready) {
         case .start: await start()
         case .stop: await stop()
         case .blockedNotify: notifier?(RecordingNotifications.recordingHotkeyBlocked())
@@ -1344,7 +1279,7 @@ public final class AppState {
     /// What the global pause/resume shortcut does (M12-T6): a live recording pauses, a paused one
     /// resumes, and with nothing recording it does nothing (a silent no-op, not a failure).
     public func togglePause() async {
-        switch Self.pauseToggleAction(isSessionActive: isSessionActive, isPaused: isPaused) {
+        switch Self.pauseToggleAction(isSessionActive: session.isActive, isPaused: session.isPaused) {
         case .pause: await pause()
         case .resume: await resume()
         case .ignore: break

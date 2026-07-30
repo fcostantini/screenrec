@@ -21,13 +21,13 @@ import RecorderCore
         state.exports.exportFunction = { _, _, _, _ in written }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
-        #expect(state.exportInProgress == "Clip.mov")   // set before the background task runs
-        #expect(state.lastExport == nil)
+        #expect(state.exports.exportInProgress == "Clip.mov")   // set before the background task runs
+        #expect(state.exports.lastExport == nil)
 
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
-        #expect(state.lastExport?.url == written)
-        #expect(state.lastExport?.menuTitle == "Exported to MP4 · Clip.mp4")
+        #expect(state.exports.lastExport?.url == written)
+        #expect(state.exports.lastExport?.menuTitle == "Exported to MP4 · Clip.mp4")
         #expect(posted.count == 1)
         #expect(posted.first?.title == "Exported to MP4")
         #expect(posted.first?.fileURL == written)
@@ -40,9 +40,9 @@ import RecorderCore
         state.exports.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
-        #expect(state.lastExport == nil)
+        #expect(state.exports.lastExport == nil)
         #expect(posted.count == 1)
         #expect(posted.first?.title == "Couldn't export to MP4")
         #expect(posted.first?.fileURL == nil)
@@ -55,13 +55,13 @@ import RecorderCore
         state.exports.exportFunction = { _, _, _, _ in firstURL }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/A.mov"))
-        while state.exportInProgress != nil { await Task.yield() }
-        #expect(state.lastExport?.url == firstURL)
+        while state.exports.exportInProgress != nil { await Task.yield() }
+        #expect(state.exports.lastExport?.url == firstURL)
 
         state.exports.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
         state.exportToMP4(URL(fileURLWithPath: "/tmp/B.mov"))
-        while state.exportInProgress != nil { await Task.yield() }
-        #expect(state.lastExport?.url == firstURL)   // A's pointer isn't erased by B's failure
+        while state.exports.exportInProgress != nil { await Task.yield() }
+        #expect(state.exports.lastExport?.url == firstURL)   // A's pointer isn't erased by B's failure
     }
 
     @Test func secondExportWhileOneRunsIsIgnored() async {
@@ -74,9 +74,9 @@ import RecorderCore
         // the guard sees `exportInProgress` set and drops the second.
         state.exportToMP4(URL(fileURLWithPath: "/tmp/A.mov"))
         state.exportToMP4(URL(fileURLWithPath: "/tmp/B.mov"))
-        #expect(state.exportInProgress == "A.mov")
+        #expect(state.exports.exportInProgress == "A.mov")
 
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
         #expect(posted.count == 1)   // exactly one export completed
     }
 
@@ -103,10 +103,10 @@ import RecorderCore
         state.exports.availableBytes = { _ in 100 }        // less than the source's 4096
 
         state.trim(source, from: 0, to: 1, mode: .lossless)
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
         #expect(ran.value != true)                          // nothing was written
-        #expect(state.lastExport == nil)                    // and no receipt claims otherwise
+        #expect(state.exports.lastExport == nil)                    // and no receipt claims otherwise
         #expect(posted.count == 1)
         #expect(posted.first?.title == "Not enough room to export")
         #expect(posted.first?.fileURL == nil)
@@ -124,10 +124,10 @@ import RecorderCore
         state.exports.availableBytes = { _ in 1_000_000_000 }
 
         state.trim(source, from: 0, to: 1, mode: .lossless)
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
         #expect(ran.value == true)
-        #expect(state.lastExport != nil)
+        #expect(state.exports.lastExport != nil)
     }
 
     @Test func aGifIsNeverRefusedForRoom() async {
@@ -139,9 +139,9 @@ import RecorderCore
         state.exports.availableBytes = { _ in 0 }
 
         state.exportToGIF(URL(fileURLWithPath: "/tmp/Clip.mov"))
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
-        #expect(state.lastExport?.url == written)
+        #expect(state.exports.lastExport?.url == written)
     }
 
     @Test func anUnreadableVolumeDoesNotBlockAnExport() async throws {
@@ -154,7 +154,7 @@ import RecorderCore
         state.exports.availableBytes = { _ in nil }         // capacity can't be read
 
         state.trim(source, from: 0, to: 1, mode: .lossless)
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
         #expect(ran.value == true)
     }
@@ -171,11 +171,11 @@ import RecorderCore
         }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
-        await state.waitForExportToFinish()
+        await state.exports.waitForExportToFinish()
 
         // The point of the whole thing: quit can't outrun the work.
         #expect(finished.value == true)
-        #expect(state.exportInProgress == nil)
+        #expect(state.exports.exportInProgress == nil)
     }
 
     @Test func abandoningAnExportClearsItBeforeQuitLooksAgain() async {
@@ -189,18 +189,18 @@ import RecorderCore
         }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
-        #expect(state.exportInProgress == "Clip.mov")
-        state.cancelExport()
-        #expect(state.exportInProgress == nil)   // no await between the two — that is the point
+        #expect(state.exports.exportInProgress == "Clip.mov")
+        state.exports.cancelExport()
+        #expect(state.exports.exportInProgress == nil)   // no await between the two — that is the point
 
-        await state.waitForExportToFinish()      // and quit's wait is now a no-op
-        #expect(state.lastExport == nil)         // an abandoned export leaves no receipt
+        await state.exports.waitForExportToFinish()      // and quit's wait is now a no-op
+        #expect(state.exports.lastExport == nil)         // an abandoned export leaves no receipt
     }
 
     @Test func waitingWithNoExportRunningReturnsAtOnce() async {
         let state = makeState()
-        await state.waitForExportToFinish()      // must not hang
-        #expect(state.exportInProgress == nil)
+        await state.exports.waitForExportToFinish()      // must not hang
+        #expect(state.exports.exportInProgress == nil)
     }
 
     @Test func gifExportSetsReceiptAndNotifies() async {
@@ -211,11 +211,11 @@ import RecorderCore
         state.exports.gifExportFunction = { _, _, _ in written }
 
         state.exportToGIF(URL(fileURLWithPath: "/tmp/Clip.mov"))
-        #expect(state.exportInProgress == "Clip.mov")
-        while state.exportInProgress != nil { await Task.yield() }
+        #expect(state.exports.exportInProgress == "Clip.mov")
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
-        #expect(state.lastExport?.url == written)
-        #expect(state.lastExport?.menuTitle == "Saved as GIF · Clip.gif")
+        #expect(state.exports.lastExport?.url == written)
+        #expect(state.exports.lastExport?.menuTitle == "Saved as GIF · Clip.gif")
         #expect(posted.first?.title == "Saved as GIF")
         #expect(posted.first?.fileURL == written)
     }
@@ -233,7 +233,7 @@ import RecorderCore
         }
 
         state.exportToGIF(URL(fileURLWithPath: "/tmp/Clip.mov"))
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
         #expect(recorded.value?.fps == 20)
         #expect(recorded.value?.maxWidth == 640)
@@ -254,7 +254,7 @@ import RecorderCore
         }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
         #expect(recorded.value?.maxWidth == 2560)
         // The height ceiling is not a preference: it is what keeps the output inside H.264
@@ -277,7 +277,7 @@ import RecorderCore
 
         state.exportToMP4(
             URL(fileURLWithPath: "/tmp/Clip.mov"), range: ExportRange(start: 30, end: 35))
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
         #expect(recordedRange.value == ExportRange(start: 30, end: 35))
         #expect(recordedOutput.value?.lastPathComponent == "Clip trimmed.mp4")
@@ -295,7 +295,7 @@ import RecorderCore
         }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
         #expect(recordedRange.value == nil)
         #expect(recordedOutput.value?.lastPathComponent == "Clip.mp4")
@@ -307,15 +307,15 @@ import RecorderCore
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
         let copied = Box<URL>()
-        state.copyToPasteboard = { copied.value = $0 }
+        state.exports.copyToPasteboard = { copied.value = $0 }
         state.exports.exportFunction = { _, output, _, _ in output }
 
         state.exports.exportAndCopy(
             URL(fileURLWithPath: "/tmp/Take.mov"), configuration: ExportConfiguration())
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
         #expect(copied.value?.lastPathComponent == "Take.mp4")
-        #expect(state.lastExport?.url == copied.value)      // the receipt still points at it
+        #expect(state.exports.lastExport?.url == copied.value)      // the receipt still points at it
         #expect(posted.count == 1)
         #expect(posted.first?.title == "Copied — ⌘V to paste")
         #expect(posted.first?.fileURL == copied.value)      // …and a click still reveals it
@@ -326,12 +326,12 @@ import RecorderCore
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
         let copied = Box<URL>()
-        state.copyToPasteboard = { copied.value = $0 }
+        state.exports.copyToPasteboard = { copied.value = $0 }
         state.exports.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
 
         state.exports.exportAndCopy(
             URL(fileURLWithPath: "/tmp/Take.mov"), configuration: ExportConfiguration())
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
         #expect(copied.value == nil)                        // nothing was copied…
         #expect(posted.first?.title == "Couldn't export to MP4")   // …and nothing claims otherwise
@@ -347,7 +347,7 @@ import RecorderCore
 
         state.exports.exportAndCopy(
             URL(fileURLWithPath: "/tmp/Take.mov"), configuration: ExportConfiguration())
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
         #expect(posted.first?.title == "Exported to MP4")
     }
@@ -385,10 +385,10 @@ import RecorderCore
         // task hasn't run yet.
         state.exportToMP4(URL(fileURLWithPath: "/tmp/A.mov"))
         state.exportToGIF(URL(fileURLWithPath: "/tmp/A.mov"))
-        #expect(state.exportInProgress == "A.mov")
-        while state.exportInProgress != nil { await Task.yield() }
+        #expect(state.exports.exportInProgress == "A.mov")
+        while state.exports.exportInProgress != nil { await Task.yield() }
         // The receipt is the MP4 sibling, not the GIF — the GIF call was dropped.
-        #expect(state.lastExport?.url.pathExtension == "mp4")
+        #expect(state.exports.lastExport?.url.pathExtension == "mp4")
     }
 
     @Test func gifNotificationCopy() {
@@ -414,14 +414,14 @@ import RecorderCore
         }
 
         state.trim(URL(fileURLWithPath: "/tmp/Clip.mov"), from: 2, to: 8)
-        #expect(state.exportInProgress == "Clip.mov")
-        while state.exportInProgress != nil { await Task.yield() }
+        #expect(state.exports.exportInProgress == "Clip.mov")
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
         #expect(range.value?.start == 2)
         #expect(range.value?.end == 8)
         #expect(range.value?.mode == .lossless)  // the default stays lossless (ADR-015)
-        #expect(state.lastExport?.url == written)
-        #expect(state.lastExport?.menuTitle == "Trimmed · Clip trimmed.mov")  // .mov ⇒ "Trimmed"
+        #expect(state.exports.lastExport?.url == written)
+        #expect(state.exports.lastExport?.menuTitle == "Trimmed · Clip trimmed.mov")  // .mov ⇒ "Trimmed"
         #expect(posted.first?.title == "Trimmed")
         #expect(posted.first?.fileURL == written)
     }
@@ -437,7 +437,7 @@ import RecorderCore
         }
 
         state.trim(URL(fileURLWithPath: "/tmp/Clip.mov"), from: 2, to: 8, mode: .precise)
-        while state.exportInProgress != nil { await Task.yield() }
+        while state.exports.exportInProgress != nil { await Task.yield() }
 
         #expect(range.value?.mode == .precise)
     }

@@ -28,7 +28,7 @@ struct ScreenRecApp: App {
         // Cached: the row re-renders per menu publish, and each miss is a LaunchServices DB
         // query plus disk metadata; an installed app's name can't change mid-run.
         var appNameCache: [String: String] = [:]
-        state.appDisplayName = { bundleID in
+        state.sources.appDisplayName = { bundleID in
             if let cached = appNameCache[bundleID] { return cached }
             let name = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
                 .map { FileManager.default.displayName(atPath: $0.path) }
@@ -38,7 +38,7 @@ struct ScreenRecApp: App {
         // Keeps the Source picker to apps a user would record: SCShareableContent also lists
         // windowed system chrome (Dock, Control Center…). Whole-list shape so one process-table
         // snapshot serves every app; the CLI's `list-apps` deliberately stays unfiltered.
-        state.recordableAppsFilter = { apps in
+        state.sources.recordableAppsFilter = { apps in
             let regular = Set(NSWorkspace.shared.runningApplications
                 .filter { $0.activationPolicy == .regular }
                 .compactMap(\.bundleIdentifier))
@@ -49,7 +49,7 @@ struct ScreenRecApp: App {
         // closure is stored on `state`, which the controller must not retain.
         let regionSelector = ScreenRecApp.regionSelector
         state.beginRegionSelection = { [weak state] in
-            regionSelector.present(seededWith: state?.selectedRegion) { displayID, rect in
+            regionSelector.present(seededWith: state?.sources.selectedRegion) { displayID, rect in
                 state?.setRegion(displayID: displayID, rect: rect)
             }
         }
@@ -57,7 +57,7 @@ struct ScreenRecApp: App {
         state.onReplayBannerWarning = { NotificationSettings.showArmedBannerWarning() }
         // Stop & Copy MP4 (M21-T2): the pasteboard is AppKit, so the app performs the copy the
         // export path asks for — the same write the per-file `Copy` row does.
-        state.copyToPasteboard = { ShareActions.copy($0) }
+        state.exports.copyToPasteboard = { ShareActions.copy($0) }
         // Naming a take as it stops (M21-T3): the same `NSAlert` the Rename… row uses.
         state.promptForTakeName = { ShareActions.nameTake($0, duration: $1) }
         // Global shortcuts (M9-T4): map each intent to a Carbon hotkey id + the action it fires.
@@ -115,7 +115,7 @@ struct ScreenRecApp: App {
         .windowResizability(.contentSize)
         .defaultPosition(.center)
 
-        // The Trim window (M10-T4): a fixed window that reads `state.trimTarget`, set by the menu's
+        // The Trim window (M10-T4): a fixed window that reads `state.exports.trimTarget`, set by the menu's
         // "Trim…" — a plain `Window`, like Settings, since an LSUIElement app has no ⌘N to spawn one.
         Window("Trim", id: trimWindowID) {
             TrimView(state: state)
@@ -148,7 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// arrives here with its answer already applied — a take finalized, or an abandoned export
     /// already cleared — so this sees nothing left to wait for.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let appState, appState.isSessionActive || appState.exportInProgress != nil else {
+        guard let appState, appState.session.isActive || appState.exports.exportInProgress != nil else {
             return .terminateNow
         }
         Task { @MainActor in
@@ -170,10 +170,10 @@ private struct StatusIconLabel: View {
 
     var body: some View {
         StatusIconView(
-            icon: state.statusIcon,
+            icon: state.session.statusIcon,
             isReplayArmed: state.isReplayArmed,
-            isExporting: state.exportInProgress != nil,
-            recordingClock: state.recordingClock,
+            isExporting: state.exports.exportInProgress != nil,
+            recordingClock: state.session.recordingClock,
             showsTimer: state.showsMenuBarTimer,
             replaySavedFlash: state.replaySavedFlash,
             microphoneLevel: state.showsMicrophoneLevel ? { state.takeMicrophoneLevel() } : nil)
@@ -208,12 +208,12 @@ private struct StatusIconLabel: View {
     /// straight from System Settings, which needs the same restart (02 §2).
     private func relaunchWhenScreenGrantLands() async {
         // Already granted at launch ⇒ no transition to wait for; also what stops a relaunch loop.
-        guard !state.screenWasGrantedAtLaunch else { return }
+        guard !state.permissions.screenWasGrantedAtLaunch else { return }
 
         while !Task.isCancelled {
             // Should be unreachable — Start is disabled while blocked — but never terminate on a
             // live writer (ADR-007).
-            if state.needsRelaunchForScreenGrant, !state.isSessionActive {
+            if state.permissions.needsRelaunchForScreenGrant, !state.session.isActive {
                 Relaunch.now()
                 // Reached only if the spawn failed; `now()` terminates on success. The back-off
                 // is long so a failing spawn can't launch copies while `terminate` unwinds.

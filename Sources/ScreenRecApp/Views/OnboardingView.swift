@@ -28,7 +28,7 @@ struct OnboardingView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 18)
 
-            ForEach(state.onboardingRows) { row in
+            ForEach(state.permissions.onboardingRows) { row in
                 PermissionRowView(row: row, act: { act(on: row) })
                 Divider()
             }

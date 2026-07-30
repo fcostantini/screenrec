@@ -119,15 +119,15 @@ import RecorderCore
         // rebuild the armed stream (wiping the buffer, the first against a config that exists
         // for a microsecond). The `sourceChoice` setter batches them into one restart (M7-T2).
         let (state, spy, _) = makeState()
-        state.selectedDisplayID = 1
+        state.sources.selectedDisplayID = 1
         state.isReplayArmed = true
         spy.calls = []
 
-        state.sourceChoice = .app(bundleID: "com.example.app")
+        state.sources.sourceChoice = .app(bundleID: "com.example.app")
         #expect(spy.calls == [.configurationChanged])
 
         spy.calls = []
-        state.sourceChoice = .display(2)
+        state.sources.sourceChoice = .display(2)
         #expect(spy.calls == [.configurationChanged])
     }
 
@@ -135,11 +135,11 @@ import RecorderCore
         // A region pick writes two backing properties (clear app, set region); the `sourceChoice`
         // setter batches them into one armed-stream rebuild, like the app/display switch (M11-T2).
         let (state, spy, _) = makeState()
-        state.selectedAppBundleID = "com.example.app"
+        state.sources.selectedAppBundleID = "com.example.app"
         state.isReplayArmed = true
         spy.calls = []
 
-        state.sourceChoice = .region(display: nil, rect: CGRect(x: 40, y: 60, width: 800, height: 500))
+        state.sources.sourceChoice = .region(display: nil, rect: CGRect(x: 40, y: 60, width: 800, height: 500))
         #expect(spy.calls == [.configurationChanged])
         #expect(spy.lastConfiguration?.content
             == .region(display: .main, rect: CGRect(x: 40, y: 60, width: 800, height: 500)))

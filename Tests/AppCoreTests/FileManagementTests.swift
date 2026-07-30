@@ -40,14 +40,14 @@ import RecorderCore
         let mp4 = directory.appendingPathComponent("Clip.mp4")
 
         let state = makeState(receipt: mp4, defaults: makeDefaults())
-        #expect(state.lastExport?.url == mp4)
+        #expect(state.exports.lastExport?.url == mp4)
     }
 
     @Test func aPersistedReceiptWhoseFileVanishedDoesNotSeed() {
         let state = makeState(
             receipt: URL(fileURLWithPath: "/tmp/gone-\(UUID().uuidString).mp4"),
             defaults: makeDefaults())
-        #expect(state.lastExport == nil)
+        #expect(state.exports.lastExport == nil)
     }
 
     // MARK: - Rename
@@ -65,7 +65,7 @@ import RecorderCore
         let renamed = directory.appendingPathComponent("Shared demo.mp4")
         #expect(FileManager.default.fileExists(atPath: renamed.path))
         #expect(!FileManager.default.fileExists(atPath: export.path))
-        #expect(state.lastExport?.url == renamed)
+        #expect(state.exports.lastExport?.url == renamed)
         #expect(SettingsStore.loadLastExport(from: defaults)?.url == renamed)
         // The invariant: renaming a derived .mp4 never touches its .mov source.
         #expect(FileManager.default.fileExists(atPath: source.path))
@@ -178,8 +178,8 @@ import RecorderCore
         let state = AppState(defaults: defaults)
 
         state.rename(old, to: "Renamed")
-        #expect(state.lastExport?.url == directory.appendingPathComponent("Renamed.mp4"))
-        #expect(state.lastExport?.date == exportedAt)             // preserved, not refreshed to now
+        #expect(state.exports.lastExport?.url == directory.appendingPathComponent("Renamed.mp4"))
+        #expect(state.exports.lastExport?.date == exportedAt)             // preserved, not refreshed to now
     }
 
     @Test func renamingADifferentFileLeavesTheReceiptUntouched() throws {
@@ -190,7 +190,7 @@ import RecorderCore
 
         let state = makeState(receipt: receipt, defaults: makeDefaults())
         state.rename(directory.appendingPathComponent("B.mp4"), to: "B renamed")
-        #expect(state.lastExport?.url == receipt)
+        #expect(state.exports.lastExport?.url == receipt)
     }
 
     // MARK: - Move to Trash
@@ -206,7 +206,7 @@ import RecorderCore
         state.moveToTrash(export)
 
         #expect(!FileManager.default.fileExists(atPath: export.path))   // now in the Trash
-        #expect(state.lastExport == nil)
+        #expect(state.exports.lastExport == nil)
         #expect(SettingsStore.loadLastExport(from: defaults) == nil)
         // The invariant again: trashing the export leaves the recording it derived from.
         #expect(FileManager.default.fileExists(atPath: source.path))

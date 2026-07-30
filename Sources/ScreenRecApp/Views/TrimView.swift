@@ -63,7 +63,7 @@ struct TrimView: View {
 
     var body: some View {
         Group {
-            if let url = state.trimTarget {
+            if let url = state.exports.trimTarget {
                 content(url)
             } else {
                 Text("Open a recording from the menu to trim it.")
@@ -71,8 +71,8 @@ struct TrimView: View {
                     .frame(width: 420, height: 120)
             }
         }
-        .onAppear { load(state.trimTarget) }
-        .onChange(of: state.trimTarget) { load(state.trimTarget) }
+        .onAppear { load(state.exports.trimTarget) }
+        .onChange(of: state.exports.trimTarget) { load(state.exports.trimTarget) }
         .onDisappear { unload() }
     }
 
@@ -118,14 +118,14 @@ struct TrimView: View {
                     state.exportToMP4(url, range: ExportRange(start: inSeconds, end: outSeconds))
                     dismiss()
                 }
-                .disabled(!hasRange || state.exportInProgress != nil)
+                .disabled(!hasRange || state.exports.exportInProgress != nil)
                 Button("Trim & Save") {
                     state.trim(url, from: inSeconds, to: outSeconds,
                                mode: reencodes ? .precise : .lossless)
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(!hasRange || state.exportInProgress != nil)
+                .disabled(!hasRange || state.exports.exportInProgress != nil)
             }
 
             Toggle("Re-encode — the clip will contain only \(Timecode.cutPoint(inSeconds)) – "

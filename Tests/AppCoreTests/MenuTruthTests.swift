@@ -18,7 +18,7 @@ import RecorderCore
     @Test func sourceLabelIsPlainEntireScreenWithOneDisplay() {
         let state = makeState()
         state.refreshSources(displays: [DisplayOption(id: 1, name: "Built-in", isMain: true)])
-        #expect(state.sourceMenuLabel == "Entire Screen")     // no display name when there's no choice
+        #expect(state.sources.sourceMenuLabel == "Entire Screen")     // no display name when there's no choice
     }
 
     @Test func sourceLabelNamesTheDisplayWhenThereIsAChoice() {
@@ -27,7 +27,7 @@ import RecorderCore
             DisplayOption(id: 1, name: "Sidecar", isMain: false),
             DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
         ])
-        #expect(state.sourceMenuLabel == "Entire Screen (Built-in Retina Display)")
+        #expect(state.sources.sourceMenuLabel == "Entire Screen (Built-in Retina Display)")
     }
 
     @Test func sourceLabelNamesWhatIsLeftOut() {
@@ -36,21 +36,21 @@ import RecorderCore
         state.refreshSources(displays: [DisplayOption(id: 1, name: "Built-in", isMain: true)])
         state.refreshApps(
             [CapturableApp(bundleID: "com.spotify.client", name: "Spotify")], excluding: nil)
-        state.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
-        #expect(state.sourceMenuLabel == "Entire Screen except Spotify")
+        state.sources.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
+        #expect(state.sources.sourceMenuLabel == "Entire Screen except Spotify")
     }
 
     @Test func sourceLabelIsTheAppNameForAScopedPick() {
         let state = makeState()
-        state.appDisplayName = { $0 == "com.acme.app" ? "Acme" : nil }
-        state.sourceChoice = .app(bundleID: "com.acme.app")
-        #expect(state.sourceMenuLabel == "Acme")
+        state.sources.appDisplayName = { $0 == "com.acme.app" ? "Acme" : nil }
+        state.sources.sourceChoice = .app(bundleID: "com.acme.app")
+        #expect(state.sources.sourceMenuLabel == "Acme")
     }
 
     @Test func sourceLabelIsTheRegionSizeForARegionPick() {
         let state = makeState()
         state.setRegion(displayID: nil, rect: CGRect(x: 0, y: 0, width: 820, height: 512))
-        #expect(state.sourceMenuLabel == "Region 820×512")
+        #expect(state.sources.sourceMenuLabel == "Region 820×512")
     }
 
     // MARK: - Microphone label
@@ -107,16 +107,16 @@ import RecorderCore
         SettingsStore.saveLastExport(
             LastExport(url: file, date: Date(timeIntervalSinceNow: -7200)), to: staleDefaults)
         let staleState = AppState(defaults: staleDefaults)
-        #expect(staleState.lastExport != nil)                 // seeded (existence only, staleness later)
-        staleState.expireStaleExportReceipt()
-        #expect(staleState.lastExport == nil)
+        #expect(staleState.exports.lastExport != nil)                 // seeded (existence only, staleness later)
+        staleState.exports.expireStaleReceipt()
+        #expect(staleState.exports.lastExport == nil)
 
         // Fresh: persisted just now → expiry keeps it.
         let freshDefaults = TestDefaults.make()
         SettingsStore.saveLastExport(LastExport(url: file, date: Date()), to: freshDefaults)
         let freshState = AppState(defaults: freshDefaults)
-        freshState.expireStaleExportReceipt()
-        #expect(freshState.lastExport?.url == file)
+        freshState.exports.expireStaleReceipt()
+        #expect(freshState.exports.lastExport?.url == file)
     }
 
     // MARK: - System audio (M16-T3, ADR-019)
@@ -201,7 +201,7 @@ import RecorderCore
         let state = makeState()
         state.refreshSources(displays: [retinaDisplay()])
         let whole = state.replayBufferBytes(seconds: 60)
-        state.sourceChoice = .region(display: 1, rect: CGRect(x: 0, y: 0, width: 800, height: 600))
+        state.sources.sourceChoice = .region(display: 1, rect: CGRect(x: 0, y: 0, width: 800, height: 600))
         let region = state.replayBufferBytes(seconds: 60)
         #expect(region != nil && whole != nil)
         #expect(region! < whole!)
@@ -217,14 +217,14 @@ import RecorderCore
                 id: 2, name: "Sidecar", isMain: false,
                 pointSize: CGSize(width: 1024, height: 768), pointPixelScale: 1),
         ])
-        state.sourceChoice = .display(2)
+        state.sources.sourceChoice = .display(2)
         let sidecarQuote = state.replayBufferBytes(seconds: 60)
 
-        state.appDisplayName = { _ in "Acme" }
-        state.sourceChoice = .app(bundleID: "com.acme.app")
+        state.sources.appDisplayName = { _ in "Acme" }
+        state.sources.sourceChoice = .app(bundleID: "com.acme.app")
         let appQuote = state.replayBufferBytes(seconds: 60)
 
-        state.sourceChoice = .display(1)
+        state.sources.sourceChoice = .display(1)
         let mainQuote = state.replayBufferBytes(seconds: 60)
 
         #expect(appQuote == mainQuote)          // composites on main…

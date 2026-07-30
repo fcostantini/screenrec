@@ -202,7 +202,7 @@ public final class SessionModel {
     ///
     /// Polled, not pushed — no per-sample progress event (there was a dead `fileProgress` arm,
     /// retired M14-T3). Suits docs/06 here anyway ("≤ 1 Hz, menu open only").
-    func refreshProgress() {
+    public func refreshProgress() {
         let duration = capture?.recordedDuration.seconds ?? 0
         // NaN until the first frame starts the session (docs/02 §10).
         let seconds = duration.isFinite ? duration : 0

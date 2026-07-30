@@ -39,47 +39,47 @@ import RecorderCore
     }
 
     @Test func idleBeforeAnythingHappens() {
-        #expect(makeState().statusIcon == .idle)
+        #expect(makeState().session.statusIcon == .idle)
     }
 
     @Test func firstFrameStartsRecording() {
-        #expect(recordingState().statusIcon == .recording)
+        #expect(recordingState().session.statusIcon == .recording)
     }
 
     @Test func pauseAndResumeSwapTheIcon() {
         let state = recordingState()
         state.apply(.paused)
-        #expect(state.statusIcon == .paused)
+        #expect(state.session.statusIcon == .paused)
         state.apply(.resumed)
-        #expect(state.statusIcon == .recording)
+        #expect(state.session.statusIcon == .recording)
     }
 
     // MARK: - Recording clock for the menu-bar label (M9-T3)
 
     @Test func startBeginsARunningClockAtZero() {
         let state = recordingState()
-        #expect(state.recordingClock?.accumulated == 0)
-        #expect(state.recordingClock?.runningSince != nil)   // running
+        #expect(state.session.recordingClock?.accumulated == 0)
+        #expect(state.session.recordingClock?.runningSince != nil)   // running
     }
 
     @Test func pauseFreezesTheClockAndResumeRunsItAgain() {
         let state = recordingState()
         state.apply(.paused)
-        #expect(state.recordingClock?.runningSince == nil)   // frozen
+        #expect(state.session.recordingClock?.runningSince == nil)   // frozen
         state.apply(.resumed)
-        #expect(state.recordingClock?.runningSince != nil)   // running again
+        #expect(state.session.recordingClock?.runningSince != nil)   // running again
     }
 
     @Test(arguments: endReasons) func everyEndingClearsTheClock(reason: EndReason) {
         let state = recordingState()
         state.apply(.finished(url: Self.outputURL, reason: reason, droppedFrames: 0))
-        #expect(state.recordingClock == nil)
+        #expect(state.session.recordingClock == nil)
     }
 
     @Test func aStartFailureLeavesNoClock() {
         let state = makeState()
         state.apply(.failed(message: "no displays"))
-        #expect(state.recordingClock == nil)
+        #expect(state.session.recordingClock == nil)
     }
 
     // MARK: - Global start/stop shortcut (M9-T4)
@@ -105,7 +105,7 @@ import RecorderCore
     @Test(arguments: endReasons) func everyEndingReturnsToIdle(reason: EndReason) {
         let state = recordingState()
         state.apply(.finished(url: Self.outputURL, reason: reason, droppedFrames: 0))
-        #expect(state.statusIcon == .idle)
+        #expect(state.session.statusIcon == .idle)
     }
 
     @Test(arguments: endReasons) func aPausedSessionCanAlsoEnd(reason: EndReason) {
@@ -114,13 +114,13 @@ import RecorderCore
         let state = recordingState()
         state.apply(.paused)
         state.apply(.finished(url: Self.outputURL, reason: reason, droppedFrames: 0))
-        #expect(state.statusIcon == .idle)
+        #expect(state.session.statusIcon == .idle)
     }
 
     @Test func aStartFailureLeavesNothingRunning() {
         let state = makeState()
         state.apply(.failed(message: "No displays available"))
-        #expect(state.statusIcon == .idle)
+        #expect(state.session.statusIcon == .idle)
     }
 
     @Test func anEngineOnlyStopReturnsToIdle() {
@@ -129,13 +129,13 @@ import RecorderCore
         // left claiming a capture that has demonstrably ended.
         let state = recordingState()
         state.apply(.stopped(.userStopped))
-        #expect(state.statusIcon == .idle)
+        #expect(state.session.statusIcon == .idle)
     }
 
     @Test func discardingReturnsToIdle() {
         let state = recordingState()
         state.apply(.discarded)
-        #expect(state.statusIcon == .idle)
+        #expect(state.session.statusIcon == .idle)
     }
 
     @Test func losingTheMicrophoneKeepsRecording() {
@@ -143,7 +143,7 @@ import RecorderCore
         // here would tell the user their 90-minute screen capture had stopped when it hadn't.
         let state = recordingState()
         state.apply(.microphoneLost)
-        #expect(state.statusIcon == .recording)
+        #expect(state.session.statusIcon == .recording)
     }
 
     @Test func losingTheMicrophoneWhilePausedKeepsTheTimelineFrozen() {
@@ -152,7 +152,7 @@ import RecorderCore
         let state = recordingState()
         state.apply(.paused)
         state.apply(.microphoneLost)
-        #expect(state.statusIcon == .paused)
+        #expect(state.session.statusIcon == .paused)
     }
 
     // MARK: - The pickers → CaptureConfiguration (docs/06 items 5–7)
@@ -178,7 +178,7 @@ import RecorderCore
         // The owner travels with the id so capture can refuse a REUSED id (docs/02 §1c) — an id
         // alone would let a restored pick bind another app's window.
         let state = makeState()
-        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
+        state.sources.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
         #expect(state.captureConfiguration.content
             == .window(id: 37, ownerBundleID: "com.apple.finder"))
     }
@@ -186,31 +186,31 @@ import RecorderCore
     @Test func pickingAWindowClearsTheAppAndRegionPicks() {
         // One Source at a time: a leftover app or region pick would win in `captureConfiguration`.
         let state = makeState()
-        state.sourceChoice = .app(bundleID: "com.example.app")
-        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
-        #expect(state.selectedAppBundleID == nil)
-        #expect(state.selectedRegion == nil)
-        state.sourceChoice = .display(nil)
-        #expect(state.selectedWindow == nil)
+        state.sources.sourceChoice = .app(bundleID: "com.example.app")
+        state.sources.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
+        #expect(state.sources.selectedAppBundleID == nil)
+        #expect(state.sources.selectedRegion == nil)
+        state.sources.sourceChoice = .display(nil)
+        #expect(state.sources.selectedWindow == nil)
     }
 
     @Test func aGoneWindowIsStillListedAndStillChecked() {
         // The pick survives absence (the `(not running)` app rule); Start fails loud instead.
         let state = makeState()
         let pick = WindowSelection(id: 37, bundleID: "com.apple.finder")
-        state.sourceChoice = .window(pick)
+        state.sources.sourceChoice = .window(pick)
         state.refreshWindows([liveWindow(id: 99)], excluding: nil)
-        #expect(state.missingPickedWindow == pick)
+        #expect(state.sources.missingPickedWindow == pick)
     }
 
     @Test func aReusedIdCountsAsGoneRatherThanAsThePick() {
         // Same number, different app: the dangerous case. Treating it as present would record
         // the wrong window while looking like it worked.
         let state = makeState()
-        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
+        state.sources.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
         state.refreshWindows([liveWindow(id: 37, bundleID: "com.apple.Safari", app: "Safari")],
                              excluding: nil)
-        #expect(state.missingPickedWindow != nil)
+        #expect(state.sources.missingPickedWindow != nil)
     }
 
     @Test func theSourceLabelRelabelsARetitledWindowAndNamesTheAppOfAGoneOne() {
@@ -220,13 +220,13 @@ import RecorderCore
         let state = makeState()
         // The app names its own resolver from the installed bundle, so a closed window still says
         // "Finder"; with nothing able to name it, `appName(for:)` falls back to the bundle id.
-        state.appDisplayName = { $0 == "com.apple.finder" ? "Finder" : nil }
-        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
+        state.sources.appDisplayName = { $0 == "com.apple.finder" ? "Finder" : nil }
+        state.sources.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
         state.refreshWindows([liveWindow(id: 37, title: "Downloads")], excluding: nil)
-        #expect(state.missingPickedWindow == nil)
-        #expect(state.sourceMenuLabel == "Finder — Downloads")
+        #expect(state.sources.missingPickedWindow == nil)
+        #expect(state.sources.sourceMenuLabel == "Finder — Downloads")
         state.refreshWindows([], excluding: nil)
-        #expect(state.sourceMenuLabel == "Finder (closed)")
+        #expect(state.sources.sourceMenuLabel == "Finder (closed)")
     }
 
     @Test func aRetitledWindowStillMatchesItsOwnMenuRow() {
@@ -234,11 +234,11 @@ import RecorderCore
         // pick, so any field that moves breaks the match and the checkmark vanishes — measured
         // before M19-T5 dropped `title` from the type. Fails if it ever comes back.
         let state = makeState()
-        state.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
+        state.sources.sourceChoice = .window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
         state.refreshWindows([liveWindow(id: 37, title: "Downloads")], excluding: nil)
 
         let rowTag = SourceChoice.window(WindowSelection(id: 37, bundleID: "com.apple.finder"))
-        #expect(state.sourceChoice == rowTag)
+        #expect(state.sources.sourceChoice == rowTag)
     }
 
     @Test func screenRecNeverOffersItsOwnWindows() {
@@ -247,12 +247,12 @@ import RecorderCore
             [liveWindow(id: 1, bundleID: "dev.fcostantini.screenrec.app", app: "ScreenRec"),
              liveWindow(id: 2)],
             excluding: "dev.fcostantini.screenrec.app")
-        #expect(state.capturableWindows.map(\.id) == [2])
+        #expect(state.sources.capturableWindows.map(\.id) == [2])
     }
 
     @Test func pickedSourcesReachTheConfiguration() {
         let state = makeState()
-        state.selectedDisplayID = 42
+        state.sources.selectedDisplayID = 42
         state.microphonePreference = .device(id: "mic-uid")
         state.quality = .high
 
@@ -287,7 +287,7 @@ import RecorderCore
             DisplayOption(id: 1, name: "Sidecar", isMain: false),
             DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
         ])
-        #expect(state.selectedDisplayID == 2)
+        #expect(state.sources.selectedDisplayID == 2)
     }
 
     @Test func aPickedDisplayIsLeftAlone() {
@@ -296,23 +296,23 @@ import RecorderCore
             DisplayOption(id: 1, name: "Sidecar", isMain: false),
             DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
         ])
-        state.selectedDisplayID = 1
+        state.sources.selectedDisplayID = 1
         state.refreshSources(displays: [
             DisplayOption(id: 1, name: "Sidecar", isMain: false),
             DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
         ])
-        #expect(state.selectedDisplayID == 1)      // the user's choice survives a menu re-open
+        #expect(state.sources.selectedDisplayID == 1)      // the user's choice survives a menu re-open
     }
 
     @Test func aVanishedDisplayFallsBackToMain() {
         // Unplug the display you picked and the submenu would otherwise show nothing checked
         // while the engine resolves an ID that no longer exists.
         let state = makeState()
-        state.selectedDisplayID = 99
+        state.sources.selectedDisplayID = 99
         state.refreshSources(displays: [
             DisplayOption(id: 2, name: "Built-in Retina Display", isMain: true),
         ])
-        #expect(state.selectedDisplayID == 2)
+        #expect(state.sources.selectedDisplayID == 2)
     }
 
     @Test func aVanishedMicrophonePickIsKeptButDisplaysAsNone() {
@@ -330,7 +330,7 @@ import RecorderCore
     @Test func noDisplaysAtAllLeavesTheConfigurationOnMain() {
         let state = makeState()
         state.refreshSources(displays: [])
-        #expect(state.selectedDisplayID == nil)
+        #expect(state.sources.selectedDisplayID == nil)
         #expect(state.captureConfiguration.content == .display(.main))
     }
 
@@ -338,19 +338,19 @@ import RecorderCore
 
     @Test func aPickedAppReachesTheConfiguration() {
         let state = makeState()
-        state.selectedAppBundleID = "com.example.app"
+        state.sources.selectedAppBundleID = "com.example.app"
         #expect(state.captureConfiguration.content == .app(bundleID: "com.example.app"))
     }
 
     @Test func sourceChoiceRoundTripsAndRemembersTheDisplay() {
         let state = makeState()
-        state.selectedDisplayID = 42
-        state.sourceChoice = .app(bundleID: "com.example.app")
-        #expect(state.sourceChoice == .app(bundleID: "com.example.app"))
+        state.sources.selectedDisplayID = 42
+        state.sources.sourceChoice = .app(bundleID: "com.example.app")
+        #expect(state.sources.sourceChoice == .app(bundleID: "com.example.app"))
 
-        state.sourceChoice = .display(42)
+        state.sources.sourceChoice = .display(42)
         // Returning from an app detour lands on the remembered display, not back on main.
-        #expect(state.selectedAppBundleID == nil)
+        #expect(state.sources.selectedAppBundleID == nil)
         #expect(state.captureConfiguration.content == .display(.id(42)))
     }
 
@@ -358,15 +358,15 @@ import RecorderCore
         // M21-T4: the exclusion rides the display pick rather than replacing it, so the display
         // choice has to survive it — and `Nothing` (a plain display tag) has to undo it.
         let state = makeState()
-        state.selectedDisplayID = 42
-        state.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
+        state.sources.selectedDisplayID = 42
+        state.sources.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
 
-        #expect(state.sourceChoice == .displayExcluding(bundleID: "com.spotify.client"))
-        #expect(state.selectedDisplayID == 42)
+        #expect(state.sources.sourceChoice == .displayExcluding(bundleID: "com.spotify.client"))
+        #expect(state.sources.selectedDisplayID == 42)
         #expect(state.captureConfiguration.content
             == .displayExcluding(.id(42), bundleID: "com.spotify.client"))
 
-        state.sourceChoice = .display(42)
+        state.sources.sourceChoice = .display(42)
         #expect(state.captureConfiguration.content == .display(.id(42)))
         #expect(state.excludedAppName == nil)
     }
@@ -375,12 +375,12 @@ import RecorderCore
         // An app- or window-scoped take is already narrowed; a leftover exclusion would silently
         // ride along in `captureConfiguration`.
         let state = makeState()
-        state.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
-        state.sourceChoice = .app(bundleID: "com.example.app")
+        state.sources.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
+        state.sources.sourceChoice = .app(bundleID: "com.example.app")
         #expect(state.captureConfiguration.content == .app(bundleID: "com.example.app"))
 
-        state.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
-        state.sourceChoice = .window(WindowSelection(id: 7, bundleID: "com.example.app"))
+        state.sources.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
+        state.sources.sourceChoice = .window(WindowSelection(id: 7, bundleID: "com.example.app"))
         #expect(state.captureConfiguration.content
             == .window(id: 7, ownerBundleID: "com.example.app"))
     }
@@ -389,16 +389,16 @@ import RecorderCore
         // The state the measurement found (M21-T4): a minimised app isn't in SCK's list, so it
         // cannot be excluded. The pick survives — absence never re-homes one — and the menu says so.
         let state = makeState()
-        state.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
+        state.sources.sourceChoice = .displayExcluding(bundleID: "com.spotify.client")
         state.refreshApps([CapturableApp(bundleID: "com.other", name: "Other")], excluding: nil)
 
-        #expect(state.sourceChoice == .displayExcluding(bundleID: "com.spotify.client"))
-        #expect(state.missingExcludedApp
+        #expect(state.sources.sourceChoice == .displayExcluding(bundleID: "com.spotify.client"))
+        #expect(state.sources.missingExcludedApp
             == CapturableApp(bundleID: "com.spotify.client", name: "com.spotify.client"))
 
         state.refreshApps(
             [CapturableApp(bundleID: "com.spotify.client", name: "Spotify")], excluding: nil)
-        #expect(state.missingExcludedApp == nil)
+        #expect(state.sources.missingExcludedApp == nil)
         #expect(state.excludedAppName == "Spotify")
     }
 
@@ -406,25 +406,25 @@ import RecorderCore
         // The mic rule (docs/06): a pick survives absence — never re-homed to Entire Screen.
         // The menu shows it through `missingPickedApp`; a start while absent fails loud (M7-T1).
         let state = makeState()
-        state.selectedAppBundleID = "com.example.gone"
+        state.sources.selectedAppBundleID = "com.example.gone"
         state.refreshApps([CapturableApp(bundleID: "com.other", name: "Other")], excluding: nil)
-        #expect(state.selectedAppBundleID == "com.example.gone")
-        #expect(state.missingPickedApp
+        #expect(state.sources.selectedAppBundleID == "com.example.gone")
+        #expect(state.sources.missingPickedApp
             == CapturableApp(bundleID: "com.example.gone", name: "com.example.gone"))
     }
 
     @Test func missingPickedAppUsesTheInjectedNameResolver() {
         let state = makeState()
-        state.appDisplayName = { $0 == "com.example.gone" ? "Gone" : nil }
-        state.selectedAppBundleID = "com.example.gone"
-        #expect(state.missingPickedApp?.name == "Gone")
+        state.sources.appDisplayName = { $0 == "com.example.gone" ? "Gone" : nil }
+        state.sources.selectedAppBundleID = "com.example.gone"
+        #expect(state.sources.missingPickedApp?.name == "Gone")
     }
 
     @Test func aRunningPickedAppIsNotMissing() {
         let state = makeState()
-        state.selectedAppBundleID = "com.example.app"
+        state.sources.selectedAppBundleID = "com.example.app"
         state.refreshApps([CapturableApp(bundleID: "com.example.app", name: "App")], excluding: nil)
-        #expect(state.missingPickedApp == nil)
+        #expect(state.sources.missingPickedApp == nil)
     }
 
     @Test func refreshAppsExcludesTheAppItself() {
@@ -433,16 +433,16 @@ import RecorderCore
             [CapturableApp(bundleID: "dev.fcostantini.screenrec.app", name: "ScreenRec"),
              CapturableApp(bundleID: "com.other", name: "Other")],
             excluding: "dev.fcostantini.screenrec.app")
-        #expect(state.capturableApps == [CapturableApp(bundleID: "com.other", name: "Other")])
+        #expect(state.sources.capturableApps == [CapturableApp(bundleID: "com.other", name: "Other")])
     }
 
     @Test func theAppPickPersistsAcrossLaunches() {
         let defaults = makeDefaults()
         let first = AppState(defaults: defaults)
-        first.selectedAppBundleID = "com.example.app"
+        first.sources.selectedAppBundleID = "com.example.app"
 
         let second = AppState(defaults: defaults)
-        #expect(second.selectedAppBundleID == "com.example.app")
+        #expect(second.sources.selectedAppBundleID == "com.example.app")
         #expect(second.captureConfiguration.content == .app(bundleID: "com.example.app"))
     }
 
@@ -464,15 +464,15 @@ import RecorderCore
 
     @Test func sourceChoiceRegionRoundTripsAndClearsOtherPicks() {
         let state = makeState()
-        state.selectedAppBundleID = "com.example.app"
+        state.sources.selectedAppBundleID = "com.example.app"
         let rect = CGRect(x: 40, y: 60, width: 800, height: 500)
 
-        state.sourceChoice = .region(display: nil, rect: rect)
-        #expect(state.sourceChoice == .region(display: nil, rect: rect))
-        #expect(state.selectedAppBundleID == nil)            // region clears the app pick
+        state.sources.sourceChoice = .region(display: nil, rect: rect)
+        #expect(state.sources.sourceChoice == .region(display: nil, rect: rect))
+        #expect(state.sources.selectedAppBundleID == nil)            // region clears the app pick
 
-        state.sourceChoice = .display(1)                     // and switching away clears the region
-        #expect(state.selectedRegion == nil)
+        state.sources.sourceChoice = .display(1)                     // and switching away clears the region
+        #expect(state.sources.selectedRegion == nil)
         #expect(state.captureConfiguration.content == .display(.id(1)))
     }
 
@@ -483,7 +483,7 @@ import RecorderCore
         first.setRegion(displayID: 7, rect: rect)
 
         let second = AppState(defaults: defaults)
-        #expect(second.selectedRegion == RegionSelection(displayID: 7, rect: rect))
+        #expect(second.sources.selectedRegion == RegionSelection(displayID: 7, rect: rect))
         #expect(second.captureConfiguration.content == .region(display: .id(7), rect: rect))
     }
 
@@ -509,17 +509,17 @@ import RecorderCore
 
     @Test func nothingIsActiveBeforeStarting() {
         let state = makeState()
-        #expect(!state.isSessionActive)
-        #expect(!state.isPaused)
+        #expect(!state.session.isActive)
+        #expect(!state.session.isPaused)
     }
 
     @Test func pausedTracksTheIcon() {
         let state = recordingState()
-        #expect(!state.isPaused)
+        #expect(!state.session.isPaused)
         state.apply(.paused)
-        #expect(state.isPaused)
+        #expect(state.session.isPaused)
         state.apply(.resumed)
-        #expect(!state.isPaused)
+        #expect(!state.session.isPaused)
     }
 
     @Test func aStartFailureIsSaidOutLoud() {
@@ -538,7 +538,7 @@ import RecorderCore
         let state = makeState()
         let gone = "That window isn't on screen any more."
         state.apply(.failed(message: gone))
-        #expect(!state.isSessionActive)
+        #expect(!state.session.isActive)
         #expect(state.lastFailure == gone)
     }
 
@@ -565,7 +565,7 @@ import RecorderCore
     @Test func losingTheMicrophoneIsReportedWithoutEndingTheRecording() {
         let state = recordingState()
         state.apply(.microphoneLost)
-        #expect(state.statusIcon == .recording)      // ADR-012
+        #expect(state.session.statusIcon == .recording)      // ADR-012
         #expect(state.lastFailure != nil)            // …but never silently
     }
 
@@ -598,7 +598,7 @@ import RecorderCore
         continuation.finish()
 
         await state.consume(events)
-        #expect(state.statusIcon == .idle)
+        #expect(state.session.statusIcon == .idle)
     }
 
     @Test func aWriteFailedTakeIsNotOfferedForNamingOrSharing() {
@@ -608,7 +608,7 @@ import RecorderCore
         let state = recordingState()
         state.apply(.finished(url: Self.outputURL, reason: .writeFailed, droppedFrames: 0))
         #expect(state.session.finishedRecording == nil)
-        #expect(state.statusIcon == .idle)          // still an ending, and still the same icon
+        #expect(state.session.statusIcon == .idle)          // still an ending, and still the same icon
     }
 
     @Test func everyOtherEndingIsStillOfferedForNaming() {
@@ -661,16 +661,16 @@ import RecorderCore
         // A publish rebuilds the open menu's AppKit rows and garbles hover state, so the
         // idle 1 Hz poll (values pinned at zero) must be observation-silent.
         let state = makeState()
-        state.refreshProgress()
+        state.session.refreshProgress()
 
         let published = Flag()
         withObservationTracking {
-            _ = state.elapsedSeconds
-            _ = state.recordedBytes
+            _ = state.session.elapsedSeconds
+            _ = state.session.recordedBytes
         } onChange: {
             published.raise()
         }
-        state.refreshProgress()
+        state.session.refreshProgress()
         #expect(!published.isRaised)
     }
 
@@ -684,7 +684,7 @@ import RecorderCore
 
         let published = Flag()
         withObservationTracking {
-            _ = state.displays
+            _ = state.sources.displays
             _ = state.microphones
             _ = state.recentRecordings
         } onChange: {
@@ -741,7 +741,7 @@ import RecorderCore
         state.countInEnabled = true
         state.runCountIn = { completion in completion(.cancelled) }
         await state.start()
-        #expect(state.isSessionActive == false)
+        #expect(state.session.isActive == false)
 
         // …and Start is immediately usable again: the count-in guard must not stay latched.
         var ranAgain = false
