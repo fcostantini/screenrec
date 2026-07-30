@@ -112,6 +112,21 @@ public final class SessionModel {
         for await event in events { apply(event) }
     }
 
+    /// Whether an ending leaves a file worth offering for naming (M21-T3) or Stop & Copy (M21-T2).
+    /// Exhaustive on purpose: a new `EndReason` has to state its answer here rather than defaulting
+    /// to "offer it", which is the shape of silence M23-T1 exists to close.
+    private static func leavesAnActionableFile(_ reason: EndReason) -> Bool {
+        switch reason {
+        case .userStopped, .displayDisconnected, .appQuit, .windowClosed, .diskAlmostFull,
+             .streamError:
+            return true
+        // Renaming or exporting onto the volume that just refused a write is the wrong next move,
+        // and asking someone to name a take that died is the wrong moment (docs/06).
+        case .writeFailed:
+            return false
+        }
+    }
+
     /// Folds one engine event into the state. Internal: production always arrives via
     /// `consume(_:)`; only tests hand-feed events.
     func apply(_ event: EngineEvent) {
@@ -126,11 +141,11 @@ public final class SessionModel {
         case .paused:
             recordingClock?.bankAndFreeze(now: Date())
             statusIcon = .paused
-        case .finished(let url, _, _):
-            // What the take left behind, for the step that runs after teardown (M21-T3). A discard
+        case .finished(let url, let reason, _):
+            // What the take left behind, for the steps that run after teardown (M21-T3). A discard
             // never lands here, and neither does a start that produced no file. The length is the
             // last polled elapsed — it labels the take in the prompt, it isn't a measurement.
-            finishedRecording = (url, elapsedSeconds)
+            if Self.leavesAnActionableFile(reason) { finishedRecording = (url, elapsedSeconds) }
             fallthrough
         case .stopped, .discarded:
             // Every ending is the same to the icon, including fail-stops (ADR-007 successes with

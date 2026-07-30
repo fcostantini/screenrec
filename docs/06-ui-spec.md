@@ -259,6 +259,8 @@ form). Never the word "error" for a fail-stop.
 | Microphone recovered mid-recording — **M8-T2** | `Still recording · microphone reconnected` | `The microphone track resumed.` | — |
 | Microphone silent mid-recording — **M16-T4** | `Still recording · microphone is silent` | `No sound has reached it for 10 seconds. Check that it isn't muted.` | — |
 | Microphone audible again — **M16-T4** | `Still recording · microphone is picking up sound` | `The microphone is working again.` | — |
+| Write failed mid-take — **M23-T1** | `Recording saved · 00:03:07` | `Ended: couldn't keep writing to disk. File is playable.` | reveal |
+| Write failed, file gone with the volume — **M23-T1** | `Couldn't save the recording` | `Couldn't keep writing the recording, and the file is no longer where it was being saved. The disk it was saving to may have been disconnected.` | — |
 | Never started | `Couldn't start recording` | the engine's own message, e.g. `No displays available — the screen may be asleep or locked.` | — |
 | Replay saved — **M5** | `Replay saved` | `Replay … .mov — last 60 s. Click to reveal.` | reveal |
 | Replay save failed — **M5** | `Couldn't save replay` | one-line cause + what to do | — |
@@ -565,7 +567,10 @@ date name and selected, buttons **`Name`** / `Cancel`.
 - Esc, Cancel, a blank field and an unchanged name all keep the date name (`RenameTarget`'s existing
   rules); a collision steps to ` 2` exactly as `Rename…` does.
 - Nothing is asked when there's nothing to name: a discarded take, a start that failed, a fail-stop
-  that left no file.
+  that left no file, and — **M23-T1** — a take whose writer failed. That one *does* leave a file, but
+  renaming or exporting it means writing to the volume that just refused a write; the same rule
+  keeps `Stop & Copy MP4` from trying. `SessionModel.leavesAnActionableFile` is exhaustive over
+  `EndReason`, so a new reason has to state its answer rather than defaulting to "ask".
 - Replay clips are never named this way — the save happens mid-take, and a modal there would
   interrupt what is being recorded.
 

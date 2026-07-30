@@ -6,7 +6,32 @@
 
 ## Now
 
-- **🔍 REVIEW (2026-07-30) — 15 findings; M23 and M24 encoded in docs/03, nothing implemented.**
+- **✅ M23-T1 SHIPPED (2026-07-30) — the write path can no longer lie about a take.** The recorder
+  checks `input.append`'s `Bool`, confirms `writer.status == .failed`, and stops the session with a
+  new `EndReason.writeFailed`; finalize **salvages the fragments** instead of finishing a dead writer.
+  `ReplayMuxer` line 277's identical discarded call now reports too. **584 tests** (576 → 584), dev
+  loop green, plan artifact `claude.ai/code/artifact/f68dd711-864e-44b8-bb93-ed33c97b1d5a`.
+  🔴 **The A/B is the evidence** (500 MB APFS image, ballast to ~20 MB free, the take fills the rest —
+  M19-T1's standard): **before**, the CLI ran the **full 60 s**, 38 s of it after the writer was
+  already dead, and ended `✗ Couldn't finish saving the recording` offering nothing — while the
+  `.partial` it abandoned probes **23.05 s** once renamed. **After**, `✓ finished (writeFailed)` at
+  **20 s**, handing back a **19.05 s** playable file (hvc1 4112×2570 + AAC, tracks ≤80 ms apart).
+  Also run: volume **detached** mid-take → ended at 8 s with the honest "the file is no longer where
+  it was being saved" (never a claimed save); **control** → `finished (userStopped)`, 12.20 s clean;
+  `~/Movies` regression → 3 tracks, 8.08 s.
+  ⚠️ **Three measurements worth knowing before touching this** (all in docs/07): `isReadyForMoreMediaData`
+  stays **`true`** on a `.failed` writer — which is *why* it was invisible; **no synthetic buffer can
+  fail a writer** (four tried, all accepted), so the mechanism is not unit-testable and the tests
+  cover the decision instead; and on a full volume the `.partial` → final **rename can itself fail**
+  (2 of 4 runs), leaving a file `AVURLAsset` won't open until the launch sweep renames it.
+  **Rulings taken** (Franco's defaults): new `EndReason` case over reusing `.streamError`; a refused
+  append confirms against `writer.status` before ending anything; `onWriteFailure` renamed
+  `onCannotBeginWriting` now it has a sibling; a `.writeFailed` take is **not** offered for naming or
+  Stop & Copy (writing to the volume that just refused a write is the wrong next move); no `VERSION`
+  bump until the M23 cut.
+  **Next: M23-T2** — export disk guard + quit-during-export. Plan artifact first, per the contract.
+
+- **🔍 REVIEW (2026-07-30) — 15 findings; M23 and M24 encoded in docs/03, T1 done.**
   Artifact: `claude.ai/code/artifact/38dcfad1-b8d9-4029-9a96-e7f9ec4544fc`. Code, architecture and
   product pass over v1.11.0, read against the source and the running app.
   🔴 **The headline is a reliability gap: the recording write path never checks whether the write
@@ -24,9 +49,8 @@
   plus the ordering rationale and a refreshed parked list (the `NSMenu` item's trigger has arguably
   been met; **crop on export needs Franco's ruling**; Core Audio taps written up as their own
   milestone). **Nothing implemented.**
-  ⚠️ **Every code finding is read-from-source, not reproduced** — M23-T1 in particular wants a real
-  injected failure before anyone calls it fixed.
-  **Next: M23-T1** — plan artifact first, per the working contract.
+  ⚠️ **Every code finding is read-from-source, not reproduced** — each one wants a real reproduction
+  before anyone calls it fixed. M23-T1 got one (above); the other fourteen have not.
   ℹ️ Worth knowing: Franco's saved WhatsApp ffmpeg recipe is now **redundant** — 1920 scale, both
   audio tracks mixed to one, H.264 VideoToolbox 6 Mbps, AAC 160k, faststart is exactly what
   `Export as MP4` does today.

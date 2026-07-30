@@ -252,8 +252,8 @@ public final class ReplayMuxer: @unchecked Sendable {
 
     /// Feeds one input from an in-memory entry list, rebasing each sample to `pts − offset`. The
     /// captured `index` carries progress across the pump's re-invocations (serial per input queue);
-    /// `WriterDrain` owns the group/finish discipline. A failed writer (`.writing` lost) or a retime
-    /// failure ends the pump — the latter after recording the message.
+    /// `WriterDrain` owns the group/finish discipline. A failed writer (`.writing` lost), a retime
+    /// failure or a refused append ends the pump — the last two after recording the message.
     private func append(
         _ entries: [RingEntry<CMSampleBuffer>],
         rebasedBy offset: CMTime,
@@ -274,7 +274,12 @@ public final class ReplayMuxer: @unchecked Sendable {
                 failure.report("Couldn't retime a \(input.mediaType.rawValue) sample.")
                 return false
             }
-            input.append(sample)
+            guard input.append(sample) else {
+                failure.report(
+                    writer.error?.localizedDescription
+                        ?? "The writer refused a \(input.mediaType.rawValue) sample.")
+                return false
+            }
             return true
         }
     }

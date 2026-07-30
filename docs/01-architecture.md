@@ -102,6 +102,7 @@ is the seam that makes this trivial.
   ```swift
   enum EndReason: Sendable {
       case userStopped, displayDisconnected, appQuit, windowClosed, diskAlmostFull
+      case writeFailed                               // the writer went .failed mid-take (M23-T1)
       case streamError(String)
   }
   enum EngineEvent: Sendable {

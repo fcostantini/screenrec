@@ -38,17 +38,23 @@ public final class RecordingSession: @unchecked Sendable {
         case finalizeStranded(path: String, reason: EndReason)
         /// The writer never began (unwritable output folder, 02 §2).
         case failWriteNeverBegan
+        /// The writer began and then went `.failed`. It can neither accept a sample nor finalize,
+        /// but the fragments it flushed are playable — keep them instead of finishing (M23-T1).
+        case salvageAfterWriteFailure
         /// The ordinary path: finish the writer and finalize the partial.
         case finalizeNormal(reason: EndReason)
     }
 
     /// Decides a finished recording's fate from the end-of-loop state. Pure, so the priority is
     /// exhaustively testable: a **discard** wins over everything, then a **start failure**, then the
-    /// sentinel's **fate** (deleted/stranded), then a writer that **never began**, else the normal
-    /// finish. Side effects (cancel/finish/remove) belong to `executeFinalize`.
+    /// sentinel's **fate** (deleted/stranded), then a writer that **never began** or **died**, else
+    /// the normal finish. Side effects (cancel/finish/remove) belong to `executeFinalize`.
+    ///
+    /// `writerFailed` is read from the recorder rather than inferred from `endReason`, so a user
+    /// Stop landing in the same moment as the failure can't relabel the cause.
     static func finalizePlan(
         discardRequested: Bool, startFailure: String?, fate: FileFate?,
-        failedToBeginWriting: Bool, endReason: EndReason
+        failedToBeginWriting: Bool, writerFailed: Bool, endReason: EndReason
     ) -> FinalizePlan {
         if discardRequested {
             if case .strandedAt(let path) = fate { return .discard(strandedPath: path) }
@@ -61,6 +67,7 @@ public final class RecordingSession: @unchecked Sendable {
         case nil: break
         }
         if failedToBeginWriting { return .failWriteNeverBegan }
+        if writerFailed { return .salvageAfterWriteFailure }
         return .finalizeNormal(reason: endReason)
     }
 
@@ -69,6 +76,9 @@ public final class RecordingSession: @unchecked Sendable {
     static func writeNeverBeganMessage(folder: String) -> String {
         "Couldn't write the recording to \"\(folder)\". Choose another folder."
     }
+    static let writeFailedFileGoneMessage =
+        "Couldn't keep writing the recording, and the file is no longer where it was being saved. "
+        + "The disk it was saving to may have been disconnected."
     static func strandedFinalizeFailedMessage(path: String) -> String {
         "Couldn't finish saving the recording. The file is at \(path)."
     }
@@ -131,7 +141,7 @@ public final class RecordingSession: @unchecked Sendable {
             // `.failed`, not a `.finished` reason.
             // ⚠️ `[weak engine]` is required: engine → router → recorder → closure, so a strong
             // capture closes the cycle and makes `CaptureEngine.deinit` unreachable.
-            onWriteFailure: { [weak engine] in
+            onCannotBeginWriting: { [weak engine] in
                 Task { await engine?.stop() }
             })
         // Watches the output DIRECTORY, not the file: same volume, but it exists before the file
@@ -156,6 +166,14 @@ public final class RecordingSession: @unchecked Sendable {
         recorder.onMicrophoneDroppedAtStart = { [weak self] in
             self?.continuation.yield(.microphoneDroppedAtStart)
         }
+        // The writer died mid-session. Stop capture so the loop below ends and finalizes; the
+        // cause comes from `recorder.writerDidFail`, not this stop, so a user Stop landing in the
+        // same moment can't relabel it.
+        // ⚠️ `[weak self]` for the same reason `onCannotBeginWriting` takes `[weak engine]`:
+        // engine → router → recorder → closure, so a strong capture closes the cycle.
+        recorder.onWriterFailed = { [weak self] in
+            Task { await self?.engine.stop() }
+        }
         engine.router.attach(recorder)
         let engine = self.engine
         let recorder = self.recorder
@@ -164,10 +182,14 @@ public final class RecordingSession: @unchecked Sendable {
         // Poll the disk guard only once there is something worth saving: stopping before the
         // first frame throws `noFramesWritten` and yields no file at all. Gating on the writer's
         // state rather than a fixed delay — engine start can outlast any sleep.
+        //
+        // The writer's own status rides the same tick: with no buffers arriving (audio off, a
+        // static screen) nothing appends, so the append site — the primary detector — never runs.
         let diskMonitor = self.diskMonitor
         let diskTask = pollingTask(every: DiskSpaceMonitor.checkInterval) {
             guard recorder.hasStartedSession else { return }
             diskMonitor.check()
+            recorder.pollWriterStatus()
         }
         self.diskTask = diskTask
 
@@ -197,7 +219,8 @@ public final class RecordingSession: @unchecked Sendable {
             let plan = Self.finalizePlan(
                 discardRequested: discardRequested.value == true,
                 startFailure: startFailure, fate: fileFate.value,
-                failedToBeginWriting: recorder.failedToBeginWriting, endReason: endReason)
+                failedToBeginWriting: recorder.failedToBeginWriting,
+                writerFailed: recorder.writerDidFail, endReason: endReason)
             await executeFinalize(plan)
             continuation.finish()
         }
@@ -248,19 +271,37 @@ public final class RecordingSession: @unchecked Sendable {
             recorder.cancel()
             let folder = recorder.outputURL.deletingLastPathComponent().lastPathComponent
             continuation.yield(.failed(message: Self.writeNeverBeganMessage(folder: folder)))
+        case .salvageAfterWriteFailure:
+            // Never `finish()` here: a `.failed` writer can't finalize, and the throw would report a
+            // loss over a file that is largely intact. The fragments already flushed are the same
+            // thing a `kill -9` leaves (02 §5) — take them. `cancel()` won't delete the partial,
+            // since `cancelWriting()` only runs while `.writing`.
+            recorder.cancel()
+            let partial = recorder.outputURL
+            // The volume may have gone away with the file on it; promising a save we can't produce
+            // is the lie this task exists to remove.
+            guard FileManager.default.fileExists(atPath: partial.path) else {
+                continuation.yield(.failed(message: Self.writeFailedFileGoneMessage))
+                return
+            }
+            yieldFinished(partial: partial, reason: .writeFailed)
         case .finalizeNormal(let reason):
             do {
-                let partial = try await recorder.finish()
-                // A rename failure after a successful finish is NOT a lost recording — the complete
-                // movie sits at the partial path; the next launch's sweep renames it.
-                let url = (try? OutputLocation.finalizePartial(partial)) ?? partial
-                continuation.yield(.finished(
-                    url: url, reason: reason, droppedFrames: recorder.droppedFrameCount))
+                yieldFinished(partial: try await recorder.finish(), reason: reason)
             } catch {
                 // The `.partial` sits in the output folder; the next launch's sweep renames it.
                 Self.finalizeFailed(error, message: Self.finalizeFailureMessage, on: continuation)
             }
         }
+    }
+
+    /// Reports a saved recording: renames the `.partial` to its final name and yields `finished`.
+    /// A rename failure is NOT a lost recording — the movie sits at the partial path and the next
+    /// launch's sweep renames it, so the path we yield is wherever it actually is.
+    private func yieldFinished(partial: URL, reason: EndReason) {
+        let url = (try? OutputLocation.finalizePartial(partial)) ?? partial
+        continuation.yield(.finished(
+            url: url, reason: reason, droppedFrames: recorder.droppedFrameCount))
     }
 
     /// Guards the partial. Runs from `onDidBeginWriting` — the one moment that's provably

@@ -1863,7 +1863,7 @@ flight is invisible from the menu bar. M16's thesis — the state stops lying �
 places it hasn't been. **PATCH** (ADR-013): no new capability, unless T3's signal turns into a real
 affordance.
 
-- [ ] M23-T1 **The writer says when it fails.** `MovieRecorder.append` discards
+- [x] M23-T1 **The writer says when it fails.** `MovieRecorder.append` discards
       `input.append(retimed)`'s `Bool`, and nothing watches `writer.status` during a session — the
       poll checks free space, not the writer. Once an `AVAssetWriter` goes `.failed` every append
       no-ops silently and the icon, the clock and the byte counter all keep claiming a recording; the

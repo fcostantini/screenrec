@@ -22,7 +22,8 @@ import RecorderCore
     /// Every way a session can end. All of them are `finished` — the fail-stops are ADR-007
     /// successes, not errors — so all of them must land on the same icon.
     private static let endReasons: [EndReason] = [
-        .userStopped, .displayDisconnected, .appQuit, .diskAlmostFull, .streamError("-3815"),
+        .userStopped, .displayDisconnected, .appQuit, .diskAlmostFull, .writeFailed,
+        .streamError("-3815"),
     ]
 
     /// An AppState on a throwaway preferences domain.
@@ -592,6 +593,26 @@ import RecorderCore
 
         await state.consume(events)
         #expect(state.statusIcon == .idle)
+    }
+
+    @Test func aWriteFailedTakeIsNotOfferedForNamingOrSharing() {
+        // M23-T1: the fold records what the take left behind so the naming prompt and Stop & Copy
+        // can act on it — but both would write to the volume that just refused a write, and a
+        // "what shall we call it?" over a take that died is the wrong moment (docs/06).
+        let state = recordingState()
+        state.apply(.finished(url: Self.outputURL, reason: .writeFailed, droppedFrames: 0))
+        #expect(state.session.finishedRecording == nil)
+        #expect(state.statusIcon == .idle)          // still an ending, and still the same icon
+    }
+
+    @Test func everyOtherEndingIsStillOfferedForNaming() {
+        // The negative control: without it the guard above passes just as well by suppressing
+        // every take, which would silently retire M21-T3.
+        for reason in Self.endReasons where reason != .writeFailed {
+            let state = recordingState()
+            state.apply(.finished(url: Self.outputURL, reason: reason, droppedFrames: 0))
+            #expect(state.session.finishedRecording?.url == Self.outputURL)
+        }
     }
 
     @Test func refreshProgressPublishesOnlyOnRealChange() {

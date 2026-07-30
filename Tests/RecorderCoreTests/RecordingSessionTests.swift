@@ -9,14 +9,15 @@ import Testing
     private func plan(
         discard: Bool = false, startFailure: String? = nil,
         fate: RecordingSession.FileFate? = nil, failedToBeginWriting: Bool = false,
-        endReason: EndReason = .userStopped
+        writerFailed: Bool = false, endReason: EndReason = .userStopped
     ) -> RecordingSession.FinalizePlan {
         RecordingSession.finalizePlan(
             discardRequested: discard, startFailure: startFailure, fate: fate,
-            failedToBeginWriting: failedToBeginWriting, endReason: endReason)
+            failedToBeginWriting: failedToBeginWriting, writerFailed: writerFailed,
+            endReason: endReason)
     }
 
-    // MARK: the six branches
+    // MARK: the seven branches
 
     @Test func normalFinishIsTheDefault() {
         #expect(plan(endReason: .userStopped) == .finalizeNormal(reason: .userStopped))
@@ -45,6 +46,19 @@ import Testing
         #expect(plan(discard: true) == .discard(strandedPath: nil))
     }
 
+    @Test func aWriterThatDiedSalvagesWhatItWrote() {
+        // Not `.finalizeNormal`: finishing a `.failed` writer throws, and the throw would report a
+        // loss over fragments that are playable (M23-T1).
+        #expect(plan(writerFailed: true) == .salvageAfterWriteFailure)
+    }
+
+    @Test func salvageIgnoresTheEndReasonItArrivedWith() {
+        // A user Stop landing in the same moment as the failure must not relabel the cause: the
+        // decision reads the recorder, not whichever stop reason won the race.
+        #expect(plan(writerFailed: true, endReason: .userStopped) == .salvageAfterWriteFailure)
+        #expect(plan(writerFailed: true, endReason: .displayDisconnected) == .salvageAfterWriteFailure)
+    }
+
     // MARK: priority — the bug-prone part (a mis-order loses or corrupts a take)
 
     @Test func discardWinsOverEveryOtherFate() {
@@ -70,6 +84,22 @@ import Testing
             == .finalizeStranded(path: "/tmp/x.partial", reason: .userStopped))
     }
 
+    @Test func fateAndStartFailureBeatSalvage() {
+        // A deleted file has nothing to salvage, and a stranded one's fragments are at the moved
+        // path, not ours — both must outrank the write failure that may also be set.
+        #expect(plan(fate: .deleted, writerFailed: true) == .failDeleted)
+        #expect(plan(fate: .strandedAt("/tmp/x.partial"), writerFailed: true)
+            == .finalizeStranded(path: "/tmp/x.partial", reason: .userStopped))
+        #expect(plan(startFailure: "x", writerFailed: true) == .failToStart(message: "x"))
+        #expect(plan(discard: true, writerFailed: true) == .discard(strandedPath: nil))
+    }
+
+    @Test func aWriterThatNeverBeganBeatsOneThatDied() {
+        // Mutually exclusive in practice; pinned so the order can't drift into claiming a save
+        // over a file that was never created.
+        #expect(plan(failedToBeginWriting: true, writerFailed: true) == .failWriteNeverBegan)
+    }
+
     // MARK: message helpers — M6-T3 bar (say what happened AND what to do)
 
     @Test func deletedMessageSaysItPlainly() {
@@ -85,6 +115,14 @@ import Testing
     @Test func strandedFinalizeFailedMessageNamesThePath() {
         #expect(RecordingSession.strandedFinalizeFailedMessage(path: "/tmp/moved.partial")
             .contains("/tmp/moved.partial"))
+    }
+
+    @Test func writeFailedFileGoneMessageSaysWhereItWentAndWhy() {
+        let message = RecordingSession.writeFailedFileGoneMessage
+        #expect(message.contains("no longer where it was being saved"))
+        #expect(message.contains("disconnected"))
+        // Never the word the copy rules forbid for a write that stopped (docs/06).
+        #expect(!message.lowercased().contains("error"))
     }
 
     @Test func finalizeFailureMessagePointsAtRecovery() {

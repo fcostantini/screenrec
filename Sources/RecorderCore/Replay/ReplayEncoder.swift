@@ -24,7 +24,7 @@ public final class ReplayEncoder: SampleConsumer, @unchecked Sendable {
     private let ring: RingBuffer<CMSampleBuffer>
     private let frameRateCap: Int
     /// Fires once on the first unrecoverable encoder error (session creation or encode failure),
-    /// from a capture/VT thread. Mirrors `MovieRecorder.onWriteFailure` — a dead encoder must
+    /// from a capture/VT thread. Mirrors `MovieRecorder.onCannotBeginWriting` — a dead encoder must
     /// surface, never wedge silently (ADR-007).
     private let onFailure: (@Sendable (String) -> Void)?
 

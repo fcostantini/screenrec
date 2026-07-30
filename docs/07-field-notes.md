@@ -7,6 +7,47 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-30 (M23-T1): what a dying `AVAssetWriter` actually does, and the one thing no unit test
+  can reach.
+  - 🔴 **`isReadyForMoreMediaData` stays `true` on a `.failed` writer, forever.** This is the whole
+    reason the bug was invisible rather than merely unreported: the readiness guard does *not*
+    short-circuit, so the append is reached, returns `false`, and — with the return value discarded —
+    the recorder cheerfully accepts every frame for the rest of the take and writes none of them.
+    Measured on a full volume: refusal and the `.failed` transition land on the **same call** (frame
+    356), and `isReady` was still `true` on the next frame. So the append's `Bool` is the primary
+    detector and the `writer.status` poll is only the backstop for when nothing is appending.
+  - 🔴 **No synthetic sample buffer can fail a writer, so the mechanism is not unit-testable.**
+    Tried and all four were **accepted** (`append` → `true`, status stayed `.writing`, `error` nil):
+    mismatched dimensions (640×480 into a 320×240 input), PTS going backwards, PTS before the
+    session start, and a wholly invalid PTS. `AVAssetWriterInput.append` validates almost nothing at
+    call time — malformation surfaces at `finishWriting`, not here. Don't spend an hour trying to
+    build a deterministic in-process failure; the unit tests cover the *decision* (`finalizePlan`'s
+    priority, the notification copy, the naming-prompt policy) and a real volume covers the rest.
+  - ✅ **The salvage is real, and it is the crash-recovery path.** ENOSPC at 11.87 s of a
+    video-only take left a fragmented file that reads **11.07 s** — 0.8 s lost, exactly the 1 s
+    `movieFragmentInterval`. Through the real CLI (video + system audio), a take killed at ~20 s
+    probed **19.05 s**, hvc1 4112×2570 + AAC, both tracks within 80 ms.
+  - **The A/B, same rig, M19-T1's standard** (500 MB APFS image, ballast leaving ~20 MB, the take
+    fills the rest): **before**, the CLI ran the **full 60 s** — 38 s of it after the writer was
+    already dead — and ended `✗ Couldn't finish saving the recording`, offering nothing; the
+    `.partial` it abandoned probes **23.05 s** once renamed, so the content was always there.
+    **After**, `✓ finished (writeFailed)` at **20 s** with a playable file handed back.
+  - ⚠️ **The error is `AVFoundationErrorDomain -11807 "Disk Full"` wrapping `NSPOSIXErrorDomain 28`** —
+    but don't key on it. A read-only remount or a detached volume arrives at the same `.failed`
+    status by a different code, which is why the detection reads `status`, not `error`.
+  - ⚠️ **On a volume that just hit ENOSPC the `.partial` → final rename can itself fail**, and it did
+    in 2 of 4 runs (nondeterministic — it needs a metadata transaction the full volume may refuse).
+    The `(try? finalizePartial) ?? partial` fallback then reports the `.partial` path, and **a
+    `.partial` is unopenable — `AVURLAsset` can't infer a type from that extension**, so `probe`
+    says "Cannot Open" over bytes that are perfectly good (copy to `X.mov` and it reads fine). The
+    launch-recovery sweep renames it, so nothing is lost, but the reveal-on-click in that window
+    lands on a file QuickTime won't open. Pre-existing behaviour of `finalizeNormal`; M23-T1 just
+    makes it far more likely to be hit, since the volume is full by definition on this path.
+  - ⚠️ Rig note: a quiet desktop encodes at **~0.4 MB/s**, ~5× under the rate budget, so a 500 MB
+    volume never fills in a 60 s take. Ballast it to a few tens of MB free — and not *too* tight,
+    or the writer dies before the first fragment flushes and there is genuinely nothing to salvage
+    (11 MB free → dead at 1.5 s, unreadable file, which is correct behaviour but proves nothing).
+
 - 2026-07-30 (M21-T4, live leg): ⚠️ **Excluding an app silences the system-audio track, not the
   room.** Under `Everything Except ▸ QuickTime`, the recorded system-audio track measured
   **−∞ dBFS** while the **microphone** track measured **−35.2 dBFS** — the mic hearing the tone

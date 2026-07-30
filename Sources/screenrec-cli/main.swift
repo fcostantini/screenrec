@@ -219,6 +219,7 @@ func describe(_ reason: EndReason) -> String {
     case .appQuit: return "appQuit"
     case .windowClosed: return "windowClosed"
     case .diskAlmostFull: return "diskAlmostFull"
+    case .writeFailed: return "writeFailed"
     case .streamError(let message): return "streamError(\(message))"
     }
 }

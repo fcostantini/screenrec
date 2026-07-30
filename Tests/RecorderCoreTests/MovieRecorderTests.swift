@@ -323,7 +323,7 @@ import Testing
             let recorder = try MovieRecorder(
                 outputURL: url, frameRate: Self.fps, preset: .efficient,
                 includesMicrophone: false, includesSystemAudio: true,
-                onWriteFailure: { failed() })
+                onCannotBeginWriting: { failed() })
             for index in 0..<2 {
                 let pts = CMTime(value: CMTimeValue(index), timescale: CMTimeScale(Self.fps))
                 recorder.consume(

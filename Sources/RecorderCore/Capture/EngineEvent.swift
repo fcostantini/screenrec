@@ -13,6 +13,10 @@ public enum EndReason: Sendable, Equatable {
     /// same stream error and report this one reason (measured, docs/02 §1c).
     case windowClosed
     case diskAlmostFull
+    /// The `AVAssetWriter` refused a write mid-session and went `.failed` — the volume filled,
+    /// went read-only, or went away. Everything flushed before that is on disk (fragmented, 02 §5),
+    /// so this is a fail-stop with a playable file, not a loss.
+    case writeFailed
     case streamError(String)
 }
 

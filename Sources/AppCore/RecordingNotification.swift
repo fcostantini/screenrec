@@ -332,6 +332,9 @@ public enum RecordingNotifications {
         case .appQuit: "the recorded app quit"
         case .windowClosed: "the recorded window closed"
         case .diskAlmostFull: "disk almost full — free up space before recording again"
+        // No remedy named: the refusal could be a full, read-only or disconnected volume, and we
+        // can't tell which. Inventing one would be worse than saying only what we know.
+        case .writeFailed: "couldn't keep writing to disk"
         case .streamError: "screen capture stopped unexpectedly"
         // Not a cause — `.userStopped` takes the manual-stop branch above.
         case .userStopped: "you stopped it"

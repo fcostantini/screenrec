@@ -31,7 +31,12 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     /// Fired once if the writer can't begin — `startWriting()` failed, e.g. an unwritable output
     /// folder (02 §2). The writer never starts, so the owner must stop capture and fail the
     /// session (ADR-007) rather than wait forever. Invoked on a capture queue, `lock` released.
-    private let onWriteFailure: (@Sendable () -> Void)?
+    private let onCannotBeginWriting: (@Sendable () -> Void)?
+    /// Fires once, from a capture queue or the owner's poll, when a writer that HAD begun goes
+    /// `.failed` — the volume filled, went read-only, or went away. Distinct from
+    /// `onCannotBeginWriting`: the fragments already flushed are playable, so the owner stops the
+    /// session and salvages rather than failing it. Set before capture starts.
+    var onWriterFailed: (@Sendable () -> Void)?
     /// Fires once, from the capture queue, after `startWriting()` has created the real output
     /// file — the earliest moment a file watcher can safely open it (before that, the path
     /// holds the reservation placeholder, a different inode). Set before capture starts.
@@ -59,6 +64,9 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     /// Latched when `startWriting()` fails (an unwritable output folder — 02 §2), so the writer
     /// isn't re-attempted and the owner can fail the session. `true` ⇒ writing never began.
     private var didFailToBeginWriting = false
+    /// Latched the first time the writer is seen `.failed` after writing began, so `onWriterFailed`
+    /// fires exactly once however many appends refuse in the meantime.
+    private var didFailMidSession = false
 
     /// Retained for the tail-frame patch (docs/02 §5): a static screen stops delivering frames,
     /// so on finish the last frame is re-appended at the end time to match the audio length.
@@ -80,13 +88,13 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         preset: QualityPreset,
         includesMicrophone: Bool,
         includesSystemAudio: Bool,
-        onWriteFailure: (@Sendable () -> Void)? = nil
+        onCannotBeginWriting: (@Sendable () -> Void)? = nil
     ) throws {
         self.outputURL = outputURL
         self.frameRate = frameRate
         self.preset = preset
         self.includesMicrophone = includesMicrophone
-        self.onWriteFailure = onWriteFailure
+        self.onCannotBeginWriting = onCannotBeginWriting
 
         writer = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
         // Fragmented .mov for crash safety: flushed every second, so a kill -9 loses at most
@@ -108,7 +116,8 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         }
     }
 
-    /// Video frames dropped because the encoder wasn't ready — reported at stop (docs/01).
+    /// Video frames that never reached the file — the encoder wasn't ready, or the writer refused
+    /// them — reported at stop (docs/01).
     public var droppedFrameCount: Int {
         lock.lock(); defer { lock.unlock() }
         return droppedFrames
@@ -130,10 +139,28 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
     }
 
     /// Whether the writer failed to begin (`startWriting()` failed). The owner reads it to fail the
-    /// session — nothing playable exists (ADR-007). Set once; see `onWriteFailure`.
+    /// session — nothing playable exists (ADR-007). Set once; see `onCannotBeginWriting`.
     var failedToBeginWriting: Bool {
         lock.lock(); defer { lock.unlock() }
         return didFailToBeginWriting
+    }
+
+    /// Whether a writer that had begun went `.failed`. The owner reads it to salvage the fragments
+    /// instead of finishing a writer that can neither accept nor finalize. Set once.
+    var writerDidFail: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return didFailMidSession
+    }
+
+    /// Reads `writer.status` and reports a failure the append path can't see: with no buffers
+    /// arriving (audio off, static screen) nothing appends, so nothing would notice. Called from
+    /// the owner's existing disk poll — the append site is the primary, this is the backstop.
+    func pollWriterStatus() {
+        lock.lock()
+        // Unlocked before notifying, like `consume`'s defers: `lock` is non-reentrant.
+        let failed = !isFinished && latchWriterFailure()
+        lock.unlock()
+        if failed { onWriterFailed?() }
     }
 
     // MARK: - Consume
@@ -144,12 +171,14 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
         lock.lock()
         // Notify outside the lock: defers run LIFO, so these registered before the unlock run
         // after it. `lock` is non-reentrant — firing a handler under it could deadlock.
-        var notifyWriteFailure = false
+        var notifyCannotBeginWriting = false
         var notifyDidBeginWriting = false
         var notifyMicrophoneDropped = false
-        defer { if notifyWriteFailure { onWriteFailure?() } }
+        var notifyWriterFailed = false
+        defer { if notifyCannotBeginWriting { onCannotBeginWriting?() } }
         defer { if notifyDidBeginWriting { onDidBeginWriting?() } }
         defer { if notifyMicrophoneDropped { onMicrophoneDroppedAtStart?() } }
+        defer { if notifyWriterFailed { onWriterFailed?() } }
         defer { lock.unlock() }
         guard !isFinished else { return }
 
@@ -192,7 +221,7 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
             // `startWriting()` failed (unwritable folder, 02 §2): fire once so the owner can stop
             // capture and fail the session. The `didFailToBeginWriting` guard above then keeps it
             // from re-attempting or re-notifying on later frames.
-            if didFailToBeginWriting { notifyWriteFailure = true }
+            if didFailToBeginWriting { notifyCannotBeginWriting = true }
             if didStartWriting {
                 notifyDidBeginWriting = true
                 // The grace expired with a wanted mic still absent: it's dropped for good (a late
@@ -214,31 +243,52 @@ public final class MovieRecorder: SampleConsumer, @unchecked Sendable {
             didStartSession = true
         }
 
-        append(buffer, retimedTo: rebasedPTS, source: type)
+        notifyWriterFailed = append(buffer, retimedTo: rebasedPTS, source: type)
     }
 
     /// Retime `buffer` onto the recording timeline and append it, counting a video frame that
-    /// the encoder can't accept right now. Must hold `lock`.
-    private func append(_ buffer: CMSampleBuffer, retimedTo rebasedPTS: CMTime, source: SourceType) {
+    /// the encoder can't accept right now. Must hold `lock`. Returns whether the writer was just
+    /// seen to fail, so the caller can notify with the lock released.
+    private func append(
+        _ buffer: CMSampleBuffer, retimedTo rebasedPTS: CMTime, source: SourceType
+    ) -> Bool {
         let input: AVAssetWriterInput?
         switch source {
         case .screen: input = videoInput
         case .systemAudio: input = systemAudioInput
         case .microphone: input = microphoneInput
         }
-        guard let input else { return }
+        guard let input else { return false }
         guard input.isReadyForMoreMediaData else {
             if source == .screen { droppedFrames += 1 }
-            return
+            return false
         }
-        guard let retimed = SampleTiming.retimed(buffer, to: rebasedPTS) else { return }
-        input.append(retimed)
+        guard let retimed = SampleTiming.retimed(buffer, to: rebasedPTS) else { return false }
+        // A refused append means "go read `writer.status`" — backpressure is already excluded by
+        // the readiness check above. Measured: on a full volume the refusal and the `.failed`
+        // transition land on the same call, and `isReadyForMoreMediaData` stays `true` afterwards,
+        // so an unchecked writer accepts frames forever and writes none (docs/07).
+        guard input.append(retimed) else {
+            if source == .screen { droppedFrames += 1 }
+            return latchWriterFailure()
+        }
 
         if source == .screen {
             lastVideoBuffer = buffer
             lastVideoRebasedPTS = rebasedPTS
         }
         if CMTimeCompare(rebasedPTS, latestRebasedPTS) > 0 { latestRebasedPTS = rebasedPTS }
+        return false
+    }
+
+    /// Latches a `.failed` writer, reporting whether this call is the one that saw it first — so
+    /// `onWriterFailed` fires once however many appends refuse. A refusal while the writer is still
+    /// `.writing` is one rejected sample, not a dead session, and latches nothing. Must hold `lock`.
+    private func latchWriterFailure() -> Bool {
+        guard writer.status == .failed else { return false }
+        guard !didFailMidSession else { return false }
+        didFailMidSession = true
+        return true
     }
 
     // MARK: - Pause / resume
