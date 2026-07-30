@@ -1920,10 +1920,11 @@ affordance.
       until a feature milestone touches those files anyway. **Verify:** tests and the deployed menu
       dump unchanged — M22's own bar.
 
-**Gate G23**: a recording that cannot be written stops itself with a stated cause and keeps what it
-wrote; an export that cannot fit refuses before it starts and names the disk; an export in flight is
-visible without opening the menu, and a take that stops while replay is armed is never silent; both
-extracted models have tests that fail when their logic is broken.
+**Gate G23** — ✅ **PASSED 2026-07-30** (evidence in STATUS.md's gate table): a recording that cannot
+be written stops itself with a stated cause and keeps what it wrote; an export that cannot fit refuses
+before it starts and names the disk; an export in flight is visible without opening the menu, and a
+take that stops while replay is armed is never silent; both extracted models have tests that fail when
+their logic is broken.
 
 ## M24 — Finish the share loop (from the 2026-07-30 review)
 

@@ -109,10 +109,11 @@
   `onCannotBeginWriting` now it has a sibling; a `.writeFailed` take is **not** offered for naming or
   Stop & Copy (writing to the volume that just refused a write is the wrong next move); no `VERSION`
   bump until the M23 cut.
-  **Next: G23** — every task M23 filed is done (T5 is optional and explicitly last, and Franco has not
-  asked for it). The gate's four criteria are each already evidenced above; running G23 means
-  re-checking them **against one release build** and pasting the result into the table below.
-  Then **M24**, whose T3 mirrors the flash this task fixed — it inherits one that works.
+  **✅ G23 PASSED 2026-07-30** — see the gate table. **M23 is complete** bar T5, which is optional,
+  explicitly last, and unasked-for.
+  **Next: Franco's call.** The obvious candidate is **M24** (finish the share loop): its T3 mirrors
+  the flash M23-T3 just repaired, so it inherits one that works, and T5 stays available if structure
+  is wanted before more features land on it.
 
 - **🔍 REVIEW (2026-07-30) — 15 findings; M23 and M24 encoded in docs/03, T1 done.**
   Artifact: `claude.ai/code/artifact/38dcfad1-b8d9-4029-9a96-e7f9ec4544fc`. Code, architecture and
@@ -201,6 +202,7 @@
 
 | Gate | Status | Evidence |
 |------|--------|----------|
+| G23  | ✅ **passed 2026-07-30** | All four criteria re-run against **one release build** (`c7509ec`, deployed, signature valid). **A recording that cannot be written stops itself and keeps what it wrote:** 500 MB APFS image, ballast to ~20 MB, the take fills the rest → **`✓ finished (writeFailed)` at 27 s** leaving **26.03 s** playable (hvc1 4112×2570 + AAC). The pre-fix binary on the identical rig ran the **full 60 s** — 38 s of it after the writer was already dead — and offered nothing. **An export that cannot fit refuses before it starts and names the disk:** 15.2 MB free against a 34.7 MB export → `Not enough room to export / This needs about 35 MB and SCRECFIT has 16 MB free. The recording is untouched.`, with **zero bytes written** (no `.mp4`, no `.partial`, no `.sb-`) and no receipt row. **An export in flight is visible without opening the menu:** the top-trailing dot, captured with the export confirmed in flight; and **armed + exporting shows both dots** without collision, meter intact. **A take that stops while replay is armed is never silent:** the tick renders beside the armed badge (item 39 → 51 pt, back to 39 after the window) — ⚠️ **the first time that flash has ever appeared**, since M9-T3 shipped it as a second `Image` a `MenuBarExtra` never draws. **Both extracted models fail when broken:** **12 breaks applied, 12 turned red**, each naming `SessionModelTests`/`ExportModelTests` rather than `AppStateTests`; tree clean after. **636 tests.** ⚠️ Method note: the icon states are evidenced by **magnified capture, not pixel count** — pixel-diffing this menu bar is unreliable (docs/07). |
 | G0   | ✅ passed 2026-07-14 | build+test(23)+bundle green; Identifier=dev.fcostantini.screenrec.app, Authority=screenrec-dev, designated requirement stable across rebuilds |
 | M1   | ✅ complete 2026-07-14 | all 5 tasks done; capture engine + router + probe + sleep guard, 41 tests |
 | G1   | ✅ passed 2026-07-14 | probe-stream: all 3 sources flowing. video 4112×2570 420v (PTS Δ 0.008–0.09s, frame-on-change); system audio 48kHz/2ch/32-bit (Δ 0.02s); mic native format device-dependent — AirPods 24kHz/1ch, built-in 48kHz/1ch (both differ from system audio → separate tracks required, M2) |
