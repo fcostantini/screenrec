@@ -26,9 +26,12 @@
   waited exactly like the wait button. Fixed by clearing `exportInProgress` **synchronously** before
   `terminate`. The general rule is in docs/07: an alert in front of `terminate` cannot decide the
   outcome; the delegate gets the last word.
-  ⚠️ **The strict ruling now has a price tag: A2's real export was 9.4 MB against its 35 MB
-  estimate**, so A1 refused a job that would have fitted. That is the ~3.7× ceiling docs/07 predicted,
-  arriving on a path where it *decides* rather than labels. **Franco may want to revisit strict.**
+  ✅ **RULED: strict stands (Franco, 2026-07-30), with the cost known.** A2's real export was 9.4 MB
+  against its 35 MB estimate, so A1 refused a job that would have fitted — the ~3.7× ceiling docs/07
+  predicted, arriving on a path where it *decides* rather than labels. The trade was taken with that
+  number in hand: a false refusal is instantly recoverable, a false accept costs minutes and ends in
+  the failure the check exists to remove. **Don't re-open without a new measurement** — a fraction
+  would be invented, and the spread is content, not a constant (5× static vs 1.02× busy, M19-T4).
   ⚠️ Also found: an abandoned export leaves an `.sb-` temp nothing sweeps (pre-existing; `Quit Anyway`
   makes it one click) — cheap follow-up noted in docs/07.
 

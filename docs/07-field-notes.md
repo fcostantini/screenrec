@@ -35,9 +35,11 @@ file every session is required to read.
   wrongly in fact. This is the same over-quote M21-T2 measured (~5× on a static desktop) arriving on
   a path where it *decides* something rather than just labelling a row. The ruling was strict on
   purpose (a false refusal is instantly recoverable; a false accept costs minutes and ends in the
-  failure the check exists to remove) — but the number is now known, and it is the argument for
-  revisiting it. ✅ The fitted size the estimate assumes was confirmed exact: the export probed
-  `avc1 1920x1200`, matching the arithmetic.
+  failure the check exists to remove). ✅ **Ruled 2026-07-30 with this number in hand: strict stands.**
+  Don't re-open it without a *new* measurement — any fraction would be invented, and the spread is a
+  property of the content, not a constant (5× on a static desktop vs 1.02× on busy content, M19-T4).
+  ✅ The fitted size the estimate assumes was confirmed exact: the export probed `avc1 1920x1200`,
+  matching the arithmetic.
 
 - 2026-07-30 (M23-T2, leg B): ⚠️ **An abandoned export leaves an `AVAssetWriter` `.sb-` temp that
   nothing sweeps.** Measured by quitting through a live export: the `.mp4.partial` is litter the
