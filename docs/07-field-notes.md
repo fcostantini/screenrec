@@ -572,12 +572,14 @@ file every session is required to read.
     (`if replaySavedFlash { Image(systemName: "checkmark.circle.fill") }`) — by this measurement it
     has **never rendered**. Not fixed here (out of M16-T5's scope); it wants the same compositing.
   - Locating the item for a screenshot: AppleScript's `position of menu bar item 1` returns `0,24`
-    (useless), but the raw AX API on `kAXExtrasMenuBarAttribute` gives the real frame — see
-    `scratchpad/itemframe.swift`. Without it you cannot crop a menu bar full of live third-party
-    items, and diffing a wide strip is meaningless (CPU% and network counters change every second).
+    (useless), but the raw AX API on `kAXExtrasMenuBarAttribute` gives the real frame. Without it you
+    cannot crop a menu bar full of live third-party items, and diffing a wide strip is meaningless
+    (CPU% and network counters change every second). **Now `tools/itemframe.swift`** — it was a
+    scratchpad script here, and scratchpads do not survive the session (M23-T3 had to rewrite it).
   - ⚠️ **`md5` of two `screencapture` PNGs is NOT a pixel comparison** — identical pixels can encode
     to different bytes. A first pass "measured" three distinct states that way; decoding and
-    comparing pixels showed two. Compare decoded pixels (`scratchpad/pixdiff.swift`).
+    comparing pixels showed two. **Now `tools/pixdiff.swift`**, which re-demonstrates the trap on
+    demand: the same capture re-encoded gives md5 `57b52…` vs `80267…` and `identical: 2592 px`.
 
 - 2026-07-27 (M16-T4): **Microphone levels, measured — two mics in the same quiet room are 23 dB
   apart, and a muted one is exactly zero.** Peak amplitude per 500 ms window, read through the real

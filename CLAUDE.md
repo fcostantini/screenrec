@@ -145,8 +145,11 @@ swift tools/frames.swift <f> 1 3 1 out  # PNG frames at timestamps (clip *conten
 swift tools/menudriver.swift dump       # the menu-bar app's open menu, as assertable text
 swift tools/menudriver.swift click "Pause"
 swift tools/settingsdriver.swift toggle # drive the Settings *window* via AX (menudriver does the menu)
+swift tools/alertdriver.swift press "Quit Anyway"  # click a modal NSAlert (a keystroke can't — 07)
 swift tools/hoverprobe.swift "Settings…" 5 out  # screenshot the open menu per-tick (caught M6-T10)
 swift tools/axdump.swift                # dump the app's Accessibility tree (find a control's real role)
+swift tools/itemframe.swift --rect      # the status item's real frame, for `screencapture -R`
+swift tools/pixdiff.swift a.png b.png   # compare DECODED pixels (md5 of two PNGs is not a diff)
 .build/debug/screenrec-cli --help
 ```
 
