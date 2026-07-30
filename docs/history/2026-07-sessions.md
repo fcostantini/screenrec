@@ -5,6 +5,112 @@ the record of how the work went, not a description of how things are. For curren
 `STATUS.md`; for the per-task specification and tick boxes read `docs/03-milestones.md`; for measured
 platform behaviour read `docs/07-field-notes.md`.
 
+## Rotated from STATUS.md 2026-07-30 — M21 (One step from "it happened" to "here it is"), shipped as v1.11.0
+
+- **✅ M21-T4 DONE (2026-07-30) — `Source ▸ Everything Except ▸`. All four M21 tasks are done; G21 is
+  the only thing left in the milestone.** Plan artifact (measurement first, three directions, Franco
+  took the recommendation): `claude.ai/code/artifact/4f5cd208-0781-4bb3-a4a8-cf491614e0f7`.
+  **576 tests (+6)**, dev loop green, deployed (pid 74408 → **91541**).
+  ⚠️ **The task's premise moved under measurement.** SCK's exclusion is not audio-only: it removes the
+  app's **picture** too, and it **cannot touch an app with nothing on screen** — the "music in the
+  background" case F3 actually named. So it shipped as what it is: `Entire Screen except Slack`, with
+  a dimmed `Slack won't be seen or heard` row. The true audio-only route (Core Audio process taps,
+  `AudioHardwareCreateProcessTap`) is written up in **docs/02 §1a-ii** as its own future milestone,
+  not attempted here.
+  **Verified twice over:** raw SCK **−9.1 → −∞ dBFS** (buffers still flowing — silent, not stalled),
+  the app's window present in one frame and absent in the other; then the shipped path,
+  `record --exclude-app` → **−∞ dBFS** full-length system-audio track vs a **−8.3 dBFS** control, and
+  the same through a menu-driven take.
+  🔴 **The honesty path is measured, not assumed:** with the app minimised the take ran, the menu read
+  **"The app to leave out wasn't on screen — nothing was excluded."**, and the file's system audio came
+  back at **−9.0 dBFS**. A new `EngineEvent.excludedAppUnavailable` carries it (the
+  `microphoneDroppedAtStart` shape) — degraded, never silent (ADR-007).
+  ⚠️ **The mic still hears an excluded app through the speakers** (−35.2 dBFS on the mic track while
+  system audio was −∞) — docs/07.
+  **Everything restored:** Source back to Entire Screen, QuickTime quit, all test files deleted.
+  **Next: G21** — the gate, then the **MINOR** cut (T1–T4 are all user-facing features).
+
+- **✅ M21-T3 DONE (2026-07-29) — a take can be named the moment it stops.** Plan artifact (rulings
+  A–C, "go with your picks"): `claude.ai/code/artifact/b0de032c-ec0d-4cfe-8528-c679a6e93fcf`.
+  **570 tests (+4)**, dev loop green, deployed (pid 73163 → **74408**).
+  **As built:** opt-in (`Settings → Recording → Ask for a name when a recording stops`, **off by
+  default**, beside Count in). A finished take raises the `Rename…` alert with take-time copy —
+  *Name this recording* / *0:10 · Esc keeps the date name* — and the answer goes straight into
+  M12-T2's `rename`, collisions and receipt re-pointing included.
+  **Two orderings carry the design:** it runs **after teardown** (a dialog left open can't delay
+  re-arming replay or cancelling the stop timer) and **before the share export** (so Stop & Copy MP4
+  copies the *named* `.mp4`).
+  🔴 **The quality pass caught the second one broken:** the share path looked the take up by its
+  pre-rename URL, which no longer existed — it would have silently exported nothing.
+  `lastFinishedRecording` now records where the take actually landed.
+  **Verified live, three legs:** named → `Bug-1204 repro.mov`, recents row agreeing; Esc →
+  `Recording 2026-07-29 at 16.25.59.mov` kept; Stop & Copy MP4 + a name → `Demo for Ana.mov` +
+  `Demo for Ana.mp4`, receipt `Exported to MP4 · Demo for Ana.mp4`, that file on the pasteboard.
+  ⚠️ **The setting is back OFF** (as Franco had it) and all four test files are deleted.
+  ⚠️ **A synthetic keystroke can't answer this app's modal alert** — it goes to whatever is frontmost,
+  and an unanswered alert leaves the app modal, which swallowed the *next* run's Start. Drive alerts
+  through AX (docs/07).
+  **Next: M21-T4** (leave an app's audio out) — the last task in M21, then G21.
+
+- **✅ M21-T2 DONE (2026-07-29) — `Stop & Copy MP4`: one row from recording to clipboard.** Plan
+  artifact (rulings A–D, "go with your picks"):
+  `claude.ai/code/artifact/4847ca05-15d1-4802-b934-de0158f76294`. **566 tests (+4)**, dev loop green,
+  deployed (pid 57391 → **58816**).
+  **As built:** the row sits under `Stop & Save` (which keeps ⌥⌘R and the bold primary), stops and
+  finalizes through `stopAndWaitForFinalize()`, exports at the Settings size through the unchanged
+  `performExport` guard, and hands the file to an injected `copyToPasteboard` — AppKit stays in the
+  app layer (`ShareActions.copy`), the notifier's own pattern. One notice, not two: `Copied — ⌘V to
+  paste`, which still reveals on click.
+  ⚠️ **Named `Stop & Copy MP4`, not the roadmap's "Stop & Share"** — `Share…` means the macOS share
+  sheet everywhere else in this app, and `Copy` is the verb that matches what you press next.
+  **Verified live end to end:** 14 s take → the pasteboard held the `.mp4` **2.0 s** after the press
+  (avc1 1920×1200 + one AAC, 15.47 s), the `.mov` master untouched, one receipt row in the menu.
+  🔴 **The leg caught my own estimate lying:** the row promised `≈11 MB`, the file was **2.2 MB** —
+  the export's rate budget over-quotes a quiet screen ~5× (docs/07). The row now says **`up to`**,
+  re-verified on the deployed build as `Stop & Copy MP4 · up to 3 MB`. The Settings picker keeps `≈`:
+  it compares picks, it doesn't promise a file.
+  ⚠️ **Your clipboard holds a deleted test clip** until you copy anything else. All test files
+  removed from ~/Movies.
+  **Next: M21-T3** (name the take) — its natural home is this same stop moment.
+
+- **✅ M21-T1 DONE (2026-07-29) — the Trim window writes the shareable MP4 itself.** Plan artifact
+  (rulings A/B/C approved): `claude.ai/code/artifact/2c0c8b44-a8d0-4f50-8b4e-07e16068e064`.
+  **562 tests (+5)**, dev loop green, **deployed** to `/Users/Shared/ScreenRec.app` (pid 56110 →
+  **24242**) and driven live.
+  **As built:** `Export as MP4` sits between Play Range and Trim & Save, with `Trim & Save` keeping
+  Return (ADR-015). The range travels `TrimView → AppState → ExportModel → Exporter` as an
+  `ExportRange`, riding the unchanged `performExport` path — same one-at-a-time guard, receipt and
+  notification. The CLI gained `export --to-mp4 --from <t> --to <t>` (ruling C), which is what made
+  the verification headless. Output is `<take> trimmed.mp4` (ruling B).
+  ⚠️ **The task's own seam sentence was wrong and the entry says so:** docs/03 put the range on
+  `AVAssetExportSession` — that is the *trim*'s engine. The MP4 export must stay a reader/writer
+  pipeline (one mixed AAC track, the size fit, faststart), so the range lands on
+  **`AVAssetReader.timeRange`**.
+  **Measured before building, and it settled the design:** a ranged read **clips exactly at the
+  in-point** — 1.900 s past the preceding keyframe, first delivered PTS **30.000**, audio identical
+  — so no retiming, and the lossless trim's "keeps N s before it inside the file" caveat simply
+  doesn't apply here.
+  **Verified headlessly:** avc1 1920×1200 + **one** AAC, `moov` before `mdat`, **5.00 s**, and the
+  folder holds exactly one new file — no `.mov`, no `.partial`. First-frame identity needed a source
+  that could fail the test: a real recording scored **38.1–38.6 dB against all six candidate
+  frames** (static content), so a clip that burns its timestamp into every frame was used instead —
+  the export's first frame reads **27.30 s**, **52.4 dB** against the source there against
+  **8.8 dB** against the keyframe 3.3 s earlier.
+  🔴 **A fast export can strand `AVAssetWriter`'s `.sb-` temp** — the file M15-T3 filed as a
+  hard-kill leftover, here after a clean export (1 of 5 runs; long and rangeless ones never did).
+  A ranged export is short by design, so it went from rare to routine: swept after finalize, by our
+  own scratch prefix only. That is the task's "no intermediate file" criterion, so it is in scope.
+  **Verified live on the deployed build:** the window drove through <kbd>I</kbd>/<kbd>O</kbd> to
+  **In 0:03 · Out 0:06 · Trimmed length ≈ 0:03**, `Export as MP4` wrote **3.04 s, avc1 1920×1200 +
+  one AAC**, the menu showed **`Exported to MP4 · Recording … trimmed.mp4`**, and ~/Movies gained
+  exactly that one file — no `.mov`, no `.partial`, no `.sb-`. The take records its own menu bar, so
+  the file checked itself: the export's first frame and the source at 3.05 s both read
+  **`00:00:02`**. Test file deleted afterwards.
+  ⚠️ **PSNR is useless on a real screen recording here** — same scene, one page-scroll apart, scores
+  12–17 dB either way; that's why the frame-exactness proof is the synthetic clock clip and the live
+  proof is the burned-in menu-bar clock (docs/07).
+  **Next: M21-T2** (Stop & Share) — it reuses this path with no range.
+
 - **🧽 M14-T3 DONE — small hygiene; M14 COMPLETE, GATE G14 PASSED (2026-07-23).** Three independent
   behaviour-preserving cleanups: **(1)** hoisted the byte-identical growing-file-size probe (AppState +
   CLI) into one **`OutputLocation.currentFileSize(for:)`** (partial-first), both callers use it, both
