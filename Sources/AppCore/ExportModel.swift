@@ -49,6 +49,12 @@ public final class ExportModel {
     /// AppKit, which AppCore may not import (docs/01).
     public var copyToPasteboard: (@MainActor (URL) -> Void)?
 
+    /// Free space on the volume holding a path, for the fit check (M23-T2). Injected so tests need
+    /// no real disk — `DiskSpaceMonitor`'s own reason for taking the same seam.
+    var availableBytes: @Sendable (String) -> Int64? = {
+        DiskSpaceMonitor.availableBytes(forVolumeAtPath: $0)
+    }
+
     /// The recording the Trim window is editing (M10-T4), or nil. Set when `Trim…` opens the window;
     /// the view reads it. Transient — not persisted.
     public var trimTarget: URL?
@@ -72,6 +78,7 @@ public final class ExportModel {
         let export = exportFunction  // snapshot; the closure captures no `self`
         performExport(
             source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source, range: range)),
+            estimate: { await Self.mp4Bytes(of: source, configuration: configuration, range: range) },
             using: { try await export($0, $1, configuration, range) },
             success: { RecordingNotifications.exported(url: $0) },
             failure: RecordingNotifications.exportFailed)
@@ -89,6 +96,7 @@ public final class ExportModel {
             : RecordingNotifications.copiedToPasteboard(url:)
         performExport(
             source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source)),
+            estimate: { await Self.mp4Bytes(of: source, configuration: configuration, range: nil) },
             using: { try await export($0, $1, configuration, nil) },
             success: notice,
             failure: RecordingNotifications.exportFailed,
@@ -97,6 +105,10 @@ public final class ExportModel {
 
     /// Saves a recording or clip as a looping GIF (M10-T3), the same off-main, one-at-a-time path.
     /// The caps come from Settings — AppState builds the `configuration` and passes it in.
+    ///
+    /// Deliberately unguarded by `ExportRoom` (M23-T2): LZW output size is content-dependent and
+    /// lands either side of the source, so any estimate would refuse GIFs that fit and pass ones
+    /// that don't. GIFs are also the smallest thing here, capped by their own fps/width.
     public func exportToGIF(_ source: URL, configuration: GifConfiguration) {
         let gifExport = gifExportFunction  // snapshot the value; the closure captures no `self`
         performExport(
@@ -112,6 +124,9 @@ public final class ExportModel {
         let trim = trimFunction  // snapshot; the closure captures no `self`
         performExport(
             source, to: Exporter.availableURL(basedOn: Trimmer.trimmedSibling(of: source)),
+            // A trim keeps a subset of the source's samples, so the whole source is a ceiling for
+            // it — no rate model needed, and it can only over-quote.
+            estimate: { Self.fileBytes(of: source) },
             using: { try await trim($0, $1, start, end, mode) },
             success: { RecordingNotifications.trimmed(url: $0) },
             failure: RecordingNotifications.trimFailed)
@@ -121,9 +136,14 @@ public final class ExportModel {
     /// export at a time; the source is only read, so it never touches a live recording. Only a
     /// success sets `lastExport`; the "Exporting…" row shadows any prior receipt while this runs,
     /// so a failed re-export leaves the previous export's pointer intact.
+    ///
+    /// `estimate` predicts the output's size so the volume can be checked before anything is
+    /// written (M23-T2). Nil means this kind of export has no defensible prediction, and runs
+    /// unguarded — see `ExportRoom.fits`.
     private func performExport(
         _ source: URL,
         to output: URL,
+        estimate: (@Sendable () async -> Int64?)? = nil,
         using export: @escaping @Sendable (URL, URL) async throws -> URL,
         success: @escaping (URL) -> RecordingNotification,
         failure: @escaping () -> RecordingNotification,
@@ -131,7 +151,18 @@ public final class ExportModel {
     ) {
         guard exportInProgress == nil else { return }
         exportInProgress = source.lastPathComponent
-        Task { [weak self, export] in
+        let availableBytes = self.availableBytes
+        exportTask = Task { [weak self, export] in
+            // Before a byte is written: an export knows its own length, so a job that cannot land
+            // is refused rather than failed part-way (the recording path's floor is the other
+            // shape, for the other reason).
+            if let shortfall = await Self.shortfall(
+                writing: output, estimate: estimate, availableBytes: availableBytes) {
+                guard let self else { return }
+                exportInProgress = nil
+                notify?(RecordingNotifications.exportNoRoom(shortfall))
+                return
+            }
             do {
                 let url = try await export(source, output)
                 guard let self else { return }
@@ -146,6 +177,69 @@ public final class ExportModel {
                 notify?(failure())
             }
         }
+    }
+
+    /// What the export would need against what the volume has, or nil when it fits (or can't be
+    /// judged). Off the main actor: both the header read and the volume probe are I/O.
+    nonisolated private static func shortfall(
+        writing output: URL, estimate: (@Sendable () async -> Int64?)?,
+        availableBytes: @Sendable (String) -> Int64?
+    ) async -> ExportRoom.Shortfall? {
+        guard let estimate, let need = await estimate() else { return nil }
+        let folder = output.deletingLastPathComponent().path
+        // The folder, not the not-yet-existing file: probing a path that doesn't exist reads nil
+        // forever and silently disables the check (the M19-T1 trap).
+        guard let free = availableBytes(folder),
+              !ExportRoom.fits(needBytes: need, freeBytes: free)
+        else { return nil }
+        return ExportRoom.Shortfall(
+            needBytes: need, freeBytes: free,
+            volumeName: ExportRoom.volumeName(forPath: folder))
+    }
+
+    /// The most a share export of `source` can weigh. Nil when the file's header can't be read —
+    /// no figure beats a wrong one (M16-T2). The arithmetic itself is
+    /// `ExportConfiguration.projectedBytes`, shared with the menu row that quotes a weight.
+    nonisolated private static func mp4Bytes(
+        of source: URL, configuration: ExportConfiguration, range: ExportRange?
+    ) async -> Int64? {
+        guard let pixels = await MediaFile.dimensions(of: source) else { return nil }
+        let seconds: Double
+        if let range {
+            seconds = max(0, range.end - range.start)
+        } else if let full = await MediaFile.duration(of: source) {
+            seconds = full
+        } else {
+            return nil
+        }
+        return configuration.projectedBytes(
+            sourceWidth: pixels.width, sourceHeight: pixels.height, seconds: seconds)
+    }
+
+    /// The source's size on disk, or nil if it can't be read.
+    nonisolated private static func fileBytes(of source: URL) -> Int64? {
+        (try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init)
+    }
+
+    /// The export in flight, held so quitting can wait for it instead of killing it with the
+    /// process (M23-T2) — the shape `SessionModel.consumeTask` uses for a recording.
+    private var exportTask: Task<Void, Never>?
+
+    /// Waits for an in-flight export to settle. Returns at once when none is running.
+    public func waitForExportToFinish() async {
+        await exportTask?.value
+    }
+
+    /// Abandons an in-flight export — the user chose to quit through it (M23-T2).
+    ///
+    /// Clears `exportInProgress` **synchronously**, before the cancellation is observed, so the
+    /// quit that follows sees no work in flight. Without that, `applicationShouldTerminate` would
+    /// turn "Quit Anyway" back into a wait, and the button would be a lie. Nothing is corrupted:
+    /// the export writes to a `.partial` and only renames on success (M15-T3).
+    public func cancelExport() {
+        exportTask?.cancel()
+        exportTask = nil
+        exportInProgress = nil
     }
 
     // MARK: - The receipt

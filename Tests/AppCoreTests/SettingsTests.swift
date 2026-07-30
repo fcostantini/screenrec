@@ -14,9 +14,7 @@ import RecorderCore
     /// `dictionaryRepresentation()` also contains every inherited global, which is not what
     /// "what did we write" means.
     private func makeDefaults() -> (defaults: UserDefaults, suite: String) {
-        let suite = "screenrec-tests-\(UUID().uuidString)"
-        // Invariant: a fresh UUID suite name is always a valid, unused domain.
-        return (UserDefaults(suiteName: suite)!, suite)
+        TestDefaults.makeNamed()
     }
 
     // MARK: - The contract
@@ -686,7 +684,7 @@ import RecorderCore
     }
 
     @Test func aWindowPickRoundTripsWithItsOwner() {
-        let defaults = UserDefaults(suiteName: "settings-window-\(UUID().uuidString)")!
+        let defaults = TestDefaults.make("settings-window")
         var settings = Settings.standard
         settings.captureWindow = WindowSelection(id: 37, bundleID: "com.apple.finder")
         SettingsStore.save(settings, to: defaults)
@@ -696,7 +694,7 @@ import RecorderCore
     @Test func aWindowPickStoresNothingButItsIdentity() {
         // A window title is another app's content — a private-browsing window or a DM would sit
         // in the plist in plaintext (M19-T5). Nothing but id and owner may reach disk.
-        let defaults = UserDefaults(suiteName: "settings-window-\(UUID().uuidString)")!
+        let defaults = TestDefaults.make("settings-window")
         var settings = Settings.standard
         settings.captureWindow = WindowSelection(id: 37, bundleID: "com.apple.finder")
         SettingsStore.save(settings, to: defaults)
@@ -708,7 +706,7 @@ import RecorderCore
     @Test func aLegacyStoredTitleIsIgnoredAndOverwritten() {
         // Entries written before M19-T5 carry a title. It must not load, and the next save of
         // anything must drop it — the whole dictionary is rewritten, so no migration is needed.
-        let defaults = UserDefaults(suiteName: "settings-window-\(UUID().uuidString)")!
+        let defaults = TestDefaults.make("settings-window")
         defaults.set(
             [SettingsStore.Key.windowID: 37,
              SettingsStore.Key.windowBundleID: "com.apple.finder",
@@ -727,7 +725,7 @@ import RecorderCore
     @Test func aStoredWindowPickWithoutAnOwnerIsDiscarded() {
         // It could never be verified at capture, which is the only reason to store one — keeping
         // it would mean binding a bare id (docs/02 §1c).
-        let defaults = UserDefaults(suiteName: "settings-window-\(UUID().uuidString)")!
+        let defaults = TestDefaults.make("settings-window")
         defaults.set([SettingsStore.Key.windowID: 37], forKey: SettingsStore.Key.captureWindow)
         #expect(SettingsStore.load(from: defaults).captureWindow == nil)
     }

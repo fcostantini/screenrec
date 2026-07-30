@@ -714,11 +714,8 @@ public final class AppState {
     /// wrong one.
     private var maximumShareBytes: Int64? {
         guard let pixels = sources.displayPixelSize, elapsedSeconds > 0 else { return nil }
-        let configuration = exportConfiguration
-        let fitted = Exporter.fittedSize(
-            width: pixels.width, height: pixels.height, configuration: configuration)
-        let perMinute = configuration.bytesPerMinute(forWidth: fitted.width, height: fitted.height)
-        return Int64(Double(perMinute) * elapsedSeconds / 60)
+        return exportConfiguration.projectedBytes(
+            sourceWidth: pixels.width, sourceHeight: pixels.height, seconds: elapsedSeconds)
     }
 
     /// The Size picker's label for `width`: the size, then what a minute of it weighs (M19-T4) —
@@ -1014,6 +1011,18 @@ public final class AppState {
 
     /// Drops a stale export receipt at menu open (M12-T3) — forwards to `exports` (M14-T1).
     public func expireStaleExportReceipt() { exports.expireStaleReceipt() }
+    /// Lets quit wait for an export instead of killing it with the process (M23-T2).
+    public func waitForExportToFinish() async { await exports.waitForExportToFinish() }
+    /// Abandons an in-flight export, for a user who chose to quit through it (M23-T2).
+    public func cancelExport() { exports.cancelExport() }
+
+    /// Settles everything a quit must not kill: a recording finalizes (ADR-007), then an export
+    /// finishes (M23-T2). One definition, so the menu's Quit and `applicationShouldTerminate`
+    /// can't drift on what "safe to exit" means. Returns at once when nothing is in flight.
+    public func finishWorkInFlight() async {
+        if isSessionActive { await stopAndWaitForFinalize() }
+        await waitForExportToFinish()
+    }
 
     /// True when `url` is still on disk. The menu's rows are stamped at open, so a file can go
     /// away under them; every action checks first and reports rather than doing nothing (M18-T4).

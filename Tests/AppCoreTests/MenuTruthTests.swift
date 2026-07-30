@@ -10,7 +10,7 @@ import RecorderCore
 @Suite struct MenuTruthTests {
 
     private func makeState() -> AppState {
-        AppState(defaults: UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!)
+        AppState(defaults: TestDefaults.make())
     }
 
     // MARK: - Source label
@@ -103,7 +103,7 @@ import RecorderCore
         try Data("x".utf8).write(to: file)
 
         // Stale: persisted two hours ago, past the one-hour window → expiry drops it.
-        let staleDefaults = UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!
+        let staleDefaults = TestDefaults.make()
         SettingsStore.saveLastExport(
             LastExport(url: file, date: Date(timeIntervalSinceNow: -7200)), to: staleDefaults)
         let staleState = AppState(defaults: staleDefaults)
@@ -112,7 +112,7 @@ import RecorderCore
         #expect(staleState.lastExport == nil)
 
         // Fresh: persisted just now → expiry keeps it.
-        let freshDefaults = UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!
+        let freshDefaults = TestDefaults.make()
         SettingsStore.saveLastExport(LastExport(url: file, date: Date()), to: freshDefaults)
         let freshState = AppState(defaults: freshDefaults)
         freshState.expireStaleExportReceipt()
@@ -122,7 +122,7 @@ import RecorderCore
     // MARK: - System audio (M16-T3, ADR-019)
 
     @Test func systemAudioIsOnUntilTurnedOffAndSurvivesRelaunch() {
-        let defaults = UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!
+        let defaults = TestDefaults.make()
         // Absent ⇒ on, so existing installs keep capturing it (the showsMenuBarTimer idiom).
         #expect(AppState(defaults: defaults).capturesSystemAudio)
 

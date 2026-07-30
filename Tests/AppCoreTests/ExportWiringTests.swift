@@ -15,7 +15,7 @@ private final class Box<Value>: @unchecked Sendable {
 @Suite struct ExportWiringTests {
 
     private func makeState() -> AppState {
-        AppState(defaults: UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!)
+        AppState(defaults: TestDefaults.make())
     }
 
     @Test func exportSetsInProgressSynchronouslyThenReceiptAndNotifies() async {
@@ -83,6 +83,129 @@ private final class Box<Value>: @unchecked Sendable {
 
         while state.exportInProgress != nil { await Task.yield() }
         #expect(posted.count == 1)   // exactly one export completed
+    }
+
+    // MARK: - The fit check (M23-T2)
+
+    /// A real file of known size on a volume the test tells the model is nearly full. The trim path
+    /// is used because its estimate is the source's own size, so no media fixture is needed.
+    private func makeSizedFile(bytes: Int) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("exportroom-\(UUID().uuidString).mov")
+        try Data(count: bytes).write(to: url)
+        return url
+    }
+
+    @Test func anExportThatCannotFitIsRefusedBeforeAnythingRuns() async throws {
+        let state = makeState()
+        var posted: [RecordingNotification] = []
+        state.notifier = { posted.append($0) }
+        let source = try makeSizedFile(bytes: 4096)
+        defer { try? FileManager.default.removeItem(at: source) }
+
+        let ran = Box<Bool>()
+        state.exports.trimFunction = { _, output, _, _, _ in ran.value = true; return output }
+        state.exports.availableBytes = { _ in 100 }        // less than the source's 4096
+
+        state.trim(source, from: 0, to: 1, mode: .lossless)
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(ran.value != true)                          // nothing was written
+        #expect(state.lastExport == nil)                    // and no receipt claims otherwise
+        #expect(posted.count == 1)
+        #expect(posted.first?.title == "Not enough room to export")
+        #expect(posted.first?.fileURL == nil)
+    }
+
+    @Test func anExportThatFitsIsNotRefused() async throws {
+        // The negative control: without it the guard above passes just as well by refusing
+        // everything, which would break every export in the app.
+        let state = makeState()
+        let source = try makeSizedFile(bytes: 4096)
+        defer { try? FileManager.default.removeItem(at: source) }
+
+        let ran = Box<Bool>()
+        state.exports.trimFunction = { _, output, _, _, _ in ran.value = true; return output }
+        state.exports.availableBytes = { _ in 1_000_000_000 }
+
+        state.trim(source, from: 0, to: 1, mode: .lossless)
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(ran.value == true)
+        #expect(state.lastExport != nil)
+    }
+
+    @Test func aGifIsNeverRefusedForRoom() async {
+        // Deliberately ungated: LZW output size can't be predicted, so a guess would refuse GIFs
+        // that fit. Pinned so nobody "fixes" the omission with an invented estimate.
+        let state = makeState()
+        let written = URL(fileURLWithPath: "/tmp/Clip.gif")
+        state.exports.gifExportFunction = { _, _, _ in written }
+        state.exports.availableBytes = { _ in 0 }
+
+        state.exportToGIF(URL(fileURLWithPath: "/tmp/Clip.mov"))
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(state.lastExport?.url == written)
+    }
+
+    @Test func anUnreadableVolumeDoesNotBlockAnExport() async throws {
+        let state = makeState()
+        let source = try makeSizedFile(bytes: 4096)
+        defer { try? FileManager.default.removeItem(at: source) }
+
+        let ran = Box<Bool>()
+        state.exports.trimFunction = { _, output, _, _, _ in ran.value = true; return output }
+        state.exports.availableBytes = { _ in nil }         // capacity can't be read
+
+        state.trim(source, from: 0, to: 1, mode: .lossless)
+        while state.exportInProgress != nil { await Task.yield() }
+
+        #expect(ran.value == true)
+    }
+
+    // MARK: - Quit waits for an export (M23-T2)
+
+    @Test func waitingForAnExportReturnsOnlyAfterItSettles() async {
+        let state = makeState()
+        let finished = Box<Bool>()
+        state.exports.exportFunction = { _, output, _, _ in
+            try await Task.sleep(for: .milliseconds(30))
+            finished.value = true
+            return output
+        }
+
+        state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
+        await state.waitForExportToFinish()
+
+        // The point of the whole thing: quit can't outrun the work.
+        #expect(finished.value == true)
+        #expect(state.exportInProgress == nil)
+    }
+
+    @Test func abandoningAnExportClearsItBeforeQuitLooksAgain() async {
+        // "Quit Anyway" calls `terminate`, which runs `applicationShouldTerminate`, which waits for
+        // an export in flight. So the clear has to be visible by the time that check runs — i.e.
+        // synchronously — or the button waits like the one beside it and its label is a lie.
+        let state = makeState()
+        state.exports.exportFunction = { _, output, _, _ in
+            try await Task.sleep(for: .seconds(10))
+            return output
+        }
+
+        state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
+        #expect(state.exportInProgress == "Clip.mov")
+        state.cancelExport()
+        #expect(state.exportInProgress == nil)   // no await between the two — that is the point
+
+        await state.waitForExportToFinish()      // and quit's wait is now a no-op
+        #expect(state.lastExport == nil)         // an abandoned export leaves no receipt
+    }
+
+    @Test func waitingWithNoExportRunningReturnsAtOnce() async {
+        let state = makeState()
+        await state.waitForExportToFinish()      // must not hang
+        #expect(state.exportInProgress == nil)
     }
 
     @Test func gifExportSetsReceiptAndNotifies() async {

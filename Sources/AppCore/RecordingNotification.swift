@@ -169,6 +169,18 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
+    /// The export was refused before it started because it can't fit (M23-T2). Names the volume and
+    /// both figures — the need and the have are what decide the next move; "check the output folder
+    /// is writable" (the generic failure) would name the wrong thing entirely.
+    public static func exportNoRoom(_ shortfall: ExportRoom.Shortfall) -> RecordingNotification {
+        RecordingNotification(
+            title: "Not enough room to export",
+            body: "This needs about \(ApproximateBytes.formatted(shortfall.needBytes)) and "
+                + "\(shortfall.volumeName) has \(ApproximateBytes.formatted(shortfall.freeBytes)) "
+                + "free. The recording is untouched.",
+            fileURL: nil)
+    }
+
     /// Stop & Copy MP4 finished (M21-T2). The file is already on the pasteboard, so the next
     /// keystroke is the point; the click-to-reveal is the fallback for a clipboard since overwritten.
     public static func copiedToPasteboard(url: URL) -> RecordingNotification {

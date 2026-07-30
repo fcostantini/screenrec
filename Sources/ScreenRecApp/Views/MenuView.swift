@@ -446,20 +446,54 @@ struct MenuView: View {
         state.refreshProgress()
     }
 
-    /// docs/06 item 12: quitting mid-recording confirms, then finalizes before exit (ADR-007).
-    private func quit() {
-        guard state.isSessionActive else { return NSApplication.shared.terminate(nil) }
-
+    /// Runs a modal confirmation, reporting whether the **first** button was chosen. Every caller
+    /// puts the safe choice first, so it is the one Return picks.
+    ///
+    /// The app is `LSUIElement`, so it must activate itself or the alert renders inactive and its
+    /// buttons can't be reached (docs/07).
+    private static func confirm(
+        _ message: String, _ informative: String,
+        first: String, second: String, secondIsDestructive: Bool = false
+    ) -> Bool {
         let alert = NSAlert()
-        alert.messageText = "Stop recording and quit?"
-        alert.informativeText = "Your recording will be saved first."
-        alert.addButton(withTitle: "Stop & Quit")
-        alert.addButton(withTitle: "Keep Recording")
+        alert.messageText = message
+        alert.informativeText = informative
+        alert.addButton(withTitle: first)
+        alert.addButton(withTitle: second).hasDestructiveAction = secondIsDestructive
         NSApplication.shared.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    /// docs/06 item 12: quitting mid-recording confirms, then finalizes before exit (ADR-007).
+    /// An export in flight confirms too (M23-T2) — quitting through it loses work silently.
+    private func quit() {
+        if state.isSessionActive {
+            guard Self.confirm(
+                "Stop recording and quit?", "Your recording will be saved first.",
+                first: "Stop & Quit", second: "Keep Recording")
+            else { return }
+            Task {
+                await state.finishWorkInFlight()
+                NSApplication.shared.terminate(nil)
+            }
+            return
+        }
+
+        guard state.exportInProgress != nil else { return NSApplication.shared.terminate(nil) }
+
+        guard Self.confirm(
+            "An export is still running.",
+            "Quitting now throws it away. The recording it came from is untouched.",
+            first: "Wait for Export", second: "Quit Anyway")
+        else {
+            // Abandon it first: `terminate` runs `applicationShouldTerminate`, which waits for an
+            // export in flight — so without this, "Quit Anyway" would wait like the other button.
+            state.cancelExport()
+            return NSApplication.shared.terminate(nil)
+        }
 
         Task {
-            await state.stopAndWaitForFinalize()
+            await state.waitForExportToFinish()
             NSApplication.shared.terminate(nil)
         }
     }
@@ -473,13 +507,11 @@ struct MenuView: View {
     private func discardRecording() {
         guard state.isSessionActive else { return }
 
-        let alert = NSAlert()
-        alert.messageText = "Discard this recording?"
-        alert.informativeText = "This take will be deleted and can't be recovered."
-        alert.addButton(withTitle: "Keep Recording")   // default (Return) — the safe choice
-        alert.addButton(withTitle: "Discard").hasDestructiveAction = true
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertSecondButtonReturn else { return }
+        // Keeping is first, so Return keeps — a reflexive press can't destroy a take.
+        guard !Self.confirm(
+            "Discard this recording?", "This take will be deleted and can't be recovered.",
+            first: "Keep Recording", second: "Discard", secondIsDestructive: true)
+        else { return }
 
         Task { await state.discard() }
     }

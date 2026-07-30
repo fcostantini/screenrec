@@ -74,6 +74,21 @@ import RecorderCore
         #expect(finished(.windowClosed)?.body == "Ended: the recorded window closed. File is playable.")
     }
 
+    @Test func theNoRoomNoticeNamesTheDiskAndBothFigures() {
+        // M23-T2: the generic export failure blames the folder's permissions, which is the wrong
+        // thing entirely when the disk is full. Need, have and which disk are what decide the fix.
+        let n = RecordingNotifications.exportNoRoom(ExportRoom.Shortfall(
+            needBytes: 1_800_000_000, freeBytes: 900_000_000, volumeName: "Macintosh HD"))
+        #expect(n.title == "Not enough room to export")
+        #expect(n.body.contains("Macintosh HD"))
+        #expect(n.body.contains("1,8 GB") || n.body.contains("1.8 GB"))   // locale decimal mark
+        #expect(n.body.contains("900 MB"))
+        #expect(n.body.contains("The recording is untouched."))
+        #expect(!n.body.lowercased().contains("error"))          // docs/06 copy rule
+        #expect(!n.body.contains("writable"))                    // never the old, wrong advice
+        #expect(n.fileURL == nil)                                // nothing to reveal
+    }
+
     @Test func writeFailedNamesTheCausePlainlyWithoutInventingARemedy() {
         // M23-T1: the take is saved up to the failure, so it takes the same "saved" title as any
         // other fail-stop. No remedy: full, read-only and disconnected all land here and we can't
@@ -214,7 +229,7 @@ import RecorderCore
         // These two paths produce no session and so no event stream. Setting `lastFailure` and
         // returning left Start looking unchanged and the user believing they were recording —
         // exactly the silence ADR-007 forbids.
-        let state = AppState(defaults: UserDefaults(suiteName: "notify-\(UUID().uuidString)")!)
+        let state = AppState(defaults: TestDefaults.make("notify"))
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
 

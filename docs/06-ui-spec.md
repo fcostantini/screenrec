@@ -242,6 +242,15 @@ Button(role: .destructive) { … } label: { Text(discardTitle) }
 //     string: "Discard Recording…", attributes: [.foregroundColor: NSColor.systemRed]))
 ```
 
+**Quitting with work in flight (M23-T2).** A recording confirms (`Stop recording and quit?`) and is
+finalized first. An **export** confirms too — `An export is still running.` / `Quitting now throws it
+away. The recording it came from is untouched.` — with **`Wait for Export` as the default button**,
+so a reflexive Return can't discard it (the `Discard Recording…` rule). ⚠️ `Quit Anyway` must clear
+the in-flight state *synchronously*: every quit route ends in `NSApplication.terminate`, whose
+delegate waits for an export, so an abandon the delegate can't observe becomes a wait (docs/07).
+Logout and shutdown reach `applicationShouldTerminate` directly, where a modal could stall the
+system — that route waits silently, and asks nothing.
+
 The plain string still reaches Accessibility as the row's title, so `menudriver` finds and clicks
 it. Same family of limitation as the header's frozen clock (item 1) and the un-two-toned folder
 path (item 10): for a `.menu` MenuBarExtra, style through AppKit, not SwiftUI modifiers.
@@ -265,6 +274,7 @@ form). Never the word "error" for a fail-stop.
 | Replay saved — **M5** | `Replay saved` | `Replay … .mov — last 60 s. Click to reveal.` | reveal |
 | Replay save failed — **M5** | `Couldn't save replay` | one-line cause + what to do | — |
 | Exported to MP4 — **M10-T2** | `Exported to MP4` | `<name>.mp4 — ready to share. Click to reveal.` | reveal |
+| Export won't fit — **M23-T2** | `Not enough room to export` | `This needs about 1,8 GB and Macintosh HD has 900 MB free. The recording is untouched.` | — |
 | Export failed — **M10-T2** | `Couldn't export to MP4` | `The original recording is untouched. Try again, or check the output folder is writable.` | — |
 | Saved as GIF — **M10-T3** | `Saved as GIF` | `<name>.gif — ready to share. Click to reveal.` | reveal |
 | GIF failed — **M10-T3** | `Couldn't save GIF` | `The original recording is untouched. Try again, or check the output folder is writable.` | — |

@@ -6,6 +6,39 @@
 
 ## Now
 
+- **✅ M23-T2 SHIPPED (2026-07-30) — an export refuses what can't land, and quit no longer eats one.**
+  The fit check sits at `ExportModel.performExport` (the one funnel) with an **injected estimate**,
+  because the four actions have different size models: MP4 uses `ExportConfiguration.projectedBytes`
+  (now shared with the menu row that quotes a weight), trim uses the source's own size as a ceiling,
+  and **GIF is deliberately ungated** — LZW output can't be predicted, and a guess would refuse GIFs
+  that fit. Quit now waits: `finishWorkInFlight()` serves both the menu's Quit and
+  `applicationShouldTerminate`. **598 tests**, dev loop green, plan artifact
+  `claude.ai/code/artifact/d19a9bb7-b534-4b4e-8416-2f5729e0cc76`.
+  ✅ **Live, through the deployed menu.** **A1:** 15.1 MB free vs a 34.7 MB export → refused with
+  **zero bytes written**, no receipt, notice read `Not enough room to export / This needs about 35 MB
+  and SCRECFIT has 16 MB free. The recording is untouched.` **A2:** ballast removed → exported clean,
+  `avc1 1920×1200` + AAC, 45.05 s, receipt correct, no `.partial`/`.sb-`. **B:** quit through a live
+  export → the alert appears with **`Wait for Export` as the default**; pressing it kept the app
+  alive **17 s** until the 75.7 MB `.mp4` landed, then quit; `Quit Anyway` exited in **0 s** and its
+  `.mp4.partial` was deleted by the next launch's sweep (`isAbandonedExportPartial`).
+  🔴 **`Quit Anyway` was a lie until leg B was designed.** Every quit route ends in
+  `NSApplication.terminate`, whose delegate waits for an in-flight export — so the abandon button
+  waited exactly like the wait button. Fixed by clearing `exportInProgress` **synchronously** before
+  `terminate`. The general rule is in docs/07: an alert in front of `terminate` cannot decide the
+  outcome; the delegate gets the last word.
+  ⚠️ **The strict ruling now has a price tag: A2's real export was 9.4 MB against its 35 MB
+  estimate**, so A1 refused a job that would have fitted. That is the ~3.7× ceiling docs/07 predicted,
+  arriving on a path where it *decides* rather than labels. **Franco may want to revisit strict.**
+  ⚠️ Also found: an abandoned export leaves an `.sb-` temp nothing sweeps (pre-existing; `Quit Anyway`
+  makes it one click) — cheap follow-up noted in docs/07.
+
+- **🧹 The test suite had leaked 49,668 preference plists — 194 MB, 99.3% of `~/Library/Preferences`**
+  (2026-07-30, found while reading the app's own settings). Deleted with Franco's OK: **50,027 → 359
+  files, 302 MB → 109 MB**. Cause fixed by `TestDefaults`, which records every throwaway suite and
+  sweeps on the way **in** as well as out. ⚠️ **The exit sweep cannot be made reliable** — it races
+  `cfprefsd`, and a single clean run fooled me before two later runs leaked 154 each; the entry sweep
+  is what bounds it. Residue is now one run's worth, self-healing, never cumulative.
+
 - **✅ M23-T1 SHIPPED (2026-07-30) — the write path can no longer lie about a take.** The recorder
   checks `input.append`'s `Bool`, confirms `writer.status == .failed`, and stops the session with a
   new `EndReason.writeFailed`; finalize **salvages the fragments** instead of finishing a dead writer.
@@ -29,7 +62,8 @@
   `onCannotBeginWriting` now it has a sibling; a `.writeFailed` take is **not** offered for naming or
   Stop & Copy (writing to the volume that just refused a write is the wrong next move); no `VERSION`
   bump until the M23 cut.
-  **Next: M23-T2** — export disk guard + quit-during-export. Plan artifact first, per the contract.
+  **Next: M23-T3** — work in flight visible from the menu bar; also owns the "a take that stops while
+  replay is armed is completely silent" half. Plan artifact first, per the contract.
 
 - **🔍 REVIEW (2026-07-30) — 15 findings; M23 and M24 encoded in docs/03, T1 done.**
   Artifact: `claude.ai/code/artifact/38dcfad1-b8d9-4029-9a96-e7f9ec4544fc`. Code, architecture and

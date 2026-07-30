@@ -7,6 +7,54 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-30 (M23-T2, found while reading the app's own preferences): 🔴 **The test suites had
+  leaked 49,668 preference plists — 194 MB, and 99.3% of every file in `~/Library/Preferences`.**
+  The per-test `UserDefaults(suiteName: "screenrec-tests-\(UUID())")` idiom exists for a good reason
+  (M4-T4 persists on `didSet`, so a bare `AppState()` scribbles on the real domain) — but a
+  written-to suite **is a real plist on disk**, and nothing ever removed them. Three prefixes were
+  accumulating: `screenrec-tests-` (42,663), `appstate-tests-` (6,449), `settings-window-` (556).
+  Every `swift test` run added a few hundred more, and `defaults domains` on this machine returned
+  2.2 MB of them. ⚠️ **A per-test teardown would not have held** — it has to be remembered by the
+  author of every future test, which is exactly how it leaked in the first place; the fix is one
+  `TestDefaults` helper that records each suite and sweeps them all from an `atexit` handler.
+  🔴 **A suite cannot be reliably deleted at process exit at all.** `removePersistentDomain` alone
+  leaves the file (`cfprefsd` owns it and writes back on its own schedule); adding
+  `CFPreferencesAppSynchronize` + `unlink` cleaned a full run **once**, then leaked **154 of ~600**
+  on the next two — it is a race with a daemon that outlives us, and one clean run is not evidence
+  of a fix. ⚠️ **Don't trust a single green measurement on a race.** What actually works is giving
+  up on winning it: sweep leftovers **on the way in** as well, so residue is bounded to one run
+  rather than cumulative, with an age floor so a concurrent run's live suites are never touched.
+
+- 2026-07-30 (M23-T2, live): ⚠️ **The export's rate budget over-quoted a real take by 3.7×, and the
+  strict fit check refused a job that would have fitted.** Measured through the deployed menu: a
+  45.05 s take quoted **35 MB** (46.2 MB/min at the fitted 1920×1200) and the export it actually
+  produced was **9.4 MB**. With 15.1 MB free the guard refused it — correctly by its own rule, and
+  wrongly in fact. This is the same over-quote M21-T2 measured (~5× on a static desktop) arriving on
+  a path where it *decides* something rather than just labelling a row. The ruling was strict on
+  purpose (a false refusal is instantly recoverable; a false accept costs minutes and ends in the
+  failure the check exists to remove) — but the number is now known, and it is the argument for
+  revisiting it. ✅ The fitted size the estimate assumes was confirmed exact: the export probed
+  `avc1 1920x1200`, matching the arithmetic.
+
+- 2026-07-30 (M23-T2, leg B): ⚠️ **An abandoned export leaves an `AVAssetWriter` `.sb-` temp that
+  nothing sweeps.** Measured by quitting through a live export: the `.mp4.partial` is litter the
+  launch sweep already deletes (`isAbandonedExportPartial`, M15-T3 — verified here by a real abandon
+  rather than a `kill -9`, and it took the file on the next launch), but the `.sb-<hex>` sibling
+  survives, because M21-T1's `.sb-` sweep runs **after a successful finalize** and an abandoned
+  export never reaches one. Pre-existing — the `M14T2 drain.mp4.sb-…` in `~/Movies` has sat there
+  since July 23 — but `Quit Anyway` turns it from a rare race into a one-click path. Cheap follow-up:
+  sweep the scratch prefix on launch too, beside the orphaned partials.
+
+- 2026-07-30 (M23-T2): 🔴 **"Quit Anyway" would have waited, because every quit route funnels
+  through `applicationShouldTerminate`.** The menu's `quit()` ends in `NSApplication.terminate(nil)`
+  — which *runs the delegate*, which now returns `.terminateLater` whenever an export is in flight.
+  So the abandon button and the wait button did the same thing, and only the label differed. Caught
+  by reasoning through the leg before running it, not by the leg. The fix is that abandoning must
+  clear `exportInProgress` **synchronously**, before `terminate` is called; a cancellation the
+  delegate can't yet observe is not enough. Generalises: **on macOS an "are you sure?" alert in
+  front of `terminate` cannot itself decide the outcome** — the delegate gets the last word, so any
+  choice the alert offers has to be expressed as state the delegate reads.
+
 - 2026-07-30 (M23-T1): what a dying `AVAssetWriter` actually does, and the one thing no unit test
   can reach.
   - 🔴 **`isReadyForMoreMediaData` stays `true` on a `.failed` writer, forever.** This is the whole

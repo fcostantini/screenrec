@@ -27,7 +27,7 @@ import Testing
     }
 
     private func makeState(_ item: FakeLoginItem) -> AppState {
-        let state = AppState(defaults: UserDefaults(suiteName: "login-\(UUID().uuidString)")!)
+        let state = AppState(defaults: TestDefaults.make("login"))
         state.loginItem = item
         return state
     }

@@ -1877,7 +1877,7 @@ affordance.
       or it confirms against `writer.status` first. **Verify:** a *real* failure, M19-T1's standard —
       a volume that goes away mid-take, not a mock — leaving `finished(<cause>)` and a playable file
       holding everything written up to the failure; plus a unit test over the decision.
-- [ ] M23-T2 **An export checks that it fits, and quitting says what's in flight.** A recording stops
+- [x] M23-T2 **An export checks that it fits, and quitting says what's in flight.** A recording stops
       itself at the 2 GB floor; an export has no check at all and writes ≈46 MB/min (the Size
       picker's own figure), so a 40-minute take is ~1.8 GB and a full disk surfaces as "check the
       output folder is writable" — the wrong sentence. Separately `applicationShouldTerminate` waits

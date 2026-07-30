@@ -11,7 +11,7 @@ import RecorderCore
 @Suite struct FileManagementTests {
 
     private func makeDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!
+        TestDefaults.make()
     }
 
     /// A throwaway directory with the named empty files, returned for the test to act on.

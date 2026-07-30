@@ -32,8 +32,7 @@ import RecorderCore
     /// a test writes to the real `UserDefaults.standard` — leaking one test's assignment into
     /// another's launch, and onto disk between runs. (That is exactly how this was found.)
     private func makeDefaults() -> UserDefaults {
-        // Invariant: a fresh UUID suite name is always a valid, unused domain.
-        UserDefaults(suiteName: "appstate-tests-\(UUID().uuidString)")!
+        TestDefaults.make("appstate-tests")
     }
 
     private func makeState() -> AppState {

@@ -140,14 +140,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ScreenRecApp.notifier.requestAuthorizationIfNeeded()
     }
 
-    /// Finalizes an in-progress recording before exit on quit routes that skip the menu's Quit —
-    /// logout, shutdown, a software update, or `⌘Q` while a window is key (ADR-007). The menu Quit
-    /// finalizes first, so `session` is already gone here (→ `.terminateNow`); idle / armed-replay
-    /// have nothing on disk to save. Silent by design — a modal during logout can stall it.
+    /// Finishes work in flight before exit — an in-progress recording (ADR-007) or an export
+    /// (M23-T2) — on every quit route, including logout, shutdown, a software update, and `⌘Q`
+    /// while a window is key. Idle / armed-replay have nothing on disk to save.
+    ///
+    /// Silent by design: a modal during logout can stall it. The menu's Quit does the asking, and
+    /// arrives here with its answer already applied — a take finalized, or an abandoned export
+    /// already cleared — so this sees nothing left to wait for.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let appState, appState.isSessionActive else { return .terminateNow }
+        guard let appState, appState.isSessionActive || appState.exportInProgress != nil else {
+            return .terminateNow
+        }
         Task { @MainActor in
-            await appState.stopAndWaitForFinalize()
+            await appState.finishWorkInFlight()
             NSApp.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater

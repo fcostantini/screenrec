@@ -50,7 +50,7 @@ import Testing
 @MainActor
 @Suite struct MicrophoneLevelVisibilityTests {
     private func makeState() -> AppState {
-        AppState(defaults: UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!)
+        AppState(defaults: TestDefaults.make())
     }
 
     @Test func armedWithAMicShowsIt() {

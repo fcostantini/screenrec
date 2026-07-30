@@ -65,7 +65,7 @@ import RecorderCore
 
     private func makeState() -> (AppState, ReplaySpy, UserDefaults) {
         // Invariant: a fresh UUID suite name is always a valid, unused domain.
-        let defaults = UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!
+        let defaults = TestDefaults.make()
         let spy = ReplaySpy()
         return (AppState(defaults: defaults, replayController: spy), spy, defaults)
     }
@@ -86,7 +86,7 @@ import RecorderCore
     }
 
     @Test func launchNeverArmsByItselfActivateDoes() {
-        let defaults = UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!
+        let defaults = TestDefaults.make()
         defaults.set(true, forKey: "replayArmed")
         let spy = ReplaySpy()
         let state = AppState(defaults: defaults, replayController: spy)
@@ -352,7 +352,7 @@ import RecorderCore
     }
 
     @Test func aLaunchThatHasAlreadySeenTheWarningNeverFiresIt() {
-        let defaults = UserDefaults(suiteName: "screenrec-tests-\(UUID().uuidString)")!
+        let defaults = TestDefaults.make()
         defaults.set(true, forKey: SettingsStore.Key.seenReplayBannerWarning)
         let state = AppState(defaults: defaults, replayController: ReplaySpy())
         var fired = 0

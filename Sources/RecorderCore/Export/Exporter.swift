@@ -75,6 +75,19 @@ public struct ExportConfiguration: Sendable {
     public func bytesPerMinute(forWidth width: Int, height: Int) -> Int64 {
         Int64(videoBitRate(forWidth: width, height: height) + audioBitRate) * 60 / 8
     }
+
+    /// What an export of a `sourceWidth × sourceHeight` source lasting `seconds` can weigh at these
+    /// settings — the rate budget over the length, at the size the export will really produce.
+    /// One definition, so a row that *quotes* a weight and a guard that *refuses* on one can't drift.
+    ///
+    /// ⚠️ Inherits `bytesPerMinute`'s ceiling: measured ~3.7× over a real take on quiet content
+    /// (docs/07). That is the intended direction — under-quoting would let a doomed export start.
+    public func projectedBytes(sourceWidth: Int, sourceHeight: Int, seconds: Double) -> Int64 {
+        let fitted = Exporter.fittedSize(
+            width: sourceWidth, height: sourceHeight, configuration: self)
+        let perMinute = bytesPerMinute(forWidth: fitted.width, height: fitted.height)
+        return Int64(Double(perMinute) * seconds / 60)
+    }
 }
 
 /// A completed export.
