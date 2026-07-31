@@ -2136,6 +2136,27 @@ backgrounds all stay out. Amendment recorded in docs/05.
       ⚠️ **Needs a letterboxed sample from Franco** — there is none in the repo, and the task is
       calibration against real bars.
 
+- [x] M26-T4 **A precise trim can crop too** (Franco's ask, 2026-07-31: *"why can't we trim and crop
+      at the same time?"*). The answer split in two: `Export & Copy` **already** does both in one pass
+      (that is what `range:` + `crop:` are), and a **lossless** trim never can — it copies encoded
+      frames, a crop must decode them. But **precise** mode already re-encodes through an
+      `AVVideoComposition`, so a crop rides the composition it was building anyway, and hands back
+      what the MP4 export cannot: the source's **codec and scale, with both audio tracks separate**
+      (ADR-004). **Seams:** `Trimmer.makeSession(.precise)`; `CropComposition`, extracted from
+      M26-T1's exporter so one transform serves both paths. **Verify:** CLI — headless, unlike T2.
+      ✅ **Done 2026-07-31.** `TrimError.cropNeedsReencode` refuses lossless + crop **before the asset
+      opens**; the window disables `Trim & Save` unless `Re-encode` is ticked and says why.
+      🔴 **The measurement that shaped it:** an `AVAssetExportSession` **honours** the composition's
+      `frameDuration`, unlike the reader path (M26-T1) which ignores it. A hand-built composition
+      resampled a 19.4 fps variable-rate capture to a constant 60 and cost **2.9× the bytes** (2.23 MB
+      → 781 KB for the identical crop). The fix is to derive the composition from
+      `videoComposition(withPropertiesOf:)` — it carries `sourceTrackIDForFrameTiming` — and override
+      only `renderSize` and `instructions` (docs/07). **673 tests.** Verified through the CLI:
+      `--crop` without `--precise` refused with nothing written; with it, **hvc1 1600 × 1000, both
+      audio tracks, 4.00 s**, container still `com.apple.quicktime-movie`, and the pixels are the rect
+      asked for (**0.72%** differ at tolerance 6, against **30.13% at delta 255** for the bottom-left
+      reading).
+
 **Gate G26**: an export can be cropped from the Trim window and from the CLI; the output's dimensions
 are what the UI promised and the Size cap still applies to them; the original is untouched; and a
 letterboxed capture's bars are found without anyone typing a rectangle.

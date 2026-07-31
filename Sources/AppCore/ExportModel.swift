@@ -41,8 +41,8 @@ public final class ExportModel {
     public var gifExportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: GifConfiguration) async throws -> URL = {
         try await GifExporter.exportGIF(from: $0, to: $1, configuration: $2).url
     }
-    public var trimFunction: @Sendable (_ source: URL, _ output: URL, _ start: Double, _ end: Double, _ mode: TrimMode) async throws -> URL = {
-        try await Trimmer.trim(from: $0, to: $1, start: $2, end: $3, mode: $4).url
+    public var trimFunction: @Sendable (_ source: URL, _ output: URL, _ start: Double, _ end: Double, _ mode: TrimMode, _ crop: CropRect?) async throws -> URL = {
+        try await Trimmer.trim(from: $0, to: $1, start: $2, end: $3, mode: $4, crop: $5).url
     }
 
     /// Puts a finished file on the pasteboard (M21-T2). Injected by the app — `NSPasteboard` is
@@ -125,16 +125,18 @@ public final class ExportModel {
             failure: RecordingNotifications.gifExportFailed)
     }
 
-    /// Trims `source` to `[start, end]` (M10-T4; `mode` M18-T1), the same off-main, one-at-a-time
-    /// path.
-    public func trim(_ source: URL, from start: Double, to end: Double, mode: TrimMode) {
+    /// Trims `source` to `[start, end]` (M10-T4; `mode` M18-T1), keeping only `crop` of each frame
+    /// when there is one (M26-T4, precise mode only), on the same off-main, one-at-a-time path.
+    public func trim(
+        _ source: URL, from start: Double, to end: Double, mode: TrimMode, crop: CropRect? = nil
+    ) {
         let trim = trimFunction  // snapshot; the closure captures no `self`
         performExport(
             source, to: Exporter.availableURL(basedOn: Trimmer.trimmedSibling(of: source)),
             // A trim keeps a subset of the source's samples, so the whole source is a ceiling for
             // it — no rate model needed, and it can only over-quote.
             estimate: { Self.fileBytes(of: source) },
-            using: { try await trim($0, $1, start, end, mode) },
+            using: { try await trim($0, $1, start, end, mode, crop) },
             success: { RecordingNotifications.trimmed(url: $0) },
             failure: RecordingNotifications.trimFailed)
     }

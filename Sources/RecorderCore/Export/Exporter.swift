@@ -352,8 +352,9 @@ private struct TranscodePlan {
             let composited = AVAssetReaderVideoCompositionOutput(
                 videoTracks: [videoTrack],
                 videoSettings: [kCVPixelBufferPixelFormatTypeKey as String: pixelFormat])
-            composited.videoComposition = Self.cropComposition(
-                cropping: crop, of: videoTrack, to: target, duration: assetDuration)
+            composited.videoComposition = CropComposition.make(
+                cropping: crop, of: videoTrack, to: target, duration: assetDuration,
+                onto: CropComposition.readerBase())
             videoOutput = composited
         } else {
             videoOutput = AVAssetReaderTrackOutput(
@@ -432,35 +433,6 @@ private struct TranscodePlan {
 
         self.sessionStart = sessionStart
         self.output = output
-    }
-
-    /// Renders `crop` of `videoTrack` into a `target`-sized frame, crop and fit in one transform.
-    /// The layer transform's origin is the frame's top-left, and `frameDuration` does not set the
-    /// output rate — the reader emits one frame per source frame, so the capture's variable rate
-    /// survives (both measured, docs/07). Per-axis scale, because `fittedSize` rounds each dimension
-    /// to even independently and one shared scale leaves an unpainted edge of up to a pixel.
-    /// Assumes an identity `preferredTransform`, true of every file this app writes.
-    private static func cropComposition(
-        cropping crop: CropRect, of videoTrack: AVAssetTrack,
-        to target: (width: Int, height: Int), duration: CMTime
-    ) -> AVVideoComposition {
-        let scaleX = Double(target.width) / Double(crop.width)
-        let scaleY = Double(target.height) / Double(crop.height)
-        let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
-        layer.setTransform(
-            CGAffineTransform(scaleX: scaleX, y: scaleY).concatenating(
-                CGAffineTransform(
-                    translationX: -Double(crop.x) * scaleX, y: -Double(crop.y) * scaleY)),
-            at: .zero)
-        let instruction = AVMutableVideoCompositionInstruction()
-        instruction.timeRange = CMTimeRange(start: .zero, duration: duration)
-        instruction.layerInstructions = [layer]
-
-        let composition = AVMutableVideoComposition()
-        composition.renderSize = CGSize(width: target.width, height: target.height)
-        composition.frameDuration = CMTime(value: 1, timescale: 60)
-        composition.instructions = [instruction]
-        return composition
     }
 
     /// Reads both tracks to exhaustion, feeding the writer; blocks until the file is finalized.

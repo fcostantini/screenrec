@@ -27,13 +27,17 @@ func printUsage() {
                                        (default 480 wide, 15 fps, first 30 s). Override with
                                        --fps <n> --width <px> --seconds <n>. Default <out> is the
                                        input's .gif sibling. The source is read-only.
-      screenrec-cli trim <in> --from <t> --to <t> [--precise] [<out>]  Trim a recording to
-                                       [from, to]; times are M:SS or seconds. Both modes start at
-                                       [from] exactly. Lossless (default) copies the streams, so
-                                       the file also keeps the frames back to the preceding
-                                       keyframe (the run prints how many). --precise re-encodes at
-                                       the source's size and codec, so the file holds only
-                                       [from, to] — slower, and larger on quiet content.
+      screenrec-cli trim <in> --from <t> --to <t> [--precise] [--crop x,y,w,h] [<out>]  Trim a
+                                       recording to [from, to]; times are M:SS or seconds. Both
+                                       modes start at [from] exactly. Lossless (default) copies the
+                                       streams, so the file also keeps the frames back to the
+                                       preceding keyframe (the run prints how many). --precise
+                                       re-encodes at the source's size and codec, so the file holds
+                                       only [from, to] — slower, and larger on quiet content.
+                                       --crop keeps only that rectangle, in source pixels from the
+                                       top-left; it needs --precise, because a crop has to
+                                       re-encode. Unlike export --to-mp4 the codec and both audio
+                                       tracks are kept.
                                        Default <out> is the input's " trimmed" sibling; read-only.
       screenrec-cli list-mics          List audio input devices
       screenrec-cli list-apps          List running apps capturable with record --app

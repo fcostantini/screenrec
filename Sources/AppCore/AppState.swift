@@ -673,8 +673,11 @@ public final class AppState {
         exports.exportAndCopy(source, configuration: exportConfiguration, range: range, crop: crop)
     }
     public func exportToGIF(_ source: URL) { exports.exportToGIF(source, configuration: gifConfiguration) }
-    public func trim(_ source: URL, from start: Double, to end: Double, mode: TrimMode = .lossless) {
-        exports.trim(source, from: start, to: end, mode: mode)
+    public func trim(
+        _ source: URL, from start: Double, to end: Double, mode: TrimMode = .lossless,
+        crop: CropRect? = nil
+    ) {
+        exports.trim(source, from: start, to: end, mode: mode, crop: crop)
     }
 
     /// The `Save as GIF` caps as a `GifConfiguration` (M10-T3 follow-up), built from the persisted

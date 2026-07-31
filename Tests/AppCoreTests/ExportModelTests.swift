@@ -66,7 +66,7 @@ import RecorderCore
         let model = makeModel()
         model.availableBytes = { _ in 0 }
         let ran = Box<Bool>()
-        model.trimFunction = { _, output, _, _, _ in ran.value = true; return output }
+        model.trimFunction = { _, output, _, _, _, _ in ran.value = true; return output }
 
         let file = try? sizedFile(bytes: 2048)
         defer { file.map { try? FileManager.default.removeItem(at: $0) } }

@@ -99,7 +99,7 @@ import RecorderCore
         defer { try? FileManager.default.removeItem(at: source) }
 
         let ran = Box<Bool>()
-        state.exports.trimFunction = { _, output, _, _, _ in ran.value = true; return output }
+        state.exports.trimFunction = { _, output, _, _, _, _ in ran.value = true; return output }
         state.exports.availableBytes = { _ in 100 }        // less than the source's 4096
 
         state.trim(source, from: 0, to: 1, mode: .lossless)
@@ -120,7 +120,7 @@ import RecorderCore
         defer { try? FileManager.default.removeItem(at: source) }
 
         let ran = Box<Bool>()
-        state.exports.trimFunction = { _, output, _, _, _ in ran.value = true; return output }
+        state.exports.trimFunction = { _, output, _, _, _, _ in ran.value = true; return output }
         state.exports.availableBytes = { _ in 1_000_000_000 }
 
         state.trim(source, from: 0, to: 1, mode: .lossless)
@@ -150,7 +150,7 @@ import RecorderCore
         defer { try? FileManager.default.removeItem(at: source) }
 
         let ran = Box<Bool>()
-        state.exports.trimFunction = { _, output, _, _, _ in ran.value = true; return output }
+        state.exports.trimFunction = { _, output, _, _, _, _ in ran.value = true; return output }
         state.exports.availableBytes = { _ in nil }         // capacity can't be read
 
         state.trim(source, from: 0, to: 1, mode: .lossless)
@@ -431,7 +431,7 @@ import RecorderCore
         state.notifier = { posted.append($0) }
         let written = URL(fileURLWithPath: "/tmp/Clip trimmed.mov")
         let range = Box<(start: Double, end: Double, mode: TrimMode)>()
-        state.exports.trimFunction = { _, _, start, end, mode in
+        state.exports.trimFunction = { _, _, start, end, mode, _ in
             range.value = (start, end, mode)
             return written
         }
@@ -454,7 +454,7 @@ import RecorderCore
         // the trim would quietly stay lossless and keep the lead-in it promised to drop (M18-T1).
         let state = makeState()
         let range = Box<(start: Double, end: Double, mode: TrimMode)>()
-        state.exports.trimFunction = { _, _, start, end, mode in
+        state.exports.trimFunction = { _, _, start, end, mode, _ in
             range.value = (start, end, mode)
             return URL(fileURLWithPath: "/tmp/Clip trimmed.mov")
         }

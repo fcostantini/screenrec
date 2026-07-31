@@ -8,6 +8,10 @@ public enum TrimError: Error, Equatable {
     case noVideoTrack
     case outputCollidesWithInput
     case emptyRange
+    case cropOutOfBounds(String)
+    /// A crop has to decode and re-encode every frame, which is precisely what `.lossless` doesn't
+    /// do — so the pair is refused rather than silently dropping one of them.
+    case cropNeedsReencode
     case trimFailed(String)
 }
 
@@ -72,28 +76,34 @@ public enum Trimmer {
     }
 
     public static func trim(
-        from input: URL, to output: URL, start: Double, end: Double, mode: TrimMode = .lossless
+        from input: URL, to output: URL, start: Double, end: Double, mode: TrimMode = .lossless,
+        crop: CropRect? = nil
     ) async throws -> TrimResult {
         guard !Exporter.sameFile(output, input) else { throw TrimError.outputCollidesWithInput }
         guard start >= 0, end > start else { throw TrimError.emptyRange }
+        // Judged before the asset loads: a crop can only be honoured by the re-encoding mode.
+        if crop != nil, case .lossless = mode { throw TrimError.cropNeedsReencode }
 
         let asset = AVURLAsset(url: input)
         let duration: CMTime
-        let hasVideo: Bool
+        let videoTrack: AVAssetTrack?
         do {
             duration = try await asset.load(.duration)
-            hasVideo = try await !asset.loadTracks(withMediaType: .video).isEmpty
+            videoTrack = try await asset.loadTracks(withMediaType: .video).first
         } catch {
             throw TrimError.unreadable(
                 "Couldn't read “\(input.lastPathComponent)”. \(error.localizedDescription)")
         }
-        guard hasVideo else { throw TrimError.noVideoTrack }
+        guard let videoTrack else { throw TrimError.noVideoTrack }
 
         let startTime = CMTime(seconds: start, preferredTimescale: 600)
         let endTime = CMTimeMinimum(CMTime(seconds: end, preferredTimescale: 600), duration)
         guard CMTimeCompare(endTime, startTime) > 0 else { throw TrimError.emptyRange }
 
-        let session = try await makeSession(for: mode, asset: asset)
+        var cropRect: CropRect?
+        if let crop { cropRect = try await validated(crop, against: videoTrack) }
+        let session = try await makeSession(
+            for: mode, asset: asset, crop: cropRect, videoTrack: videoTrack, duration: duration)
         session.timeRange = CMTimeRange(start: startTime, end: endTime)
 
         // Write to the `.partial` companion and rename only on success (M15-T3) — see `Exporter`.
@@ -115,11 +125,32 @@ public enum Trimmer {
             byteCount: bytes)
     }
 
+    /// The crop as it applies to `videoTrack`, in `TrimError` terms — a trim shouldn't leak an
+    /// `ExportError` to its caller.
+    private static func validated(
+        _ crop: CropRect, against videoTrack: AVAssetTrack
+    ) async throws -> CropRect {
+        let size = try await videoTrack.load(.naturalSize)
+        do {
+            return try Exporter.validatedCrop(
+                crop, sourceWidth: Int(size.width.rounded()),
+                sourceHeight: Int(size.height.rounded()))
+        } catch ExportError.cropOutOfBounds(let message) {
+            throw TrimError.cropOutOfBounds(message)
+        }
+    }
+
     /// One place per mode, exhaustively: a preset and its composition must not drift apart.
     /// `AVAssetExportPresetHEVCHighestQuality` alone passes an HEVC source straight through
     /// (measured: byte-identical output), so precise mode needs the composition to encode at all.
+    ///
+    /// A crop rides that same composition (M26-T4), which is why only precise mode can carry one.
+    /// It is built from the asset's properties and then overridden, never replaced: the derived
+    /// composition holds `sourceTrackIDForFrameTiming`, without which the export resamples a
+    /// variable-rate capture to constant (measured: 2.9× the bytes, docs/07).
     private static func makeSession(
-        for mode: TrimMode, asset: AVAsset
+        for mode: TrimMode, asset: AVAsset, crop: CropRect?, videoTrack: AVAssetTrack,
+        duration: CMTime
     ) async throws -> AVAssetExportSession {
         func session(preset: String) throws -> AVAssetExportSession {
             guard let session = AVAssetExportSession(asset: asset, presetName: preset) else {
@@ -133,8 +164,14 @@ public enum Trimmer {
         case .precise:
             let session = try session(preset: AVAssetExportPresetHEVCHighestQuality)
             do {
-                session.videoComposition = try await AVVideoComposition.videoComposition(
+                let derived = try await AVMutableVideoComposition.videoComposition(
                     withPropertiesOf: asset)
+                session.videoComposition = crop.map {
+                    // A precise trim keeps the source's own scale, so the crop is the output size.
+                    CropComposition.make(
+                        cropping: $0, of: videoTrack, to: (width: $0.width, height: $0.height),
+                        duration: duration, onto: derived)
+                } ?? derived
             } catch {
                 throw TrimError.trimFailed(
                     "Couldn't set up a precise trim. \(error.localizedDescription)")

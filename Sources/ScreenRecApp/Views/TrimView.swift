@@ -169,13 +169,15 @@ struct TrimView: View {
                 .disabled(!hasRange || state.exports.exportInProgress != nil)
                 Button("Trim & Save") {
                     state.trim(url, from: inSeconds, to: outSeconds,
-                               mode: reencodes ? .precise : .lossless)
+                               mode: reencodes ? .precise : .lossless, crop: crop)
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
-                // A trim is an `AVAssetExportSession` — it has no crop, so with one set this button
-                // could only ignore it (M26-T2).
-                .disabled(!hasRange || state.exports.exportInProgress != nil || crop != nil)
+                // A crop has to decode and re-encode every frame, which is what lossless doesn't do
+                // (M26-T4) — so the pair is refused rather than one of them silently dropped.
+                .disabled(
+                    !hasRange || state.exports.exportInProgress != nil
+                        || (crop != nil && !reencodes))
             }
 
             HStack(spacing: 8) {
@@ -188,10 +190,12 @@ struct TrimView: View {
                         .buttonStyle(.link)
                 }
             }
-            if crop != nil {
-                Text("Trim & Save can't crop — clear the crop to use it.")
+            if crop != nil, !reencodes {
+                Text("A crop has to re-encode, so a lossless trim can't have one. Tick Re-encode "
+                    + "to trim and crop, or use Export & Copy.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Toggle("Re-encode — the clip will contain only \(Timecode.cutPoint(inSeconds)) – "

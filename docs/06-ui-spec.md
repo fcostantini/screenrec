@@ -601,9 +601,12 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   the next one, the rule the range already follows.
   **It is a mode because `AVPlayerView`'s inline transport controls sit under any always-on overlay**
   — while cropping, the playhead still moves by ←/→, ⇧←/⇧→ and the filmstrip, which is what makes
-  that acceptable. **`Trim & Save` is disabled while a crop is set**, with
-  *"Trim & Save can't crop — clear the crop to use it."*: a trim is an `AVAssetExportSession` and has
-  no crop, so the button could only ignore one. The export caption states the **cropped** size, live —
+  that acceptable. **A crop needs `Re-encode`** (M26-T4): with it ticked, `Trim & Save` crops too and
+  writes a `.mov` at the source's own codec and scale with both audio tracks — the one thing
+  `Export & Copy` can't produce. With it unticked the button is disabled, because lossless copies the
+  encoded frames and a crop must decode them: *"A crop has to re-encode, so a lossless trim can't have
+  one. Tick Re-encode to trim and crop, or use Export & Copy."* The export caption states the
+  **cropped** size, live —
   *"Export & Copy writes only the range, cropped — H.264 1600 × 1000 — …"* — and that figure is the
   gate: what it says and what `probe` reads off the file are the same numbers.
 - **Re-encode** (M18-T1, unchecked by default — ADR-015 keeps lossless the default): *"Re-encode —

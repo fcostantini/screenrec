@@ -60,6 +60,24 @@ import Testing
         }
     }
 
+    @Test func refusesToCropALosslessTrim() async throws {
+        // Lossless copies the encoded frames; a crop has to decode and re-encode them. Refused
+        // before the asset is even opened, so the pair can't half-happen.
+        let source = FileManager.default.temporaryDirectory
+            .appendingPathComponent("trim-crop-\(UUID().uuidString).mov")
+        let output = FileManager.default.temporaryDirectory
+            .appendingPathComponent("trim-crop-out-\(UUID().uuidString).mov")
+        FileManager.default.createFile(atPath: source.path, contents: Data())
+        defer { try? FileManager.default.removeItem(at: source) }
+
+        await #expect(throws: TrimError.cropNeedsReencode) {
+            _ = try await Trimmer.trim(
+                from: source, to: output, start: 0, end: 1, mode: .lossless,
+                crop: CropRect(x: 0, y: 0, width: 320, height: 200))
+        }
+        #expect(!FileManager.default.fileExists(atPath: output.path))
+    }
+
     // MARK: - Integration (gated — the fixture build uses the VT encoder; the trim itself doesn't)
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["SCREENREC_HW_ENCODE_TESTS"] == "1"))
@@ -132,6 +150,31 @@ import Testing
         let video = try #require(tracks.first { $0.mediaType == .video })
         #expect(try await Self.subtype(of: video) == kCMVideoCodecType_HEVC)
         #expect(try await video.load(.naturalSize) == CGSize(width: 640, height: 360))
+    }
+
+    /// A cropped precise trim: the rectangle, at the source's own codec and scale, with the two
+    /// audio tracks still separate (ADR-004) — the thing `Export & Copy` cannot produce. Gated with
+    /// the trims above: same fixture encoder.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["SCREENREC_HW_ENCODE_TESTS"] == "1"))
+    func aPreciseTrimCanCropAndStillKeepTheCodecAndBothAudioTracks() async throws {
+        let source = try await Self.makeClip(seconds: 2, withMicrophone: true)
+        defer { try? FileManager.default.removeItem(at: source) }
+        let output = FileManager.default.temporaryDirectory
+            .appendingPathComponent("trim-cropped-\(UUID().uuidString).mov")
+        defer { try? FileManager.default.removeItem(at: output) }
+
+        _ = try await Trimmer.trim(
+            from: source, to: output, start: 0.5, end: 1.5, mode: .precise,
+            crop: CropRect(x: 100, y: 60, width: 320, height: 200))
+
+        let tracks = try await AVURLAsset(url: output).load(.tracks)
+        let video = try #require(tracks.first { $0.mediaType == .video })
+        #expect(try await video.load(.naturalSize) == CGSize(width: 320, height: 200))
+        #expect(try await Self.subtype(of: video) == kCMVideoCodecType_HEVC)  // not H.264
+        #expect(tracks.filter { $0.mediaType == .audio }.count == 2)
+        #expect(try await AVURLAsset(url: output).load(.isPlayable))
+        // The range still applies — a crop must not cost the trim its reason for existing.
+        #expect(abs(try await AVURLAsset(url: output).load(.duration).seconds - 1.0) < 0.2)
     }
 
     // MARK: - Fixtures

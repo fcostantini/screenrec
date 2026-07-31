@@ -7,6 +7,17 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-31 (M26-T4): 🔴 **`AVAssetExportSession` honours a composition's `frameDuration`; the
+  asset-reader path ignores it.** The same crop, the same source (19.4 fps variable-rate capture),
+  the same 4 s range: a hand-built `AVMutableVideoComposition` with `frameDuration` 1/60 produced a
+  **constant 60 fps** file of **2.23 MB**; deriving the composition from
+  `videoComposition(withPropertiesOf:)` and overriding only `renderSize`/`instructions` produced
+  **19.4 fps** and **781 KB** — 2.9× smaller, and the same rate today's uncropped precise trim
+  writes. The reason is `sourceTrackIDForFrameTiming` (**2** on this asset), which the derived
+  composition sets and a hand-built one leaves at zero. ⚠️ **So M26-T1's "frameDuration doesn't set
+  the output rate" is true of the reader only** — carrying that belief into the export-session path
+  silently triples the file. **Derive, then override.**
+
 - 2026-07-31 (M26-T2 plan): 🔴 **Never post a synthetic click at a window's frame — this app's
   windows are behind everything.** `CGWindowBounds` says where a window *is*, not whether it is
   visible there. Aiming at the Trim window's close button (frame confirmed at 781,387) put the click

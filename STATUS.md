@@ -33,6 +33,21 @@
   ⚠️ **The VERSION bump is still pending** — 1.13.0 rides with T2, the first half a user of the app
   can reach, and M25's deferred patch rides in that cut.
 
+- **✅ M26-T4 SHIPPED (2026-07-31) — a precise trim can crop too.** From Franco's question, *"why
+  can't we trim and crop at the same time?"* The honest answer had two halves: **`Export & Copy`
+  already does both** in one pass, and a **lossless** trim never can — it copies encoded frames and a
+  crop must decode them. **Precise** mode already re-encodes through a composition, so a crop rides
+  it and produces what the MP4 export can't: **the source's codec and scale, both audio tracks
+  separate**. **673 tests.** Verified headlessly through the CLI (`trim --precise --crop`), unlike T2.
+  🔴 **The measurement that shaped it, and it is a trap:** an `AVAssetExportSession` **honours** the
+  composition's `frameDuration`, where the reader path (T1) ignores it. Hand-building one resampled a
+  19.4 fps capture to a constant 60 and cost **2.9× the bytes**. Derive from
+  `videoComposition(withPropertiesOf:)` — it carries `sourceTrackIDForFrameTiming` — then override
+  only `renderSize`/`instructions` (docs/07).
+  ✅ **One transform now serves both paths:** `CropComposition`, extracted from T1's exporter.
+  ⚠️ **No plan artifact for this one** — Franco chose it from an option whose preview showed the
+  states and the output, and the shape didn't move once measured.
+
 - **🟡 M26-T2 BUILT (2026-07-31), awaiting Franco's live leg — then M26-T3.** The Trim window can
   draw a crop: tick **Crop**, drag on the preview, read `1600 × 1000 px at 400,300`, `Reset` clears
   it. **671 tests** (+6 `CropGeometry`, +1 wiring). `VERSION` → **1.13.0**, carrying M25's deferred

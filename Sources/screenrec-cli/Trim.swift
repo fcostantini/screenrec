@@ -31,19 +31,25 @@ private func trimErrorMessage(_ error: Error) -> String {
         return "The output path matches the input — choose a different name."
     case TrimError.emptyRange:
         return "Couldn't trim: the time range is empty."
+    case TrimError.cropOutOfBounds(let message):
+        return "Couldn't trim: \(message)"
+    case TrimError.cropNeedsReencode:
+        return "A crop has to re-encode, so it needs --precise."
     default:
         return "Couldn't trim: \(error.localizedDescription)"
     }
 }
 
-/// `trim <in> --from <t> --to <t> [--precise] [<out>]` — trim a recording to `[from, to]`, by
-/// copying the streams (M10-T4) or, with `--precise`, by re-encoding so the file holds only that
-/// range (M18-T1). Default `<out>` is the input's ` trimmed` sibling; the source is read-only.
+/// `trim <in> --from <t> --to <t> [--precise] [--crop x,y,w,h] [<out>]` — trim a recording to
+/// `[from, to]`, by copying the streams (M10-T4) or, with `--precise`, by re-encoding so the file
+/// holds only that range (M18-T1). `--crop` keeps only that rectangle, and needs `--precise`
+/// (M26-T4). Default `<out>` is the input's ` trimmed` sibling; the source is read-only.
 func runTrim(_ args: [String]) async {
     var positionals: [String] = []
     var from: Double?
     var to: Double?
     var mode = TrimMode.lossless
+    var crop: CropRect?
 
     var index = 0
     func value(after flag: String) -> String {
@@ -65,6 +71,7 @@ func runTrim(_ args: [String]) async {
             to = parsed
         case "--precise":
             mode = .precise
+        case "--crop": crop = parseCropRect(value(after: "--crop"))
         case let flag where flag.hasPrefix("--"): die("Unknown trim option: \(flag)")
         default: positionals.append(args[index])
         }
@@ -93,10 +100,12 @@ func runTrim(_ args: [String]) async {
         print("          \(description)")
     }
     do {
-        let result = try await Trimmer.trim(from: input, to: output, start: from, end: to, mode: mode)
+        let result = try await Trimmer.trim(
+            from: input, to: output, start: from, end: to, mode: mode, crop: crop)
+        let kept = crop.map { " cropped to \($0.width) × \($0.height)" } ?? ""
         let how = mode == .lossless
             ? "passthrough, no re-encode"
-            : "re-encoded; the file holds only \(Timecode.cutPoint(from)) – \(Timecode.cutPoint(to))"
+            : "re-encoded\(kept); the file holds only \(Timecode.cutPoint(from)) – \(Timecode.cutPoint(to))"
         print(
             String(
                 format: "Wrote     %@  (%.2fs, %.1f MB) — %@.",
