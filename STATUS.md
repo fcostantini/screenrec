@@ -6,6 +6,14 @@
 
 ## Now
 
+- **✅ G25 PASSED (2026-07-31) — M25 complete. Swift 6 is on for everything that ships.** Evidence
+  in the gate table. ✅ **RULED (Franco): no v1.12.1** — M25 has zero user-facing change, so there is
+  nothing to download; the bump rides into **M26's cut**. `VERSION` stays **1.12.0**. Recorded in
+  docs/03 too, so a later session doesn't "correct" it with a stray tag.
+  **Next: Franco's call.** M26 (crop on export) is the natural one — it has a named user, a measured
+  pain, and its ruling is already taken; M27 (Core Audio taps) and M28 (`NSMenu`) are the other two
+  encoded milestones.
+
 - **✅ M25-T3 SHIPPED (2026-07-31) — every shipping target compiles in Swift 6. M25 done; G25 next.**
   `RecorderCore`, `AppCore`, `ScreenRecApp`, `screenrec-cli` and `AppCoreTests` are all v6. **660
   tests**, release build and signed bundle green. Plan artifact:

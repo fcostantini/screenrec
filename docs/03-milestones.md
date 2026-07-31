@@ -2007,7 +2007,9 @@ queue, no unbounded buffer retention — are held in agents' heads and checked b
 the compiler check a real subset of them. **First, because it protects what follows:** M27 adds a
 second audio clock into `SampleRouter`, the most concurrency-dense work on this list, and M22 set the
 precedent of pulling the protective milestone ahead of the one it protects. **PATCH** — nothing here
-is user-facing. `Package.swift` is already tools-version 6.0 with every target pinned to v5, so this
+is user-facing. ⚠️ **The bump is deliberately deferred (Franco, 2026-07-31): no v1.12.1.** With no
+user-facing change there is nothing to download, so M25 rides into **M26's cut** instead. Do not
+"correct" this by tagging a patch release after the fact. `Package.swift` is already tools-version 6.0 with every target pinned to v5, so this
 is a per-target flip, not a migration.
 
 - [x] M25-T1 **`RecorderCore` compiles in v6.** **7 distinct sites, measured 2026-07-31:** the
