@@ -5,6 +5,139 @@ the record of how the work went, not a description of how things are. For curren
 `STATUS.md`; for the per-task specification and tick boxes read `docs/03-milestones.md`; for measured
 platform behaviour read `docs/07-field-notes.md`.
 
+## Rotated from STATUS.md 2026-07-31 (later) — M24 (finish the share loop) and G24
+
+- **✅ G24 PASSED (2026-07-31) — M24 is complete, cut as v1.12.0.** Evidence in the gate table.
+  🔴 **The gate earned its keep: criterion 1 failed on the first run.** `Export & Copy` had no key
+  equivalent, so a chosen range could not reach the clipboard without a click — the two halves
+  existed separately (T1 was one action with the mouse; T2 was mouse-free but whole-take). Fixed
+  with ⌘↩ (`625488b`) and re-run. **A gate that only confirms what you already believe isn't one.**
+  ⚠️ **The keyboard criteria are Franco's to run and always will be** — `LSUIElement` plus synthetic
+  input cannot confer activation, checked three ways this session (docs/07).
+
+- **✅ M24-T5 SHIPPED (2026-07-31) — M24's five tasks are all done.**
+  A trim now **keeps its container** and the derive group is offered only where it applies.
+  **660 tests** (654 → 660), dev loop green, deployed. Plan artifact:
+  `claude.ai/code/artifact/3deb6330-efaa-4f0a-a06e-cc58a275562f`.
+  ✅ **Headless verify, container proved with `mdls` rather than the extension:** `sample.mp4` →
+  `sample trimmed.mp4`, **`kMDItemContentType = public.mpeg-4`**, 3.00 s `avc1` + AAC, passthrough.
+  `.mov` regression → `com.apple.quicktime-movie`. A second trim gave `sample trimmed 2.mp4` — the
+  stutter gone, the ` 2` being `availableURL`'s normal collision suffix.
+  ✅ **The submenus, by `menudriver dump` before and after:** a `.gif` lost all three derive rows
+  **and its divider**; an `.mp4` lost only `Export as MP4`, keeping `Save as GIF` and `Trim…`; a
+  `.mov` is unchanged.
+  🔴 **On a GIF those rows could only fail.** docs/03 called it "quietly re-encoding something
+  already encoded" — true for `.mp4`, but `AVURLAsset` on a `.gif` reads **`isReadable false`, no
+  video tracks, duration `-1`**, and `AVAssetExportSession` is **still created** for it, so the
+  failure only ever surfaced once the export ran.
+  🔴 **The `.mov` was our own hard-code and the comment defending it was false** — it claimed
+  passthrough writes QuickTime "regardless of the input's extension"; `supportedFileTypes` reports
+  **`mpeg-4`** for both presets. Fourth roadmap/code claim this milestone that didn't survive
+  measurement (docs/07).
+
+- **✅ M24-T4 SHIPPED (2026-07-31) — the Trim window can find a moment. Next: M24-T5, then G24.**
+  The Trim window gained a **16-thumbnail filmstrip** that fills progressively, and **←/→ steps one
+  real frame** (⇧ a second). **654 tests** (650 → 654), dev loop green, deployed. Plan artifact:
+  `claude.ai/code/artifact/3f8024d7-d1e2-48a2-8f01-c9fd1151c05b`.
+  ✅ **Verified:** the strip builds and renders — captured filling left-to-right, then 16/16 on the
+  2:09 take. And the step mechanism is **exact**: five consecutive steps landed **0.000000 s** off
+  the source's presentation times, and the backward step round-tripped exactly.
+  ✅ **Both input paths confirmed live by Franco (2026-07-31)** — arrow navigation *and*
+  click-to-seek, the half I could not reach. This app is `LSUIElement`, so `activate` leaves
+  Terminal frontmost (checked) and every synthetic keystroke went to the wrong app; the
+  window-scoped `NSEvent` monitor and the `SpatialTapGesture` both work in a real focused window.
+  🔴 **Three findings, all measured, all in docs/07.** `AVPlayerItem.step(byCount:)` **does not step
+  a frame on our recordings** — frame-on-change capture has no fixed cadence, and one step moved
+  **0.25 s and landed 25 ms off any real frame**; the sample cursor lands exactly. A **bare arrow is
+  not a key equivalent**, so `.keyboardShortcut(.leftArrow)` never fires and `AVPlayerView` scrubs
+  instead (90 presses → 47.7 s); a scoped local `NSEvent` monitor takes them. And a strip's cost is
+  **keyframe spacing × count, not take length** — the 270 s replay is 6× cheaper per thumbnail than
+  the 129 s recording, so a 40-minute take costs what a two-minute one does.
+  🔴 **docs/03's stated seams were wrong twice.** `VideoFrameReader` reads sequentially from zero and
+  cannot build a strip; `AVPlayer.step` is on `AVPlayerItem` and is the wrong call anyway. Third time
+  a roadmap parenthetical hasn't survived contact (after M23-T5's line counts).
+  ⚠️ **A bug the live leg caught that the tests could not:** the strip keyed its callback lookup on
+  the `Double` it asked for, but `AVAssetImageGenerator` reports the **quantised** `CMTime` —
+  12.10406 s comes back as 12.10333. **Only 6 of 16 thumbnails ever appeared**, and the unit tests
+  (which cover the time ladder, not the callback) were green throughout. Now keyed on `CMTimeValue`.
+
+- **✅ M24-T3 SHIPPED (2026-07-31) — the take you just stopped has a row. Next: M24-T4.**
+  `Recording saved · 0:22` sits first in the receipt group with the same `fileActions` submenu
+  `Replay saved` has had since M9-T2. Titled by **length, not filename** — "identified by timestamp"
+  is the finding, so repeating the timestamped name would have moved the problem. **650 tests**
+  (644 → 650), dev loop green, plan artifact
+  `claude.ai/code/artifact/08baa782-550f-4b91-8fdf-1b1e1384486b`.
+  ✅ **Live, with Franco's replay armed** — the case where a stop is otherwise silent. A 22 s take
+  through the menu → the row read **`Recording saved · 0:22`** with Reveal/Quick Look/Share/Copy
+  under it; the flash measured **100 pt (recording clock) → 51 pt (idle + tick) → 39 pt** (M23-T3's
+  exact signature), tick captured beside the armed badge; `Reveal in Finder` opened `~/Movies` with
+  **that file selected**. Deleting the take made the row **vanish at the next menu open** — the
+  expiry rule demonstrated live rather than only in a test.
+  ✅ **Half of T3 was already done:** the flash ruling docs/03 filed was answered by M23-T3
+  (`stopNeedsFlash` — armed only, since an ordinary stop already gets a banner). Left untouched and
+  said so in the plan rather than re-litigated.
+  ⚠️ **The receipt is not persisted, unlike the export's** — an export receipt is its file's *only*
+  pointer (the `.mov`-only recents list can't show one), while a take already lives in
+  `Recordings ▸`. So this row is prominence, not access, and expires on the same one-hour clock.
+  🔴 **The assignment had to move to be testable at all.** It lived inside `start()`'s consume task,
+  which no test can reach — M23-T3's trap exactly. Extracted as `finishTake(_:)`, which production
+  and tests both run; **five breaks applied, five turned their tests red**.
+  ⚠️ **Renamed `lastFinishedRecording` → `lastRecording`**; docs/03's M21-T2 seam pointer updated so
+  the name stays greppable. `docs/history` left alone (unmaintained by contract).
+
+- **✅ M24-T2 SHIPPED (2026-07-31) — the keyboard reaches the clipboard. Next: M24-T3.**
+  The start/stop shortcut gained an ending: **`When it stops: Save · Save and copy`**
+  (`stopHotkeyCopies`, absent ⇒ Save, so no existing install changes). **No new hotkey** — a picker
+  under the existing shortcut, because `Save and copy` keeps the `.mov` too (ADR-004) and so loses
+  nothing, costs zero Settings height while the shortcut is off, and adds no combo to clash.
+  **644 tests** (641 → 644), dev loop green, plan artifact
+  `claude.ai/code/artifact/1ab7e7d0-3e63-4c22-9d1c-a0bb88a42aa7`.
+  ✅ **Live, fired from Terminal** (a global Carbon hotkey, so genuinely another app): ⌥⌘S started a
+  take, and the recording menu showed the combo had **moved to `Stop & Copy MP4 · up to 1,5 MB
+  [⌥⌘S]`** with `Stop & Save` carrying none. ⌥⌘S again → 22.06 s `avc1` 1920×1200 + AAC on the
+  clipboard (sentinel replaced), the 4112×2570 hvc1 `.mov` kept beside it. **Busy-export leg, twice:**
+  take saved, **no `.mp4` derived**, clipboard untouched, `Saved — the copy had to wait` delivered.
+  🔴 **That notice was delivered and invisible.** Posted right after `stop()` returns — *before*
+  `.finished` drains — so "Recording saved" replaced it **within 0.3 s**. Three runs sampling at
+  0.3 s caught it **zero times**; `--print-delivered-notifications` had it every time. Now awaits
+  `stopAndWaitForFinalize()`, so the exception posts last and is the banner left standing (docs/07).
+  ✅ **RULED: two notices per stop is fine as it is (Franco, 2026-07-31).** The take's own
+  `Recording saved · 0:22`, then `Copied — ⌘V to paste` ~8 s later. docs/03's Verify says "one
+  notice" and it was flagged rather than silently changed; the behaviour is pre-existing (the menu's
+  Stop & Copy MP4 has done this since M21-T2) and the two notices describe two different files
+  arriving at two different times. **Don't "fix" this** — suppressing the save notice was offered
+  and declined.
+  🔴 **I toggled `Launch at login` off by accident** — a `checkbox 1` press landed on the General tab
+  while Settings was still opening. Restored within seconds and verified re-registered. The driver
+  now addresses controls **by label**; docs/07.
+  ✅ **Settings restored and verified against `defaults read`:** `recordHotkey` absent,
+  `stopHotkeyCopies` 0, `pauseHotkey` absent, `replayArmed` 0. All test files deleted, clipboard
+  cleared.
+
+- **✅ M24-T1 SHIPPED (2026-07-31) — the Trim window hands you the clip. Next: M24-T2.**
+  `Export as MP4` is now **`Export & Copy`**: one press writes the ranged `.mp4` *and* leaves it on the
+  pasteboard, ending the three moves (menu → receipt row → `Copy`) it used to cost. The change is one
+  parameter — `ExportModel.exportAndCopy` gained `range:`, and every other seam already took one
+  (`mp4Sibling(of:range:)` names the ` trimmed.mp4`, M23-T2's estimate is range-aware). **641 tests**
+  (636 → 641), dev loop green, plan artifact
+  `claude.ai/code/artifact/0d750213-d48e-4308-acd0-9b25bc3bac82`.
+  ✅ **Live, through the deployed build.** A sentinel on the clipboard, `Trim…` on the 2:09 take,
+  range 0:00–0:06, one press → the sentinel was **replaced by the clip's file URL**, and the file
+  probes **6.53 s `avc1` 1920×1200 + AAC** out of a **129 s** source. The banner read
+  **`Copied — ⌘V to paste`** (captured). No `.partial`, no new `.sb-`; the window dismissed; the
+  receipt row expired itself when the test clip was deleted. Both clips cleaned up.
+  ✅ **Rulings taken:** one button over a pair — the row has **39.5 pt of slack** and a fourth button
+  needs **~112 pt** (measured off a capture, docs/07), so a second button would truncate titles or
+  widen the window; and the title names the copy because the clipboard is taken either way. The
+  notice is M21-T2's, reused.
+  ⚠️ **Two findings for later, both in docs/07:** `exportToMP4`'s `range:` now has **no production
+  caller** (TrimView was its only one) — left in place for M24-T5, delete it if M24 closes without
+  one; and deriving from a derived file stutters its name (**`… trimmed trimmed.mp4`**), which is
+  M24-T5's case arriving early. ⚠️ Also: **`menudriver click` takes the first match**, and with an
+  export receipt row present that is not the row you meant — the second live run trimmed the *clip*.
+  ⚠️ **Franco's clipboard was overwritten** by the leg (sentinel → clip URL → cleared). Unavoidable
+  for this task; worth saying rather than leaving him to find it.
+
 ## Rotated from STATUS.md 2026-07-31 — M23 (the write path tells the truth) and the 2026-07-30 review
 
 - **✅ M23-T5 DONE (2026-07-30) — `AppState` is 130 → 95 public members, 1,420 → 1,355 lines.**
