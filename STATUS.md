@@ -6,6 +6,30 @@
 
 ## Now
 
+- **✅ M24-T3 SHIPPED (2026-07-31) — the take you just stopped has a row. Next: M24-T4.**
+  `Recording saved · 0:22` sits first in the receipt group with the same `fileActions` submenu
+  `Replay saved` has had since M9-T2. Titled by **length, not filename** — "identified by timestamp"
+  is the finding, so repeating the timestamped name would have moved the problem. **650 tests**
+  (644 → 650), dev loop green, plan artifact
+  `claude.ai/code/artifact/08baa782-550f-4b91-8fdf-1b1e1384486b`.
+  ✅ **Live, with Franco's replay armed** — the case where a stop is otherwise silent. A 22 s take
+  through the menu → the row read **`Recording saved · 0:22`** with Reveal/Quick Look/Share/Copy
+  under it; the flash measured **100 pt (recording clock) → 51 pt (idle + tick) → 39 pt** (M23-T3's
+  exact signature), tick captured beside the armed badge; `Reveal in Finder` opened `~/Movies` with
+  **that file selected**. Deleting the take made the row **vanish at the next menu open** — the
+  expiry rule demonstrated live rather than only in a test.
+  ✅ **Half of T3 was already done:** the flash ruling docs/03 filed was answered by M23-T3
+  (`stopNeedsFlash` — armed only, since an ordinary stop already gets a banner). Left untouched and
+  said so in the plan rather than re-litigated.
+  ⚠️ **The receipt is not persisted, unlike the export's** — an export receipt is its file's *only*
+  pointer (the `.mov`-only recents list can't show one), while a take already lives in
+  `Recordings ▸`. So this row is prominence, not access, and expires on the same one-hour clock.
+  🔴 **The assignment had to move to be testable at all.** It lived inside `start()`'s consume task,
+  which no test can reach — M23-T3's trap exactly. Extracted as `finishTake(_:)`, which production
+  and tests both run; **five breaks applied, five turned their tests red**.
+  ⚠️ **Renamed `lastFinishedRecording` → `lastRecording`**; docs/03's M21-T2 seam pointer updated so
+  the name stays greppable. `docs/history` left alone (unmaintained by contract).
+
 - **✅ M24-T2 SHIPPED (2026-07-31) — the keyboard reaches the clipboard. Next: M24-T3.**
   The start/stop shortcut gained an ending: **`When it stops: Save · Save and copy`**
   (`stopHotkeyCopies`, absent ⇒ Save, so no existing install changes). **No new hotkey** — a picker

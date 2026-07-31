@@ -1758,7 +1758,8 @@ this replaced did both in one command. **MINOR.**
       **Two orderings carry it:** *after* teardown, so a dialog left open can't delay re-arming
       replay; *before* the share export, so `Stop & Copy MP4` copies the **named** `.mp4`.
       🔴 The quality pass caught the second one broken — the share path looked the take up by its
-      pre-rename URL and would have exported nothing. `lastFinishedRecording` records where it landed.
+      pre-rename URL and would have exported nothing. `lastRecording` (named `lastFinishedRecording`
+      until M24-T3) records where it landed.
       **Verified live:** named → `Bug-1204 repro.mov` with the recents row agreeing; Esc → the date
       name kept; named + Stop & Copy MP4 → both files, receipt and pasteboard carrying the name.
 - [x] M21-T4 **Leave an app's audio out** — shipped as **`Source ▸ Everything Except ▸`**.
@@ -1958,13 +1959,15 @@ hand it to you. **MINOR.**
       it **still stops and saves**, then says so — stopping is the combo's primary contract, and a
       hotkey can't grey itself out (M17-T2's lesson). **Verify:** fired from another app; the file
       lands on the clipboard and one notice is posted.
-- [ ] M24-T3 **The take you just made is one click away.** A replay save gets a top-level receipt row
+- [x] M24-T3 **The take you just made is one click away.** A replay save gets a top-level receipt row
       *and* a menu-bar flash; the recording you just stopped gets neither — it is two levels down
       under `Recordings ▸`, identified by timestamp. **Seams:** `lastReplay`'s row and
       `replaySavedFlash` are the shapes to mirror; `RecentRecordings` already refreshes on finalize.
-      **Rulings:** how long the receipt lives (the export receipt expires after an hour — same rule?);
-      and whether the flash is always or only when banners are suppressed. ⚠️ Coordinate with
-      **M23-T3**, which touches the same two mechanisms. **Verify:** stop with replay armed → the row
+      **Rulings taken** (Franco, 2026-07-31): the receipt is **in memory only**, expiring at menu
+      open on the export receipt's own one-hour clock (an export's receipt is persisted because it is
+      that file's only pointer — a take already lives in `Recordings ▸`, so its row is prominence, not
+      access), and it appears after **every** stop, not only when banners are suppressed. The flash
+      ruling was **already answered by M23-T3** (`stopNeedsFlash`: armed only) and was left alone. **Verify:** stop with replay armed → the row
       and the flash both appear; clicking reveals the file.
 - [ ] M24-T4 **Find the moment without scrubbing blind.** The Trim window offers a 480×300 player,
       Set In/Set Out and nothing else: no filmstrip, no waveform, no frame stepping. docs/06 calls the

@@ -60,6 +60,7 @@ struct MenuView: View {
 
         Divider()
 
+        lastRecordingRow
         exportStatusRow
         lastReplayRow
 
@@ -222,6 +223,7 @@ struct MenuView: View {
 
         Divider()
 
+        lastRecordingRow
         exportStatusRow
         lastReplayRow
 
@@ -287,6 +289,17 @@ struct MenuView: View {
     /// armed session; cleared on disarm.
     @ViewBuilder private var lastReplayRow: some View {
         if let last = state.lastReplay {
+            Menu(last.menuTitle) { fileActions(last.url) }
+            Divider()
+        }
+    }
+
+    /// The take that just stopped (M24-T3), the receipt `lastReplay` has always had. Titled by
+    /// length, not filename: the timestamped name is what makes `Recordings ▸` hard to scan.
+    /// Above the export receipt because a take precedes anything derived from it — with
+    /// Stop & Copy MP4 both rows are present and point at their own file.
+    @ViewBuilder private var lastRecordingRow: some View {
+        if let last = state.lastRecording {
             Menu(last.menuTitle) { fileActions(last.url) }
             Divider()
         }
@@ -444,6 +457,7 @@ struct MenuView: View {
         state.refreshRecordingRoom()
         Task { await state.refreshRecentDetails() }
         state.exports.expireStaleReceipt()   // drop a receipt aged out since a prior session (M12-T3)
+        state.expireStaleRecordingReceipt()  // …and the take receipt, on the same clock (M24-T3)
         if !state.session.isActive {
             state.refreshSources(displays: DisplayOption.liveScreens())
             // Async because SCShareableContent takes ~a second; on the first open the app rows

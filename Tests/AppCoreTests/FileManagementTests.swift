@@ -240,6 +240,38 @@ import RecorderCore
         #expect(state.lastReplay?.seconds == 30)              // the length survives the rename
     }
 
+    // MARK: - The take receipt (M24-T3)
+
+    @Test func renameRepointsATakeReceiptAndKeepsItsAge() throws {
+        // The date must survive: re-stamping it would make a renamed old receipt fresh again and
+        // resurface it — the rule `LastExport` learned in M12-T3.
+        let directory = try makeFixture(["Take.mov"])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let take = directory.appendingPathComponent("Take.mov")
+
+        let state = AppState(defaults: makeDefaults())
+        state.finishTake((url: take, duration: 22))
+        let stamped = try #require(state.lastRecording?.date)
+
+        state.rename(take, to: "Kept take")
+        #expect(state.lastRecording?.url == directory.appendingPathComponent("Kept take.mov"))
+        #expect(state.lastRecording?.duration == 22)
+        #expect(state.lastRecording?.date == stamped)
+    }
+
+    @Test func trashClearsATakeReceipt() throws {
+        let directory = try makeFixture(["Take.mov"])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let take = directory.appendingPathComponent("Take.mov")
+
+        let state = AppState(defaults: makeDefaults())
+        state.finishTake((url: take, duration: 22))
+        #expect(state.lastRecording != nil)                   // precondition
+
+        state.moveToTrash(take)
+        #expect(state.lastRecording == nil)
+    }
+
     @Test func trashClearsAReplayReceipt() async throws {
         let directory = try makeFixture(["Replay.mov"])
         defer { try? FileManager.default.removeItem(at: directory) }

@@ -425,9 +425,11 @@ public final class AppState {
     /// configuration, which only AppState holds.
     public let exports: ExportModel
 
-    /// Where the last finished take ended up — after any rename (M21-T3), so Stop & Copy MP4
-    /// shares the file under the name it was just given. Cleared when the next take starts.
-    private(set) var lastFinishedRecording: URL?
+    /// The take that just finished — after any rename (M21-T3), so Stop & Copy MP4 shares the file
+    /// under the name it was just given, and the menu's receipt row (M24-T3) names it correctly.
+    /// Cleared when the next take starts. Only set for an ending that leaves an actionable file:
+    /// `SessionModel.finishedRecording` already withholds `.writeFailed` (M23-T1).
+    public private(set) var lastRecording: LastRecording?
 
     /// Asks what to call a take that just stopped (M21-T3), pre-filled with its date name; nil ⇒ keep
     /// that name. Wired by the app: an `NSAlert` is the only surface an `LSUIElement` app has for a
@@ -1017,11 +1019,24 @@ public final class AppState {
         return false
     }
 
+    /// Drops the take receipt once it has aged past the export receipt's window, or if its file has
+    /// gone (M24-T3). Called at menu open, riding the same stamp-at-open refresh as the recents and
+    /// `exports.expireStaleReceipt()`. The row claims recency; `Recordings ▸` is where a take lives
+    /// afterwards, so this expires rather than persisting.
+    public func expireStaleRecordingReceipt() {
+        guard let take = lastRecording else { return }
+        if take.isStale(now: Date(), freshFor: ExportModel.receiptFreshness)
+            || !FileManager.default.fileExists(atPath: take.url.path) {
+            lastRecording = nil
+        }
+    }
+
     /// Drops every menu pointer to `url`. The replay receipt is the one that otherwise survives —
     /// it clears only on disarm, so without this a trashed clip keeps its row and re-reports.
     private func forget(_ url: URL) {
         exports.clearReceipt(for: url)
         if lastReplay?.url.isSameFile(as: url) == true { lastReplay = nil }
+        if lastRecording?.url.isSameFile(as: url) == true { lastRecording = nil }
         refreshRecentRecordings()
     }
 
@@ -1050,6 +1065,10 @@ public final class AppState {
         if let replay = lastReplay, replay.url.isSameFile(as: url) {
             lastReplay = LastReplay(url: target, seconds: replay.seconds)
         }
+        if let take = lastRecording, take.url.isSameFile(as: url) {
+            // Keeps the original date, so a renamed take doesn't become fresh again (M12-T3's rule).
+            lastRecording = LastRecording(url: target, duration: take.duration, date: take.date)
+        }
         refreshRecentRecordings()
         return target
     }
@@ -1065,6 +1084,7 @@ public final class AppState {
         }
         exports.clearReceipt(for: url)   // clears the export receipt if it named this
         if lastReplay?.url.isSameFile(as: url) == true { lastReplay = nil }
+        if lastRecording?.url.isSameFile(as: url) == true { lastRecording = nil }
         refreshRecentRecordings()
     }
 
@@ -1168,7 +1188,7 @@ public final class AppState {
             return
         }
 
-        lastFinishedRecording = nil   // a new take supersedes whatever the last one was named
+        lastRecording = nil   // a new take supersedes whatever the last one was named
         session.attach(
             capture, outputURL: outputURL, microphoneName: microphone.name,
             appName: sources.selectedAppBundleID.map(sources.appName(for:)), region: sources.selectedRegion?.rect.size)
@@ -1198,10 +1218,7 @@ public final class AppState {
             // discard or a start that left no file.
             let finished = session.finishedRecording
             endSession()
-            if let finished {
-                lastFinishedRecording =
-                    nameTakeIfAsked(finished.url, duration: finished.duration) ?? finished.url
-            }
+            finishTake(finished)
         }
         await capture.start()
     }
@@ -1210,6 +1227,16 @@ public final class AppState {
     /// actually ends the session — see `endSession`.
     public func stop() async {
         await session.capture?.stop()
+    }
+
+    /// Names the take that just ended, if asked (M21-T3), and raises its menu receipt (M24-T3).
+    /// Nil ⇒ the ending left no actionable file (a discard, a start that failed, a `.writeFailed`),
+    /// and nothing is claimed. Internal rather than inline in the consume task, which no test can
+    /// reach (M23-T3).
+    func finishTake(_ finished: (url: URL, duration: TimeInterval)?) {
+        guard let finished else { return }
+        let url = nameTakeIfAsked(finished.url, duration: finished.duration) ?? finished.url
+        lastRecording = LastRecording(url: url, duration: finished.duration, date: Date())
     }
 
     /// Asks what to call the take that just finished, if the user opted in (M21-T3), and renames it.
@@ -1229,10 +1256,10 @@ public final class AppState {
     public func stopAndShare() async {
         guard session.isActive, exports.exportInProgress == nil else { return }
         await stopAndWaitForFinalize()
-        // `lastFinishedRecording` is where the take actually ended up: the naming prompt (M21-T3)
+        // `lastRecording` is where the take actually ended up: the naming prompt (M21-T3)
         // runs inside the same task, so the `.mp4` inherits the chosen name instead of landing
         // beside it under the date. Nil ⇒ the take left no file (a discard, a start that failed).
-        guard let finished = lastFinishedRecording,
+        guard let finished = lastRecording?.url,
               FileManager.default.fileExists(atPath: finished.path)
         else { return }
         exportAndCopy(finished)

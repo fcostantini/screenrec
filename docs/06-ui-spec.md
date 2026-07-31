@@ -166,7 +166,15 @@ Order and grouping (separators between groups):
     **manage** group: **`Rename…`** (an `NSAlert` text field, extension preserved, collisions → ` 2`) and
     **`Move to Trash`** (reversible → no confirmation, red attributed title). Both act on the row's own file
     only — trashing/renaming a derived `.mp4` never touches its `.mov` source. The saved-replay receipt
-    (M9-T2) shares the same submenu. ⚠️
+    (M9-T2) shares the same submenu.
+    **M24-T3 gave the take that just stopped the same receipt**: `Recording saved · 0:22`, first in the
+    receipt group (a take precedes anything derived from it, so Stop & Copy MP4 shows both rows, each
+    pointing at its own file). Titled by **length, not filename** — the timestamped name is exactly what
+    makes `Recordings ▸` hard to scan, so repeating it would move the problem. It appears after **every**
+    stop that leaves a file (`.writeFailed` is already withheld by `SessionModel.finishedRecording`), is
+    **not persisted** — a recording already lives in `Recordings ▸`, so the row is prominence, not access —
+    and expires at menu open on the export receipt's own one-hour clock, or when its file goes, or when the
+    next take starts. A rename re-points it keeping its original date; a trash clears it. ⚠️
     Implementation notes from M4-T2: a SwiftUI `.menu`
     `MenuBarExtra` exposes neither `NSMenuItem.indentationLevel` (the indent is leading
     whitespace in the title, with an explicit accessibility label so VoiceOver reads the

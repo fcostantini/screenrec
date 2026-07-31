@@ -81,6 +81,61 @@ import RecorderCore
         #expect(state.microphoneMenuLabel == device.name)
     }
 
+    // MARK: - The take receipt (M24-T3)
+
+    private static let take = URL(fileURLWithPath: "/tmp/Recording 2026-07-31 at 11.26.54.mov")
+
+    @Test func theTakeReceiptNamesItsLengthRatherThanItsTimestamp() {
+        // The finding is that a take is "identified by timestamp"; a receipt titled with the
+        // filename would move that problem rather than fix it.
+        let state = makeState()
+        state.finishTake((url: Self.take, duration: 22.4))
+        #expect(state.lastRecording?.menuTitle == "Recording saved · 0:22")
+        #expect(state.lastRecording?.url == Self.take)
+    }
+
+    @Test func anEndingThatLeavesNoFileRaisesNoReceipt() {
+        // A discard, a start that failed, a `.writeFailed` — `finishedRecording` is nil for all
+        // three, and a row pointing at nothing is worse than no row.
+        let state = makeState()
+        state.finishTake(nil)
+        #expect(state.lastRecording == nil)
+    }
+
+    @Test func theTakeReceiptExpiresPastTheHourOrWhenItsFileIsGone() throws {
+        let file = try sizedFile(bytes: 16)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let state = makeState()
+
+        state.finishTake((url: file, duration: 5))
+        state.expireStaleRecordingReceipt()
+        #expect(state.lastRecording != nil)          // fresh, and its file is there
+
+        try FileManager.default.removeItem(at: file)
+        state.expireStaleRecordingReceipt()
+        #expect(state.lastRecording == nil)          // the row's every action would be a no-op
+    }
+
+    @Test func aTakeReceiptOlderThanTheExportWindowIsDropped() {
+        // Same clock as the export receipt (M12-T3), so there is one rule rather than two.
+        let state = makeState()
+        state.finishTake((url: Self.take, duration: 5))
+        let old = LastRecording(
+            url: Self.take, duration: 5,
+            date: Date(timeIntervalSinceNow: -ExportModel.receiptFreshness - 1))
+        #expect(old.isStale(now: Date(), freshFor: ExportModel.receiptFreshness))
+        #expect(state.lastRecording?.isStale(
+            now: Date(), freshFor: ExportModel.receiptFreshness) == false)
+    }
+
+    /// A real file of a known size, for the paths that check one exists.
+    private func sizedFile(bytes: Int) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("menutruth-\(UUID().uuidString).mov")
+        try Data(count: bytes).write(to: url)
+        return url
+    }
+
     // MARK: - Which Stop row owns the shortcut (M24-T2)
 
     @Test func exactlyOneStopRowAdvertisesTheShortcutAndItIsTheOneTheKeyPerforms() {
