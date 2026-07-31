@@ -2125,6 +2125,12 @@ backgrounds all stay out. Amendment recorded in docs/05.
       `ExportModel` → `Exporter`, and into `mp4Bytes` so M23-T2's disk guard weighs the **cropped**
       size instead of refusing a cropped export that fits. **671 tests.** `VERSION` → **1.13.0**,
       carrying M25's deferred patch.
+      ✅ **Live leg PASSED (Franco, 2026-07-31), which is the only way this task could be verified.**
+      Two real takes off a 4112 × 2570 source: `avc1` **1920 × 812**, and then **57.21 s of 129.11 s
+      at 1920 × 1030** — a range and a crop in one encode. Both heights follow the *crop's* aspect,
+      not the source's (an uncropped export of that take is 1920 × 1200), so the cap measured the
+      crop. **The caption matched the file — confirmed by Franco**, which is the criterion the task
+      was filed on. Source untouched, `public.mpeg-4`, faststart intact, no `.partial`/`.sb-`.
 - [ ] M26-T3 **Find the bars without being told.** This is why it is a milestone and not a one-liner.
       **Seams:** `VideoFrameReader` decodes frames off the main thread already, and M24-T4 measured
       what frame extraction costs (keyframe spacing × count, not take length) — sample a handful and

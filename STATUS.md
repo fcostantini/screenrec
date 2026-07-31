@@ -53,10 +53,12 @@
   1920 × 812**, 129.12 s, 56 MB, one export receipt in the menu. **The crop reached the encoder and
   the cap measured it** — an uncropped export of that take is 1920 × 1200, so the height followed the
   *crop's* aspect (2.36), not the source's (1.60). The source `.mov` still probes 4112 × 2570 /
-  129.11 s. ⚠️ **One number still unconfirmed:** what the window's caption read at the moment he
-  pressed it. The caption and the exporter both compute through `Exporter.fittedSize` from the same
-  `crop` state, so they cannot disagree structurally — but "the window is honest" is the task's own
-  criterion and deserves his eyes, not my inference.
+  129.11 s. ✅ **And the caption matched, confirmed by Franco** — which is the criterion the task was
+  really filed on: what the window promises and what `probe` reads are the same numbers.
+  ✅ **A second take, 18:20, proves the pair in one pass:** `… trimmed 2.mp4`, **57.21 s of a 129.11 s
+  source at `avc1` 1920 × 1030** — a range *and* a crop in a single encode, no intermediate file,
+  one mixed AAC track, `public.mpeg-4`, `ftyp/moov/mdat` faststart, name collision-resolved off the
+  17:55 export. No `.partial` or `.sb-` left behind; the source still probes 4112 × 2570.
 
 - **🟡 M26-T2 BUILT (2026-07-31), awaiting Franco's live leg — then M26-T3.** The Trim window can
   draw a crop: tick **Crop**, drag on the preview, read `1600 × 1000 px at 400,300`, `Reset` clears
