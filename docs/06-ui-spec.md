@@ -589,7 +589,8 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   pair: the row has 39.5 pt of slack and a fourth button needs ~112 pt. The title names the copy
   because the clipboard is taken either way. A caption states what it will produce:
   *"Export & Copy writes only the range — H.264 1920 × 1200 — and puts it on the clipboard. ⌘V pastes
-  it."* The size is this recording's own fitted through the Settings width, and is omitted until the
+  it."* **⌘↩ presses it** (G24: with ←/→ and <kbd>I</kbd>/<kbd>O</kbd> the whole loop is keyboard-only);
+  Return stays on `Trim & Save`, since ADR-015 keeps lossless the default action. The size is this recording's own fitted through the Settings width, and is omitted until the
   source's geometry has loaded (M16-T2). Unlike a lossless trim, this holds only the range: a ranged
   read clips at the in-point (docs/07), so no lead-in caveat applies.
 - **Re-encode** (M18-T1, unchecked by default — ADR-015 keeps lossless the default): *"Re-encode —

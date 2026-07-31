@@ -142,6 +142,10 @@ struct TrimView: View {
                     state.exportAndCopy(url, range: ExportRange(start: inSeconds, end: outSeconds))
                     dismiss()
                 }
+                // ⌘↩ so the whole loop is keyboard-only (G24): ←/→ to find the moment, I/O to set
+                // the range, this to copy it. Return stays on Trim & Save — ADR-015 keeps lossless
+                // the default action.
+                .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!hasRange || state.exports.exportInProgress != nil)
                 Button("Trim & Save") {
                     state.trim(url, from: inSeconds, to: outSeconds,
