@@ -17,7 +17,12 @@ import CoreMedia
 public final class ResampledMicInput {
 
     /// The fixed target. `standardFormat` = Float32 deinterleaved; mono, so one plane.
-    public static let targetFormat = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
+    ///
+    /// `AVAudioFormat` is immutable after init — every property is get-only — so the shared mutable
+    /// state the compiler warns about does not exist. Kept a static because this is the mic sample
+    /// path, where docs/01 cares about per-buffer allocation.
+    public nonisolated(unsafe) static let targetFormat =
+        AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
 
     public init() {}
 

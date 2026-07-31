@@ -8,7 +8,7 @@ let package = Package(
         // All capture/encode/write logic. Must never import AppKit/SwiftUI (ADR in docs/01).
         .target(
             name: "RecorderCore",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // Dev harness and primary verification surface until M4 (ADR-011).
         .executableTarget(

@@ -29,7 +29,9 @@ public enum FilmstripThumbnails {
     ) -> AsyncStream<(index: Int, image: CGImage)> {
         AsyncStream { continuation in
             guard !times.isEmpty else { continuation.finish(); return }
-            let generator = AVAssetImageGenerator(asset: asset)
+            // Confined to this stream: created here, used by its own callback and its
+            // termination handler, and never handed anywhere else.
+            nonisolated(unsafe) let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             generator.maximumSize = CGSize(width: maxPixels, height: maxPixels)
             generator.requestedTimeToleranceBefore = tolerance

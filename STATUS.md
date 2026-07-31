@@ -6,6 +6,32 @@
 
 ## Now
 
+- **✅ M25-T1 SHIPPED (2026-07-31) — `RecorderCore` compiles in Swift 6. Next: M25-T2.**
+  **660 tests, and no test file was edited** — that was the whole claim of a task whose point is
+  that nothing changes except who checks the rules. Real capture (3 tracks, hvc1 4112×2570), ranged
+  export and GIF all re-run, since three of the fixes are on the export path. Plan artifact:
+  `claude.ai/code/artifact/c1efcd9e-316d-4867-b1a6-d4ed4393078a`.
+  🔴 **The measured "7 sites" was a floor.** Fixing the first batch revealed **5 more** — 1 in
+  `MicrophoneRescue`, 4 `SCStream` sites in `CaptureEngine` — for **12 sites, 8 edits**. The
+  compiler stops after the first batch, so each fix unblocks the next wave. **T2's "5" and T3's
+  "unmeasured" are floors too**, and both now say so in docs/03.
+  🔴 **My plan was wrong about the mechanism, and the fix reversed twice.** I said I would not reach
+  for `nonisolated(unsafe)` in `CaptureEngine`; it turned out **not to work there at all** — that
+  diagnostic is region analysis on the *call's result*, not the binding's isolation. A narrow
+  `@unchecked Sendable` box worked for `forCapture()`, then four `SCStream` sites appeared behind
+  it. The real finding: **SCK carries no `Sendable` annotations at all**, so this was never one
+  value needing an assertion.
+  ✅ **RULED (Franco, 2026-07-31): `@preconcurrency import ScreenCaptureKit` in `CaptureEngine`** —
+  one true statement about an un-annotated SDK, rather than hand-written hatches scattered through
+  the capture path. ⚠️ It is file-wide, so future SCK-originated `Sendable` diagnostics there are
+  warnings; **our own types stay fully checked**, which is the milestone's whole value.
+  ✅ **The plan's per-site calls that survived contact:** `Exporter:411` was a real over-capture (the
+  drain closure held the whole `TranscodePlan` for three values) and got a real fix;
+  `ByteCountFormatter` is built per call rather than asserted safe — its thread-safety is
+  undocumented, and the pinned strings (`"1,8 GB"`, `"900 MB"`) stayed green; `AVAudioFormat` took
+  `nonisolated(unsafe)` because its immutability is real. `MicrophoneRescue` took **`sending`** —
+  a genuine ownership hand-off, and the one fix that needed no concession at all.
+
 - **🗓️ M25–M28 ENCODED (2026-07-31, Franco's call) — nothing started.** Four of the six parked
   items are now milestones in docs/03, with tasks, seams, rulings and gates: **M25 Swift 6 language
   mode** (debt, PATCH), **M26 Crop on export** (MINOR), **M27 Audio-only per-app exclusion via Core

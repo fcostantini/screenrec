@@ -7,7 +7,14 @@ public enum ApproximateBytes {
 
     /// `183_100_000` → `180 MB`, in the user's locale.
     public static func formatted(_ bytes: Int64) -> String {
-        formatter.string(fromByteCount: roundedToTwoSignificantFigures(bytes))
+        // Built per call rather than held as a static: `ByteCountFormatter` keeps internal state and
+        // Apple has never documented it as safe for concurrent use, so `nonisolated(unsafe)` would
+        // assert an invariant nobody can justify. This is menu-open copy, never the sample path.
+        let formatter = ByteCountFormatter()
+        // `.file` is decimal, which is what Finder shows the same file as.
+        formatter.countStyle = .file
+        formatter.allowedUnits = [.useMB, .useGB]
+        return formatter.string(fromByteCount: roundedToTwoSignificantFigures(bytes))
     }
 
     static func roundedToTwoSignificantFigures(_ bytes: Int64) -> Int64 {
@@ -16,12 +23,4 @@ public enum ApproximateBytes {
         guard magnitude >= 1 else { return bytes }
         return Int64(((Double(bytes) / magnitude).rounded() * magnitude).rounded())
     }
-
-    private static let formatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        // `.file` is decimal, which is what Finder shows the same file as.
-        formatter.countStyle = .file
-        formatter.allowedUnits = [.useMB, .useGB]
-        return formatter
-    }()
 }

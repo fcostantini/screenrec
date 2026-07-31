@@ -55,7 +55,9 @@ public enum GifExporter {
     ) async throws -> GifResult {
         guard !Exporter.sameFile(output, input) else { throw GifExportError.outputCollidesWithInput }
 
-        let reader: VideoFrameReader
+        // Confined, not shared: built here, handed to `gifQueue`, used only there, and no other
+        // reference exists. The assertion is about this value's single owner, not about the type.
+        nonisolated(unsafe) let reader: VideoFrameReader
         do {
             reader = try await VideoFrameReader.make(
                 input: input, maxWidth: configuration.maxWidth, maxHeight: configuration.maxHeight,

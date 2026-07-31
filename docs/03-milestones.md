@@ -2010,7 +2010,7 @@ precedent of pulling the protective milestone ahead of the one it protects. **PA
 is user-facing. `Package.swift` is already tools-version 6.0 with every target pinned to v5, so this
 is a per-target flip, not a migration.
 
-- [ ] M25-T1 **`RecorderCore` compiles in v6.** **7 distinct sites, measured 2026-07-31:** the
+- [x] M25-T1 **`RecorderCore` compiles in v6.** **7 distinct sites, measured 2026-07-31:** the
       `SCShareableContent.forCapture()` hop (`CaptureEngine.swift:125`); two static non-`Sendable`
       globals — `ByteCountFormatter` (`ApproximateBytes.swift:20`) and `AVAudioFormat`
       (`ResampledMicInput.swift:20`); and four non-`Sendable` captures in the export plans
@@ -2021,10 +2021,19 @@ is a per-target flip, not a migration.
       `@unchecked Sendable` would buy the flip while spending the point of it. **Verify:** the target
       at v6, dev loop green, **no behaviour change**, plus one real capture — the sample path is what
       this protects.
-      ⚠️ **Re-measure before starting.** The composition already drifted from the 2026-07-30 count:
-      `MicrophoneRescue`'s closure is gone, `FilmstripThumbnails` (M24-T4) is new. The total happened
-      to stay 7; the list did not.
-- [ ] M25-T2 **`AppCore` compiles in v6.** **5 distinct sites, all one cluster:** the replay-save
+      ✅ **Done 2026-07-31 — and the 7 was a floor.** Fixing the first batch revealed **5 more**
+      (1 in `MicrophoneRescue`, 4 `SCStream` sites in `CaptureEngine`): **12 sites, 8 edits**. The
+      compiler stops after the first batch, so each fix unblocks the next wave (docs/07).
+      **Rulings taken** (Franco, 2026-07-31): `@preconcurrency import ScreenCaptureKit` in
+      `CaptureEngine` — SCK carries no `Sendable` annotations at all, so this is one true statement
+      rather than escape hatches scattered through the capture path, and **our own types stay
+      checked**. `nonisolated(unsafe)` for the three confined export workers and the immutable
+      `AVAudioFormat`; **not** for `ByteCountFormatter`, which is built per call instead because its
+      thread-safety is undocumented. `Exporter:411` was a genuine over-capture and got a real fix;
+      `MicrophoneRescue` took `sending`, which needs no import concession. **No test was edited** —
+      that was the claim, and it held (660 green).
+- [ ] M25-T2 **`AppCore` compiles in v6.** **At least 5 distinct sites** — ⚠️ a floor, not a total:
+      T1's measured 7 became 12 as each fix unblocked the next wave. Clustered on the replay-save
       completion closure (`AppState.swift:641–647`) capturing non-`Sendable` state across a callback.
       **Seams:** `ReplayController`'s completion; `AppState`'s `@MainActor` isolation. **Verify:** as
       T1.

@@ -7,6 +7,31 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-31 (M25-T1): 🔴 **A Swift 6 error count measured before you start is a FLOOR, not a total.**
+  `RecorderCore` measured **7 distinct sites**; fixing them revealed **5 more** (1 in
+  `MicrophoneRescue`, 4 more `SCStream` sites in `CaptureEngine`) for a true **12**. The compiler
+  stops emitting after the first batch per module, so each fix unblocks the next wave. ⚠️ Plan a
+  Swift 6 flip as "until the build is green", never as "N sites"; and treat the *next* target's
+  measured number the same way.
+
+- 2026-07-31 (M25-T1): 🔴 **`nonisolated(unsafe)` does not silence
+  *"non-sendable result type cannot be sent from nonisolated context"*.** That diagnostic is region
+  analysis on the **call's result**, not the binding's isolation, so annotating the `let` changes
+  nothing (tried). The tools that do work: a `@unchecked Sendable` box around the value, or
+  `@preconcurrency import`. `nonisolated(unsafe)` *is* right for a **static global** and for a
+  **local captured into a closure** — three of those in the export paths took it.
+
+- 2026-07-31 (M25-T1): **ScreenCaptureKit carries no `Sendable` annotations at all**, so an actor
+  that owns SCK objects trips the checker everywhere, not in one place: `SCShareableContent` can't
+  cross, `SCContentFilter` **is not `Sendable`** (type-checked directly, which is why a "return a
+  Sendable snapshot" helper cannot work — `ScopeResolution` carries a filter), and every
+  `await stream.startCapture()` / `stopCapture()` on a stored `SCStream` reports *sending risks
+  causing data races*. `@preconcurrency import ScreenCaptureKit` is the sanctioned answer and
+  **still checks our own types** — it only downgrades diagnostics originating in that module
+  (Franco's ruling, 2026-07-31). ⚠️ Where the value is genuinely handed off rather than shared,
+  `sending` on the parameter is the better fix and needs no import concession —
+  `MicrophoneRescue.stopStream` takes it.
+
 - 2026-07-31 (M24-T5): 🔴 **A GIF is not a movie to AVFoundation, and the menu offered it three
   actions that could only fail.** `AVURLAsset` on a `.gif`: **`isReadable false`, no video tracks,
   duration `-1`** — yet `AVAssetExportSession(asset:presetName:)` still **returns a session**, so the

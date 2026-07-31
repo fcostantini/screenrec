@@ -221,7 +221,10 @@ public enum Exporter {
         // recording path's discipline): a crash or quit mid-export then leaves nothing at the final
         // name for the menu's Recent Exports to offer as a finished file.
         let scratch = OutputLocation.partialURL(for: output)
-        let plan = try TranscodePlan(
+        // Confined, not shared: built here, handed to `transcodeQueue`, used only there, and no
+        // other reference exists. The assertion is about this value's single owner — `TranscodePlan`
+        // itself is not safe to share, and is not marked as if it were.
+        nonisolated(unsafe) let plan = try TranscodePlan(
             asset: asset, videoTrack: videoTrack, audioTracks: audioTracks,
             output: scratch, target: target, sessionStart: clipStart,
             readRange: readRange, configuration: configuration)
@@ -405,6 +408,9 @@ private struct TranscodePlan {
 
         let group = DispatchGroup()
         let failure = FirstError()
+        // The value, not the plan: reading `self.sessionStart` inside the @Sendable progress
+        // closure would hand the whole transcode to the drain queue.
+        let sessionStart = sessionStart
         drain(videoOutput, into: videoInput, label: "video", group: group, failure: failure) { sample in
             guard let progress, durationSeconds > 0 else { return }
             let elapsed = CMTimeGetSeconds(

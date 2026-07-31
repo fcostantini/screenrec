@@ -1,7 +1,7 @@
 import CoreGraphics
 import CoreMedia
 import Foundation
-import ScreenCaptureKit
+@preconcurrency import ScreenCaptureKit
 import os
 
 /// Owns the single `SCStream`'s lifecycle and publishes `EngineEvent`s.

@@ -263,7 +263,10 @@ final class MicrophoneRescue: @unchecked Sendable {
         return stream
     }
 
-    private func stopStream(_ stream: SCStream?) {
+    /// `sending`, because this is a hand-off, not a share: every caller reaches here via
+    /// `takeStreamLocked()`, which has already cleared `stream` and `handler`, so the value passed
+    /// in is the last reference and the Task is what disposes of it.
+    private func stopStream(_ stream: sending SCStream?) {
         guard let stream else { return }
         Task { try? await stream.stopCapture() }
     }
