@@ -255,6 +255,15 @@ public final class AppState {
         }
     }
 
+    /// Whether the start/stop shortcut also copies an MP4 when it stops (M24-T2). Off by default.
+    /// Persisted. Only reachable while `recordHotkey` is set — the menu keeps both endings as rows.
+    public var stopHotkeyCopies: Bool = false {
+        didSet {
+            guard stopHotkeyCopies != oldValue else { return }
+            persist()
+        }
+    }
+
     /// Whether Start runs a 3-2-1 count-in first (M12-T6). Off by default. Persisted.
     public var countInEnabled: Bool = false {
         didSet {
@@ -496,6 +505,7 @@ public final class AppState {
         replayHotkey = settings.replayHotkey
         recordHotkey = settings.recordHotkey
         pauseHotkey = settings.pauseHotkey
+        stopHotkeyCopies = settings.stopHotkeyCopies
         countInEnabled = settings.countInEnabled
         namesTakeOnStop = settings.namesTakeOnStop
         showsMenuBarTimer = settings.showsMenuBarTimer
@@ -573,7 +583,8 @@ public final class AppState {
                 captureWindow: sources.selectedWindow,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
                 replayHotkey: replayHotkey, recordHotkey: recordHotkey,
-                pauseHotkey: pauseHotkey, countInEnabled: countInEnabled,
+                pauseHotkey: pauseHotkey, stopHotkeyCopies: stopHotkeyCopies,
+                countInEnabled: countInEnabled,
                 namesTakeOnStop: namesTakeOnStop,
                 showsMenuBarTimer: showsMenuBarTimer, showsMenuBarLevel: showsMenuBarLevel,
                 gifFPS: gifFPS, gifWidth: gifWidth, gifMaxSeconds: gifMaxSeconds,
@@ -680,6 +691,12 @@ public final class AppState {
     public var stopAndCopyTitle: String {
         MenuHeader.stopAndCopy(maximumBytes: maximumShareBytes)
     }
+
+    /// Which of the two Stop rows advertises the start/stop shortcut (M24-T2) — at most one, and
+    /// the one the combo actually performs. Without them the menu would claim an ending the key
+    /// doesn't have.
+    public var stopAndSaveHotkey: Hotkey? { stopHotkeyCopies ? nil : recordHotkey }
+    public var stopAndCopyHotkey: Hotkey? { stopHotkeyCopies ? recordHotkey : nil }
 
     /// The most a share export of the take running now can weigh — the Size picker's own rate
     /// budget (M19-T4) over the elapsed minutes. Nil without display geometry: no figure beats a
@@ -1264,19 +1281,43 @@ public final class AppState {
     /// stops and saves; otherwise a ready app starts, and a blocked one says why. Never a silent
     /// no-op — the shortcut advertised an action.
     public func toggleRecording() async {
-        switch Self.recordToggleAction(isSessionActive: session.isActive, isReady: readiness == .ready) {
+        switch Self.recordToggleAction(
+            isSessionActive: session.isActive, isReady: readiness == .ready,
+            copiesOnStop: stopHotkeyCopies, isExporting: exports.exportInProgress != nil
+        ) {
         case .start: await start()
         case .stop: await stop()
+        case .stopAndCopy: await stopAndShare()
+        case .stopWithoutCopy:
+            // Waits for finalize, not just `stop()`: the take's own "Recording saved" is posted
+            // when `.finished` drains, so notifying any earlier puts this notice on screen first
+            // and lets the next banner bury it (measured — it lasted under 0.3 s).
+            await stopAndWaitForFinalize()
+            notifier?(RecordingNotifications.stopCopySkipped())
         case .blockedNotify: notifier?(RecordingNotifications.recordingHotkeyBlocked())
         }
     }
 
-    enum RecordToggleAction: Equatable { case start, stop, blockedNotify }
+    enum RecordToggleAction: Equatable {
+        case start, stop, stopAndCopy, stopWithoutCopy, blockedNotify
+    }
 
-    /// Pure so the three branches are unit-tested without live capture (which `start`/`stop` need).
-    static func recordToggleAction(isSessionActive: Bool, isReady: Bool) -> RecordToggleAction {
-        if isSessionActive { return .stop }   // a paused session is still active — stop wins
-        return isReady ? .start : .blockedNotify
+    /// Pure so every branch is unit-tested without live capture (which `start`/`stop` need).
+    ///
+    /// `stopWithoutCopy` is the one non-obvious arm (M24-T2): an export is already running, and
+    /// `performExport` would drop a second one. Stopping is the shortcut's primary contract, so it
+    /// still stops — but the missing half has to be said, since a hotkey can't grey itself out the
+    /// way the menu row does (M17-T2).
+    /// Neither flag is defaulted: a caller that passed `copiesOnStop` and forgot `isExporting`
+    /// would land in `stopAndShare`, whose own guard returns silently.
+    static func recordToggleAction(
+        isSessionActive: Bool, isReady: Bool, copiesOnStop: Bool, isExporting: Bool
+    ) -> RecordToggleAction {
+        guard isSessionActive else {   // a paused session is still active — stop wins
+            return isReady ? .start : .blockedNotify
+        }
+        guard copiesOnStop else { return .stop }
+        return isExporting ? .stopWithoutCopy : .stopAndCopy
     }
 
     /// What the global pause/resume shortcut does (M12-T6): a live recording pauses, a paused one

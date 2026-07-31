@@ -40,7 +40,7 @@ Order and grouping (separators between groups):
 2. **Start Recording** — primary action, bold. **M12-T3: the first actionable row** — the export/replay
    receipts (below) sit *under* Start/Arm, never squatting above it. When the opt-in start/stop shortcut
    is enabled (`recordHotkey`), Start advertises the combo in the shortcut column (the `Save Replay Now`
-   pattern), and `Stop & Save` does the same while recording.
+   pattern), and while recording so does whichever Stop row the ending selects (item 3b, M24-T2).
    **A Start that fails carries its reason directly under this row (M17-T2).** Such a start produces no
    session, so the menu stays *idle* — where `lastFailure` used to render nowhere and Start looked like
    a no-op. The recording-state menu has always shown it; both surfaces now do. ⚠️ The notification is
@@ -196,8 +196,10 @@ Order and grouping (separators between groups):
 3. **Stop & Save** — primary.
 3b. **Stop & Copy MP4 · up to 95 MB** (M21-T2) — stops, finalizes, exports at the Settings size and puts
    the `.mp4` on the pasteboard, so the next keystroke is ⌘V. Sits *beside* Stop & Save, never
-   replacing it: Stop & Save keeps the hotkey and the bold primary, and muscle memory must not start
-   an encode. **Not called "Stop & Share"** — `Share…` means the macOS share sheet everywhere else in
+   replacing it: Stop & Save keeps the bold primary, and muscle memory must not start an encode.
+   **The shortcut column follows `stopHotkeyCopies`** (M24-T2): exactly one of the two Stop rows
+   prints the combo, and it is the one the key performs — the setting is opt-in, so this is a
+   chosen ending rather than a surprise. **Not called "Stop & Share"** — `Share…` means the macOS share sheet everywhere else in
    this app. The figure is the Size picker's rate budget (M19-T4) over the elapsed minutes, stamped
    at open (M6-T10) and **omitted** without display geometry (M16-T2). It says **`up to`**, not `≈`:
    the encoder undershoots the budget badly on a quiet screen (11 MB quoted, 2.2 MB written — docs/07). **Disabled while an export
@@ -429,6 +431,15 @@ collapses toolbar tabs into a `»` overflow menu, hiding three of the four pages
   user didn't choose can clash); enabling seeds ⌥⌘S and shows the recorder pill. Fires
   `AppState.toggleRecording` (active session ⇒ Stop & Save; idle+ready ⇒ Start; blocked ⇒ notify).
   Backed by `recordHotkey`.
+  - **When it stops — `Save` · `Save and copy`** (M24-T2), a segmented picker below the pill, visible
+    only while the shortcut is on. `Save and copy` ends in `AppState.stopAndShare` instead of `stop`,
+    so the take is kept *and* an `.mp4` lands on the clipboard. A picker rather than a second
+    shortcut: `Save and copy` keeps the `.mov` too (ADR-004), so there is nothing to trade per-take,
+    and the menu keeps both endings as rows. Backed by `stopHotkeyCopies`; absent ⇒ `Save`, so an
+    existing install's combo is unchanged. The caption gains a sentence when it copies.
+  - **An export already running** ⇒ it still stops and saves, then posts *"Saved — the copy had to
+    wait"*: `performExport` takes one job at a time, stopping is the combo's primary contract, and a
+    hotkey cannot grey itself out the way the menu row does (M17-T2).
 - **Global pause/resume shortcut** (M12-T6) — the start/stop twin: opt-in toggle, seeds ⌥⌘P, recorder
   pill. Fires `AppState.togglePause` (recording ⇒ Pause; paused ⇒ Resume; **idle ⇒ silent no-op** — a
   notification there would be noise, unlike the record hotkey's real "blocked" failure). Lets a demo be
@@ -517,6 +528,7 @@ moved):
 | `recordHotkey` | Dict: keyCode Int, modifiers Int; **absent ⇒ off** (M9-T4, opt-in global start/stop) | M9-T4 |
 | `pauseHotkey` | Dict: keyCode Int, modifiers Int; **absent ⇒ off** (M12-T6, opt-in global pause/resume) | M12-T6 |
 | `countInEnabled` | Bool; **absent ⇒ off** (M12-T6). Start runs a 3-2-1 count-in before capture | M12-T6 |
+| `stopHotkeyCopies` | Bool; **absent ⇒ off** (`Save`). The start/stop shortcut's ending — on ⇒ it also leaves an `.mp4` on the clipboard (M24-T2) | M24-T2 |
 | `showsMenuBarTimer` | Bool; **absent ⇒ on** (opt-out). The status-item label's live elapsed clock while recording (M9-T3) | M9-T3 |
 | `showsMenuBarLevel` | Bool; **absent ⇒ on** (opt-out). The status-item input meter while recording or armed (M16-T5) | M16-T5 |
 | `seenReplayBannerWarning` | Bool; **absent ⇒ false** (not seen). Once true the first-arm banner-suppression alert never fires again (M12-T5) | M12-T5 |

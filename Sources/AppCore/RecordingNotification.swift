@@ -336,6 +336,17 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
+    /// The start/stop shortcut stopped a take it was set to copy, while another export held the
+    /// one-at-a-time slot (M24-T2). The take is saved; only the copy was dropped, and the menu is
+    /// where the second one is asked for.
+    public static func stopCopySkipped() -> RecordingNotification {
+        RecordingNotification(
+            title: "Saved — the copy had to wait",
+            body: "Another export was still running, so this take was saved without one. "
+                + "Export it from the menu when that finishes.",
+            fileURL: nil)
+    }
+
     /// One phrase per reachable `EndReason` (docs/06). Never the raw SCK string, never the word
     /// "error" — the user can't act on either.
     private static func cause(_ reason: EndReason) -> String {

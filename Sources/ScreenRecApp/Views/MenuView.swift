@@ -231,12 +231,16 @@ struct MenuView: View {
         } else {
             shortcutRow("Pause", hotkey: state.pauseHotkey) { Task { await state.pause() } }
         }
-        shortcutRow("Stop & Save", hotkey: state.recordHotkey) { Task { await state.stop() } }
+        // The combo sits on whichever ending it actually has (M24-T2) — one keypress with two
+        // meanings is only honest if the menu says which one is live.
+        shortcutRow("Stop & Save", hotkey: state.stopAndSaveHotkey) { Task { await state.stop() } }
         // docs/06 recording item 3b (M21-T2): stop, transcode, and leave it on the clipboard.
         // Disabled while an export runs — `performExport` would drop the second one, and a dropped
         // action must be visible rather than silent (M17-T2). The row above it says what's running.
-        Button(state.stopAndCopyTitle) { Task { await state.stopAndShare() } }
-            .disabled(state.exports.exportInProgress != nil)
+        shortcutRow(state.stopAndCopyTitle, hotkey: state.stopAndCopyHotkey) {
+            Task { await state.stopAndShare() }
+        }
+        .disabled(state.exports.exportInProgress != nil)
 
         Divider()
 

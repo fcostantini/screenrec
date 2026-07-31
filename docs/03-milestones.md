@@ -1946,14 +1946,18 @@ hand it to you. **MINOR.**
       because the clipboard is taken either way; and the notice is M21-T2's **`Copied — ⌘V to paste`**
       reused, one notice rather than a receipt plus a copy. **Verify:** live — set a range, one press,
       ⌘V pastes the clip.
-- [ ] M24-T2 **Stop and copy from the keyboard.** The start/stop shortcut stops *and saves* a `.mov`,
+- [x] M24-T2 **Stop and copy from the keyboard.** The start/stop shortcut stops *and saves* a `.mov`,
       so the keyboard path stops one step short of the thing you wanted; the menu is still required
       for the last move. **Seams:** `HotkeyID` has been a typed registry since M22-T4, so a second id
-      is cheap; `AppState.stopAndShare()` is the action. **Rulings:** a separate shortcut versus a
-      setting on the existing one ("when it stops: save · save and copy"); and what it does when an
-      export is already running — the menu row is disabled there, but a hotkey has to *say* something
-      (M17-T2's lesson). **Verify:** fired from another app; the file lands on the clipboard and one
-      notice is posted.
+      is cheap; `AppState.stopAndShare()` is the action. **Rulings taken** (Franco, 2026-07-31): a
+      **setting on the existing shortcut**, not a second combo — `When it stops: Save · Save and
+      copy`, backed by `stopHotkeyCopies`, so **no new `HotkeyID` was needed**. `Save and copy` keeps
+      the `.mov` too (ADR-004), so there is nothing to trade per-take; it costs no Settings height
+      while the shortcut is off; and the menu's shortcut column moves to whichever Stop row the
+      ending selects, so one combo with two meanings still can't lie. With an export already running
+      it **still stops and saves**, then says so — stopping is the combo's primary contract, and a
+      hotkey can't grey itself out (M17-T2's lesson). **Verify:** fired from another app; the file
+      lands on the clipboard and one notice is posted.
 - [ ] M24-T3 **The take you just made is one click away.** A replay save gets a top-level receipt row
       *and* a menu-bar flash; the recording you just stopped gets neither — it is two levels down
       under `Recordings ▸`, identified by timestamp. **Seams:** `lastReplay`'s row and

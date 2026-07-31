@@ -132,7 +132,18 @@ struct SettingsView: View {
                             }
                         })
                 }
-                Text("Starts recording, or stops and saves the current one, from any app. "
+                // M24-T2: which ending the combo has. A picker rather than a second shortcut —
+                // "Save and copy" keeps the .mov too (ADR-004), so there is nothing to trade
+                // per-take, and the menu's shortcut column follows this pick.
+                Picker("When it stops", selection: $state.stopHotkeyCopies) {
+                    Text("Save").tag(false)
+                    Text("Save and copy").tag(true)
+                }
+                .pickerStyle(.segmented)
+                Text("Starts recording, or stops the current one, from any app. "
+                    + (state.stopHotkeyCopies
+                        ? "It also writes an MP4 and leaves it on the clipboard. "
+                        : "")
                     + "Must include ⌥ or ⌃.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

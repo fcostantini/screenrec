@@ -206,6 +206,9 @@ public struct Settings: Sendable, Equatable {
     public var recordHotkey: Hotkey?
     /// The optional global pause/resume shortcut (M12-T6). Nil ⇒ off — opt-in like `recordHotkey`.
     public var pauseHotkey: Hotkey?
+    /// Whether the start/stop shortcut also leaves an MP4 on the clipboard when it stops (M24-T2).
+    /// Default off: the copy costs a transcode and the pasteboard, so it is chosen, not assumed.
+    public var stopHotkeyCopies: Bool
     /// Whether Start runs a 3-2-1 count-in first (M12-T6). Default off.
     public var countInEnabled: Bool
     /// Whether a finished take asks to be named (M21-T3). Default off — a modal after every stop
@@ -294,6 +297,7 @@ public struct Settings: Sendable, Equatable {
             replayHotkey: .standard,
             recordHotkey: nil,
             pauseHotkey: nil,
+            stopHotkeyCopies: false,
             countInEnabled: false,
             namesTakeOnStop: false,
             showsMenuBarTimer: true,
@@ -346,6 +350,8 @@ public enum SettingsStore {
         public static let recordHotkey = "recordHotkey"
         /// Absent ⇒ the pause/resume shortcut is off (M12-T6). Same Dict shape as `replayHotkey`.
         public static let pauseHotkey = "pauseHotkey"
+        /// Absent ⇒ the start/stop shortcut only saves (M24-T2).
+        public static let stopHotkeyCopies = "stopHotkeyCopies"
         /// Absent ⇒ no count-in (M12-T6).
         public static let countInEnabled = "countInEnabled"
         public static let namesTakeOnStop = "namesTakeOnStop"
@@ -474,6 +480,7 @@ public enum SettingsStore {
         // Absent or malformed ⇒ the start/stop shortcut stays off (M9-T4).
         settings.recordHotkey = hotkey(from: defaults.dictionary(forKey: Key.recordHotkey))
         settings.pauseHotkey = hotkey(from: defaults.dictionary(forKey: Key.pauseHotkey))
+        settings.stopHotkeyCopies = defaults.bool(forKey: Key.stopHotkeyCopies)
         settings.countInEnabled = defaults.bool(forKey: Key.countInEnabled)
         settings.namesTakeOnStop = defaults.bool(forKey: Key.namesTakeOnStop)
 
@@ -617,6 +624,7 @@ public enum SettingsStore {
         } else {
             defaults.removeObject(forKey: Key.pauseHotkey)
         }
+        defaults.set(settings.stopHotkeyCopies, forKey: Key.stopHotkeyCopies)
         defaults.set(settings.countInEnabled, forKey: Key.countInEnabled)
         defaults.set(settings.namesTakeOnStop, forKey: Key.namesTakeOnStop)
         defaults.set(settings.showsMenuBarTimer, forKey: Key.showsMenuBarTimer)

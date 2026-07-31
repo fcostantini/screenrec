@@ -86,10 +86,35 @@ import RecorderCore
 
     @Test func theStartStopToggleReadsOffSessionAndReadiness() {
         // Pure, so the three branches are testable without live capture (which start/stop need).
-        #expect(AppState.recordToggleAction(isSessionActive: false, isReady: true) == .start)
-        #expect(AppState.recordToggleAction(isSessionActive: true, isReady: true) == .stop)
-        #expect(AppState.recordToggleAction(isSessionActive: true, isReady: false) == .stop)  // active wins
-        #expect(AppState.recordToggleAction(isSessionActive: false, isReady: false) == .blockedNotify)
+        let plain = { (active: Bool, ready: Bool) in
+            AppState.recordToggleAction(
+                isSessionActive: active, isReady: ready, copiesOnStop: false, isExporting: false)
+        }
+        #expect(plain(false, true) == .start)
+        #expect(plain(true, true) == .stop)
+        #expect(plain(true, false) == .stop)          // active wins
+        #expect(plain(false, false) == .blockedNotify)
+    }
+
+    @Test func theStopEndingDecidesWhetherTheShortcutAlsoCopies() {
+        // M24-T2: one combo, two endings — plus the arm for a copy that can't run.
+        #expect(AppState.recordToggleAction(
+            isSessionActive: true, isReady: true, copiesOnStop: true, isExporting: false)
+            == .stopAndCopy)
+        #expect(AppState.recordToggleAction(
+            isSessionActive: true, isReady: true, copiesOnStop: false, isExporting: false) == .stop)
+        // An export already holds the one-at-a-time slot. Stopping is the combo's primary
+        // contract, so it still stops — and the dropped copy is announced, not swallowed.
+        #expect(AppState.recordToggleAction(
+            isSessionActive: true, isReady: true, copiesOnStop: true, isExporting: true)
+            == .stopWithoutCopy)
+        // The ending never leaks into the idle branches: with nothing recording there is no stop
+        // to give an ending to.
+        #expect(AppState.recordToggleAction(
+            isSessionActive: false, isReady: true, copiesOnStop: true, isExporting: true) == .start)
+        #expect(AppState.recordToggleAction(
+            isSessionActive: false, isReady: false, copiesOnStop: true, isExporting: false)
+            == .blockedNotify)
     }
 
     // MARK: - Global pause/resume shortcut (M12-T6)

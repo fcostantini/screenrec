@@ -6,6 +6,33 @@
 
 ## Now
 
+- **✅ M24-T2 SHIPPED (2026-07-31) — the keyboard reaches the clipboard. Next: M24-T3.**
+  The start/stop shortcut gained an ending: **`When it stops: Save · Save and copy`**
+  (`stopHotkeyCopies`, absent ⇒ Save, so no existing install changes). **No new hotkey** — a picker
+  under the existing shortcut, because `Save and copy` keeps the `.mov` too (ADR-004) and so loses
+  nothing, costs zero Settings height while the shortcut is off, and adds no combo to clash.
+  **644 tests** (641 → 644), dev loop green, plan artifact
+  `claude.ai/code/artifact/1ab7e7d0-3e63-4c22-9d1c-a0bb88a42aa7`.
+  ✅ **Live, fired from Terminal** (a global Carbon hotkey, so genuinely another app): ⌥⌘S started a
+  take, and the recording menu showed the combo had **moved to `Stop & Copy MP4 · up to 1,5 MB
+  [⌥⌘S]`** with `Stop & Save` carrying none. ⌥⌘S again → 22.06 s `avc1` 1920×1200 + AAC on the
+  clipboard (sentinel replaced), the 4112×2570 hvc1 `.mov` kept beside it. **Busy-export leg, twice:**
+  take saved, **no `.mp4` derived**, clipboard untouched, `Saved — the copy had to wait` delivered.
+  🔴 **That notice was delivered and invisible.** Posted right after `stop()` returns — *before*
+  `.finished` drains — so "Recording saved" replaced it **within 0.3 s**. Three runs sampling at
+  0.3 s caught it **zero times**; `--print-delivered-notifications` had it every time. Now awaits
+  `stopAndWaitForFinalize()`, so the exception posts last and is the banner left standing (docs/07).
+  ⚠️ **Two notices per stop, not one** — the take's own `Recording saved · 0:22` then `Copied — ⌘V to
+  paste` ~8 s later. Pre-existing (the menu's Stop & Copy MP4 does the same since M21-T2), but
+  docs/03's Verify says "one notice", so: **flagged, not silently changed.** Say the word and the
+  save notice can be suppressed when the ending copies.
+  🔴 **I toggled `Launch at login` off by accident** — a `checkbox 1` press landed on the General tab
+  while Settings was still opening. Restored within seconds and verified re-registered. The driver
+  now addresses controls **by label**; docs/07.
+  ✅ **Settings restored and verified against `defaults read`:** `recordHotkey` absent,
+  `stopHotkeyCopies` 0, `pauseHotkey` absent, `replayArmed` 0. All test files deleted, clipboard
+  cleared.
+
 - **✅ M24-T1 SHIPPED (2026-07-31) — the Trim window hands you the clip. Next: M24-T2.**
   `Export as MP4` is now **`Export & Copy`**: one press writes the ranged `.mp4` *and* leaves it on the
   pasteboard, ending the three moves (menu → receipt row → `Copy`) it used to cost. The change is one

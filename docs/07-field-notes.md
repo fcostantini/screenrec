@@ -7,6 +7,24 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-31 (M24-T2): 🔴 **A notification can be delivered and still never be seen: the next banner
+  replaces it.** The skipped-copy notice was posted right after `stop()` returns — which is *before*
+  `.finished` drains and posts "Recording saved", so the take's own banner landed on top **inside
+  0.3 s**. Three live runs, sampling the corner every 0.3 s, caught the notice **zero times**;
+  `--print-delivered-notifications` showed it every time, one second ahead of its replacement.
+  Fixed by awaiting `stopAndWaitForFinalize()` instead of `stop()`, so the pair posts in the order
+  a reader needs. ⚠️ **Generalises:** when two notifications describe one action, the one carrying
+  the *exception* must post last. And **screenshots are the wrong instrument for "was it posted"** —
+  the delivered list answers that; screenshots only answer "was it on screen", which is a different
+  and weaker question.
+
+- 2026-07-31 (M24-T2): ⚠️ **`trimdriver checkbox <n>` toggled the wrong setting** — the Settings
+  window had not finished opening, the press landed on the **General** tab, and index 1 there is
+  `Launch at login`, not the shortcut. Restored immediately, but the lesson stands: **address a
+  control by its label, not its index**, because an index silently means something else in a pane
+  you didn't expect to be looking at. The scratch driver grew a `labeled` command that finds the
+  checkbox following a given `AXStaticText`.
+
 - 2026-07-31 (M24-T1): **Deriving from a derived file stutters its name: `… trimmed trimmed.mp4`.**
   `mp4Sibling(of:range:)` composes `Trimmer.trimmedSibling`, which appends unconditionally, so a
   ranged export *of a clip* stacks the suffix. Measured live (6.53 s clip → 5.45 s clip, both

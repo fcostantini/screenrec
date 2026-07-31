@@ -81,6 +81,27 @@ import RecorderCore
         #expect(state.microphoneMenuLabel == device.name)
     }
 
+    // MARK: - Which Stop row owns the shortcut (M24-T2)
+
+    @Test func exactlyOneStopRowAdvertisesTheShortcutAndItIsTheOneTheKeyPerforms() {
+        // The mitigation for one combo having two meanings: the menu names the live one. If both
+        // rows printed it, or the wrong one did, the menu would be the lie this suite exists for.
+        let state = makeState()
+        state.recordHotkey = .recordDefault
+
+        #expect(state.stopAndSaveHotkey == .recordDefault)
+        #expect(state.stopAndCopyHotkey == nil)
+
+        state.stopHotkeyCopies = true
+        #expect(state.stopAndSaveHotkey == nil)
+        #expect(state.stopAndCopyHotkey == .recordDefault)
+
+        // Shortcut off: neither row claims one, whatever the ending says.
+        state.recordHotkey = nil
+        #expect(state.stopAndSaveHotkey == nil)
+        #expect(state.stopAndCopyHotkey == nil)
+    }
+
     // MARK: - Receipt staleness
 
     @Test func aReceiptIsStaleOnlyAfterTheFreshnessWindow() {

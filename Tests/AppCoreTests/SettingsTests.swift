@@ -97,6 +97,16 @@ import RecorderCore
         #expect(SettingsStore.load(from: defaults).countInEnabled == true)
     }
 
+    @Test func stopHotkeyCopiesRoundTripsAndDefaultsToSaveOnly() {
+        // Absent ⇒ off, so an existing install's shortcut keeps the ending it already had (M24-T2).
+        let defaults = makeDefaults().defaults
+        #expect(SettingsStore.load(from: defaults).stopHotkeyCopies == false)
+        var settings = Settings.standard
+        settings.stopHotkeyCopies = true
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).stopHotkeyCopies == true)
+    }
+
     @Test func seenReplayBannerWarningRoundTripsAndDefaultsToFalse() {
         let defaults = makeDefaults().defaults
         #expect(SettingsStore.load(from: defaults).seenReplayBannerWarning == false)   // absent ⇒ not seen
@@ -174,7 +184,7 @@ import RecorderCore
             "outputDirectory", "qualityPreset", "fpsCap", "capturesSystemAudio",
             "replayArmed", "replaySeconds", "replayHotkey", "showsMenuBarTimer", "showsMenuBarLevel",
             "gifFPS", "gifWidth", "gifMaxSeconds", "mp4Width", "stopAfterMinutes",
-            "seenReplayBannerWarning", "countInEnabled", "namesTakeOnStop",
+            "seenReplayBannerWarning", "countInEnabled", "namesTakeOnStop", "stopHotkeyCopies",
         ])
     }
 
