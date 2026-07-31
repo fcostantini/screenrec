@@ -2056,7 +2056,7 @@ is a per-target flip, not a migration.
       `Package.swift` entirely**, so a later target cannot be added at v5 silently. **Verify:** no
       `.v5` remains anywhere; dev loop green; a deployed build records, replays and exports.
 
-**Gate G25** — ⚠️ **criterion amended 2026-07-31 (Franco), before being run.** As filed it required
+**Gate G25** — ✅ **PASSED 2026-07-31** (evidence in STATUS.md's gate table). ⚠️ **Criterion amended 2026-07-31 (Franco), before being run.** As filed it required
 *no `.v5` left in `Package.swift`*. One remains, deliberately: `RecorderCoreTests`, whose conversion
 would rewrite three bounded waits that exist so a stuck drain fails rather than hangs (docs/07). The
 gate now reads: **every target that ships builds and tests in Swift 6** — `RecorderCore`, `AppCore`,
