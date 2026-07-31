@@ -7,6 +7,18 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-31 (M26-T2 plan): 🔴 **Never post a synthetic click at a window's frame — this app's
+  windows are behind everything.** `CGWindowBounds` says where a window *is*, not whether it is
+  visible there. Aiming at the Trim window's close button (frame confirmed at 781,387) put the click
+  into **Discord**, which was in front at that point; `CGWindowListCopyWindowInfo(.optionOnScreenOnly)`
+  lists front-to-back and would have said so *before* the click. The cause is structural: an
+  `LSUIElement` app cannot be activated by synthetic input (G24), so a window it opens can never come
+  forward for an agent. ⚠️ **AX is no way round it** — `kAXWindowsAttribute` reports **0 windows** for
+  this app while it isn't frontmost, so `axdump` and a close-button press both come up empty, even
+  with the Accessibility grant. **Consequences:** an agent can *open* a window (menudriver) and
+  *capture* it (`screencapture -R` at the frame the window server reports), but cannot close it,
+  activate it, or drag inside it. Anything drag-driven in the Trim or Settings window is a human leg.
+
 - 2026-07-31 (M26-T1): 🔴 **`AVURLAsset.loadTracks(withMediaType:)` segfaults when called from
   `RecorderCoreTests`.** Deterministic `EXC_BAD_ACCESS` in `swift_retain`, resuming the compiler's
   bridged continuation for that ObjC completion handler

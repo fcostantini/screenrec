@@ -33,6 +33,19 @@
   ⚠️ **The VERSION bump is still pending** — 1.13.0 rides with T2, the first half a user of the app
   can reach, and M25's deferred patch rides in that cut.
 
+- **🗓️ M26-T2 PLANNED, not started (2026-07-31) — four rulings waiting on Franco.** Artifact:
+  `claude.ai/code/artifact/1f4eb109-09a3-4cac-82b5-81f30da6a844`, with a real capture of today's Trim
+  window (preview blanked — it held Franco's own recording) beside the proposal. **Recommended:** drag
+  to draw with a live read-out and Reset, no numeric fields; the crop does **not** persist between
+  opens; the caption quotes the **cropped** size live; and **`Trim & Save` goes quiet while a crop is
+  set** and says why — a trim is `AVAssetExportSession`, it has no crop, and silently ignoring one is
+  the lie this project keeps refusing. ⚠️ **Crop drawing has to be a mode:** `AVPlayerView`'s inline
+  controls sit under any always-on overlay, so the toggle is off by default and today's window is
+  unchanged until it's asked for.
+  🔴 **The drag is a human leg** — synthetic input can't activate an `LSUIElement` app, and its
+  windows sit behind everything (docs/07). ⚠️ **The Trim window I opened for the screenshot is still
+  open** behind Discord/Slack — ⌘W it. A click I aimed at its close button landed in Discord.
+
 - **✅ G25 PASSED (2026-07-31) — M25 complete. Swift 6 is on for everything that ships.** Evidence
   in the gate table. ✅ **RULED (Franco): no v1.12.1** — M25 has zero user-facing change, so there is
   nothing to download; the bump rides into **M26's cut**. `VERSION` stays **1.12.0**. Recorded in
