@@ -1992,9 +1992,13 @@ hand it to you. **MINOR.**
       **Rulings taken** (Franco, 2026-07-31): **hide** them, not disable — on a GIF they were never choices (AVFoundation can't read one: `isReadable false`, no tracks, duration `-1`, yet an export session is still *created*, which is why it never failed at the menu), and M18-T3 shortened this menu rather than annotating it. Also fixed, beyond the filed text: the `… trimmed trimmed` stutter found live in M24-T1. ⚠️ **The `.mov` was a hard-code and its comment was wrong** — passthrough reports `mpeg-4` among its supported types (docs/07). **Verify:** trim
       an `.mp4` → an `.mp4` out, probe clean; the submenu on an export no longer offers to re-derive it.
 
-**Gate G24**: from a finished take, a chosen range reaches the clipboard in one action without the
-mouse; the take you just recorded is actionable from the top of the menu; the Trim window can find a
-moment without blind scrubbing; and deriving from an export never silently re-encodes it.
+**Gate G24** — ✅ **PASSED 2026-07-31** (evidence in STATUS.md's gate table): from a finished take, a
+chosen range reaches the clipboard in one action without the mouse; the take you just recorded is
+actionable from the top of the menu; the Trim window can find a moment without blind scrubbing; and
+deriving from an export never silently re-encodes it. ⚠️ **Criterion 1 failed on the first run** —
+`Export & Copy` had no key equivalent, so the last press needed a click; ⌘↩ was added and it was
+re-run. The keyboard criteria are human-only: `LSUIElement` plus synthetic input cannot confer
+activation (docs/07).
 
 ## Dependency graph
 

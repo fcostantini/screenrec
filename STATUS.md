@@ -6,7 +6,15 @@
 
 ## Now
 
-- **✅ M24-T5 SHIPPED (2026-07-31) — M24's five tasks are all done. Next: G24, then the MINOR bump.**
+- **✅ G24 PASSED (2026-07-31) — M24 is complete, cut as v1.12.0.** Evidence in the gate table.
+  🔴 **The gate earned its keep: criterion 1 failed on the first run.** `Export & Copy` had no key
+  equivalent, so a chosen range could not reach the clipboard without a click — the two halves
+  existed separately (T1 was one action with the mouse; T2 was mouse-free but whole-take). Fixed
+  with ⌘↩ (`625488b`) and re-run. **A gate that only confirms what you already believe isn't one.**
+  ⚠️ **The keyboard criteria are Franco's to run and always will be** — `LSUIElement` plus synthetic
+  input cannot confer activation, checked three ways this session (docs/07).
+
+- **✅ M24-T5 SHIPPED (2026-07-31) — M24's five tasks are all done.**
   A trim now **keeps its container** and the derive group is offered only where it applies.
   **660 tests** (654 → 660), dev loop green, deployed. Plan artifact:
   `claude.ai/code/artifact/3deb6330-efaa-4f0a-a06e-cc58a275562f`.
@@ -343,6 +351,7 @@
 
 | Gate | Status | Evidence |
 |------|--------|----------|
+| G24  | ✅ **passed 2026-07-31** | All four criteria re-run against **one release build** (`625488b`, deployed, signature valid). **A chosen range reaches the clipboard in one action without the mouse:** in the Trim window, ←/→ to navigate, `O` to set the out-point and **⌘↩** — driven entirely from the keyboard by Franco — replaced a `SENTINEL-G24` clipboard with `Recording 2026-07-28 at 17.19.30 trimmed.mp4`: **5.19 s out of a 129 s source**, `avc1` 1920×1200 + AAC, `kMDItemContentType = public.mpeg-4`, window dismissed, **one** notice (`Copied — ⌘V to paste`, delivered list). ⚠️ The button had **no key equivalent** until this run — the gate found it, and ⌘↩ was added before re-running (`625488b`). **The take you just recorded is actionable from the top of the menu:** a take stopped **while replay is armed** — the case that was silent on every channel — produced `Recording saved · 0:07` as the first receipt row with the full `fileActions` submenu. **The Trim window can find a moment without blind scrubbing:** 16/16 filmstrip thumbnails on the 2:09 take, first at ~80 ms; arrow stepping walks the **sample table** and lands **0.000000 s** off the source's presentation times (`AVPlayerItem.step(byCount:)` moved 0.25 s and missed every frame — docs/07); ←/→ and click-to-seek confirmed live by Franco. **Deriving from an export never silently re-encodes it:** the export receipt's submenu offers `Save as GIF` and `Trim…` but **no `Export as MP4`** (the source `.mov` keeps all three), and trimming that `.mp4` through the Trim window landed `… trimmed.mp4` at **`public.mpeg-4`**, passthrough — while a `.gif` row loses all three derives, because `AVURLAsset` cannot read one at all. **660 tests.** ⚠️ Method note: the keyboard legs are **Franco's** — `LSUIElement` plus synthetic input cannot confer activation, so no agent can press a key into this app (docs/07). |
 | G23  | ✅ **passed 2026-07-30** | All four criteria re-run against **one release build** (`c7509ec`, deployed, signature valid). **A recording that cannot be written stops itself and keeps what it wrote:** 500 MB APFS image, ballast to ~20 MB, the take fills the rest → **`✓ finished (writeFailed)` at 27 s** leaving **26.03 s** playable (hvc1 4112×2570 + AAC). The pre-fix binary on the identical rig ran the **full 60 s** — 38 s of it after the writer was already dead — and offered nothing. **An export that cannot fit refuses before it starts and names the disk:** 15.2 MB free against a 34.7 MB export → `Not enough room to export / This needs about 35 MB and SCRECFIT has 16 MB free. The recording is untouched.`, with **zero bytes written** (no `.mp4`, no `.partial`, no `.sb-`) and no receipt row. **An export in flight is visible without opening the menu:** the top-trailing dot, captured with the export confirmed in flight; and **armed + exporting shows both dots** without collision, meter intact. **A take that stops while replay is armed is never silent:** the tick renders beside the armed badge (item 39 → 51 pt, back to 39 after the window) — ⚠️ **the first time that flash has ever appeared**, since M9-T3 shipped it as a second `Image` a `MenuBarExtra` never draws. **Both extracted models fail when broken:** **12 breaks applied, 12 turned red**, each naming `SessionModelTests`/`ExportModelTests` rather than `AppStateTests`; tree clean after. **636 tests.** ⚠️ Method note: the icon states are evidenced by **magnified capture, not pixel count** — pixel-diffing this menu bar is unreliable (docs/07). |
 | G0   | ✅ passed 2026-07-14 | build+test(23)+bundle green; Identifier=dev.fcostantini.screenrec.app, Authority=screenrec-dev, designated requirement stable across rebuilds |
 | M1   | ✅ complete 2026-07-14 | all 5 tasks done; capture engine + router + probe + sleep guard, 41 tests |
