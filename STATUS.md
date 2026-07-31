@@ -13,11 +13,10 @@
   ✅ **Verified:** the strip builds and renders — captured filling left-to-right, then 16/16 on the
   2:09 take. And the step mechanism is **exact**: five consecutive steps landed **0.000000 s** off
   the source's presentation times, and the backward step round-tripped exactly.
-  ✅ **Arrow-key navigation confirmed live by Franco (2026-07-31)** — the half I could not reach.
-  This app is `LSUIElement`, so `activate` leaves Terminal frontmost (checked) and every synthetic
-  keystroke went to the wrong app; the window-scoped `NSEvent` monitor works in a real focused
-  window. ⚠️ **Click-to-seek on the strip is still unconfirmed** — same reason, and it is not part
-  of docs/03's filed Verify.
+  ✅ **Both input paths confirmed live by Franco (2026-07-31)** — arrow navigation *and*
+  click-to-seek, the half I could not reach. This app is `LSUIElement`, so `activate` leaves
+  Terminal frontmost (checked) and every synthetic keystroke went to the wrong app; the
+  window-scoped `NSEvent` monitor and the `SpatialTapGesture` both work in a real focused window.
   🔴 **Three findings, all measured, all in docs/07.** `AVPlayerItem.step(byCount:)` **does not step
   a frame on our recordings** — frame-on-change capture has no fixed cadence, and one step moved
   **0.25 s and landed 25 ms off any real frame**; the sample cursor lands exactly. A **bare arrow is
@@ -293,9 +292,6 @@
 
 **Open:**
 
-- [ ] **M24-T4's click-to-seek** (2026-07-31) — clicking the filmstrip should seek to where you
-      clicked. Arrows are confirmed working; this one is still unwatched. Unverifiable headlessly —
-      `LSUIElement` + synthetic input can't confer activation (docs/07). Catch it if convenient.
 
 - [ ] **Display-sleep lever** (declined 2026-07-27 — "headless legs only"): two questions need
       `pmset displaysleepnow` while armed, which blanks the screen mid-session. Does
