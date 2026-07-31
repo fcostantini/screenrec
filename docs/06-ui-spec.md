@@ -557,6 +557,15 @@ Opened from a recent recording's `Trim…` submenu row; a plain `Window` (id `tr
 design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
 - An **`AVPlayerView`** preview (AppKit via `NSViewRepresentable` — SwiftUI's generic `VideoPlayer`
   fatal-errors in the Command-Line-Tools SPM build; field note).
+- A **filmstrip** under the player (M24-T4): **16 thumbnails** across the take, one row, no scrolling,
+  filling **progressively** as they decode (first at ~80 ms, all 16 in ~785 ms on a recording —
+  docs/07). A click seeks proportionally to where you clicked, not to the thumbnail; a white marker
+  tracks the playhead. Caption: *"Click to seek · ←/→ a frame · ⇧←/⇧→ a second"*. Navigation, not
+  editing — no zoom, no waveform, no multi-track; the window stays spare.
+- **←/→ step one real frame**, ⇧ makes it a second. The frame comes from the sample table
+  (`FrameStep`), not `AVPlayerItem.step(byCount:)`, which assumes a cadence frame-on-change capture
+  doesn't have. The keys are claimed by a local `NSEvent` monitor scoped to this window, because a
+  bare arrow isn't a key equivalent and `AVPlayerView` would otherwise scrub with it (docs/07).
 - **Set In** / **Set Out** grab the playhead; `In M:SS` / `Out M:SS` readouts; `Trimmed length ≈`.
   <kbd>I</kbd> and <kbd>O</kbd> are their shortcuts (M18-T1).
 - **▶ Play range** plays `[in, out]` and pauses at the out-point (a boundary time observer, removed

@@ -6,6 +6,34 @@
 
 ## Now
 
+- **🟡 M24-T4 CODE COMPLETE, HALF-VERIFIED (2026-07-31) — the box is NOT ticked. Needs Franco.**
+  The Trim window gained a **16-thumbnail filmstrip** that fills progressively, and **←/→ steps one
+  real frame** (⇧ a second). **654 tests** (650 → 654), dev loop green, deployed. Plan artifact:
+  `claude.ai/code/artifact/3f8024d7-d1e2-48a2-8f01-c9fd1151c05b`.
+  ✅ **Verified:** the strip builds and renders — captured filling left-to-right, then 16/16 on the
+  2:09 take. And the step mechanism is **exact**: five consecutive steps landed **0.000000 s** off
+  the source's presentation times, and the backward step round-tripped exactly.
+  🔴 **NOT verified — yours to check, 20 seconds:** open Trim, **click the strip** (should seek to
+  where you clicked) and **press ←/→** (should nudge one frame; the readout barely moves — that's
+  correct, frames are ~14 ms apart). I could not test either: this app is `LSUIElement`, so
+  `activate` leaves Terminal frontmost (checked) and every synthetic keystroke went to the wrong
+  app — the same activation wall `menudriver` documents. **If ←/→ do nothing, the monitor's
+  window-title scope is the first suspect.**
+  🔴 **Three findings, all measured, all in docs/07.** `AVPlayerItem.step(byCount:)` **does not step
+  a frame on our recordings** — frame-on-change capture has no fixed cadence, and one step moved
+  **0.25 s and landed 25 ms off any real frame**; the sample cursor lands exactly. A **bare arrow is
+  not a key equivalent**, so `.keyboardShortcut(.leftArrow)` never fires and `AVPlayerView` scrubs
+  instead (90 presses → 47.7 s); a scoped local `NSEvent` monitor takes them. And a strip's cost is
+  **keyframe spacing × count, not take length** — the 270 s replay is 6× cheaper per thumbnail than
+  the 129 s recording, so a 40-minute take costs what a two-minute one does.
+  🔴 **docs/03's stated seams were wrong twice.** `VideoFrameReader` reads sequentially from zero and
+  cannot build a strip; `AVPlayer.step` is on `AVPlayerItem` and is the wrong call anyway. Third time
+  a roadmap parenthetical hasn't survived contact (after M23-T5's line counts).
+  ⚠️ **A bug the live leg caught that the tests could not:** the strip keyed its callback lookup on
+  the `Double` it asked for, but `AVAssetImageGenerator` reports the **quantised** `CMTime` —
+  12.10406 s comes back as 12.10333. **Only 6 of 16 thumbnails ever appeared**, and the unit tests
+  (which cover the time ladder, not the callback) were green throughout. Now keyed on `CMTimeValue`.
+
 - **✅ M24-T3 SHIPPED (2026-07-31) — the take you just stopped has a row. Next: M24-T4.**
   `Recording saved · 0:22` sits first in the receipt group with the same `fileActions` submenu
   `Replay saved` has had since M9-T2. Titled by **length, not filename** — "identified by timestamp"
@@ -265,6 +293,11 @@
 ## Needs Franco (human-only items)
 
 **Open:**
+
+- [ ] **M24-T4's input paths** (2026-07-31) — open Trim on any recording, then: **click the
+      filmstrip** (seeks to where you clicked) and **press ←/→** (steps one frame; ⇧←/⇧→ a second).
+      Unverifiable headlessly — `LSUIElement` + synthetic input can't confer activation (docs/07).
+      The step *mechanism* is measured exact; this is only about the keys and the click arriving.
 
 - [ ] **Display-sleep lever** (declined 2026-07-27 — "headless legs only"): two questions need
       `pmset displaysleepnow` while armed, which blanks the screen mid-session. Does

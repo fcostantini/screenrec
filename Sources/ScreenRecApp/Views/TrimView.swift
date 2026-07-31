@@ -1,5 +1,6 @@
 import AVKit
 import AppCore
+import Carbon.HIToolbox
 import RecorderCore
 import SwiftUI
 
@@ -20,10 +21,16 @@ private struct PlayerView: NSViewRepresentable {
     }
 }
 
-/// Holds the Play Range boundary observer. A reference so the observer's own closure can capture
-/// it without capturing the view — which would reach the player through `@State` and retain it.
-private final class RangeObserver {
-    var token: Any?
+/// Holds the observers the view installs on its player. A reference so an observer's own closure
+/// can capture it without capturing the view — which would reach the player through `@State` and
+/// retain it.
+private final class PlayerObservers {
+    /// The Play Range boundary observer.
+    var range: Any?
+    /// The periodic observer driving the filmstrip's playhead (M24-T4).
+    var playhead: Any?
+    /// The Trim window's arrow-key monitor (M24-T4).
+    var keys: Any?
 }
 
 /// The Trim window (M10-T4, docs/06 "Trim window" — the first editing surface): a preview to find
@@ -42,7 +49,18 @@ struct TrimView: View {
     @State private var reencodes = false
     /// What a lossless trim would keep before the in-point, or nil when nothing would be hidden.
     @State private var leadInText: String?
-    @State private var rangeObserver = RangeObserver()
+    @State private var observers = PlayerObservers()
+    /// The filmstrip's frames, by slice index — sparse while they arrive (M24-T4).
+    @State private var thumbnails: [Int: CGImage] = [:]
+    @State private var stripTask: Task<Void, Never>?
+    @State private var playhead = 0.0
+
+    /// One row of thumbnails across the player's width. 16 measured at 785 ms on a recording,
+    /// against 1.8 s for 24 — which is also past the size a screen recording reads at (docs/07).
+    private static let stripCount = 16
+    private static let stripHeight: CGFloat = 19
+    /// Bounds the decoded thumbnail; the cell is 30 pt wide, so this covers a 2× display.
+    private static let thumbnailPixels = 80
 
     /// A range worth acting on; below this, Trim & Save and Play Range are meaningless.
     private var hasRange: Bool { outSeconds - inSeconds >= 0.1 }
@@ -89,6 +107,11 @@ struct TrimView: View {
                     .frame(width: 480, height: 300)
                     .cornerRadius(6)
             }
+
+            filmstrip
+            Text("Click to seek · ←/→ a frame · ⇧←/⇧→ a second")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             HStack {
                 Button("Set In") { setIn() }
@@ -149,6 +172,80 @@ struct TrimView: View {
         .frame(width: 500)
     }
 
+    /// One row of thumbnails across the take (M24-T4), filling in as they decode. Navigation, not
+    /// editing: a click seeks proportionally, so the resolution is the pointer's, not the strip's.
+    @ViewBuilder private var filmstrip: some View {
+        GeometryReader { geometry in
+            HStack(spacing: 1) {
+                ForEach(0..<Self.stripCount, id: \.self) { index in
+                    if let image = thumbnails[index] {
+                        Image(decorative: image, scale: 1)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+                    } else {
+                        Rectangle().fill(.quaternary)
+                    }
+                }
+            }
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(.white)
+                    .frame(width: 2)
+                    .offset(x: geometry.size.width * playheadFraction)
+                    .shadow(radius: 1)
+            }
+            .contentShape(Rectangle())
+            .gesture(SpatialTapGesture().onEnded { event in
+                seek(toFraction: event.location.x / max(geometry.size.width, 1))
+            })
+        }
+        .frame(height: Self.stripHeight)
+        .clipShape(RoundedRectangle(cornerRadius: 3))
+        .accessibilityLabel("Filmstrip")
+        .accessibilityValue(Timecode.cutPoint(playhead))
+    }
+
+    /// Where the playhead sits along the strip, 0…1.
+    private var playheadFraction: Double {
+        guard durationSeconds > 0 else { return 0 }
+        return min(max(playhead / durationSeconds, 0), 1)
+    }
+
+    /// Exactly one frame — the source's next one, found in the sample table. `step(byCount:)`
+    /// assumes a fixed cadence our frame-on-change capture doesn't have (measured: it moved 0.25 s
+    /// and landed off every source frame, `FrameStep`).
+    private func step(byFrames count: Int) {
+        guard let player, let asset = player.currentItem?.asset, let url = loadedURL else { return }
+        player.pause()
+        let from = currentTime()
+        Task {
+            guard let next = await FrameStep.time(in: asset, from: from, by: count),
+                  loadedURL == url                                   // superseded while walking
+            else { return }
+            seek(toSeconds: next)
+        }
+    }
+
+    /// A second either way, for travelling without leaving the keyboard. Zero-tolerance, so the
+    /// playhead lands where the label says rather than at a keyframe up to seconds earlier.
+    private func nudge(bySeconds seconds: Double) {
+        seek(toSeconds: currentTime() + seconds)
+    }
+
+    private func seek(toFraction fraction: Double) {
+        seek(toSeconds: durationSeconds * min(max(fraction, 0), 1))
+    }
+
+    private func seek(toSeconds seconds: Double) {
+        guard let player, durationSeconds > 0 else { return }
+        player.pause()
+        player.seek(
+            to: CMTime(seconds: min(max(seconds, 0), durationSeconds), preferredTimescale: 600),
+            toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
     /// The playhead, clamped into the clip.
     private func currentTime() -> Double {
         max(0, min(player?.currentTime().seconds ?? 0, durationSeconds))
@@ -165,14 +262,14 @@ struct TrimView: View {
     private func playRange() {
         guard let player else { return }
         stopRangePlayback()
-        let observer = rangeObserver
+        let observers = observers
         let out = CMTime(seconds: outSeconds, preferredTimescale: 600)
-        observer.token = player.addBoundaryTimeObserver(
+        observers.range = player.addBoundaryTimeObserver(
             forTimes: [NSValue(time: out)], queue: .main
         ) { [weak player] in
             player?.pause()
-            if let token = observer.token { player?.removeTimeObserver(token) }
-            observer.token = nil
+            if let token = observers.range { player?.removeTimeObserver(token) }
+            observers.range = nil
         }
         player.seek(
             to: CMTime(seconds: inSeconds, preferredTimescale: 600),
@@ -183,10 +280,10 @@ struct TrimView: View {
     /// Ends a range playback in flight. An out-point at the very end of the clip may never be
     /// traversed, so the observer can outlive the playback that installed it.
     private func stopRangePlayback() {
-        guard let token = rangeObserver.token else { return }
+        guard let token = observers.range else { return }
         player?.removeTimeObserver(token)
         player?.pause()
-        rangeObserver.token = nil
+        observers.range = nil
     }
 
     /// Asks the asset where a lossless trim from the in-point would really start keeping frames.
@@ -209,9 +306,75 @@ struct TrimView: View {
     /// `loadedURL` goes with it so reopening the same recording rebuilds instead of resuming.
     private func unload() {
         stopRangePlayback()
+        stopPlayheadObserver()
+        stopKeyMonitor()
+        // A superseded strip would otherwise keep decoding a multi-GB source behind a closed window.
+        stripTask?.cancel()
+        stripTask = nil
         player?.pause()
         player = nil
         loadedURL = nil
+    }
+
+    /// Claims the arrow keys for the Trim window.
+    ///
+    /// Not `.keyboardShortcut(.leftArrow, …)`: a bare arrow is not a key equivalent, so it is
+    /// delivered as a `keyDown` to the first responder — which is `AVPlayerView`, whose own
+    /// handling scrubs (measured: 90 presses moved the playhead **47.7 s**, ~0.53 s each). The
+    /// monitor takes the event first and returns nil so the player never sees it. Scoped by window
+    /// title, so Settings and the rename alert keep their arrows.
+    private func startKeyMonitor() {
+        stopKeyMonitor()
+        observers.keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard event.window?.title == trimWindowTitle else { return event }
+            let stepsASecond = event.modifierFlags.contains(.shift)
+            switch Int(event.keyCode) {
+            case kVK_LeftArrow:
+                stepsASecond ? nudge(bySeconds: -1) : step(byFrames: -1)
+            case kVK_RightArrow:
+                stepsASecond ? nudge(bySeconds: 1) : step(byFrames: 1)
+            default:
+                return event
+            }
+            return nil
+        }
+    }
+
+    private func stopKeyMonitor() {
+        if let monitor = observers.keys { NSEvent.removeMonitor(monitor) }
+        observers.keys = nil
+    }
+
+    /// Drives the strip's playhead. 0.2 s is enough to read as live and assigns to one `@State`,
+    /// so it costs a redraw of 16 already-decoded images.
+    private func startPlayheadObserver(_ player: AVPlayer) {
+        stopPlayheadObserver()
+        observers.playhead = player.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.2, preferredTimescale: 600), queue: .main
+        ) { time in playhead = time.seconds.isFinite ? time.seconds : 0 }
+    }
+
+    private func stopPlayheadObserver() {
+        guard let token = observers.playhead else { return }
+        player?.removeTimeObserver(token)
+        observers.playhead = nil
+    }
+
+    /// Fills the strip as frames arrive (M24-T4) — the first lands in ~80 ms, so the window is
+    /// usable long before the last one does.
+    private func loadFilmstrip(_ url: URL, asset: AVAsset, duration: Double) {
+        stripTask?.cancel()
+        thumbnails = [:]
+        let times = FilmstripThumbnails.times(count: Self.stripCount, duration: duration)
+        guard !times.isEmpty else { return }
+        stripTask = Task {
+            for await frame in FilmstripThumbnails.stream(
+                for: asset, times: times, maxPixels: Self.thumbnailPixels
+            ) {
+                guard loadedURL == url else { return }   // superseded by another recording
+                thumbnails[frame.index] = frame.image
+            }
+        }
     }
 
     /// Rebuilds the player and range for a new target; a superseded async duration load is ignored.
@@ -223,7 +386,12 @@ struct TrimView: View {
         guard let url else { player = nil; return }
 
         let item = AVPlayerItem(url: url)
-        player = AVPlayer(playerItem: item)
+        let newPlayer = AVPlayer(playerItem: item)
+        player = newPlayer
+        startPlayheadObserver(newPlayer)
+        startKeyMonitor()
+        playhead = 0
+        thumbnails = [:]
         inSeconds = 0
         outSeconds = 0
         durationSeconds = 0
@@ -241,6 +409,7 @@ struct TrimView: View {
             durationSeconds = duration.isFinite ? max(0, duration) : 0
             outSeconds = durationSeconds
             sourceSize = size
+            loadFilmstrip(url, asset: asset, duration: durationSeconds)
         }
     }
 }

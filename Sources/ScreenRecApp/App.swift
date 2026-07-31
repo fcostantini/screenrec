@@ -6,6 +6,8 @@ import SwiftUI
 let onboardingWindowID = "onboarding"
 let settingsWindowID = "settings"
 let trimWindowID = "trim"
+/// The Trim window's title, shared with `TrimView`'s key monitor, which scopes itself by it.
+let trimWindowTitle = "Trim"
 
 /// The menu-bar app (docs/06 "Shell"): `LSUIElement`, so the status item and its menu are the
 /// app's surface. Owns the one `AppState`; the only windows are Onboarding and Settings.
@@ -117,7 +119,7 @@ struct ScreenRecApp: App {
 
         // The Trim window (M10-T4): a fixed window that reads `state.exports.trimTarget`, set by the menu's
         // "Trim…" — a plain `Window`, like Settings, since an LSUIElement app has no ⌘N to spawn one.
-        Window("Trim", id: trimWindowID) {
+        Window(trimWindowTitle, id: trimWindowID) {
             TrimView(state: state)
         }
         .windowResizability(.contentSize)

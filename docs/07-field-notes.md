@@ -7,6 +7,34 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-31 (M24-T4): 🔴 **`AVPlayerItem.step(byCount:)` does not step a frame on our recordings.**
+  It assumes a fixed cadence; capture is frame-on-change, so frames are irregularly spaced. Measured
+  on a 48.1 fps-nominal take: one `step(byCount: 1)` moved **0.25 s — three frames — and landed
+  25 ms off any source frame**. Walking the sample table instead (`makeSampleCursor` +
+  `stepInPresentationOrder`, the primitive `KeyframeIndex` already uses) lands **0.000000 s** off,
+  forward and back, over five consecutive steps. The real gaps in that file: 0.0167, 0.0333, 0.0167,
+  0.0167 — irregular, which is the whole reason. docs/03 named `AVPlayer.step(byCount:)`; it is on
+  `AVPlayerItem`, and it is the wrong call either way.
+
+- 2026-07-31 (M24-T4): **A filmstrip's cost is keyframe spacing × count, not take length.** 16
+  thumbnails at 80 px, 0.5 s tolerance, `AVAssetImageGenerator` batch: **785 ms** on a recording
+  (58 keyframes in 6,211 frames, mean gap **2.39 s**, max 7.76 s) against **221 ms** on a replay
+  (279 in 10,384, mean **0.98 s**) — the *longer* file is 6× cheaper per thumbnail. So a 40-minute
+  take costs what a two-minute one does at the same count; these are random-access seeks, not a
+  scan. Other figures on the recording: 8 → 594 ms, 12 → 451 ms, 24 → 1,821 ms, 40 → 2,242 ms; first
+  thumbnail always ~80 ms, so a progressive fill hides the rest. Zero-tolerance seeking costs ~1.7×
+  and buys nothing at 30 pt. ⚠️ **`VideoFrameReader` cannot do this** — it reads sequentially from
+  zero (built for GIF), so a strip through it would decode the whole file.
+
+- 2026-07-31 (M24-T4): ⚠️ **A bare arrow key is not a key equivalent**, so
+  `.keyboardShortcut(.leftArrow, modifiers: [])` never fires: the event goes to the first responder,
+  which in the Trim window is `AVPlayerView`, whose own handling scrubs — measured **90 presses →
+  47.7 s**, ~0.53 s each. Fixed with a local `NSEvent` monitor scoped by window title, returning nil
+  so the player never sees it. ⚠️ **And the input path cannot be verified headlessly:** this app is
+  `LSUIElement`, so `tell application "ScreenRec" to activate` leaves Terminal frontmost (checked)
+  and every synthetic keystroke goes to the wrong app. Same wall `tools/menudriver.swift` documents
+  for activation. Keyboard and click-through in a window are human checks.
+
 - 2026-07-31 (M24-T2): 🔴 **A notification can be delivered and still never be seen: the next banner
   replaces it.** The skipped-copy notice was posted right after `stop()` returns — which is *before*
   `.finished` drains and posts "Recording saved", so the take's own banner landed on top **inside
