@@ -6,6 +6,27 @@
 
 ## Now
 
+- **🗓️ M25–M28 ENCODED (2026-07-31, Franco's call) — nothing started.** Four of the six parked
+  items are now milestones in docs/03, with tasks, seams, rulings and gates: **M25 Swift 6 language
+  mode** (debt, PATCH), **M26 Crop on export** (MINOR), **M27 Audio-only per-app exclusion via Core
+  Audio process taps** (MINOR), **M28 an `NSMenu`-backed status item** (MINOR).
+  ✅ **RULED: crop on export is in scope (Franco, 2026-07-31)** — the one parked item marked
+  🔴 *needs a ruling*. **ADR-015 is amended, not contradicted** (docs/05): crop goes in on the
+  mechanism — the export path already scales every frame, so a source rect is an argument to work
+  that happens anyway — and the render/composite/animate line does **not** move.
+  ⚠️ **Proposed order, his to change: M25 → M26 → M27 → M28.** Swift 6 first because M27 puts a
+  second audio clock into `SampleRouter` and the compiler should be checking docs/01's rules before
+  that lands — M22-before-M21's logic. M28 last: largest, and it buys polish rather than capability.
+  ✅ **Measured today, so the milestones quote facts:** Swift 6 is **7 distinct sites in
+  `RecorderCore`** (named in M25-T1) and **5 in `AppCore`**, all one cluster; `ScreenRecApp`, the CLI
+  and both test targets are **unmeasured**, because the build stops at the first failing target.
+  ⚠️ The 2026-07-30 count of "7" still holds by luck — its *composition* changed (M24-T4 added one,
+  `MicrophoneRescue` lost one).
+  🔴 **Deferred, and recorded as deferred:** multi-display region capture (no second monitor) and
+  cursor emphasis / auto-zoom (not wanted now). Both stay in docs/03's parked section with their
+  triggers — the auto-zoom entry says out loud that taking it up is a second product identity, not a
+  feature.
+
 - **✅ G24 PASSED (2026-07-31) — M24 is complete, cut as v1.12.0.** Evidence in the gate table.
   🔴 **The gate earned its keep: criterion 1 failed on the first run.** `Export & Copy` had no key
   equivalent, so a chosen range could not reach the clipboard without a click — the two halves
@@ -158,10 +179,11 @@
   **Don't re-file without a new mechanism.** The generalised trap — measure any new
   `MovieRecorder` track *while writing*, by counting `moof` atoms — is in docs/07.
 
-- **Parked, with triggers:** multi-display region capture (the week a second display is attached); an
-  `NSMenu`-backed status item (the next feature needing custom row rendering); cursor emphasis /
-  auto-zoom (behind ADR-015's render stage); and **audio-only per-app exclusion via Core Audio process
-  taps** — the honest answer to review finding F3, since SCK's filter can't do it (docs/02 §1a-ii).
+- **Parked: two items, both deferred by Franco 2026-07-31** — multi-display region capture (he
+  doesn't use a second monitor; trigger unchanged) and cursor emphasis / auto-zoom (behind ADR-015's
+  render stage, kept on the list deliberately). ⚠️ **Read `docs/03`'s parked section, not this
+  line** — this summary was lossy until today: it listed four items when docs/03 had six, and the
+  two it dropped were crop on export (the one waiting on a ruling) and Swift 6.
 
 - **Per-task session logs for M15–M22 live in `docs/history/2026-07-sessions.md`.** This file keeps
   current state, live decisions, the human-only list, and the gate table.

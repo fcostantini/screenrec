@@ -143,6 +143,16 @@ consequences:
 The line: **trim and transcode = yes (M10); render/composite/animate = no, pending a deliberate
 future ADR.** The brief's non-goals list is amended to point here.
 
+**AMENDED 2026-07-31 (Franco): crop on export is on the "yes" side — scheduled as M26.** Crop was
+neither trim nor transcode, so this ADR did not settle it and the parked list carried it as
+🔴 *needs a ruling*. It goes in on the mechanism, not the appetite: the export path **already scales
+every frame**, so a source rectangle is an argument to work that happens anyway, not a new pipeline.
+**The line itself does not move** — composite, animate, auto-zoom, cursor emphasis and padded
+backgrounds all stay out, and ADR-008's cursor-as-data sidecar stays parked with them (Franco
+deferred both again on the same day). ⚠️ The test for anything asking to follow crop through this
+door: does it reuse a stage the app already runs, or does it need the Metal/CoreImage render stage
+screenrec deliberately does not have? Crop is the first; the rest of that list is the second.
+
 ## ADR-016 ✅ H.264/MP4 "share" export (demand-driven, realizes ADR-004's parked note)
 ADR-004 kept HEVC + `.mov` the capture default and named H.264 export "a post-v1 transcode feature if
 ever needed." The need is real and measured: clips are re-encoded by hand today (an ffmpeg recipe) to

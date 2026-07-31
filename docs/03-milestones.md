@@ -2000,6 +2000,154 @@ deriving from an export never silently re-encodes it. ⚠️ **Criterion 1 faile
 re-run. The keyboard criteria are human-only: `LSUIElement` plus synthetic input cannot confer
 activation (docs/07).
 
+## M25 — Swift 6 language mode (debt; encoded from the parked list 2026-07-31)
+
+docs/01's concurrency rules — sample-path code uses locks not actors, never block an SCK callback
+queue, no unbounded buffer retention — are held in agents' heads and checked by review. Swift 6 makes
+the compiler check a real subset of them. **First, because it protects what follows:** M27 adds a
+second audio clock into `SampleRouter`, the most concurrency-dense work on this list, and M22 set the
+precedent of pulling the protective milestone ahead of the one it protects. **PATCH** — nothing here
+is user-facing. `Package.swift` is already tools-version 6.0 with every target pinned to v5, so this
+is a per-target flip, not a migration.
+
+- [ ] M25-T1 **`RecorderCore` compiles in v6.** **7 distinct sites, measured 2026-07-31:** the
+      `SCShareableContent.forCapture()` hop (`CaptureEngine.swift:125`); two static non-`Sendable`
+      globals — `ByteCountFormatter` (`ApproximateBytes.swift:20`) and `AVAudioFormat`
+      (`ResampledMicInput.swift:20`); and four non-`Sendable` captures in the export plans
+      (`Exporter.swift:233`, `Exporter.swift:411`, `GifExporter.swift:84`,
+      `FilmstripThumbnails.swift:58`). **Rulings:** per site, whether the fix is
+      `nonisolated(unsafe)` (defensible for an immutable, thread-safe formatter), a real isolation
+      change, or a redesign — "make the error go away" is the failure mode here, and a blanket
+      `@unchecked Sendable` would buy the flip while spending the point of it. **Verify:** the target
+      at v6, dev loop green, **no behaviour change**, plus one real capture — the sample path is what
+      this protects.
+      ⚠️ **Re-measure before starting.** The composition already drifted from the 2026-07-30 count:
+      `MicrophoneRescue`'s closure is gone, `FilmstripThumbnails` (M24-T4) is new. The total happened
+      to stay 7; the list did not.
+- [ ] M25-T2 **`AppCore` compiles in v6.** **5 distinct sites, all one cluster:** the replay-save
+      completion closure (`AppState.swift:641–647`) capturing non-`Sendable` state across a callback.
+      **Seams:** `ReplayController`'s completion; `AppState`'s `@MainActor` isolation. **Verify:** as
+      T1.
+- [ ] M25-T3 **The rest, and the escape hatch goes.** `ScreenRecApp`, `screenrec-cli` and both test
+      targets are **unmeasured** — `swift build` stops at the first failing target, so they have
+      never been compiled at v6 at all. Measure, fix, then **delete `.swiftLanguageMode(.v5)` from
+      `Package.swift` entirely**, so a later target cannot be added at v5 silently. **Verify:** no
+      `.v5` remains anywhere; dev loop green; a deployed build records, replays and exports.
+
+**Gate G25**: every target builds and tests in Swift 6 language mode with no `.v5` left in
+`Package.swift`, and a real recording, replay and export still work — the whole point is that nothing
+changed except who checks the rules.
+
+## M26 — Crop on export (from the parked list; **ADR-015 amended**, Franco 2026-07-31)
+
+Franco crops recordings by hand today. The recipe exists because `cropdetect` fails on letterboxed
+stream captures: the bars are **luma 62–66**, not black, so a black-threshold detector finds none.
+Region capture does not help — it crops what you record yourself, not a window that arrives
+letterboxed. **MINOR.**
+
+**Ruling (Franco, 2026-07-31): crop is in scope.** ADR-015 admits "trim and format export" and rules
+out the render/compositing stage; crop sat between them, and this decides it. The reasoning: the
+export path **already scales every frame**, so a source rectangle is an argument to work that happens
+anyway — not a new pipeline. ADR-015's line does not move: composite, animate, auto-zoom and padded
+backgrounds all stay out. Amendment recorded in docs/05.
+
+- [ ] M26-T1 **The exporter takes a source rect.** **Seams:** `Exporter.exportToMP4`'s existing
+      `fittedSize` scaling and its `AVVideoComposition`; `ExportConfiguration`, where the width cap
+      already lives; `screenrec-cli export --to-mp4`, so this half is verifiable headlessly.
+      **Rulings:** whether the rect is source **pixels** or a normalised **fraction** — a fraction
+      survives a source of a different size, pixels are what a person reads off `probe`; and whether
+      the Size cap then applies to the *cropped* rect (it must, or the picker's "≈46 MB per minute"
+      starts lying). **Verify:** CLI crop → `probe` shows the cropped dimensions and the aspect
+      follows; the source is untouched; `mdls` confirms the container is unchanged (M24-T5).
+- [ ] M26-T2 **A crop rectangle in the Trim window.** The window already has the player, the range
+      and the export button, and since M24-T1 `Export & Copy` already carries a range — the rect
+      rides the same way. **Seams:** `TrimView`'s player overlay (the filmstrip's `SpatialTapGesture`
+      is the drag precedent); `ExportRange`'s shape. **Rulings:** drag-to-draw, numeric fields, or
+      both; whether a crop persists between opens (the range does not); and what the caption
+      promises, since M16-T2's rule is that a figure you cannot compute yet is omitted, not guessed.
+      **Verify:** live — crop, export, and the file matches what the window said it would produce.
+- [ ] M26-T3 **Find the bars without being told.** This is why it is a milestone and not a one-liner.
+      **Seams:** `VideoFrameReader` decodes frames off the main thread already, and M24-T4 measured
+      what frame extraction costs (keyframe spacing × count, not take length) — sample a handful and
+      look for constant-luma bands rather than black ones. **Rulings:** how many frames, and what
+      counts as "constant" at luma 62–66; whether a detected crop auto-applies or is merely offered.
+      **Verify:** measured against a real letterboxed capture — the detected rect matches the
+      hand-cropped one to within a pixel or two, **and a non-letterboxed take detects nothing** (the
+      negative control, without which a detector that always fires looks like it works).
+      ⚠️ **Needs a letterboxed sample from Franco** — there is none in the repo, and the task is
+      calibration against real bars.
+
+**Gate G26**: an export can be cropped from the Trim window and from the CLI; the output's dimensions
+are what the UI promised and the Size cap still applies to them; the original is untouched; and a
+letterboxed capture's bars are found without anyone typing a rectangle.
+
+## M27 — Audio-only per-app exclusion, via Core Audio process taps (the honest answer to F3)
+
+`Everything Except ▸ <app>` is a **content** filter. Measured (docs/02 §1a-ii): the excluded app's
+audio goes to **−∞ dBFS** — and **its windows leave the frame with it**, because SCK has no
+audio-scoped exclusion. 🔴 **And the case worth having is the one the API cannot reach at all:**
+minimise an app and it vanishes from `SCShareableContent.applications`, so it cannot be excluded —
+while its audio still lands at **full level (−9.1 dBFS, measured)**. Background music is exactly that
+shape. The route is `AudioHardwareCreateProcessTap` + `CATapDescription(excludeProcesses:)`
+(macOS 14.2+): **a second system-audio source, not a filter change.** **MINOR.**
+
+- [ ] M27-T1 **Measure before designing anything else.** M21's lesson, already recorded in this file:
+      three of its four tasks were filed on a premise measurement moved. Answer, with numbers in
+      docs/07: does a process tap capture system audio minus a chosen process, **including a
+      windowless one**? What format and clock does the aggregate device present? What happens when
+      the excluded process quits mid-take, or was never running? What does it cost against ADR-019's
+      current path? **Verify:** a spike and a field note — **every task below is shaped by this, so
+      none of them should be detailed further until it lands.**
+- [ ] M27-T2 **The tap as a second system-audio source.** **Seams:** `SampleRouter` (the one place
+      consumers attach), `TimestampRebaser` (a tap has its own clock — this is the alignment risk),
+      `CaptureConfiguration`. **Rulings:** whether the tap *replaces* SCK's audio whenever an
+      exclusion is set or runs beside it; and what a mid-take tap failure does — ADR-012's shape
+      (keep recording, say so) is the precedent, and a silent drop to no audio is the outcome to
+      design against.
+- [ ] M27-T3 **The UI, and the vocabulary.** Two ideas stop sharing one row: `Everything Except`
+      keeps meaning *neither seen nor heard*; the new list means *heard no more*, and it can offer
+      apps with no window — which the existing one structurally cannot. **Rulings:** what it is
+      called; whether both can be set at once, and on the same app.
+- [ ] M27-T4 **The failure modes are honest.** Tap permission refused, the aggregate device
+      disappearing, the excluded process quitting mid-take. **Verify:** each one observed, each one
+      leaving a playable file and a true sentence.
+
+**Gate G27**: a **windowless** app's audio is absent from a take while the rest of the system is
+present. ⚠️ Verified with two *windowed* apps as the control, **never `afplay`** — G21 nearly
+recorded a false negative that way, because a bare windowless process never appears in the captured
+track at all (docs/02 §1a-ii).
+
+## M28 — An `NSMenu`-backed status item (the bridge's bill comes due)
+
+The menu is a SwiftUI `MenuBarExtra(.menu)`, and the bridge to AppKit keeps only text. The
+compromises have accumulated: rows are **stamped at open and cannot tick** (M6-T10), a disabled
+`Picker` row **will not dim** (M7-T2), and a label renders **only its first `Image`** — which is why
+the clock, the level meter, the armed badge and the saved tick are composited into one bitmap by hand
+(M16-T5, M23-T3). Its trigger — "the next feature that needs custom row rendering" — is **met three
+times over**. **MINOR** (T1 alone is no user-facing change).
+
+- [ ] M28-T1 **Parity first: the same menu, drawn by AppKit.** An `NSStatusItem` + `NSMenu` with
+      custom `NSView` rows, replacing `MenuBarExtra`. **Seams:** `MenuView` (~470 lines) and all of
+      docs/06's menu spec, which is written in its terms; the inline `Picker` checkmark behaviour in
+      `Source ▸` is load-bearing and has to be rebuilt by hand. **Verify:** `menudriver dump`
+      **identical** before and after — M22's bar, and the one that matters most here, because
+      **every gate since G4 has leaned on that instrument**.
+- [ ] M28-T2 **A thumbnail per recents row.** **Seams:** `FilmstripThumbnails` (M24-T4) already
+      decodes a frame off the main thread and its cost is measured — first frame ~80 ms, and cost
+      tracks keyframe spacing × count, not take length. **Rulings:** thumbnail size; whether it is
+      cached across menu opens (rows are stamped at open, so a re-decode per open is the naive cost).
+- [ ] M28-T3 **A progress row that advances while the menu is open.** The M6-T10 constraint —
+      nothing may tick into an open menu — dies here, and with it the stamped-at-open `Exporting …`
+      row. **Rulings:** what else may now tick, and what deliberately still should not (a live clock
+      in an open menu was never the ask).
+- [ ] M28-T4 **More than five recents, legibly.** `RecentRecordings.limit = 5` exists because a
+      longer list of identical timestamps is unreadable, not because five is right. **Rulings:** the
+      new cap, and whether rows group by day.
+
+**Gate G28**: the menu does everything it did — proven by dump parity at T1, before any new
+capability lands — plus a thumbnail on every recents row, a progress row that advances while the menu
+is open, and a recents list longer than five that is still readable.
+
 ## Dependency graph
 
 ```
@@ -2051,27 +2199,32 @@ can be lost quietly. M23-T5 (collapsing `AppState`'s forwards) is deliberately l
 is structure, and M22's lesson is that structure is easiest to justify after the features that would
 otherwise land on top of it.
 
-**Parked, with the trigger that would un-park each (updated 2026-07-30):**
-- **Multi-display region capture** — M11 is main-display only and honest about it. Trigger: a second
-  display is attached.
-- **An `NSMenu`-backed status item** — ⚠️ **its trigger has arguably been met.** It was "the next
-  feature that needs custom row rendering"; it now blocks three separate wants at once — thumbnails
-  in the recents rows, a progress row that updates while the menu is open (M23-T3), and a recents
-  list longer than five. Worth costing the next time one of those is asked for.
-- **Audio-only per-app exclusion via Core Audio process taps** (`AudioHardwareCreateProcessTap` +
-  `CATapDescription(excludeProcesses:)`, macOS 14.2+) — the honest answer to F3, which M21-T4 could
-  not deliver: SCK's filter takes the picture with the sound and cannot see an app with no window
-  (docs/02 §1a-ii). A milestone, not a task: a second system-audio source, an aggregate device, its
-  own clock alignment into `SampleRouter`, and a new way for a take to lose audio.
-- **Crop on export** — 🔴 **needs a ruling before anyone builds it.** Franco crops recordings by hand
-  today (his own notes carry an ffmpeg cropping recipe for letterboxed stream captures, where
-  `cropdetect` fails because the bars are luma 62–66). Region capture only helps for what you record
-  yourself. The export path already scales frames, so a source rect is a small addition and *not* a
-  render stage — but ADR-015 admits "trim and format export" and crop is neither.
-- **Cursor emphasis / auto-zoom** — behind ADR-015's parked render stage; still the only levers that
-  would change the product's category.
-- **Swift 6 language mode** — measured 2026-07-30: **7 error sites in `RecorderCore`** (two static
-  formatters, three non-`Sendable` captures in the export/GIF plans, one `SCShareableContent` hop, one
-  closure in `MicrophoneRescue`). `Package.swift` is already tools-version 6.0 with targets pinned to
-  v5. The value is that the compiler starts checking the concurrency rules docs/01 asks agents to hold
-  in their heads.
+**Encoded from the parked list 2026-07-31 (Franco) — M25, M26, M27, M28.** Not a review roadmap:
+these are four of the six items that had been parked with triggers, promoted on his call after the
+v1.12.0 cut. **Proposed order M25 → M26 → M27 → M28, and it is his to change.** M25 (Swift 6) first
+on M22-before-M21's logic — M27 puts a second audio clock into `SampleRouter`, and the compiler
+should be checking docs/01's concurrency rules *before* that lands rather than after. M26 (crop) next
+because it is the one with a named user and a measured pain. M27 third: real new capability, real new
+failure modes. M28 (`NSMenu`) last — the largest, and it buys polish rather than capability, so it
+should not sit in front of things that buy capability. The two items that stayed parked are below the
+graph.
+
+**Parked, with the trigger that would un-park each (updated 2026-07-31).** Four of the six were
+**encoded as M25–M28 on 2026-07-31 (Franco)** and are no longer parked. What remains:
+
+- **Multi-display region capture** — M11 is main-display only and honest about it: the overlay draws
+  *"Region capture uses the main display only"* rather than silently cropping the wrong screen.
+  `RegionSelection.displayID` already exists and is already persisted, and the filter is per-display
+  either way, so the engine side is close to free. **Deferred by Franco (2026-07-31): he does not use
+  a second monitor.** Trigger unchanged — a second display is attached. It is the only item here
+  gated by hardware rather than by a decision, and an untested multi-display path is worse than an
+  honest single-display one.
+- **Cursor emphasis / auto-zoom** — click highlights, cursor smoothing, zoom-to-activity, padded
+  backgrounds. Needs the **Metal/CoreImage render stage screenrec deliberately does not have**
+  (today video goes SCK → encoder untouched, which is most of why a 4112×2570 two-hour take holds
+  up). ADR-015 parks it and says crossing that line is a **separate, explicit decision**, not
+  something to drift into one convenience at a time; ADR-008's cursor-as-data sidecar is parked with
+  it, and ADR-017 closed the webcam fork on the same reasoning. **Deferred by Franco (2026-07-31):
+  not wanted for now — kept on this list deliberately, not dropped.** ⚠️ If it is ever taken up, the
+  honest framing is that it is not a feature but a **second product identity**, and it wants its own
+  review before any milestone: it changes what every other decision was optimising for.
