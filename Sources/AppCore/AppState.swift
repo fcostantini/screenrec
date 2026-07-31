@@ -654,6 +654,9 @@ public final class AppState {
     public func exportToMP4(_ source: URL, range: ExportRange? = nil) {
         exports.exportToMP4(source, configuration: exportConfiguration, range: range)
     }
+    public func exportAndCopy(_ source: URL, range: ExportRange? = nil) {
+        exports.exportAndCopy(source, configuration: exportConfiguration, range: range)
+    }
     public func exportToGIF(_ source: URL) { exports.exportToGIF(source, configuration: gifConfiguration) }
     public func trim(_ source: URL, from start: Double, to end: Double, mode: TrimMode = .lossless) {
         exports.trim(source, from: start, to: end, mode: mode)
@@ -1215,7 +1218,7 @@ public final class AppState {
         guard let finished = lastFinishedRecording,
               FileManager.default.fileExists(atPath: finished.path)
         else { return }
-        exports.exportAndCopy(finished, configuration: exportConfiguration)
+        exportAndCopy(finished)
     }
 
     /// Arms the `Stop After` bound for this take (M18-T4), if one is set. Wall clock from the

@@ -7,6 +7,28 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-31 (M24-T1): **Deriving from a derived file stutters its name: `… trimmed trimmed.mp4`.**
+  `mp4Sibling(of:range:)` composes `Trimmer.trimmedSibling`, which appends unconditionally, so a
+  ranged export *of a clip* stacks the suffix. Measured live (6.53 s clip → 5.45 s clip, both
+  `avc1`, both correct otherwise) — the naming is the only defect, and it is **M24-T5's** case
+  arriving early, since M24-T1 makes it easy to reach: the export receipt row carries its own
+  `Trim…`, so the first `Trim…` in the menu is the clip, not the take. ⚠️ **`menudriver click` takes
+  the first match** — with a receipt row present that is not the row you meant.
+
+- 2026-07-31 (M24-T1): ⚠️ **`exportToMP4`'s `range:` no longer has a production caller.** The Trim
+  window was its only one, and M24-T1 moved that press to `exportAndCopy`; the menu's per-file
+  `Export as MP4` has never passed a range. So the ranged non-copying path now lives only in
+  M21-T1's tests. Left in place deliberately — it is public AppCore surface with tests, and M24-T5
+  reworks the derive-actions that would use it — but if M24 closes without a caller, delete the
+  parameter rather than leaving a path only the suite exercises.
+
+- 2026-07-31 (M24-T1): The Trim window's button row has **39.5 pt of slack** in a 500 pt window
+  (label ink ends 147 pt; `Play Range` 186.5–269.5, `Export & Copy` 278–382, `Trim & Save` 390–478,
+  ~8 pt gaps), so **a fourth button does not fit** — it needs ~112 pt and would truncate titles or
+  force the window wider. Measure the row off a `screencapture -l` of the window rather than
+  guessing whether a control fits: the numbers above came from a luma scan of one capture and took
+  two minutes.
+
 - 2026-07-30 (M23-T5): 🔴 **The two extractions M23-T5 filed as "the real weight" are a third of the
   size the task states, and the sizing was never checked.** docs/03 says the replay cluster is
   **360 lines** in `AppState` on top of `ReplayController`, and the self-test **188**. Measured by

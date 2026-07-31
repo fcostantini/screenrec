@@ -84,9 +84,12 @@ public final class ExportModel {
             failure: RecordingNotifications.exportFailed)
     }
 
-    /// Exports `source` and leaves the result on the pasteboard (M21-T2) — the same off-main,
-    /// one-at-a-time path, ending in one notice rather than an export receipt plus a copy.
-    public func exportAndCopy(_ source: URL, configuration: ExportConfiguration) {
+    /// Exports `source` — or just `range` of it (M24-T1) — and leaves the result on the pasteboard
+    /// (M21-T2): the same off-main, one-at-a-time path, ending in one notice rather than an export
+    /// receipt plus a copy.
+    public func exportAndCopy(
+        _ source: URL, configuration: ExportConfiguration, range: ExportRange? = nil
+    ) {
         let export = exportFunction  // snapshot; the closure captures no `self`
         let copy = copyToPasteboard
         // With no pasteboard injected (tests, or an unwired app) the export still runs, but the
@@ -95,9 +98,9 @@ public final class ExportModel {
             ? RecordingNotifications.exported(url:)
             : RecordingNotifications.copiedToPasteboard(url:)
         performExport(
-            source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source)),
-            estimate: { await Self.mp4Bytes(of: source, configuration: configuration, range: nil) },
-            using: { try await export($0, $1, configuration, nil) },
+            source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source, range: range)),
+            estimate: { await Self.mp4Bytes(of: source, configuration: configuration, range: range) },
+            using: { try await export($0, $1, configuration, range) },
             success: notice,
             failure: RecordingNotifications.exportFailed,
             completion: copy)

@@ -6,6 +6,30 @@
 
 ## Now
 
+- **✅ M24-T1 SHIPPED (2026-07-31) — the Trim window hands you the clip. Next: M24-T2.**
+  `Export as MP4` is now **`Export & Copy`**: one press writes the ranged `.mp4` *and* leaves it on the
+  pasteboard, ending the three moves (menu → receipt row → `Copy`) it used to cost. The change is one
+  parameter — `ExportModel.exportAndCopy` gained `range:`, and every other seam already took one
+  (`mp4Sibling(of:range:)` names the ` trimmed.mp4`, M23-T2's estimate is range-aware). **641 tests**
+  (636 → 641), dev loop green, plan artifact
+  `claude.ai/code/artifact/0d750213-d48e-4308-acd0-9b25bc3bac82`.
+  ✅ **Live, through the deployed build.** A sentinel on the clipboard, `Trim…` on the 2:09 take,
+  range 0:00–0:06, one press → the sentinel was **replaced by the clip's file URL**, and the file
+  probes **6.53 s `avc1` 1920×1200 + AAC** out of a **129 s** source. The banner read
+  **`Copied — ⌘V to paste`** (captured). No `.partial`, no new `.sb-`; the window dismissed; the
+  receipt row expired itself when the test clip was deleted. Both clips cleaned up.
+  ✅ **Rulings taken:** one button over a pair — the row has **39.5 pt of slack** and a fourth button
+  needs **~112 pt** (measured off a capture, docs/07), so a second button would truncate titles or
+  widen the window; and the title names the copy because the clipboard is taken either way. The
+  notice is M21-T2's, reused.
+  ⚠️ **Two findings for later, both in docs/07:** `exportToMP4`'s `range:` now has **no production
+  caller** (TrimView was its only one) — left in place for M24-T5, delete it if M24 closes without
+  one; and deriving from a derived file stutters its name (**`… trimmed trimmed.mp4`**), which is
+  M24-T5's case arriving early. ⚠️ Also: **`menudriver click` takes the first match**, and with an
+  export receipt row present that is not the row you meant — the second live run trimmed the *clip*.
+  ⚠️ **Franco's clipboard was overwritten** by the leg (sentinel → clip URL → cleared). Unavoidable
+  for this task; worth saying rather than leaving him to find it.
+
 - **✅ M23-T5 DONE (2026-07-30) — `AppState` is 130 → 95 public members, 1,420 → 1,355 lines.**
   Views and tests read `state.sources.x` / `state.session.x` / `state.exports.x` /
   `state.permissions.x` directly; the scaffolding M22 left is gone. **636 tests green**, and the

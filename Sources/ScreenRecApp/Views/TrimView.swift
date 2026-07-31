@@ -47,7 +47,7 @@ struct TrimView: View {
     /// A range worth acting on; below this, Trim & Save and Play Range are meaningless.
     private var hasRange: Bool { outSeconds - inSeconds >= 0.1 }
 
-    /// What `Export as MP4` will produce (M21-T1). The size is this recording's own, fitted through
+    /// What `Export & Copy` will produce (M21-T1). The size is this recording's own, fitted through
     /// the width in Settings; it is left out until the geometry loads rather than quoting a figure
     /// that can't be computed yet (M16-T2).
     private var exportNote: String {
@@ -58,7 +58,8 @@ struct TrimView: View {
                 configuration: state.exportConfiguration)
             profile += " \(fitted.width) × \(fitted.height)"
         }
-        return "Export as MP4 writes only the range — \(profile), ready to paste into a message."
+        return "Export & Copy writes only the range — \(profile) — and puts it on the clipboard. "
+            + "⌘V pastes it."
     }
 
     var body: some View {
@@ -114,8 +115,8 @@ struct TrimView: View {
                 Spacer()
                 Button("Play Range") { playRange() }
                     .disabled(!hasRange)
-                Button("Export as MP4") {
-                    state.exportToMP4(url, range: ExportRange(start: inSeconds, end: outSeconds))
+                Button("Export & Copy") {
+                    state.exportAndCopy(url, range: ExportRange(start: inSeconds, end: outSeconds))
                     dismiss()
                 }
                 .disabled(!hasRange || state.exports.exportInProgress != nil)

@@ -1937,12 +1937,15 @@ M21 made "it happened → here it is" one action from the menu. It is still not 
 keyboard, and the window whose whole job is producing a shareable clip is the one place that won't
 hand it to you. **MINOR.**
 
-- [ ] M24-T1 **The Trim window hands you the clip.** `Export as MP4` writes the ranged `.mp4` and
+- [x] M24-T1 **The Trim window hands you the clip.** `Export as MP4` writes the ranged `.mp4` and
       leaves you to find it: back to the menu, into the receipt row, `Copy`. Stop & Copy MP4 already
       proves the ending. **Seams:** `ExportModel.exportAndCopy` and `ExportRange` both exist — this is
-      the two of them meeting; `TrimView`'s button row. **Rulings:** whether `Export as MP4` simply
-      always copies (one button, the Stop & Copy precedent) or a second button appears; and what the
-      notice says when it does both. **Verify:** live — set a range, one press, ⌘V pastes the clip.
+      the two of them meeting; `TrimView`'s button row. **Rulings taken** (Franco, 2026-07-31): one
+      button, renamed **`Export & Copy`**, over an `Export` / `Export & Copy` pair — the row has
+      39.5 pt of slack and a fourth button needs ~112 pt (docs/07), and the title names the copy
+      because the clipboard is taken either way; and the notice is M21-T2's **`Copied — ⌘V to paste`**
+      reused, one notice rather than a receipt plus a copy. **Verify:** live — set a range, one press,
+      ⌘V pastes the clip.
 - [ ] M24-T2 **Stop and copy from the keyboard.** The start/stop shortcut stops *and saves* a `.mov`,
       so the keyboard path stops one step short of the thing you wanted; the menu is still required
       for the last move. **Seams:** `HotkeyID` has been a typed registry since M22-T4, so a second id

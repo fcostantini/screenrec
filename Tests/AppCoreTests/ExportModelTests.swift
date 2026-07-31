@@ -77,6 +77,69 @@ import RecorderCore
         #expect(ran.value != true)
     }
 
+    // MARK: - Copying a range (M24-T1)
+
+    @Test func aRangedCopyWritesTheTrimmedSiblingSoAClipCannotPassForTheTake() async {
+        let model = makeModel()
+        model.copyToPasteboard = { _ in }
+        let written = Box<URL>()
+        model.exportFunction = { _, output, _, _ in written.value = output; return output }
+
+        model.exportAndCopy(
+            Self.source, configuration: ExportConfiguration(),
+            range: ExportRange(start: 1, end: 3))
+        await settle(model)
+
+        #expect(written.value?.lastPathComponent == "Clip trimmed.mp4")
+    }
+
+    @Test func aCopyWithNoRangeStillWritesTheTakesOwnMP4() async {
+        // The control: Stop & Copy (M21-T2) passes no range, and its output name must not move.
+        let model = makeModel()
+        model.copyToPasteboard = { _ in }
+        let written = Box<URL>()
+        model.exportFunction = { _, output, _, _ in written.value = output; return output }
+
+        model.exportAndCopy(Self.source, configuration: ExportConfiguration())
+        await settle(model)
+
+        #expect(written.value?.lastPathComponent == "Clip.mp4")
+    }
+
+    @Test func theRangeReachesTheExporter() async {
+        // Naming the output alone would hand back the whole take under the clip's name.
+        let model = makeModel()
+        model.copyToPasteboard = { _ in }
+        let seen = Box<ExportRange>()
+        model.exportFunction = { _, output, _, range in seen.value = range; return output }
+
+        model.exportAndCopy(
+            Self.source, configuration: ExportConfiguration(),
+            range: ExportRange(start: 1.5, end: 4.25))
+        await settle(model)
+
+        #expect(seen.value == ExportRange(start: 1.5, end: 4.25))
+    }
+
+    @Test func aRangedCopyPostsOneNoticeForTheFileItPutOnThePasteboard() async {
+        let model = makeModel()
+        var posted: [RecordingNotification] = []
+        model.notify = { posted.append($0) }
+        let copied = Box<URL>()
+        model.copyToPasteboard = { copied.value = $0 }
+        model.exportFunction = { _, output, _, _ in output }
+
+        model.exportAndCopy(
+            Self.source, configuration: ExportConfiguration(),
+            range: ExportRange(start: 0, end: 2))
+        await settle(model)
+
+        #expect(copied.value?.lastPathComponent == "Clip trimmed.mp4")
+        #expect(posted.count == 1)
+        #expect(posted.first?.title == "Copied — ⌘V to paste")
+        #expect(posted.first?.fileURL == copied.value)
+    }
+
     // MARK: - Receipt policy (M12-T2/T3)
 
     @Test func onlyASuccessSetsTheReceipt() async {

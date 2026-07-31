@@ -283,6 +283,29 @@ import RecorderCore
         #expect(recordedOutput.value?.lastPathComponent == "Clip trimmed.mp4")
     }
 
+    @Test func theTrimWindowsCopyCarriesBothTheSettingsSizeAndItsRange() async {
+        // M24-T1: the adapter's whole job. A dropped range copies the whole take; a dropped
+        // configuration silently reverts every clip to the default width (M18-T2).
+        let state = makeState()
+        state.notifier = { _ in }
+        state.mp4Width = 2560
+        state.exports.copyToPasteboard = { _ in }
+        let recorded = Box<ExportConfiguration>()
+        let recordedRange = Box<ExportRange>()
+        state.exports.exportFunction = { _, output, configuration, range in
+            recorded.value = configuration
+            recordedRange.value = range
+            return output
+        }
+
+        state.exportAndCopy(
+            URL(fileURLWithPath: "/tmp/Clip.mov"), range: ExportRange(start: 12, end: 34))
+        while state.exports.exportInProgress != nil { await Task.yield() }
+
+        #expect(recorded.value?.maxWidth == 2560)
+        #expect(recordedRange.value == ExportRange(start: 12, end: 34))
+    }
+
     @Test func aWholeFileExportPassesNoRange() async {
         let state = makeState()
         state.notifier = { _ in }
