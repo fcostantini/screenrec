@@ -53,14 +53,15 @@ final class CountInController {
 
         var remaining = from
         let ticker = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            remaining -= 1
-            if remaining > 0 {
-                view.value = remaining
-                view.needsDisplay = true
-            } else {
-                // The timer is scheduled on RunLoop.main, so this body is already on the main
-                // thread; the isolation is provable, not assumed.
-                MainActor.assumeIsolated {
+            // The timer is scheduled on RunLoop.main, so this body is already on the main thread;
+            // the isolation is provable, not assumed — and `assumeIsolated` traps if that ever
+            // stops being true, which a looser annotation would not.
+            MainActor.assumeIsolated {
+                remaining -= 1
+                if remaining > 0 {
+                    view.value = remaining
+                    view.needsDisplay = true
+                } else {
                     self?.dismiss()
                     completion(.finished)
                 }

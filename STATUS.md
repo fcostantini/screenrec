@@ -6,6 +6,31 @@
 
 ## Now
 
+- **✅ M25-T3 SHIPPED (2026-07-31) — every shipping target compiles in Swift 6. M25 done; G25 next.**
+  `RecorderCore`, `AppCore`, `ScreenRecApp`, `screenrec-cli` and `AppCoreTests` are all v6. **660
+  tests**, release build and signed bundle green. Plan artifact:
+  `claude.ai/code/artifact/884dad3b-36bf-4197-9ca0-27cd03c8fa4d`.
+  ✅ **34 sites, and ~30 were one sentence:** these AppKit types were always main-actor-only and
+  nothing said so. `@MainActor` on `RegionSelectionController` (19 sites alone), `ShareActions`,
+  `QuickLookController`, `Relaunch`, `HotkeyCenter`, the meter's ticker. ⚠️ Unlike T1's
+  `@preconcurrency`, this **adds** checking — a future background-thread caller now fails to compile.
+  **No ripple into AppCore**, which was the risk the plan flagged.
+  ✅ **The stragglers took real answers, two by reusing what exists:** `TrimView` now calls
+  `MediaFile.dimensions` instead of loading tracks itself (deleting duplicated code); `OnboardingView`
+  crosses the `Sendable` status enum, not `UNNotificationSettings`; QuickLook crosses only the `URL`;
+  `CountInOverlay` uses `MainActor.assumeIsolated`, a pattern that file already had.
+  🔴 **RULED (Franco): `RecorderCoreTests` stays at v5, documented in `Package.swift`.** Its 8 sites
+  include three `DispatchGroup.wait(timeout:)` calls M15-T1 added **so a drain that never leaves
+  fails instead of hanging**; Swift 6 bans blocking waits in async contexts. Against this project's
+  two prior vacuous-test incidents, a uniform setting wasn't worth the risk.
+  ⚠️ **G25's criterion was amended before being run**, not quietly passed: it asked for zero `.v5`.
+  The amendment and its reason are in docs/03.
+  ✅ **Live on the v6 build:** menu Ready and armed, the **region overlay opened full-screen and
+  cancelled on Esc** (19 of the 34 sites, the least-exercised path), a 0:06 recording with its
+  receipt row, and a menu export probing `avc1` 1920×1200 + AAC. Test files cleaned up; replay still
+  armed. ⚠️ One screenshot of the overlay caught Franco's terminal content through the transparent
+  region and was **deleted**, not kept as evidence.
+
 - **✅ M25-T2 SHIPPED (2026-07-31) — `AppCore` compiles in Swift 6. Next: M25-T3.**
   Five explicit-`self` lines in the replay-save closure, plus two `nonisolated` keywords on a test
   fixture. **660 tests.** Verified live where it counts: a real replay save rendered

@@ -14,7 +14,7 @@ let package = Package(
         .executableTarget(
             name: "screenrec-cli",
             dependencies: ["RecorderCore"],
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // The app's state and view models. Like RecorderCore it imports no AppKit/SwiftUI,
         // which is the point: it keeps everything the UI decides unit-testable without a UI
@@ -33,8 +33,14 @@ let package = Package(
             // Both are assembled into the .app bundle by Scripts/bundle.sh, not compiled —
             // exclude them so SPM doesn't treat them as unhandled resources.
             exclude: ["Resources/Info.plist", "Resources/AppIcon.icns"],
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        // ⚠️ The one target deliberately left in v5 (M25-T3, Franco's ruling 2026-07-31). Flipping it
+        // means rewriting three `DispatchGroup.wait(timeout:)` calls that M15-T1 added so a drain
+        // that never leaves *fails* the test instead of hanging it — Swift 6 bans blocking waits in
+        // async contexts, and the async equivalent races a continuation against a timeout. This
+        // project has twice shipped tests that silently stopped testing; that trade is not worth a
+        // uniform setting. Everything that ships is v6.
         .testTarget(
             name: "RecorderCoreTests",
             dependencies: ["RecorderCore"],

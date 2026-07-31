@@ -5,6 +5,7 @@ import AppKit
 /// chosen rectangle in SCK `sourceRect` space. AppKit lives here, not in AppCore (docs/01).
 ///
 /// One reused instance (held by the app): it owns the window only while selecting.
+@MainActor
 final class RegionSelectionController {
     private var window: NSWindow?
 

@@ -20,6 +20,7 @@ enum HotkeyID: UInt32 {
 /// needs no Accessibility/Input-Monitoring grant (02 §9). Holds several at once, keyed by id
 /// (M9-T4: save-replay and start/stop record), each with its own action; the shared handler
 /// dispatches by the fired hotkey's id.
+@MainActor
 final class HotkeyCenter {
     private var refs: [UInt32: EventHotKeyRef] = [:]
     private var actions: [UInt32: @MainActor () -> Void] = [:]

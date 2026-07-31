@@ -120,9 +120,14 @@ private struct SelfTestSection: View {
         state.setNotificationState(granted ? .granted : .denied)
     }
 
+    /// Reads only the status, which is `Sendable` — `UNNotificationSettings` itself is not, and
+    /// nothing here needs it.
+    private nonisolated static func notificationAuthorizationStatus() async -> UNAuthorizationStatus {
+        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+    }
+
     private func refreshNotificationState() async {
-        let settings = await UNUserNotificationCenter.current().notificationSettings()
-        switch settings.authorizationStatus {
+        switch await Self.notificationAuthorizationStatus() {
         case .authorized, .provisional, .ephemeral: state.setNotificationState(.granted)
         case .denied: state.setNotificationState(.denied)
         case .notDetermined: state.setNotificationState(.notDetermined)

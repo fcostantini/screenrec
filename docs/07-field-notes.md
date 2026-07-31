@@ -7,6 +7,26 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-31 (M25-T3): **Most of a UI target's Swift 6 work is one sentence: these AppKit types were
+  always main-actor-only and nothing said so.** 30 of `ScreenRecApp`'s 34 sites were
+  *"main actor-isolated … from a nonisolated context"* on plain `class`/`enum` types whose every
+  member touches `NSWindow`/`NSView`/`NSPasteboard` — `RegionSelectionController` alone was 19.
+  `@MainActor` on the type fixes them all, and unlike `@preconcurrency` it **adds** checking: a
+  future background-thread caller now fails to compile. ⚠️ The rule that made the stragglers easy:
+  **cross only the `Sendable` thing**. `MainActor.assumeIsolated { self.url }` (a `URL`) instead of
+  returning a `QLPreviewItem`; the `UNAuthorizationStatus` enum instead of `UNNotificationSettings`;
+  `MediaFile.dimensions` instead of an `[AVAssetTrack]` — that last one deleted duplicated code as
+  well.
+
+- 2026-07-31 (M25-T3): ⚠️ **`RecorderCoreTests` is deliberately left in Swift 5** (Franco's ruling).
+  Its 8 sites include three `DispatchGroup.wait(timeout:)` calls that M15-T1 added **so a drain that
+  never leaves fails the test instead of hanging it**; Swift 6 bans blocking waits in async
+  contexts, and the faithful rewrite races a continuation against a timeout. Given this project has
+  twice shipped tests that silently stopped testing (M22-T3's `Polling`, M23-T4's clock), a uniform
+  language-mode setting was judged not worth that risk. **Everything that ships is v6.** The reason
+  is written in `Package.swift` beside the setting, so it reads as a decision rather than an
+  oversight.
+
 - 2026-07-31 (M25-T2): 🔴 **A target and its test target must flip language mode together — the
   link breaks otherwise.** `AppCore` at v6 with `AppCoreTests` still at v5 built fine and then died
   at link time: `symbol(s) not found` for every `@MainActor` closure property

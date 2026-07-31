@@ -6,6 +6,7 @@ import RecorderCore
 /// here because AppCore may not import AppKit (docs/01), and the menu view — already in this layer —
 /// calls them directly, the `Finder.reveal` precedent (they touch nothing in AppCore).
 
+@MainActor
 enum ShareActions {
     /// Writes the file to the pasteboard so ⌘V drops it into Slack/Messages/Finder (docs/06 file item).
     static func copy(_ url: URL) {
@@ -100,6 +101,7 @@ enum ShareActions {
 /// Drives the system Quick Look panel for one file from the menu-bar app (M12-T1). The panel's data
 /// source is unowned, so this is a held singleton; a `URL` (as `NSURL`) is a `QLPreviewItem`. We're an
 /// LSUIElement agent, so the app is activated to bring the panel forward.
+@MainActor
 private final class QuickLookController: NSObject, QLPreviewPanelDataSource {
     @MainActor static let shared = QuickLookController()
 
@@ -114,11 +116,19 @@ private final class QuickLookController: NSObject, QLPreviewPanelDataSource {
         panel.reloadData()
     }
 
-    func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
-        url == nil ? 0 : 1
+    // `QLPreviewPanelDataSource` declares these nonisolated, and QuickLook calls them on the main
+    // thread — asserted rather than assumed, so a change of heart by the framework traps here
+    // instead of racing on `url`.
+    nonisolated func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
+        MainActor.assumeIsolated { url == nil ? 0 : 1 }
     }
 
-    func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> (any QLPreviewItem)! {
-        url.map { $0 as NSURL }
+    nonisolated func previewPanel(
+        _ panel: QLPreviewPanel!, previewItemAt index: Int
+    ) -> (any QLPreviewItem)! {
+        // Only the `URL` crosses — it is `Sendable`; `QLPreviewItem` is not, so the `NSURL` is
+        // made on this side rather than handed out of the isolated block.
+        let url = MainActor.assumeIsolated { self.url }
+        return url.map { $0 as NSURL }
     }
 }

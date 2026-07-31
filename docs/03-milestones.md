@@ -2049,16 +2049,21 @@ is a per-target flip, not a migration.
       would have needed it regardless. ⚠️ So M25-T1's "no test edited" property **does not carry
       forward**, by necessity rather than choice. Verified live: a real replay save rendered
       `Replay saved · 27 s`, which is exactly the closure that changed.
-- [ ] M25-T3 **The rest, and the escape hatch goes.** `ScreenRecApp`, `screenrec-cli` and
+- [x] M25-T3 **The rest, and the escape hatch goes.** `ScreenRecApp`, `screenrec-cli` and
       `RecorderCoreTests` are **unmeasured** (`AppCoreTests` flipped with `AppCore` in T2, of
       necessity — see above) — `swift build` stops at the first failing target, so they have
       never been compiled at v6 at all. Measure, fix, then **delete `.swiftLanguageMode(.v5)` from
       `Package.swift` entirely**, so a later target cannot be added at v5 silently. **Verify:** no
       `.v5` remains anywhere; dev loop green; a deployed build records, replays and exports.
 
-**Gate G25**: every target builds and tests in Swift 6 language mode with no `.v5` left in
-`Package.swift`, and a real recording, replay and export still work — the whole point is that nothing
-changed except who checks the rules.
+**Gate G25** — ⚠️ **criterion amended 2026-07-31 (Franco), before being run.** As filed it required
+*no `.v5` left in `Package.swift`*. One remains, deliberately: `RecorderCoreTests`, whose conversion
+would rewrite three bounded waits that exist so a stuck drain fails rather than hangs (docs/07). The
+gate now reads: **every target that ships builds and tests in Swift 6** — `RecorderCore`, `AppCore`,
+`ScreenRecApp`, `screenrec-cli` and `AppCoreTests` — **the single remaining `.v5` is documented in
+`Package.swift` as a decision**, and a real recording, replay and export still work. The point is
+unchanged: nothing changed except who checks the rules. ⚠️ Recorded here rather than quietly passed
+against a criterion that moved.
 
 ## M26 — Crop on export (from the parked list; **ADR-015 amended**, Franco 2026-07-31)
 

@@ -5,6 +5,7 @@ import Foundation
 /// (02 §2).
 ///
 /// `open -n` is spawned detached so it outlives this process; `waitUntilExit` would deadlock.
+@MainActor
 enum Relaunch {
 
     /// Callers must be certain nothing is recording — terminating mid-session would abandon a

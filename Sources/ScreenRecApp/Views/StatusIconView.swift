@@ -358,6 +358,7 @@ struct StatusIconView: View {
 /// The input meter's clock (M16-T5). Polls rather than subscribes: a per-buffer publish is what
 /// M6-T10 forbids, and the poll only writes state when the bar count changes — so a silent room
 /// costs no redraws at all.
+@MainActor
 private enum MenuBarLevelMeter {
     static let framesPerSecond: Double = 8
     static let ticker = Timer.publish(

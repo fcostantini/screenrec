@@ -355,7 +355,10 @@ struct TrimView: View {
         stopPlayheadObserver()
         observers.playhead = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.2, preferredTimescale: 600), queue: .main
-        ) { time in playhead = time.seconds.isFinite ? time.seconds : 0 }
+        ) { time in
+            // Installed with `queue: .main`, so this is provably on the main actor.
+            MainActor.assumeIsolated { playhead = time.seconds.isFinite ? time.seconds : 0 }
+        }
     }
 
     private func stopPlayheadObserver() {
@@ -405,9 +408,10 @@ struct TrimView: View {
         Task {
             let asset = item.asset
             let duration = (try? await asset.load(.duration).seconds) ?? 0
-            var size: CGSize?
-            if let track = try? await asset.loadTracks(withMediaType: .video).first {
-                size = try? await track.load(.naturalSize)
+            // `MediaFile.dimensions` instead of loading the track here: it returns a plain size
+            // rather than an `AVAssetTrack`, so nothing non-`Sendable` crosses back.
+            let size = await MediaFile.dimensions(of: url).map {
+                CGSize(width: $0.width, height: $0.height)
             }
             guard loadedURL == url else { return }
             durationSeconds = duration.isFinite ? max(0, duration) : 0
