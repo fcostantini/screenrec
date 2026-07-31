@@ -24,7 +24,10 @@ private struct PlayerView: NSViewRepresentable {
 /// Holds the observers the view installs on its player. A reference so an observer's own closure
 /// can capture it without capturing the view — which would reach the player through `@State` and
 /// retain it.
-private final class PlayerObservers {
+///
+/// Main-queue confined, which is what lets an observer's `@Sendable` closure hold it: the view
+/// touches it on the main actor, and every observer here is installed with `queue: .main`.
+private final class PlayerObservers: @unchecked Sendable {
     /// The Play Range boundary observer.
     var range: Any?
     /// The periodic observer driving the filmstrip's playhead (M24-T4).
@@ -54,7 +57,16 @@ struct TrimView: View {
     @State private var thumbnails: [Int: CGImage] = [:]
     @State private var stripTask: Task<Void, Never>?
     @State private var playhead = 0.0
+    /// Crop drawing is a mode: an always-on overlay would swallow `AVPlayerView`'s inline transport
+    /// controls, which sit under it (M26-T2).
+    @State private var cropping = false
+    /// The crop, in source pixels — the shape the exporter takes, so nothing about the preview's
+    /// geometry can drift into it. Nil until one is drawn.
+    @State private var crop: CropRect?
+    /// The drag in flight, in preview coordinates.
+    @State private var dragged: CGRect?
 
+    private static let previewSize = CGSize(width: 480, height: 300)
     /// One row of thumbnails across the player's width. 16 measured at 785 ms on a recording,
     /// against 1.8 s for 24 — which is also past the size a screen recording reads at (docs/07).
     private static let stripCount = 16
@@ -65,18 +77,21 @@ struct TrimView: View {
     /// A range worth acting on; below this, Trim & Save and Play Range are meaningless.
     private var hasRange: Bool { outSeconds - inSeconds >= 0.1 }
 
-    /// What `Export & Copy` will produce (M21-T1). The size is this recording's own, fitted through
-    /// the width in Settings; it is left out until the geometry loads rather than quoting a figure
-    /// that can't be computed yet (M16-T2).
+    /// What `Export & Copy` will produce (M21-T1). The size is what will really be encoded — the
+    /// crop when there is one (M26-T2), else the whole frame — fitted through the width in Settings;
+    /// it is left out until the geometry loads rather than quoting a figure that can't be computed
+    /// yet (M16-T2).
     private var exportNote: String {
         var profile = "H.264"
         if let sourceSize {
             let fitted = Exporter.fittedSize(
-                width: Int(sourceSize.width.rounded()), height: Int(sourceSize.height.rounded()),
+                width: crop?.width ?? Int(sourceSize.width.rounded()),
+                height: crop?.height ?? Int(sourceSize.height.rounded()),
                 configuration: state.exportConfiguration)
             profile += " \(fitted.width) × \(fitted.height)"
         }
-        return "Export & Copy writes only the range — \(profile) — and puts it on the clipboard. "
+        let written = crop == nil ? "only the range" : "only the range, cropped"
+        return "Export & Copy writes \(written) — \(profile) — and puts it on the clipboard. "
             + "⌘V pastes it."
     }
 
@@ -92,6 +107,9 @@ struct TrimView: View {
         }
         .onAppear { load(state.exports.trimTarget) }
         .onChange(of: state.exports.trimTarget) { load(state.exports.trimTarget) }
+        // Unticking is how a crop is discarded: leaving one set but undrawn would crop an export
+        // with nothing on screen saying so.
+        .onChange(of: cropping) { if !cropping { crop = nil; dragged = nil } }
         .onDisappear { unload() }
     }
 
@@ -104,7 +122,8 @@ struct TrimView: View {
 
             if let player {
                 PlayerView(player: player)
-                    .frame(width: 480, height: 300)
+                    .frame(width: Self.previewSize.width, height: Self.previewSize.height)
+                    .overlay { if cropping { cropOverlay } }
                     .cornerRadius(6)
             }
 
@@ -139,7 +158,8 @@ struct TrimView: View {
                 Button("Play Range") { playRange() }
                     .disabled(!hasRange)
                 Button("Export & Copy") {
-                    state.exportAndCopy(url, range: ExportRange(start: inSeconds, end: outSeconds))
+                    state.exportAndCopy(
+                        url, range: ExportRange(start: inSeconds, end: outSeconds), crop: crop)
                     dismiss()
                 }
                 // ⌘↩ so the whole loop is keyboard-only (G24): ←/→ to find the moment, I/O to set
@@ -153,7 +173,25 @@ struct TrimView: View {
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(!hasRange || state.exports.exportInProgress != nil)
+                // A trim is an `AVAssetExportSession` — it has no crop, so with one set this button
+                // could only ignore it (M26-T2).
+                .disabled(!hasRange || state.exports.exportInProgress != nil || crop != nil)
+            }
+
+            HStack(spacing: 8) {
+                Toggle("Crop — drag on the preview", isOn: $cropping)
+                if let crop {
+                    Text("\(crop.width) × \(crop.height) px at \(crop.x),\(crop.y)")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    Button("Reset") { self.crop = nil }
+                        .buttonStyle(.link)
+                }
+            }
+            if crop != nil {
+                Text("Trim & Save can't crop — clear the crop to use it.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
 
             Toggle("Re-encode — the clip will contain only \(Timecode.cutPoint(inSeconds)) – "
@@ -174,6 +212,58 @@ struct TrimView: View {
         }
         .padding()
         .frame(width: 500)
+    }
+
+    /// The crop band over the preview (M26-T2): drag to draw, drag again to redraw. The dim is
+    /// punched through by the kept rectangle, so the bright area is what the export will hold.
+    /// Held in source pixels and converted back for drawing, never the other way round.
+    @ViewBuilder private var cropOverlay: some View {
+        GeometryReader { geometry in
+            let size = geometry.size
+            let band = dragged ?? crop.flatMap { rect in
+                sourceSize.map {
+                    CropGeometry.viewRect(for: rect, sourceSize: $0, viewSize: size)
+                }
+            }
+            ZStack(alignment: .topLeading) {
+                Color.black.opacity(0.45)
+                if let band {
+                    Rectangle()
+                        .frame(width: band.width, height: band.height)
+                        .offset(x: band.minX, y: band.minY)
+                        .blendMode(.destinationOut)
+                }
+            }
+            .compositingGroup()
+            .overlay(alignment: .topLeading) {
+                if let band {
+                    Rectangle()
+                        .strokeBorder(Color.accentColor, lineWidth: 2)
+                        .frame(width: band.width, height: band.height)
+                        .offset(x: band.minX, y: band.minY)
+                }
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 3)
+                    .onChanged { dragged = Self.rect(from: $0.startLocation, to: $0.location) }
+                    .onEnded { drag in
+                        dragged = nil
+                        guard let sourceSize else { return }
+                        crop = CropGeometry.crop(
+                            fromViewRect: Self.rect(from: drag.startLocation, to: drag.location),
+                            sourceSize: sourceSize, viewSize: size)
+                    })
+        }
+        .accessibilityLabel("Crop region")
+    }
+
+    /// The rectangle between two drag points, in any direction. Not `CGRect.union`, which treats an
+    /// empty rect as absent and would collapse a drag to a point.
+    private static func rect(from start: CGPoint, to end: CGPoint) -> CGRect {
+        CGRect(
+            x: min(start.x, end.x), y: min(start.y, end.y),
+            width: abs(end.x - start.x), height: abs(end.y - start.y))
     }
 
     /// One row of thumbnails across the take (M24-T4), filling in as they decode. Navigation, not
@@ -405,6 +495,11 @@ struct TrimView: View {
         sourceSize = nil
         leadInText = nil
         reencodes = false
+        // A crop belongs to the clip it was drawn on, so it does not survive the next one — the
+        // same rule the range follows.
+        cropping = false
+        crop = nil
+        dragged = nil
         Task {
             let asset = item.asset
             let duration = (try? await asset.load(.duration).seconds) ?? 0

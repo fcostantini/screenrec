@@ -2103,13 +2103,28 @@ backgrounds all stay out. Amendment recorded in docs/05.
       unchanged. **The pixels are the rect asked for** — 0.36% differ from the same rect cut out of a
       source frame (tolerance 6) against **29.86% at delta 255** for the bottom-left reading, the
       control without which a plausible-looking wrong crop would have passed.
-- [ ] M26-T2 **A crop rectangle in the Trim window.** The window already has the player, the range
+- [x] M26-T2 **A crop rectangle in the Trim window.** The window already has the player, the range
       and the export button, and since M24-T1 `Export & Copy` already carries a range — the rect
       rides the same way. **Seams:** `TrimView`'s player overlay (the filmstrip's `SpatialTapGesture`
       is the drag precedent); `ExportRange`'s shape. **Rulings:** drag-to-draw, numeric fields, or
       both; whether a crop persists between opens (the range does not); and what the caption
       promises, since M16-T2's rule is that a figure you cannot compute yet is omitted, not guessed.
       **Verify:** live — crop, export, and the file matches what the window said it would produce.
+      ✅ **Built 2026-07-31; the live leg is Franco's** (an agent cannot drag inside this app —
+      docs/07). **Rulings taken:** drag to draw with a live read-out and `Reset`, no numeric fields;
+      **no persistence** between opens; the caption quotes the **cropped** size live; and
+      **`Trim & Save` is disabled while a crop is set** and says why — a trim is an
+      `AVAssetExportSession` and has no crop, so the button could only ignore one. ⚠️ **Crop had to be
+      a mode:** `AVPlayerView`'s inline transport controls sit under any always-on overlay, so the
+      toggle is off by default and the window is unchanged until it is asked for; while cropping, the
+      playhead still moves by ←/→, ⇧←/⇧→ and the filmstrip. **The risky part is pure and tested:**
+      `CropGeometry` maps a drag inside a letterboxed preview to source pixels — **6 tests**
+      including a round-trip and the drag-in-any-direction case — because that is where an
+      off-by-a-scale-factor bug would live. The crop is held **in source pixels** and converted back
+      for drawing, never the reverse. `crop:` is threaded through `AppState.exportAndCopy` →
+      `ExportModel` → `Exporter`, and into `mp4Bytes` so M23-T2's disk guard weighs the **cropped**
+      size instead of refusing a cropped export that fits. **671 tests.** `VERSION` → **1.13.0**,
+      carrying M25's deferred patch.
 - [ ] M26-T3 **Find the bars without being told.** This is why it is a milestone and not a one-liner.
       **Seams:** `VideoFrameReader` decodes frames off the main thread already, and M24-T4 measured
       what frame extraction costs (keyframe spacing × count, not take length) — sample a handful and

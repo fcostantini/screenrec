@@ -18,7 +18,7 @@ import RecorderCore
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
         let written = URL(fileURLWithPath: "/tmp/Clip.mp4")
-        state.exports.exportFunction = { _, _, _, _ in written }
+        state.exports.exportFunction = { _, _, _, _, _ in written }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
         #expect(state.exports.exportInProgress == "Clip.mov")   // set before the background task runs
@@ -37,7 +37,7 @@ import RecorderCore
         let state = makeState()
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
-        state.exports.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
+        state.exports.exportFunction = { _, _, _, _, _ in throw ExportError.writerFailed("nope") }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/Clip.mov"))
         while state.exports.exportInProgress != nil { await Task.yield() }
@@ -52,13 +52,13 @@ import RecorderCore
         let state = makeState()
         state.notifier = { _ in }
         let firstURL = URL(fileURLWithPath: "/tmp/A.mp4")
-        state.exports.exportFunction = { _, _, _, _ in firstURL }
+        state.exports.exportFunction = { _, _, _, _, _ in firstURL }
 
         state.exportToMP4(URL(fileURLWithPath: "/tmp/A.mov"))
         while state.exports.exportInProgress != nil { await Task.yield() }
         #expect(state.exports.lastExport?.url == firstURL)
 
-        state.exports.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
+        state.exports.exportFunction = { _, _, _, _, _ in throw ExportError.writerFailed("nope") }
         state.exportToMP4(URL(fileURLWithPath: "/tmp/B.mov"))
         while state.exports.exportInProgress != nil { await Task.yield() }
         #expect(state.exports.lastExport?.url == firstURL)   // A's pointer isn't erased by B's failure
@@ -68,7 +68,7 @@ import RecorderCore
         let state = makeState()
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
-        state.exports.exportFunction = { _, output, _, _ in output }
+        state.exports.exportFunction = { _, output, _, _, _ in output }
 
         // No suspension point between the two calls, so the first export's task hasn't run yet —
         // the guard sees `exportInProgress` set and drops the second.
@@ -164,7 +164,7 @@ import RecorderCore
     @Test func waitingForAnExportReturnsOnlyAfterItSettles() async {
         let state = makeState()
         let finished = Box<Bool>()
-        state.exports.exportFunction = { _, output, _, _ in
+        state.exports.exportFunction = { _, output, _, _, _ in
             try await Task.sleep(for: .milliseconds(30))
             finished.value = true
             return output
@@ -183,7 +183,7 @@ import RecorderCore
         // an export in flight. So the clear has to be visible by the time that check runs — i.e.
         // synchronously — or the button waits like the one beside it and its label is a lie.
         let state = makeState()
-        state.exports.exportFunction = { _, output, _, _ in
+        state.exports.exportFunction = { _, output, _, _, _ in
             try await Task.sleep(for: .seconds(10))
             return output
         }
@@ -248,7 +248,7 @@ import RecorderCore
         state.notifier = { _ in }
         state.mp4Width = 2560
         let recorded = Box<ExportConfiguration>()
-        state.exports.exportFunction = { _, output, configuration, _ in
+        state.exports.exportFunction = { _, output, configuration, _, _ in
             recorded.value = configuration
             return output
         }
@@ -269,7 +269,7 @@ import RecorderCore
         state.notifier = { _ in }
         let recordedRange = Box<ExportRange>()
         let recordedOutput = Box<URL>()
-        state.exports.exportFunction = { _, output, _, range in
+        state.exports.exportFunction = { _, output, _, range, _ in
             recordedRange.value = range
             recordedOutput.value = output
             return output
@@ -292,7 +292,7 @@ import RecorderCore
         state.exports.copyToPasteboard = { _ in }
         let recorded = Box<ExportConfiguration>()
         let recordedRange = Box<ExportRange>()
-        state.exports.exportFunction = { _, output, configuration, range in
+        state.exports.exportFunction = { _, output, configuration, range, _ in
             recorded.value = configuration
             recordedRange.value = range
             return output
@@ -311,7 +311,7 @@ import RecorderCore
         state.notifier = { _ in }
         let recordedRange = Box<ExportRange>()
         let recordedOutput = Box<URL>()
-        state.exports.exportFunction = { _, output, _, range in
+        state.exports.exportFunction = { _, output, _, range, _ in
             recordedRange.value = range
             recordedOutput.value = output
             return output
@@ -331,7 +331,7 @@ import RecorderCore
         state.notifier = { posted.append($0) }
         let copied = Box<URL>()
         state.exports.copyToPasteboard = { copied.value = $0 }
-        state.exports.exportFunction = { _, output, _, _ in output }
+        state.exports.exportFunction = { _, output, _, _, _ in output }
 
         state.exports.exportAndCopy(
             URL(fileURLWithPath: "/tmp/Take.mov"), configuration: ExportConfiguration())
@@ -350,7 +350,7 @@ import RecorderCore
         state.notifier = { posted.append($0) }
         let copied = Box<URL>()
         state.exports.copyToPasteboard = { copied.value = $0 }
-        state.exports.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
+        state.exports.exportFunction = { _, _, _, _, _ in throw ExportError.writerFailed("nope") }
 
         state.exports.exportAndCopy(
             URL(fileURLWithPath: "/tmp/Take.mov"), configuration: ExportConfiguration())
@@ -366,7 +366,7 @@ import RecorderCore
         let state = makeState()
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
-        state.exports.exportFunction = { _, output, _, _ in output }
+        state.exports.exportFunction = { _, output, _, _, _ in output }
 
         state.exports.exportAndCopy(
             URL(fileURLWithPath: "/tmp/Take.mov"), configuration: ExportConfiguration())
@@ -401,7 +401,7 @@ import RecorderCore
     @Test func oneExportAtATimeAcrossFormats() async {
         let state = makeState()
         state.notifier = { _ in }
-        state.exports.exportFunction = { _, output, _, _ in output }
+        state.exports.exportFunction = { _, output, _, _, _ in output }
         state.exports.gifExportFunction = { _, output, _ in output }
 
         // An MP4 in flight blocks a GIF (they share one guard); no await between, so the MP4

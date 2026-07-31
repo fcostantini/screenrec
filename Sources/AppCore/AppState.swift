@@ -669,8 +669,8 @@ public final class AppState {
     public func exportToMP4(_ source: URL, range: ExportRange? = nil) {
         exports.exportToMP4(source, configuration: exportConfiguration, range: range)
     }
-    public func exportAndCopy(_ source: URL, range: ExportRange? = nil) {
-        exports.exportAndCopy(source, configuration: exportConfiguration, range: range)
+    public func exportAndCopy(_ source: URL, range: ExportRange? = nil, crop: CropRect? = nil) {
+        exports.exportAndCopy(source, configuration: exportConfiguration, range: range, crop: crop)
     }
     public func exportToGIF(_ source: URL) { exports.exportToGIF(source, configuration: gifConfiguration) }
     public func trim(_ source: URL, from start: Double, to end: Double, mode: TrimMode = .lossless) {

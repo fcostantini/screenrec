@@ -33,7 +33,25 @@
   ⚠️ **The VERSION bump is still pending** — 1.13.0 rides with T2, the first half a user of the app
   can reach, and M25's deferred patch rides in that cut.
 
-- **🗓️ M26-T2 PLANNED, not started (2026-07-31) — four rulings waiting on Franco.** Artifact:
+- **🟡 M26-T2 BUILT (2026-07-31), awaiting Franco's live leg — then M26-T3.** The Trim window can
+  draw a crop: tick **Crop**, drag on the preview, read `1600 × 1000 px at 400,300`, `Reset` clears
+  it. **671 tests** (+6 `CropGeometry`, +1 wiring). `VERSION` → **1.13.0**, carrying M25's deferred
+  patch. Dev loop green; **not yet deployed** — the running app is still 1.12.0.
+  ✅ **Rulings, all as recommended in the artifact** (`claude.ai/code/artifact/1f4eb109-09a3-4cac-82b5-81f30da6a844`):
+  drag only, no numeric fields; **no persistence** between opens; the caption quotes the **cropped**
+  size live; **`Trim & Save` disabled while a crop is set**, saying why — a trim has no crop, so it
+  could only ignore one.
+  ⚠️ **Crop is a mode, not an always-on overlay** — `AVPlayerView`'s inline transport controls sit
+  underneath one. Off by default, so the window is unchanged until asked.
+  ✅ **The untestable part was made small:** `CropGeometry` (AppCore) is pure — drag rect in a
+  letterboxed preview → source pixels — with a round-trip test and a drag-in-any-direction test.
+  The crop is held in **source pixels** and converted back for drawing, never the reverse.
+  ⚠️ **`PlayerObservers` gained `@unchecked Sendable`** with its confinement stated. The diagnostic
+  was always true of that closure (a non-`Sendable` class captured in a `@Sendable` one) and my diff
+  surfaced it; it is main-queue confined, which is what `startPlayheadObserver` already relies on.
+  🔴 **Still Franco's:** deploy + drag + ⌘↩, then check the caption's size against `probe`.
+
+- **🗓️ M26-T2 planned (2026-07-31) — four rulings, all taken.** Artifact:
   `claude.ai/code/artifact/1f4eb109-09a3-4cac-82b5-81f30da6a844`, with a real capture of today's Trim
   window (preview blanked — it held Franco's own recording) beside the proposal. **Recommended:** drag
   to draw with a live read-out and Reset, no numeric fields; the crop does **not** persist between

@@ -593,6 +593,19 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   Return stays on `Trim & Save`, since ADR-015 keeps lossless the default action. The size is this recording's own fitted through the Settings width, and is omitted until the
   source's geometry has loaded (M16-T2). Unlike a lossless trim, this holds only the range: a ranged
   read clips at the in-point (docs/07), so no lead-in caveat applies.
+- **Crop** (M26-T2, unchecked by default — the window is unchanged until it's asked for): ticking it
+  puts a band over the preview; drag to draw, drag again to redraw, `Reset` clears it, and unticking
+  discards it — a crop that survived out of sight would crop an export with nothing on screen saying
+  so. The read-out beside the toggle is the rect in **source pixels**, top-left origin:
+  *`1600 × 1000 px at 400,300`*. A crop belongs to the clip it was drawn on and does not persist to
+  the next one, the rule the range already follows.
+  **It is a mode because `AVPlayerView`'s inline transport controls sit under any always-on overlay**
+  — while cropping, the playhead still moves by ←/→, ⇧←/⇧→ and the filmstrip, which is what makes
+  that acceptable. **`Trim & Save` is disabled while a crop is set**, with
+  *"Trim & Save can't crop — clear the crop to use it."*: a trim is an `AVAssetExportSession` and has
+  no crop, so the button could only ignore one. The export caption states the **cropped** size, live —
+  *"Export & Copy writes only the range, cropped — H.264 1600 × 1000 — …"* — and that figure is the
+  gate: what it says and what `probe` reads off the file are the same numbers.
 - **Re-encode** (M18-T1, unchecked by default — ADR-015 keeps lossless the default): *"Re-encode —
   the clip will contain only M:SS – M:SS"*. Both modes start exactly at the in-point; lossless also
   keeps the frames back to the previous keyframe inside the file (docs/02 §6a), which the window

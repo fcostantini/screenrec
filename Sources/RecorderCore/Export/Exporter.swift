@@ -183,7 +183,7 @@ public enum Exporter {
     /// rounded **down** to even, since H.264 needs even and rounding up would ask for a pixel the
     /// source doesn't have. Throws unless the whole rect is inside the source — clamping would
     /// silently export a rectangle nobody chose, the reason a negative range start is refused too.
-    static func validatedCrop(
+    public static func validatedCrop(
         _ crop: CropRect, sourceWidth: Int, sourceHeight: Int
     ) throws -> CropRect {
         guard crop.x >= 0, crop.y >= 0, crop.width >= 2, crop.height >= 2,

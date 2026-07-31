@@ -35,8 +35,8 @@ public final class ExportModel {
 
     /// The transcode and the GIF encode, injected so tests exercise the wiring without the hardware
     /// codecs. Each returns where it wrote. Default to the production `Exporter`/`GifExporter`/`Trimmer`.
-    public var exportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: ExportConfiguration, _ range: ExportRange?) async throws -> URL = {
-        try await Exporter.exportToMP4(from: $0, to: $1, configuration: $2, range: $3).url
+    public var exportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: ExportConfiguration, _ range: ExportRange?, _ crop: CropRect?) async throws -> URL = {
+        try await Exporter.exportToMP4(from: $0, to: $1, configuration: $2, range: $3, crop: $4).url
     }
     public var gifExportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: GifConfiguration) async throws -> URL = {
         try await GifExporter.exportGIF(from: $0, to: $1, configuration: $2).url
@@ -79,16 +79,17 @@ public final class ExportModel {
         performExport(
             source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source, range: range)),
             estimate: { await Self.mp4Bytes(of: source, configuration: configuration, range: range) },
-            using: { try await export($0, $1, configuration, range) },
+            using: { try await export($0, $1, configuration, range, nil) },
             success: { RecordingNotifications.exported(url: $0) },
             failure: RecordingNotifications.exportFailed)
     }
 
-    /// Exports `source` — or just `range` of it (M24-T1) — and leaves the result on the pasteboard
-    /// (M21-T2): the same off-main, one-at-a-time path, ending in one notice rather than an export
-    /// receipt plus a copy.
+    /// Exports `source` — or just `range` of it (M24-T1), or just `crop` of each frame (M26-T2) —
+    /// and leaves the result on the pasteboard (M21-T2): the same off-main, one-at-a-time path,
+    /// ending in one notice rather than an export receipt plus a copy.
     public func exportAndCopy(
-        _ source: URL, configuration: ExportConfiguration, range: ExportRange? = nil
+        _ source: URL, configuration: ExportConfiguration, range: ExportRange? = nil,
+        crop: CropRect? = nil
     ) {
         let export = exportFunction  // snapshot; the closure captures no `self`
         let copy = copyToPasteboard
@@ -99,8 +100,11 @@ public final class ExportModel {
             : RecordingNotifications.copiedToPasteboard(url:)
         performExport(
             source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source, range: range)),
-            estimate: { await Self.mp4Bytes(of: source, configuration: configuration, range: range) },
-            using: { try await export($0, $1, configuration, range) },
+            estimate: {
+                await Self.mp4Bytes(
+                    of: source, configuration: configuration, range: range, crop: crop)
+            },
+            using: { try await export($0, $1, configuration, range, crop) },
             success: notice,
             failure: RecordingNotifications.exportFailed,
             completion: copy)
@@ -204,7 +208,8 @@ public final class ExportModel {
     /// no figure beats a wrong one (M16-T2). The arithmetic itself is
     /// `ExportConfiguration.projectedBytes`, shared with the menu row that quotes a weight.
     nonisolated private static func mp4Bytes(
-        of source: URL, configuration: ExportConfiguration, range: ExportRange?
+        of source: URL, configuration: ExportConfiguration, range: ExportRange?,
+        crop: CropRect? = nil
     ) async -> Int64? {
         guard let pixels = await MediaFile.dimensions(of: source) else { return nil }
         let seconds: Double
@@ -215,8 +220,11 @@ public final class ExportModel {
         } else {
             return nil
         }
+        // A crop is what gets encoded, so it is what the guard must weigh: quoting the whole frame
+        // would refuse a cropped export that fits.
         return configuration.projectedBytes(
-            sourceWidth: pixels.width, sourceHeight: pixels.height, seconds: seconds)
+            sourceWidth: crop?.width ?? pixels.width, sourceHeight: crop?.height ?? pixels.height,
+            seconds: seconds)
     }
 
     /// The source's size on disk, or nil if it can't be read.

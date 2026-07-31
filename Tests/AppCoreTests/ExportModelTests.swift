@@ -27,7 +27,7 @@ import RecorderCore
         // Set inside the Task instead, and the menu offers a second export in the gap — which the
         // guard below then can't see.
         let model = makeModel()
-        model.exportFunction = { _, output, _, _ in output }
+        model.exportFunction = { _, output, _, _, _ in output }
         model.exportToMP4(Self.source, configuration: ExportConfiguration())
         #expect(model.exportInProgress == "Clip.mov")
         await settle(model)
@@ -37,7 +37,7 @@ import RecorderCore
         let model = makeModel()
         var posted: [RecordingNotification] = []
         model.notify = { posted.append($0) }
-        model.exportFunction = { _, output, _, _ in output }
+        model.exportFunction = { _, output, _, _, _ in output }
 
         // No suspension point between the calls, so the first task hasn't run yet.
         model.exportToMP4(Self.source, configuration: ExportConfiguration())
@@ -51,12 +51,12 @@ import RecorderCore
     @Test func inProgressClearsOnFailureSoTheNextExportIsNotWedged() async {
         // Clearing only on success wedges every later export behind one failure.
         let model = makeModel()
-        model.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
+        model.exportFunction = { _, _, _, _, _ in throw ExportError.writerFailed("nope") }
         model.exportToMP4(Self.source, configuration: ExportConfiguration())
         await settle(model)
         #expect(model.exportInProgress == nil)
 
-        model.exportFunction = { _, output, _, _ in output }
+        model.exportFunction = { _, output, _, _, _ in output }
         model.exportToMP4(Self.source, configuration: ExportConfiguration())
         #expect(model.exportInProgress == "Clip.mov")   // the next one is accepted
         await settle(model)
@@ -83,7 +83,7 @@ import RecorderCore
         let model = makeModel()
         model.copyToPasteboard = { _ in }
         let written = Box<URL>()
-        model.exportFunction = { _, output, _, _ in written.value = output; return output }
+        model.exportFunction = { _, output, _, _, _ in written.value = output; return output }
 
         model.exportAndCopy(
             Self.source, configuration: ExportConfiguration(),
@@ -98,7 +98,7 @@ import RecorderCore
         let model = makeModel()
         model.copyToPasteboard = { _ in }
         let written = Box<URL>()
-        model.exportFunction = { _, output, _, _ in written.value = output; return output }
+        model.exportFunction = { _, output, _, _, _ in written.value = output; return output }
 
         model.exportAndCopy(Self.source, configuration: ExportConfiguration())
         await settle(model)
@@ -111,7 +111,7 @@ import RecorderCore
         let model = makeModel()
         model.copyToPasteboard = { _ in }
         let seen = Box<ExportRange>()
-        model.exportFunction = { _, output, _, range in seen.value = range; return output }
+        model.exportFunction = { _, output, _, range, _ in seen.value = range; return output }
 
         model.exportAndCopy(
             Self.source, configuration: ExportConfiguration(),
@@ -121,13 +121,28 @@ import RecorderCore
         #expect(seen.value == ExportRange(start: 1.5, end: 4.25))
     }
 
+    @Test func theCropReachesTheExporter() async {
+        // The window can draw a rectangle all it likes; this is the only thing that makes it real.
+        let model = makeModel()
+        model.copyToPasteboard = { _ in }
+        let seen = Box<CropRect>()
+        model.exportFunction = { _, output, _, _, crop in seen.value = crop; return output }
+
+        model.exportAndCopy(
+            Self.source, configuration: ExportConfiguration(),
+            crop: CropRect(x: 400, y: 300, width: 1600, height: 1000))
+        await settle(model)
+
+        #expect(seen.value == CropRect(x: 400, y: 300, width: 1600, height: 1000))
+    }
+
     @Test func aRangedCopyPostsOneNoticeForTheFileItPutOnThePasteboard() async {
         let model = makeModel()
         var posted: [RecordingNotification] = []
         model.notify = { posted.append($0) }
         let copied = Box<URL>()
         model.copyToPasteboard = { copied.value = $0 }
-        model.exportFunction = { _, output, _, _ in output }
+        model.exportFunction = { _, output, _, _, _ in output }
 
         model.exportAndCopy(
             Self.source, configuration: ExportConfiguration(),
@@ -145,7 +160,7 @@ import RecorderCore
     @Test func onlyASuccessSetsTheReceipt() async {
         let model = makeModel()
         let written = URL(fileURLWithPath: "/tmp/Clip.mp4")
-        model.exportFunction = { _, _, _, _ in written }
+        model.exportFunction = { _, _, _, _, _ in written }
         model.exportToMP4(Self.source, configuration: ExportConfiguration())
         await settle(model)
         #expect(model.lastExport?.url == written)
@@ -154,7 +169,7 @@ import RecorderCore
     @Test func aFailureLeavesNoReceiptAtAll() async {
         // A receipt here points the menu at a file that was never written.
         let model = makeModel()
-        model.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
+        model.exportFunction = { _, _, _, _, _ in throw ExportError.writerFailed("nope") }
         model.exportToMP4(Self.source, configuration: ExportConfiguration())
         await settle(model)
         #expect(model.lastExport == nil)
@@ -165,11 +180,11 @@ import RecorderCore
         // than destroy a good pointer.
         let model = makeModel()
         let first = URL(fileURLWithPath: "/tmp/First.mp4")
-        model.exportFunction = { _, _, _, _ in first }
+        model.exportFunction = { _, _, _, _, _ in first }
         model.exportToMP4(Self.source, configuration: ExportConfiguration())
         await settle(model)
 
-        model.exportFunction = { _, _, _, _ in throw ExportError.writerFailed("nope") }
+        model.exportFunction = { _, _, _, _, _ in throw ExportError.writerFailed("nope") }
         model.exportToMP4(Self.source, configuration: ExportConfiguration())
         await settle(model)
         #expect(model.lastExport?.url == first)
@@ -247,7 +262,7 @@ import RecorderCore
         // The whole point: quit must not be able to outrun the export it promised to wait for.
         let model = makeModel()
         let finished = Box<Bool>()
-        model.exportFunction = { _, output, _, _ in
+        model.exportFunction = { _, output, _, _, _ in
             try await Task.sleep(for: .milliseconds(30))
             finished.value = true
             return output
@@ -266,7 +281,7 @@ import RecorderCore
         // `Quit Anyway` calls `terminate`, whose delegate waits for an export in flight — so the
         // clear must be visible before that check runs, or the button waits like the one beside it.
         let model = makeModel()
-        model.exportFunction = { _, output, _, _ in
+        model.exportFunction = { _, output, _, _, _ in
             try await Task.sleep(for: .seconds(10))
             return output
         }
