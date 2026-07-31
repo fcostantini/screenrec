@@ -6,19 +6,18 @@
 
 ## Now
 
-- **🟡 M24-T4 CODE COMPLETE, HALF-VERIFIED (2026-07-31) — the box is NOT ticked. Needs Franco.**
+- **✅ M24-T4 SHIPPED (2026-07-31) — the Trim window can find a moment. Next: M24-T5, then G24.**
   The Trim window gained a **16-thumbnail filmstrip** that fills progressively, and **←/→ steps one
   real frame** (⇧ a second). **654 tests** (650 → 654), dev loop green, deployed. Plan artifact:
   `claude.ai/code/artifact/3f8024d7-d1e2-48a2-8f01-c9fd1151c05b`.
   ✅ **Verified:** the strip builds and renders — captured filling left-to-right, then 16/16 on the
   2:09 take. And the step mechanism is **exact**: five consecutive steps landed **0.000000 s** off
   the source's presentation times, and the backward step round-tripped exactly.
-  🔴 **NOT verified — yours to check, 20 seconds:** open Trim, **click the strip** (should seek to
-  where you clicked) and **press ←/→** (should nudge one frame; the readout barely moves — that's
-  correct, frames are ~14 ms apart). I could not test either: this app is `LSUIElement`, so
-  `activate` leaves Terminal frontmost (checked) and every synthetic keystroke went to the wrong
-  app — the same activation wall `menudriver` documents. **If ←/→ do nothing, the monitor's
-  window-title scope is the first suspect.**
+  ✅ **Arrow-key navigation confirmed live by Franco (2026-07-31)** — the half I could not reach.
+  This app is `LSUIElement`, so `activate` leaves Terminal frontmost (checked) and every synthetic
+  keystroke went to the wrong app; the window-scoped `NSEvent` monitor works in a real focused
+  window. ⚠️ **Click-to-seek on the strip is still unconfirmed** — same reason, and it is not part
+  of docs/03's filed Verify.
   🔴 **Three findings, all measured, all in docs/07.** `AVPlayerItem.step(byCount:)` **does not step
   a frame on our recordings** — frame-on-change capture has no fixed cadence, and one step moved
   **0.25 s and landed 25 ms off any real frame**; the sample cursor lands exactly. A **bare arrow is
@@ -294,10 +293,9 @@
 
 **Open:**
 
-- [ ] **M24-T4's input paths** (2026-07-31) — open Trim on any recording, then: **click the
-      filmstrip** (seeks to where you clicked) and **press ←/→** (steps one frame; ⇧←/⇧→ a second).
-      Unverifiable headlessly — `LSUIElement` + synthetic input can't confer activation (docs/07).
-      The step *mechanism* is measured exact; this is only about the keys and the click arriving.
+- [ ] **M24-T4's click-to-seek** (2026-07-31) — clicking the filmstrip should seek to where you
+      clicked. Arrows are confirmed working; this one is still unwatched. Unverifiable headlessly —
+      `LSUIElement` + synthetic input can't confer activation (docs/07). Catch it if convenient.
 
 - [ ] **Display-sleep lever** (declined 2026-07-27 — "headless legs only"): two questions need
       `pmset displaysleepnow` while armed, which blanks the screen mid-session. Does

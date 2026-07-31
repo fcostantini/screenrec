@@ -1969,14 +1969,20 @@ hand it to you. **MINOR.**
       access), and it appears after **every** stop, not only when banners are suppressed. The flash
       ruling was **already answered by M23-T3** (`stopNeedsFlash`: armed only) and was left alone. **Verify:** stop with replay armed → the row
       and the flash both appear; clicking reveals the file.
-- [ ] M24-T4 **Find the moment without scrubbing blind.** The Trim window offers a 480×300 player,
+- [x] M24-T4 **Find the moment without scrubbing blind.** The Trim window offers a 480×300 player,
       Set In/Set Out and nothing else: no filmstrip, no waveform, no frame stepping. docs/06 calls the
       window "spare by design" and that is right — but ←/→ and thumbnails are *navigation*, not
       editing, and finding 20 seconds in a 3-minute take is the step that costs the most. **Seams:**
       `VideoFrameReader` already extracts frames off the main thread; `AVPlayer.step(byCount:)` is the
-      stepping primitive. **Rulings:** how dense the strip is and what it costs on a 40-minute take
-      (needs a measured budget before it ships — M18-T1's cursor walk was 0.0–0.9 ms, frame extraction
-      is far heavier); whether ←/→ step frames or seconds. **Verify:** measure strip build time on a
+      stepping primitive. **Rulings taken** (Franco, 2026-07-31): **16 thumbnails**
+      (785 ms measured; 24 costs 1.8 s and is past the size a screen recording reads at), and
+      **←/→ step one frame, ⇧←/⇧→ a second** — the strip covers travel, so the keys buy exactness.
+      ⚠️ **Both stated seams were wrong.** `VideoFrameReader` reads sequentially from zero and cannot
+      build a strip (`AVAssetImageGenerator` does); and `step(byCount:)` is on `AVPlayerItem`, not
+      `AVPlayer`, *and* assumes a cadence frame-on-change capture doesn't have — measured, one step
+      moved 0.25 s and landed 25 ms off any real frame, so stepping walks the sample table instead.
+      ⚠️ **The budget's real driver is keyframe spacing, not take length**, so a 40-minute take costs
+      what a two-minute one does at the same count (docs/07). **Verify:** measure strip build time on a
       long take; a step lands on the adjacent PTS (`probe`), not "looks right".
 - [ ] M24-T5 **An `.mp4` stays an `.mp4`.** `Trimmer.trimmedSibling` hard-codes `.mov`, so trimming
       the `.mp4` you just made for Slack hands back the container you were converting away from. The
