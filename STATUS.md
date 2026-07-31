@@ -48,6 +48,16 @@
   ⚠️ **No plan artifact for this one** — Franco chose it from an option whose preview showed the
   states and the output, and the shape didn't move once measured.
 
+- **✅ M26-T2's live leg PASSED (2026-07-31, Franco at the keyboard).** He cropped a 4112 × 2570 take
+  in the Trim window and exported: `Recording 2026-07-28 at 17.19.30 trimmed.mp4`, **`avc1`
+  1920 × 812**, 129.12 s, 56 MB, one export receipt in the menu. **The crop reached the encoder and
+  the cap measured it** — an uncropped export of that take is 1920 × 1200, so the height followed the
+  *crop's* aspect (2.36), not the source's (1.60). The source `.mov` still probes 4112 × 2570 /
+  129.11 s. ⚠️ **One number still unconfirmed:** what the window's caption read at the moment he
+  pressed it. The caption and the exporter both compute through `Exporter.fittedSize` from the same
+  `crop` state, so they cannot disagree structurally — but "the window is honest" is the task's own
+  criterion and deserves his eyes, not my inference.
+
 - **🟡 M26-T2 BUILT (2026-07-31), awaiting Franco's live leg — then M26-T3.** The Trim window can
   draw a crop: tick **Crop**, drag on the preview, read `1600 × 1000 px at 400,300`, `Reset` clears
   it. **671 tests** (+6 `CropGeometry`, +1 wiring). `VERSION` → **1.13.0**, carrying M25's deferred
