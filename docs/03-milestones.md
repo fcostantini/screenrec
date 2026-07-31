@@ -1984,12 +1984,12 @@ hand it to you. **MINOR.**
       ⚠️ **The budget's real driver is keyframe spacing, not take length**, so a 40-minute take costs
       what a two-minute one does at the same count (docs/07). **Verify:** measure strip build time on a
       long take; a step lands on the adjacent PTS (`probe`), not "looks right".
-- [ ] M24-T5 **An `.mp4` stays an `.mp4`.** `Trimmer.trimmedSibling` hard-codes `.mov`, so trimming
+- [x] M24-T5 **An `.mp4` stays an `.mp4`.** `Trimmer.trimmedSibling` hard-codes `.mov`, so trimming
       the `.mp4` you just made for Slack hands back the container you were converting away from. The
       per-file submenu is generic too: it offers `Export as MP4` on an `.mp4` and `Save as GIF` on a
       GIF, quietly re-encoding something already encoded. **Seams:** `trimmedSibling`;
       `AVAssetExportSession.export(to:as:)` writes either container; `MenuView.fileActions`.
-      **Rulings:** hide the redundant derive-actions or disable them with a reason. **Verify:** trim
+      **Rulings taken** (Franco, 2026-07-31): **hide** them, not disable — on a GIF they were never choices (AVFoundation can't read one: `isReadable false`, no tracks, duration `-1`, yet an export session is still *created*, which is why it never failed at the menu), and M18-T3 shortened this menu rather than annotating it. Also fixed, beyond the filed text: the `… trimmed trimmed` stutter found live in M24-T1. ⚠️ **The `.mov` was a hard-code and its comment was wrong** — passthrough reports `mpeg-4` among its supported types (docs/07). **Verify:** trim
       an `.mp4` → an `.mp4` out, probe clean; the submenu on an export no longer offers to re-derive it.
 
 **Gate G24**: from a finished take, a chosen range reaches the clipboard in one action without the

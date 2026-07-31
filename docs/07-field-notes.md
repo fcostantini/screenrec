@@ -7,6 +7,22 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-31 (M24-T5): 🔴 **A GIF is not a movie to AVFoundation, and the menu offered it three
+  actions that could only fail.** `AVURLAsset` on a `.gif`: **`isReadable false`, no video tracks,
+  duration `-1`** — yet `AVAssetExportSession(asset:presetName:)` still **returns a session**, so the
+  failure only surfaces when the export runs. That is why `Export as MP4` / `Save as GIF` / `Trim…`
+  on a GIF row never failed *at* the menu. Decide by container before offering (`DeriveOptions`).
+
+- 2026-07-31 (M24-T5): **The trim's `.mov` was a hard-code, and the comment defending it was wrong.**
+  `Trimmer` said "always `.mov`, because the passthrough export writes a QuickTime container
+  regardless of the input's extension" — but the container came from our own
+  `export(to:as: .mov)`. Asked directly, `AVAssetExportSession.supportedFileTypes` for a passthrough
+  of an `.mp4` reports **`quicktime-movie, m4a-audio, mpeg-4, m4v-video, 3gpp, …`**; the HEVC preset
+  reports `quicktime-movie, mpeg-4, m4v-video`. Both containers were always available. ⚠️ **Verify a
+  container with `mdls kMDItemContentType`, never the extension** — a trimmed `.mp4` now reads
+  `public.mpeg-4` and a trimmed `.mov` `com.apple.quicktime-movie`, which an extension check could
+  not have told apart.
+
 - 2026-07-31 (M24-T4): 🔴 **`AVPlayerItem.step(byCount:)` does not step a frame on our recordings.**
   It assumes a fixed cadence; capture is frame-on-change, so frames are irregularly spaced. Measured
   on a 48.1 fps-nominal take: one `step(byCount: 1)` moved **0.25 s — three frames — and landed

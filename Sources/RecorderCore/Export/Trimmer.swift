@@ -32,13 +32,43 @@ public enum TrimMode: Sendable {
 /// Trims a recording to `[start, end]` (M10-T4; precise mode M18-T1). The original is only read; a
 /// new file is written. Both modes are `AVAssetExportSession` with a `timeRange`.
 public enum Trimmer {
-    /// `<stem> trimmed.mov` beside the input — always `.mov`, because the passthrough export writes
-    /// a QuickTime container regardless of the input's extension. Pure.
+    /// `<stem> trimmed` beside the input, **keeping the input's container** (M24-T5): trimming the
+    /// `.mp4` you made to share must not hand back the `.mov` you converted away from. Pure; the
+    /// export re-checks that the type is really writable (`fileType(for:)`).
+    ///
+    /// Already-trimmed stems don't stutter into `… trimmed trimmed`.
     public static func trimmedSibling(of input: URL) -> URL {
         let stem = input.deletingPathExtension().lastPathComponent
+        let name = stem.hasSuffix(" \(trimmedSuffix)") ? stem : "\(stem) \(trimmedSuffix)"
         return input.deletingLastPathComponent()
-            .appendingPathComponent("\(stem) trimmed")
-            .appendingPathExtension("mov")
+            .appendingPathComponent(name)
+            .appendingPathExtension(keptExtension(of: input))
+    }
+
+    private static let trimmedSuffix = "trimmed"
+
+    /// The container a trim of `input` writes. Only the two this app produces are preserved;
+    /// anything else becomes `.mov`, which every source here can be written as.
+    static func keptExtension(of input: URL) -> String {
+        switch input.pathExtension.lowercased() {
+        case "mp4": "mp4"
+        case "m4v": "m4v"
+        default: "mov"
+        }
+    }
+
+    /// `output`'s extension as an `AVFileType`, or `.mov` when it isn't one the session can write.
+    /// Asked, not assumed: the old code hard-coded `.mov` and explained it with a claim about
+    /// passthrough that isn't true — it reports `mpeg-4` among its supported types (docs/07).
+    private static func fileType(
+        for output: URL, supported: [AVFileType]
+    ) -> AVFileType {
+        let candidate: AVFileType = switch output.pathExtension.lowercased() {
+        case "mp4": .mp4
+        case "m4v": .m4v
+        default: .mov
+        }
+        return supported.contains(candidate) ? candidate : .mov
     }
 
     public static func trim(
@@ -70,7 +100,7 @@ public enum Trimmer {
         let scratch = OutputLocation.partialURL(for: output)
         try? FileManager.default.removeItem(at: scratch)
         do {
-            try await session.export(to: scratch, as: .mov)
+            try await session.export(to: scratch, as: fileType(for: output, supported: session.supportedFileTypes))
         } catch {
             try? FileManager.default.removeItem(at: scratch)  // no torn file on failure
             throw TrimError.trimFailed(error.localizedDescription)

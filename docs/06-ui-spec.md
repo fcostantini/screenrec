@@ -167,6 +167,12 @@ Order and grouping (separators between groups):
     **`Move to Trash`** (reversible → no confirmation, red attributed title). Both act on the row's own file
     only — trashing/renaming a derived `.mp4` never touches its `.mov` source. The saved-replay receipt
     (M9-T2) shares the same submenu.
+    **M24-T5: the derive group is offered only where it applies** (`DeriveOptions`, by container).
+    A **`.gif`** gets none of the three — AVFoundation can't read one at all, so every row was a
+    failure notice waiting to happen — and its divider goes with them. An **`.mp4`/`.m4v`** loses
+    `Export as MP4` (it is already one, and the action stays available on the `.mov` that produced
+    it) but keeps `Save as GIF` and `Trim…`. A `.mov` is unchanged. Hidden rather than disabled: on
+    a GIF these were never choices, and M18-T3 shortened this menu rather than annotating it.
     **M24-T3 gave the take that just stopped the same receipt**: `Recording saved · 0:22`, first in the
     receipt group (a take precedes anything derived from it, so Stop & Copy MP4 shows both rows, each
     pointing at its own file). Titled by **length, not filename** — the timestamped name is exactly what
@@ -572,7 +578,9 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   when it fires — the player retains the closure).
 - **Trim & Save** runs the trim (`AppState.trim`, off-main via `performExport`, the
   one-at-a-time/receipt/notification path) and dismisses. Disabled for a <0.1 s range or while an
-  export runs.
+  export runs. The clip **keeps the source's container** (M24-T5): an `.mp4` trims to an `.mp4`,
+  a `.mov` to a `.mov` — verified with `mdls`, not the extension — and a stem that already ends
+  ` trimmed` isn't given a second one.
 - **Export & Copy** (M21-T1; copies since M24-T1) writes the shareable `.mp4` of that range directly
   — no `.mov` in between — leaves it on the pasteboard, and dismisses; same disabled rule.
   `Trim & Save` keeps the Return key (ADR-015: lossless is the default). The file is the ` trimmed`

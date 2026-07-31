@@ -6,6 +6,26 @@
 
 ## Now
 
+- **✅ M24-T5 SHIPPED (2026-07-31) — M24's five tasks are all done. Next: G24, then the MINOR bump.**
+  A trim now **keeps its container** and the derive group is offered only where it applies.
+  **660 tests** (654 → 660), dev loop green, deployed. Plan artifact:
+  `claude.ai/code/artifact/3deb6330-efaa-4f0a-a06e-cc58a275562f`.
+  ✅ **Headless verify, container proved with `mdls` rather than the extension:** `sample.mp4` →
+  `sample trimmed.mp4`, **`kMDItemContentType = public.mpeg-4`**, 3.00 s `avc1` + AAC, passthrough.
+  `.mov` regression → `com.apple.quicktime-movie`. A second trim gave `sample trimmed 2.mp4` — the
+  stutter gone, the ` 2` being `availableURL`'s normal collision suffix.
+  ✅ **The submenus, by `menudriver dump` before and after:** a `.gif` lost all three derive rows
+  **and its divider**; an `.mp4` lost only `Export as MP4`, keeping `Save as GIF` and `Trim…`; a
+  `.mov` is unchanged.
+  🔴 **On a GIF those rows could only fail.** docs/03 called it "quietly re-encoding something
+  already encoded" — true for `.mp4`, but `AVURLAsset` on a `.gif` reads **`isReadable false`, no
+  video tracks, duration `-1`**, and `AVAssetExportSession` is **still created** for it, so the
+  failure only ever surfaced once the export ran.
+  🔴 **The `.mov` was our own hard-code and the comment defending it was false** — it claimed
+  passthrough writes QuickTime "regardless of the input's extension"; `supportedFileTypes` reports
+  **`mpeg-4`** for both presets. Fourth roadmap/code claim this milestone that didn't survive
+  measurement (docs/07).
+
 - **✅ M24-T4 SHIPPED (2026-07-31) — the Trim window can find a moment. Next: M24-T5, then G24.**
   The Trim window gained a **16-thumbnail filmstrip** that fills progressively, and **←/→ steps one
   real frame** (⇧ a second). **654 tests** (650 → 654), dev loop green, deployed. Plan artifact:

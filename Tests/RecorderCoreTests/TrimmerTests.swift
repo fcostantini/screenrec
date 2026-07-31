@@ -14,6 +14,28 @@ import Testing
         #expect(Trimmer.trimmedSibling(of: input).lastPathComponent == "Recording 2026 trimmed.mov")
     }
 
+    @Test func theSiblingKeepsTheInputsContainer() {
+        // M24-T5: trimming the .mp4 you made to share must not hand back the .mov you converted
+        // away from. Anything we don't write becomes .mov, which every source here can be.
+        let cases = [
+            ("/tmp/Clip.mp4", "Clip trimmed.mp4"),
+            ("/tmp/Clip.m4v", "Clip trimmed.m4v"),
+            ("/tmp/Clip.MP4", "Clip trimmed.mp4"),
+            ("/tmp/Clip.mkv", "Clip trimmed.mov"),
+        ]
+        for (path, expected) in cases {
+            #expect(Trimmer.trimmedSibling(of: URL(fileURLWithPath: path)).lastPathComponent
+                == expected, "\(path)")
+        }
+    }
+
+    @Test func aSecondTrimDoesNotStutterTheSuffix() {
+        // Reachable from the menu: the export receipt's own row carries Trim… (found live, M24-T1).
+        let once = Trimmer.trimmedSibling(of: URL(fileURLWithPath: "/tmp/Recording 2026.mp4"))
+        #expect(once.lastPathComponent == "Recording 2026 trimmed.mp4")
+        #expect(Trimmer.trimmedSibling(of: once).lastPathComponent == "Recording 2026 trimmed.mp4")
+    }
+
     @Test func rejectsOutputEqualToInput() async throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("trim-same-\(UUID().uuidString).mov")

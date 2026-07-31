@@ -348,16 +348,27 @@ struct MenuView: View {
         fileButton("Share…", url, ShareActions.share)
         fileButton("Copy", url, ShareActions.copy)
 
-        Divider()
+        // Only the derives this file can actually take (M24-T5): a GIF is unreadable to
+        // AVFoundation, and an export doesn't need re-exporting. The rule lives in `DeriveOptions`.
+        let derives = DeriveOptions(for: url)
+        if derives.hasAny {
+            Divider()
 
-        fileButton("Export as MP4", url) { state.exportToMP4($0) }
-            .disabled(state.exports.exportInProgress != nil)
-        fileButton("Save as GIF", url) { state.exportToGIF($0) }
-            .disabled(state.exports.exportInProgress != nil)
-        fileButton("Trim…", url) { url in
-            state.exports.trimTarget = url
-            openWindow(id: trimWindowID)
-            NSApplication.shared.activate(ignoringOtherApps: true)
+            if derives.canExportToMP4 {
+                fileButton("Export as MP4", url) { state.exportToMP4($0) }
+                    .disabled(state.exports.exportInProgress != nil)
+            }
+            if derives.canSaveAsGIF {
+                fileButton("Save as GIF", url) { state.exportToGIF($0) }
+                    .disabled(state.exports.exportInProgress != nil)
+            }
+            if derives.canTrim {
+                fileButton("Trim…", url) { url in
+                    state.exports.trimTarget = url
+                    openWindow(id: trimWindowID)
+                    NSApplication.shared.activate(ignoringOtherApps: true)
+                }
+            }
         }
 
         Divider()
