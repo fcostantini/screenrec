@@ -22,7 +22,7 @@ let package = Package(
         .target(
             name: "AppCore",
             dependencies: ["RecorderCore"],
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // Menu-bar app: SwiftUI views only, over AppCore.
         // Info.plist is copied into the .app bundle by Scripts/bundle.sh, not compiled —
@@ -46,7 +46,7 @@ let package = Package(
         .testTarget(
             name: "AppCoreTests",
             dependencies: ["AppCore", "RecorderCore"],
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]
 )

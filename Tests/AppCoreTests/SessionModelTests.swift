@@ -17,7 +17,7 @@ import RecorderCore
     private static let url = URL(fileURLWithPath: "/tmp/screenrec-session-test.mov")
 
     /// Every way a session can end. All are `finished` — fail-stops are ADR-007 successes.
-    private static let endReasons: [EndReason] = [
+    nonisolated private static let endReasons: [EndReason] = [
         .userStopped, .displayDisconnected, .appQuit, .windowClosed, .diskAlmostFull,
         .writeFailed, .streamError("-3815"),
     ]

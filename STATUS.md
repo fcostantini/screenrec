@@ -6,6 +6,26 @@
 
 ## Now
 
+- **✅ M25-T2 SHIPPED (2026-07-31) — `AppCore` compiles in Swift 6. Next: M25-T3.**
+  Five explicit-`self` lines in the replay-save closure, plus two `nonisolated` keywords on a test
+  fixture. **660 tests.** Verified live where it counts: a real replay save rendered
+  **`Replay saved · 27 s`** — that row *is* the closure that changed.
+  🔴 **`AppCore` cannot flip without `AppCoreTests`.** v6 mangles `@MainActor` into closure-property
+  types, so the v5 test target failed to **link** — `symbol(s) not found` for `copyToPasteboard`,
+  `notify`, `reportFailure`, `notifier`. ⚠️ It surfaces as a bare `error: fatalError` from
+  `swift test`, which reads like a crash and isn't one (docs/07).
+  🔴 **That flip breaks `@Test(arguments:)` on a `@MainActor` suite** — five declarations — because
+  the macro evaluates the argument closure outside the actor. Fixed with `nonisolated` on the shared
+  `endReasons` fixture. ✅ **RULED (Franco): the test edit is fine** — an isolation keyword, no
+  assertion or fixture value touched. ⚠️ But **M25-T1's "no test edited" property does not carry
+  forward**, by necessity rather than choice.
+  ⚠️ **The cluster was a double `[weak self]`** — outer closure *and* inner `Task`. Both kept (the
+  inner one stops the Task extending `AppState`'s lifetime across the hop) and made explicit; a
+  future reader should not "simplify" it away.
+  ⚠️ **Franco's replay disarmed itself during one redeploy and I re-armed it.** Not the Swift 6
+  build: a clean quit+relaunch of the same binary kept it armed. It is the **known transient
+  self-disarm** already recorded under G6 (bundle replaced mid-quit on a busy machine).
+
 - **✅ M25-T1 SHIPPED (2026-07-31) — `RecorderCore` compiles in Swift 6. Next: M25-T2.**
   **660 tests, and no test file was edited** — that was the whole claim of a task whose point is
   that nothing changes except who checks the rules. Real capture (3 tracks, hvc1 4112×2570), ranged

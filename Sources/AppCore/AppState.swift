@@ -638,13 +638,15 @@ public final class AppState {
                 case .success(let saved):
                     // The in-app receipt (M9-T2): the notification below is banner-suppressed while
                     // armed, so the menu row is what actually reaches the user.
-                    lastReplay = LastReplay(url: saved.url, seconds: Int(saved.duration.rounded()))
-                    flashSaved()                   // and a signal without opening the menu (M9-T3)
-                    notifier?(RecordingNotifications.replaySaved(url: saved.url, duration: saved.duration))
-                    refreshRecentRecordings()      // the new clip belongs at the top
+                    self.lastReplay = LastReplay(
+                        url: saved.url, seconds: Int(saved.duration.rounded()))
+                    self.flashSaved()              // and a signal without opening the menu (M9-T3)
+                    self.notifier?(
+                        RecordingNotifications.replaySaved(url: saved.url, duration: saved.duration))
+                    self.refreshRecentRecordings() // the new clip belongs at the top
                 case .failure(let error):
                     Self.log.error("replay save failed: \(error.localizedDescription, privacy: .public)")
-                    notifier?(RecordingNotifications.replaySaveFailed())
+                    self.notifier?(RecordingNotifications.replaySaveFailed())
                 }
             }
         }

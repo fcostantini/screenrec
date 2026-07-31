@@ -7,6 +7,21 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-31 (M25-T2): 🔴 **A target and its test target must flip language mode together — the
+  link breaks otherwise.** `AppCore` at v6 with `AppCoreTests` still at v5 built fine and then died
+  at link time: `symbol(s) not found` for every `@MainActor` closure property
+  (`ExportModel.copyToPasteboard`, `.notify`, `SessionModel.reportFailure`, `.notifier`). v6 mangles
+  the isolation into the type; v5 does not, so the test target looks for a symbol that no longer
+  exists. ⚠️ Not a compile error and not a test failure — `swift test` reports a bare
+  `error: fatalError`, which reads like a crash. Flip the pair.
+
+- 2026-07-31 (M25-T2): **swift-testing's `@Test(arguments:)` breaks on a `@MainActor` suite under
+  v6.** Every parameterised test whose arguments come from an isolated static fails inside the macro
+  expansion with *"expression is 'async' but is not marked with 'await'"* — the macro evaluates the
+  argument closure outside the actor. Five declarations across `AppStateTests` and
+  `SessionModelTests`; the fix is `nonisolated` on the shared fixture (`endReasons`), which changes
+  no assertion and no fixture value.
+
 - 2026-07-31 (M25-T1): 🔴 **A Swift 6 error count measured before you start is a FLOOR, not a total.**
   `RecorderCore` measured **7 distinct sites**; fixing them revealed **5 more** (1 in
   `MicrophoneRescue`, 4 more `SCStream` sites in `CaptureEngine`) for a true **12**. The compiler

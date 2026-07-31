@@ -2032,13 +2032,26 @@ is a per-target flip, not a migration.
       thread-safety is undocumented. `Exporter:411` was a genuine over-capture and got a real fix;
       `MicrophoneRescue` took `sending`, which needs no import concession. **No test was edited** —
       that was the claim, and it held (660 green).
-- [ ] M25-T2 **`AppCore` compiles in v6.** **At least 5 distinct sites** — ⚠️ a floor, not a total:
+- [x] M25-T2 **`AppCore` compiles in v6.** **At least 5 distinct sites** — ⚠️ a floor, not a total:
       T1's measured 7 became 12 as each fix unblocked the next wave. Clustered on the replay-save
       completion closure (`AppState.swift:641–647`) capturing non-`Sendable` state across a callback.
       **Seams:** `ReplayController`'s completion; `AppState`'s `@MainActor` isolation. **Verify:** as
       T1.
-- [ ] M25-T3 **The rest, and the escape hatch goes.** `ScreenRecApp`, `screenrec-cli` and both test
-      targets are **unmeasured** — `swift build` stops at the first failing target, so they have
+      ✅ **Done 2026-07-31 — and it was 5 mechanical lines with two structural surprises.** The
+      cluster is a **double `[weak self]`** (outer closure *and* inner `Task`), which defeats Swift
+      6's implicit-self rebinding; both captures were kept — the inner one stops the Task extending
+      `AppState`'s lifetime across the hop — and made explicit. 🔴 **`AppCore` cannot flip without
+      `AppCoreTests`:** v6 mangles `@MainActor` into closure-property types, so the v5 test target
+      fails to *link* (`symbol(s) not found`, reported as a bare `error: fatalError`). 🔴 That flip
+      then breaks **`@Test(arguments:)` on a `@MainActor` suite** — five declarations — fixed with
+      `nonisolated` on the shared `endReasons` fixture. **Ruling (Franco, 2026-07-31): the test edit
+      is fine** — it is an isolation keyword, changing no assertion and no fixture value, and T3
+      would have needed it regardless. ⚠️ So M25-T1's "no test edited" property **does not carry
+      forward**, by necessity rather than choice. Verified live: a real replay save rendered
+      `Replay saved · 27 s`, which is exactly the closure that changed.
+- [ ] M25-T3 **The rest, and the escape hatch goes.** `ScreenRecApp`, `screenrec-cli` and
+      `RecorderCoreTests` are **unmeasured** (`AppCoreTests` flipped with `AppCore` in T2, of
+      necessity — see above) — `swift build` stops at the first failing target, so they have
       never been compiled at v6 at all. Measure, fix, then **delete `.swiftLanguageMode(.v5)` from
       `Package.swift` entirely**, so a later target cannot be added at v5 silently. **Verify:** no
       `.v5` remains anywhere; dev loop green; a deployed build records, replays and exports.
