@@ -100,10 +100,12 @@
   `.finished` drains — so "Recording saved" replaced it **within 0.3 s**. Three runs sampling at
   0.3 s caught it **zero times**; `--print-delivered-notifications` had it every time. Now awaits
   `stopAndWaitForFinalize()`, so the exception posts last and is the banner left standing (docs/07).
-  ⚠️ **Two notices per stop, not one** — the take's own `Recording saved · 0:22` then `Copied — ⌘V to
-  paste` ~8 s later. Pre-existing (the menu's Stop & Copy MP4 does the same since M21-T2), but
-  docs/03's Verify says "one notice", so: **flagged, not silently changed.** Say the word and the
-  save notice can be suppressed when the ending copies.
+  ✅ **RULED: two notices per stop is fine as it is (Franco, 2026-07-31).** The take's own
+  `Recording saved · 0:22`, then `Copied — ⌘V to paste` ~8 s later. docs/03's Verify says "one
+  notice" and it was flagged rather than silently changed; the behaviour is pre-existing (the menu's
+  Stop & Copy MP4 has done this since M21-T2) and the two notices describe two different files
+  arriving at two different times. **Don't "fix" this** — suppressing the save notice was offered
+  and declined.
   🔴 **I toggled `Launch at login` off by accident** — a `checkbox 1` press landed on the General tab
   while Settings was still opening. Restored within seconds and verified re-registered. The driver
   now addresses controls **by label**; docs/07.
