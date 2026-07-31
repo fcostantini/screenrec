@@ -2080,7 +2080,7 @@ export path **already scales every frame**, so a source rectangle is an argument
 anyway — not a new pipeline. ADR-015's line does not move: composite, animate, auto-zoom and padded
 backgrounds all stay out. Amendment recorded in docs/05.
 
-- [ ] M26-T1 **The exporter takes a source rect.** **Seams:** `Exporter.exportToMP4`'s existing
+- [x] M26-T1 **The exporter takes a source rect.** **Seams:** `Exporter.exportToMP4`'s existing
       `fittedSize` scaling and its `AVVideoComposition`; `ExportConfiguration`, where the width cap
       already lives; `screenrec-cli export --to-mp4`, so this half is verifiable headlessly.
       **Rulings:** whether the rect is source **pixels** or a normalised **fraction** — a fraction
@@ -2088,6 +2088,21 @@ backgrounds all stay out. Amendment recorded in docs/05.
       the Size cap then applies to the *cropped* rect (it must, or the picker's "≈46 MB per minute"
       starts lying). **Verify:** CLI crop → `probe` shows the cropped dimensions and the aspect
       follows; the source is untouched; `mdls` confirms the container is unchanged (M24-T5).
+      ✅ **Done 2026-07-31. Rulings taken (Franco): source pixels, and the cap measures the crop.**
+      🔴 **The seam named above does not exist:** the MP4 path has no `AVVideoComposition` — it
+      declares a smaller size on the writer input and the *encoder* scales. The composition is
+      `VideoFrameReader`'s (the GIF path), and it carries: `420v` accepted, one frame per source
+      frame, top-left origin, crop+fit in one transform (all measured before implementing, docs/07).
+      **A crop composites; an uncropped export reads exactly the code it always did.** Three smaller
+      calls: an out-of-bounds crop is **refused, not clamped** (`ExportError.cropOutOfBounds`); crop
+      dimensions round **down** to even so the fit never upscales; and a cropped export keeps today's
+      file naming, with a " cropped" suffix left to T2. **664 tests** (+4 pure, +1 gated encode).
+      Verified on a real 4112×2570 take: crop → `avc1` 1600×1000; crop + `--width 1280` →
+      **1280×782**, the *crop's* aspect; an out-of-bounds crop refused with **no `.mp4`, no
+      `.partial`, no `.sb-`**; the uncropped control still 1920×1200; `public.mpeg-4`; source md5
+      unchanged. **The pixels are the rect asked for** — 0.36% differ from the same rect cut out of a
+      source frame (tolerance 6) against **29.86% at delta 255** for the bottom-left reading, the
+      control without which a plausible-looking wrong crop would have passed.
 - [ ] M26-T2 **A crop rectangle in the Trim window.** The window already has the player, the range
       and the export button, and since M24-T1 `Export & Copy` already carries a range — the rect
       rides the same way. **Seams:** `TrimView`'s player overlay (the filmstrip's `SpatialTapGesture`

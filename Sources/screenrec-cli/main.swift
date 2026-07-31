@@ -11,16 +11,18 @@ func printUsage() {
 
     USAGE:
       screenrec-cli record [options] [path]   Record screen + audio to a .mov
-      screenrec-cli export --to-mp4 <in> [--width <px>] [--from <t> --to <t>] [<out>]  Transcode a
-                                       recording to a shareable H.264 + AAC .mp4 (yuv420p,
-                                       faststart): 1920 wide by default, the two audio tracks mixed
-                                       to one. --width sets the cap (height follows the aspect,
-                                       capped at 2304 so the output stays inside H.264 Level 5.2);
-                                       bitrate scales with the output size. --from/--to (M:SS or
-                                       seconds) export only that range, which the file then holds
-                                       exactly — no intermediate trim. Default <out> is the input's
-                                       .mp4 sibling, or its " trimmed" one for a range. The source
-                                       is read-only.
+      screenrec-cli export --to-mp4 <in> [--width <px>] [--from <t> --to <t>] [--crop x,y,w,h] [<out>]
+                                       Transcode a recording to a shareable H.264 + AAC .mp4
+                                       (yuv420p, faststart): 1920 wide by default, the two audio
+                                       tracks mixed to one. --width sets the cap (height follows the
+                                       aspect, capped at 2304 so the output stays inside H.264
+                                       Level 5.2); bitrate scales with the output size. --from/--to
+                                       (M:SS or seconds) export only that range, which the file then
+                                       holds exactly — no intermediate trim. --crop keeps only that
+                                       rectangle of each frame, in source pixels from the top-left;
+                                       --width then caps the crop, not the source. Default <out> is
+                                       the input's .mp4 sibling, or its " trimmed" one for a range.
+                                       The source is read-only.
       screenrec-cli export --to-gif <in> [<out>]  Save a clip as a looping animated .gif
                                        (default 480 wide, 15 fps, first 30 s). Override with
                                        --fps <n> --width <px> --seconds <n>. Default <out> is the
@@ -98,6 +100,18 @@ func parsePositive(
         die("\(flag) needs a positive number of \(unit)\(max.map { " (max \(Int($0)))" } ?? "")")
     }
     return parsed
+}
+
+/// Parses `--crop`'s `x,y,width,height` in source pixels, or dies with a usage error. Whether the
+/// rect fits is the exporter's to judge — it is the only side that knows the source's size.
+func parseCropRect(_ value: String) -> CropRect {
+    let parts = value.split(separator: ",").map { Int($0.trimmingCharacters(in: .whitespaces)) }
+    guard parts.count == 4, let x = parts[0], let y = parts[1], let width = parts[2],
+        let height = parts[3], x >= 0, y >= 0, width > 0, height > 0
+    else {
+        die("--crop needs x,y,width,height in source pixels (x/y ≥ 0, width/height > 0)")
+    }
+    return CropRect(x: x, y: y, width: width, height: height)
 }
 
 /// Parses `--output`'s directory argument — one resolver so record and replay-arm can't drift.

@@ -31,6 +31,8 @@ private func exportErrorMessage(_ error: Error) -> String {
         return "The output path matches the input — choose a different name."
     case ExportError.emptyRange:
         return "Couldn't export: the time range is empty."
+    case ExportError.cropOutOfBounds(let message):
+        return "Couldn't export: \(message)"
     case GifExportError.noFrames:
         return "Couldn't export: the clip has no frames to encode."
     default:
@@ -39,8 +41,9 @@ private func exportErrorMessage(_ error: Error) -> String {
 }
 
 /// `export (--to-mp4 | --to-gif) <in> [<out>]` — derive a shareable file from a recording (ADR-016,
-/// M10-T3). `--to-mp4` also takes `--from`/`--to`, writing only that range (M21-T1). Default output
-/// is the input's `.mp4`/`.gif` sibling, collision-resolved; the source is only read.
+/// M10-T3). `--to-mp4` also takes `--from`/`--to`, writing only that range (M21-T1), and `--crop`,
+/// keeping only that rectangle of each frame (M26-T1). Default output is the input's `.mp4`/`.gif`
+/// sibling, collision-resolved; the source is only read.
 func runExport(_ args: [String]) async {
     var toMP4 = false
     var toGIF = false
@@ -50,6 +53,7 @@ func runExport(_ args: [String]) async {
     var gifSeconds: Double?
     var from: Double?
     var to: Double?
+    var crop: CropRect?
 
     var index = 0
     func value(after flag: String) -> String {
@@ -78,6 +82,7 @@ func runExport(_ args: [String]) async {
                 die("--to must be M:SS or seconds (≥ 0)")
             }
             to = parsed
+        case "--crop": crop = parseCropRect(value(after: "--crop"))
         case let flag where flag.hasPrefix("--"): die("Unknown export option: \(flag)")
         default: positionals.append(args[index])
         }
@@ -87,7 +92,9 @@ func runExport(_ args: [String]) async {
     guard !toMP4 || (gifFPS == nil && gifSeconds == nil) else {
         die("--fps/--seconds only apply to --to-gif")
     }
-    guard !toGIF || (from == nil && to == nil) else { die("--from/--to only apply to --to-mp4") }
+    guard !toGIF || (from == nil && to == nil && crop == nil) else {
+        die("--from/--to/--crop only apply to --to-mp4")
+    }
     guard (from == nil) == (to == nil) else { die("a range needs both --from and --to") }
     if let from, let to { guard to > from else { die("--to must be after --from") } }
     guard let inputPath = positionals.first else { die("export needs an input path") }
@@ -114,7 +121,8 @@ func runExport(_ args: [String]) async {
                 nil
             }
             try await runMP4(
-                input: input, explicitOutput: explicitOutput, width: width, range: range)
+                input: input, explicitOutput: explicitOutput, width: width, range: range,
+                crop: crop)
         }
     } catch {
         die(exportErrorMessage(error), code: 70)
@@ -122,7 +130,7 @@ func runExport(_ args: [String]) async {
 }
 
 private func runMP4(
-    input: URL, explicitOutput: URL?, width: Int?, range: ExportRange?
+    input: URL, explicitOutput: URL?, width: Int?, range: ExportRange?, crop: CropRect?
 ) async throws {
     let output = explicitOutput
         ?? Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: input, range: range))
@@ -131,8 +139,11 @@ private func runMP4(
     if let range {
         print("Range     \(Timecode.cutPoint(range.start)) – \(Timecode.cutPoint(range.end))")
     }
+    if let crop {
+        print("Crop      x\(crop.x) y\(crop.y) · \(crop.width) × \(crop.height) px")
+    }
     let result = try await Exporter.exportToMP4(
-        from: input, to: output, configuration: configuration, range: range,
+        from: input, to: output, configuration: configuration, range: range, crop: crop,
         progress: { progress.report($0) })
     progress.finish()
     print(

@@ -7,6 +7,42 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-31 (M26-T1): 🔴 **`AVURLAsset.loadTracks(withMediaType:)` segfaults when called from
+  `RecorderCoreTests`.** Deterministic `EXC_BAD_ACCESS` in `swift_retain`, resuming the compiler's
+  bridged continuation for that ObjC completion handler
+  (`@objc completion handler block implementation … with result type [AVAssetTrack]`). Measured both
+  ways: it crashes on a MovieRecorder fixture **and** on an ffmpeg-written `.mov`, with no export
+  code in the test at all; the same call from **production** `RecorderCore` (`Trimmer`) on the same
+  file is fine. ⚠️ The crash is reported as `error: Exited with unexpected signal code 11` with no
+  failing test named, so it reads like an infrastructure fault. **In this target use
+  `asset.load(.tracks).filter { $0.mediaType == … }`**, which is what every other test in
+  `ExporterTests` already did. Unproven but suggestive: `RecorderCoreTests` is the one target still
+  at language mode v5 (M25-T3), and the bridging thunk is emitted in the caller's module.
+
+- 2026-07-31 (M26-T1): **How the export path crops — four things measured before writing any of it.**
+  ① `AVAssetReaderVideoCompositionOutput` accepts **`420v`**, the capture's own pixel format, so a
+  crop needs no 32BGRA round-trip (42 MB/frame at 4112×2570). ② It emits **one frame per source
+  frame** on the transcode path too — 38 frames over PTS 0.000…1.983 of a 30.3 fps VFR source, where
+  the composition's `frameDuration` of 1/60 would have forced 120 (extends M10-T3's GIF measurement
+  to where a mistake costs a whole export). ③ **The layer transform's origin is the frame's
+  top-left**: against the same rect cut from a decoded source frame, 12.78% of pixels differ at max
+  channel delta 27 (re-encode noise); the bottom-left reading differs by 42.67% at delta 255. ④ Crop
+  and downscale ride **one transform** with no double-scaling. Cost: 2 s of 4112×2570 cropped in
+  0.30–0.40 s, against 0.91 s for the uncropped CLI export of the same 2 s.
+  ⚠️ **docs/03 named a seam that does not exist** — "`exportToMP4`'s existing `AVVideoComposition`".
+  The MP4 path had none: it declares a smaller size on the writer input and lets the *encoder* scale.
+  The composition it means lives in `VideoFrameReader` (the GIF path).
+
+- 2026-07-31 (M26-T1, deliberate duplication): the CLI now has **two rect parsers** — `parseRegion`
+  (`--region`, display points, `CGRect`) and `parseCropRect` (`--crop`, source pixels, `CropRect`).
+  Same comma-splitting, different units, types and bounds. Kept separate (Franco's call): sharing a
+  helper means editing `parseRegion`, which region capture is gate-verified against and which no test
+  target covers. **Fold them together if a third rect flag appears.**
+
+- 2026-07-31 (M26-T1, out of scope): `AppState.swift:753` warns *"value 'capture' was defined but
+  never used"* — pre-existing, in a file this task didn't touch. One-line fix (`if session.capture
+  != nil`), left for a `docs:`/follow-up commit rather than smuggled into a crop diff.
+
 - 2026-07-31 (M25-T3): **Most of a UI target's Swift 6 work is one sentence: these AppKit types were
   always main-actor-only and nothing said so.** 30 of `ScreenRecApp`'s 34 sites were
   *"main actor-isolated … from a nonisolated context"* on plain `class`/`enum` types whose every

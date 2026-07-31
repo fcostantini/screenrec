@@ -80,6 +80,50 @@ import Testing
         #expect(size.height <= 2304)
     }
 
+    // MARK: - Crop (pure)
+
+    @Test func theSizeCapAppliesToTheCroppedRectNotTheSource() throws {
+        // A 3600×2200 crop of the 4112×2570 display, capped at 1280 wide: the aspect that survives
+        // is the crop's (1.636), not the source's (1.600) — the whole point of cropping.
+        let crop = try Exporter.validatedCrop(
+            CropRect(x: 0, y: 0, width: 3600, height: 2200), sourceWidth: 4112, sourceHeight: 2570)
+        let size = Exporter.fittedSize(
+            width: crop.width, height: crop.height,
+            configuration: ExportConfiguration(maxWidth: 1280))
+        #expect(size == (1280, 782))
+        // And a crop already under the cap is encoded 1:1 — no scaling pass at all.
+        #expect(Exporter.fittedSize(
+            width: 1600, height: 1000, configuration: ExportConfiguration()) == (1600, 1000))
+    }
+
+    @Test func cropDimensionsRoundDownToEven() throws {
+        // Down, not to nearest: rounding 1601 up asks the compositor for a column the source
+        // doesn't have. The offsets are untouched — only the encoder needs even.
+        let crop = try Exporter.validatedCrop(
+            CropRect(x: 3, y: 5, width: 1601, height: 1001), sourceWidth: 4112, sourceHeight: 2570)
+        #expect(crop == CropRect(x: 3, y: 5, width: 1600, height: 1000))
+        // A rect that already fills the source keeps every pixel of it.
+        let full = try Exporter.validatedCrop(
+            CropRect(x: 0, y: 0, width: 4112, height: 2570), sourceWidth: 4112, sourceHeight: 2570)
+        #expect(full == CropRect(x: 0, y: 0, width: 4112, height: 2570))
+    }
+
+    @Test func aCropOutsideTheSourceIsRefusedNotClamped() {
+        // Clamping would silently export a rectangle nobody chose — the reasoning that already
+        // refuses a negative range start.
+        let outside = [
+            CropRect(x: 3000, y: 0, width: 1600, height: 1000),  // runs off the right edge
+            CropRect(x: 0, y: 2000, width: 1600, height: 1000),  // runs off the bottom
+            CropRect(x: -10, y: 0, width: 1600, height: 1000),  // starts before the frame
+            CropRect(x: 0, y: 0, width: 1, height: 1000),  // narrower than one even column
+        ]
+        for crop in outside {
+            #expect(throws: ExportError.self) {
+                try Exporter.validatedCrop(crop, sourceWidth: 4112, sourceHeight: 2570)
+            }
+        }
+    }
+
     // MARK: - Output path (pure + filesystem)
 
     @Test func mp4SiblingSwapsExtension() {
@@ -228,6 +272,43 @@ import Testing
         let tail = try await Exporter.exportToMP4(
             from: source, to: overrun, range: ExportRange(start: 2.5, end: 99))
         #expect(abs(tail.duration - 0.5) < 0.15)
+    }
+
+    /// A cropped export writes the rectangle, at the rectangle's own aspect, and the width cap
+    /// measures the crop rather than the source. Gated with the transcodes above: same hardware
+    /// encoder. Which pixels land inside the rect is CLI-verified against a real recording
+    /// (ADR-011) — this fixture's frames are synthetic.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["SCREENREC_HW_ENCODE_TESTS"] == "1"))
+    func exportsOnlyTheCroppedRectangle() async throws {
+        let source = try await Self.makeThreeTrackMov(width: 640, height: 360)
+        defer { try? FileManager.default.removeItem(at: source) }
+        let directory = FileManager.default.temporaryDirectory
+        let whole = directory.appendingPathComponent("export-crop-\(UUID().uuidString).mp4")
+        let capped = directory.appendingPathComponent("export-crop-cap-\(UUID().uuidString).mp4")
+        defer {
+            try? FileManager.default.removeItem(at: whole)
+            try? FileManager.default.removeItem(at: capped)
+        }
+
+        // 320×180 out of 640×360, under the default 1920 cap: encoded 1:1, no scaling pass.
+        let crop = CropRect(x: 100, y: 60, width: 320, height: 180)
+        let result = try await Exporter.exportToMP4(from: source, to: whole, crop: crop)
+        #expect(result.width == 320)
+        #expect(result.height == 180)
+        let asset = AVURLAsset(url: whole)
+        let videoTracks = try await asset.load(.tracks).filter { $0.mediaType == .video }
+        let naturalSize = try await #require(videoTracks.first).load(.naturalSize)
+        #expect(Int(naturalSize.width.rounded()) == 320)
+        #expect(Int(naturalSize.height.rounded()) == 180)
+        #expect(try await asset.load(.isPlayable))
+
+        // A 4:3 crop of this 16:9 source, capped at 160 wide: 160×120 can only come from fitting
+        // the crop — fitting the source would have given 160×90.
+        let tall = CropRect(x: 0, y: 0, width: 320, height: 240)
+        let fitted = try await Exporter.exportToMP4(
+            from: source, to: capped, configuration: ExportConfiguration(maxWidth: 160), crop: tall)
+        #expect(fitted.width == 160)
+        #expect(fitted.height == 120)  // the crop's 4:3, not the source's 16:9
     }
 
     // MARK: - Fixtures

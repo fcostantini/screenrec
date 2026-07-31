@@ -6,6 +6,33 @@
 
 ## Now
 
+- **✅ M26-T1 SHIPPED (2026-07-31) — the exporter takes a source rect. Next: M26-T2 (crop in the
+  Trim window).** `--crop x,y,w,h` on `screenrec-cli export --to-mp4`, and a `crop:` parameter beside
+  `range:` on `Exporter.exportToMP4`. **664 tests.** Plan artifact:
+  `claude.ai/code/artifact/dd785060-1f81-488a-a763-48bf10ae9bbd`.
+  ✅ **RULED (Franco, 2026-07-31): source pixels, not a fraction; the Size cap measures the cropped
+  rect.** So a 3600×2200 crop capped at 1280 lands at **1280×782** — the crop's aspect, not the
+  source's — and "≈46 MB per minute" stays true because the rate model sees what is really encoded.
+  🔴 **The seam docs/03 named does not exist.** The MP4 path never had an `AVVideoComposition`: it
+  declares a smaller size on the writer input and the *encoder* scales. The composition it meant is
+  `VideoFrameReader`'s, one file over. **Measured before implementing** (docs/07): `420v` accepted so
+  no BGRA round-trip, **one frame per source frame** so VFR survives, the transform's origin is
+  **top-left**, crop and fit ride one transform. Cost: 2 s of 4112×2570 in 0.30–0.40 s against 0.91 s
+  for the uncropped export of the same 2 s.
+  ✅ **An uncropped export runs exactly the code it ran yesterday** — the composition branch is
+  reached only when a crop is set, the discipline `range` already uses.
+  ✅ **Three smaller calls, decided rather than drifted into:** an out-of-bounds crop is **refused,
+  not clamped**; crop dimensions round **down** to even, so the fit never upscales; naming is
+  unchanged, and a " cropped" suffix is T2's to decide.
+  ✅ **The content leg has a negative control:** the exported pixels differ from the same rect cut out
+  of a source frame by **0.36%** (tolerance 6), while the bottom-left reading differs by **29.86% at
+  delta 255**. Without that control a wrong-but-plausible crop passes.
+  🔴 **`loadTracks(withMediaType:)` segfaults from `RecorderCoreTests`** — deterministic, on any file,
+  with no export code involved, while the same call from production is fine. It surfaces as
+  `Exited with unexpected signal code 11` naming no test. Use `load(.tracks)` there (docs/07).
+  ⚠️ **The VERSION bump is still pending** — 1.13.0 rides with T2, the first half a user of the app
+  can reach, and M25's deferred patch rides in that cut.
+
 - **✅ G25 PASSED (2026-07-31) — M25 complete. Swift 6 is on for everything that ships.** Evidence
   in the gate table. ✅ **RULED (Franco): no v1.12.1** — M25 has zero user-facing change, so there is
   nothing to download; the bump rides into **M26's cut**. `VERSION` stays **1.12.0**. Recorded in

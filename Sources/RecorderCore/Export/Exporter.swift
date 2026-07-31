@@ -9,6 +9,7 @@ public enum ExportError: Error, Equatable {
     case noVideoTrack
     case outputCollidesWithInput
     case emptyRange
+    case cropOutOfBounds(String)
     case readerFailed(String)
     case writerFailed(String)
 }
@@ -23,6 +24,23 @@ public struct ExportRange: Sendable, Equatable {
     public init(start: Double, end: Double) {
         self.start = start
         self.end = end
+    }
+}
+
+/// The part of each frame to export, in source pixels with the origin at the top-left (M26-T1) —
+/// the convention `probe` and the frame tools print, and what a bar detector measures. Not a
+/// fraction: a fraction cannot state an even width, which H.264 requires.
+public struct CropRect: Sendable, Equatable {
+    public var x: Int
+    public var y: Int
+    public var width: Int
+    public var height: Int
+
+    public init(x: Int, y: Int, width: Int, height: Int) {
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
     }
 }
 
@@ -161,14 +179,34 @@ public enum Exporter {
     /// so the CLI flag, the Settings list and the encode can't drift apart.
     public static let levelSafeBox = (width: 4096, height: 2304)
 
-    /// Transcodes `input` to `output`, or just `range` of it (M21-T1). `progress` (0…1, on a
-    /// background queue) tracks the video pass. Blocking work runs off the cooperative pool. Throws
-    /// before writing on a bad input, leaving no partial file.
+    /// `crop` as it will really be applied to a `sourceWidth × sourceHeight` source: each dimension
+    /// rounded **down** to even, since H.264 needs even and rounding up would ask for a pixel the
+    /// source doesn't have. Throws unless the whole rect is inside the source — clamping would
+    /// silently export a rectangle nobody chose, the reason a negative range start is refused too.
+    static func validatedCrop(
+        _ crop: CropRect, sourceWidth: Int, sourceHeight: Int
+    ) throws -> CropRect {
+        guard crop.x >= 0, crop.y >= 0, crop.width >= 2, crop.height >= 2,
+            crop.x + crop.width <= sourceWidth, crop.y + crop.height <= sourceHeight
+        else {
+            throw ExportError.cropOutOfBounds(
+                "that crop isn't inside the video — \(crop.width) × \(crop.height) px at "
+                    + "\(crop.x),\(crop.y) falls outside \(sourceWidth) × \(sourceHeight).")
+        }
+        return CropRect(
+            x: crop.x, y: crop.y,
+            width: crop.width - crop.width % 2, height: crop.height - crop.height % 2)
+    }
+
+    /// Transcodes `input` to `output`, or just `range` of it (M21-T1) and just `crop` of each frame
+    /// (M26-T1). `progress` (0…1, on a background queue) tracks the video pass. Blocking work runs
+    /// off the cooperative pool. Throws before writing on a bad input, leaving no partial file.
     public static func exportToMP4(
         from input: URL,
         to output: URL,
         configuration: ExportConfiguration = ExportConfiguration(),
         range: ExportRange? = nil,
+        crop: CropRect? = nil,
         progress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> ExportResult {
         // Identity, not string equality: a symlink, the /tmp→/private/tmp alias, or a
@@ -196,9 +234,16 @@ public enum Exporter {
         }
         let audioTracks = tracks.filter { $0.mediaType == .audio }
         let (naturalSize, videoRange) = try await videoTrack.load(.naturalSize, .timeRange)
+        let sourceWidth = Int(naturalSize.width.rounded())
+        let sourceHeight = Int(naturalSize.height.rounded())
+        let crop = try crop.map {
+            try validatedCrop($0, sourceWidth: sourceWidth, sourceHeight: sourceHeight)
+        }
+        // The cap measures the crop, never the source, so the rate model and the Size picker's
+        // "≈ n MB per minute" stay quoted against what is really encoded.
         let target = fittedSize(
-            width: Int(naturalSize.width.rounded()),
-            height: Int(naturalSize.height.rounded()),
+            width: crop?.width ?? sourceWidth,
+            height: crop?.height ?? sourceHeight,
             configuration: configuration)
 
         // What to write, in asset time: the whole file, or the requested range clamped to the media
@@ -226,8 +271,8 @@ public enum Exporter {
         // itself is not safe to share, and is not marked as if it were.
         nonisolated(unsafe) let plan = try TranscodePlan(
             asset: asset, videoTrack: videoTrack, audioTracks: audioTracks,
-            output: scratch, target: target, sessionStart: clipStart,
-            readRange: readRange, configuration: configuration)
+            output: scratch, target: target, crop: crop, assetDuration: assetDuration,
+            sessionStart: clipStart, readRange: readRange, configuration: configuration)
 
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -277,7 +322,7 @@ public enum Exporter {
 /// `Exporter` and the blocking pass sits here, off the cooperative pool.
 private struct TranscodePlan {
     let reader: AVAssetReader
-    let videoOutput: AVAssetReaderTrackOutput
+    let videoOutput: AVAssetReaderOutput
     let audioOutput: AVAssetReaderAudioMixOutput?
     let writer: AVAssetWriter
     let videoInput: AVAssetWriterInput
@@ -291,19 +336,30 @@ private struct TranscodePlan {
         audioTracks: [AVAssetTrack],
         output: URL,
         target: (width: Int, height: Int),
+        crop: CropRect?,
+        assetDuration: CMTime,
         sessionStart: CMTime,
         readRange: CMTimeRange?,
         configuration: ExportConfiguration
     ) throws {
         reader = try AVAssetReader(asset: asset)
         if let readRange { reader.timeRange = readRange }  // must precede `startReading`
-        // A pixel-format hint forces decode (nil would pass compressed HEVC through). The writer
-        // then re-encodes; the encoder scales the source frames to the input's configured size.
-        videoOutput = AVAssetReaderTrackOutput(
-            track: videoTrack,
-            outputSettings: [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
-            ])
+        // A pixel-format hint forces decode (nil would pass compressed HEVC through). Without a
+        // crop the writer's own encoder scales the decoded frames to the input's configured size,
+        // as it always has; a crop needs the frame rendered first, so only that path composites.
+        let pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        if let crop {
+            let composited = AVAssetReaderVideoCompositionOutput(
+                videoTracks: [videoTrack],
+                videoSettings: [kCVPixelBufferPixelFormatTypeKey as String: pixelFormat])
+            composited.videoComposition = Self.cropComposition(
+                cropping: crop, of: videoTrack, to: target, duration: assetDuration)
+            videoOutput = composited
+        } else {
+            videoOutput = AVAssetReaderTrackOutput(
+                track: videoTrack,
+                outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: pixelFormat])
+        }
         videoOutput.alwaysCopiesSampleData = false
         guard reader.canAdd(videoOutput) else {
             throw ExportError.readerFailed("The reader refused the video track.")
@@ -376,6 +432,35 @@ private struct TranscodePlan {
 
         self.sessionStart = sessionStart
         self.output = output
+    }
+
+    /// Renders `crop` of `videoTrack` into a `target`-sized frame, crop and fit in one transform.
+    /// The layer transform's origin is the frame's top-left, and `frameDuration` does not set the
+    /// output rate — the reader emits one frame per source frame, so the capture's variable rate
+    /// survives (both measured, docs/07). Per-axis scale, because `fittedSize` rounds each dimension
+    /// to even independently and one shared scale leaves an unpainted edge of up to a pixel.
+    /// Assumes an identity `preferredTransform`, true of every file this app writes.
+    private static func cropComposition(
+        cropping crop: CropRect, of videoTrack: AVAssetTrack,
+        to target: (width: Int, height: Int), duration: CMTime
+    ) -> AVVideoComposition {
+        let scaleX = Double(target.width) / Double(crop.width)
+        let scaleY = Double(target.height) / Double(crop.height)
+        let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
+        layer.setTransform(
+            CGAffineTransform(scaleX: scaleX, y: scaleY).concatenating(
+                CGAffineTransform(
+                    translationX: -Double(crop.x) * scaleX, y: -Double(crop.y) * scaleY)),
+            at: .zero)
+        let instruction = AVMutableVideoCompositionInstruction()
+        instruction.timeRange = CMTimeRange(start: .zero, duration: duration)
+        instruction.layerInstructions = [layer]
+
+        let composition = AVMutableVideoComposition()
+        composition.renderSize = CGSize(width: target.width, height: target.height)
+        composition.frameDuration = CMTime(value: 1, timescale: 60)
+        composition.instructions = [instruction]
+        return composition
     }
 
     /// Reads both tracks to exhaustion, feeding the writer; blocks until the file is finalized.
