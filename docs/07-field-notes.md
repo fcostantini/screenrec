@@ -7,18 +7,22 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
-- 2026-08-03 (M27, open defect — blocks 1.14.0): 🔴 **A saved replay writes the tap's audio at
-  24 kHz, where SCK's writes 48 kHz.** Isolated by A/B with one variable, same rig minutes apart:
-  **no mute → `audio aac 48000Hz 2ch`; mute set → `audio aac 24000Hz 2ch`**. A half-rate track plays
-  back at half speed, an octave down. ⚠️ **Replay only:** plain recordings with a mute set measured
-  **48000 Hz** repeatedly the same day, and the tap reports 48 kHz when queried directly — so the
-  halving happens between the tap and the replay muxer, not in the tap. Suspects, unexamined:
-  `ReplayAudioRing`'s format capture (armed *before* any tap buffer exists, so it may weld a format
-  from something else) and the keep-alive silence buffers M27-T4 added.
-  ⚠️ **Second anomaly in the same clip, unexplained:** audio stopped ~14 s before the save — the
-  *newest* 14 s of a replay window were silent while the older 28 s were a steady −18 dBFS.
-  ✅ **What does work:** the ring receives tap audio at all (440 Hz at −22.1 dBFS in the saved clip),
-  which was the open question M27-T2 left — `SampleRouter` carries it with no consumer change.
+- 2026-08-03 (M27): 🔴 **A process tap's sample rate follows the output device — it is NOT fixed at
+  48 kHz like SCK's system audio.** Measured on the same Mac hours apart: **48000 Hz** in the T1
+  spike, **24000 Hz** later the same day (`ASBD rate 24000, ch 2, bytesPerFrame 8, flags 0x9`,
+  interleaved, one buffer). So a muted take's system-audio track can be **24 kHz where an unmuted
+  one is always 48 kHz** — visible as `audio aac 24000Hz 2ch` in a saved replay against
+  `48000Hz 2ch` in the control.
+  ⚠️ **This was first written up as a half-speed playback bug. It is not one** — the track is
+  correctly labelled at the rate it holds and plays correctly; the cost is **fidelity**, not pitch.
+  The retraction is left here because the wrong diagnosis is the more tempting one: an A/B showing
+  24 kHz vs 48 kHz looks like a factor-of-two bug, and reading the tap's ASBD live is what settles it.
+  🔴 **The open design question:** SCK always hands over 48 kHz, a tap hands over whatever the device
+  is doing, so a recording's audio quality now depends on the output hardware. Resample the tap up to
+  48 kHz for consistency, or accept the device's rate? `ResampledMicInput` is the precedent for
+  normalising an input, and it exists because the mic had exactly this problem.
+  ⚠️ **Unexplained, still open:** in the same clip the newest ~14 s were silent while the older 28 s
+  held a steady −18 dBFS.
 
 - 2026-08-03 (M27, Franco's catch): 🔴 **An app's audio usually belongs to a helper, not to the
   app.** Discord's call audio is reported as **`com.hnc.Discord.helper.Renderer`**, a nested `.app`
