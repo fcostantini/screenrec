@@ -29,10 +29,19 @@ file every session is required to read.
   ✅ **④ It is nearly free:** 0.05 s user + 0.04 s sys over a 20.6 s run (**~0.4% of one core**),
   27.6 MB RSS, from a compiled binary. ⚠️ Measure the *compiled* spike — `/usr/bin/time swift x.swift`
   bills the compile too, and read 0.60 s user and 196 MB the first time.
-  ⚠️ **⑤ No TCC prompt appeared** creating the tap or the aggregate device from the CLI. **Unproven
-  for the shipped `.app`**, which is the version that matters — this terminal already holds Screen
-  Recording and Microphone, and which (if either) covers a tap was not isolated. Establish that
-  before T2 commits to the design.
+  🔴 **⑤ A tap without the right TCC grant returns SILENCE, not an error — and no prompt.** Measured
+  three ways against the same tone, same moment: **Terminal** (holds Screen Recording + Microphone)
+  → **−18.2 dBFS**; a **freshly signed `.app` with no grants and no usage-description key** →
+  **−∞ dBFS**, while still reporting `AudioHardwareCreateProcessTap` **OSStatus 0**, a valid tap UID,
+  **374 callbacks and 191 488 samples**. The pipeline runs perfectly and every sample is zero. ⚠️ So
+  a tap can never be checked by status code alone — **any health check has to measure level**, or a
+  future permission change ships as silent audio.
+  ✅ **The grants ScreenRec already holds are enough.** Running the same probe through the deployed
+  bundle's own identity (`--tap-probe`, a temporary hook in the shape of
+  `--print-delivered-notifications`, reverted straight after) read the tone at **−18.2 dBFS**.
+  **M27 needs no new permission and no new `Info.plist` key.** ⚠️ *Which* grant carries it was not
+  isolated — that would mean revoking one on Franco's machine; Screen Recording is the likely one,
+  since SCK's system audio already depends on it.
   **Shape of the working spike:** process objects → `CATapDescription(stereoGlobalTapButExcludeProcesses:)`
   (that one initialiser covers both "everything" and the exclusion) → `AudioHardwareCreateProcessTap`
   → private aggregate device with `kAudioAggregateDeviceTapListKey` → `AudioDeviceIOProcID`.
