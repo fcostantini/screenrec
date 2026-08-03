@@ -7,6 +7,16 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-03 (M27-T5, verified live): ✅ **An armed replay survives an output-device switch, and
+  keeps one rate across it.** AirPods disconnected mid-arm with a mute set: the saved clip is
+  **91.7 s with an 89 s audio track at 48000 Hz**, and audio recorded **before** the switch is still
+  in it — had `ReplayAudioRing` cleared on a format change, only the ~32 s after the switch would
+  have survived. So normalising the tap (T5) is what keeps the rolling window intact.
+  ✅ **And it explains an anomaly logged as unexplained twice:** the "newest seconds are silent" tail
+  in two replay clips was the **40-second tone fixture ending**, not the tap stalling — audio ran
+  from clip-time 4 s to 36 s, which is the tone's own length. ⚠️ A fixture that outlives the test is
+  worth more than the measurement it enables; a short one manufactures a mystery.
+
 - 2026-08-03 (M27): 🔴 **A process tap's sample rate follows the output device — it is NOT fixed at
   48 kHz like SCK's system audio.** Measured on the same Mac hours apart: **48000 Hz** in the T1
   spike, **24000 Hz** later the same day (`ASBD rate 24000, ch 2, bytesPerFrame 8, flags 0x9`,

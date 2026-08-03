@@ -22,10 +22,11 @@
   M27-T2 left open.
   ✅ **M27-T5 SHIPPED: the tap is normalised to 48 kHz stereo** through the mic path's own converter,
   now with an injectable target (the mic's default is untouched by construction). **694 tests.**
-  ⚠️ **The conversion is unit-pinned, not hardware-proven** — the device had returned to 48 kHz by
-  the time the code was ready, so the live run was a pass-through. 🔴 **Still owed: switch the output
-  device while replay is armed** and confirm the ring keeps its window — the failure T5 exists to
-  prevent.
+  ✅ **The leg with teeth passed (Franco, 2026-08-03):** AirPods disconnected mid-arm → the saved
+  clip is 91.7 s with an **89 s audio track at 48000 Hz**, holding audio from *before* the switch.
+  The ring kept its window; a format change would have emptied it. ✅ It also explains the
+  "newest seconds are silent" anomaly logged twice: the **40 s tone fixture ending**, not a stall.
+  ⚠️ The 24 kHz→48 kHz conversion itself stays unit-pinned — the device was back at 48 kHz by then.
   ⚠️ **Background: a tap's sample rate follows the output device (24 kHz measured, 48 kHz in T1) —
   SCK's is always 48 kHz.** So a muted take's audio quality now depends on the hardware. **Not the
   half-speed bug it was first written up as** — the track is correctly labelled and plays correctly;
