@@ -18,9 +18,16 @@
   and muting it silences `com.hnc.Discord.helper.Renderer`, where the call audio actually is. ⚠️ The
   earlier framing was wrong twice over — the helper row was not noise to hide, and the plain Discord
   row would have silenced **nothing** (docs/07).
-  🔴 **Still open before a 1.14.0 cut:** a long take (the real-time allocation deferred in T2) and
-  armed replay with a mute set. ⚠️ **Don't run a long take while Franco is on a call** — it captures
-  the call.
+  ✅ **Armed replay does receive tap audio** (440 Hz at −22.1 dBFS in a saved clip) — the question
+  M27-T2 left open.
+  🔴 **BLOCKING 1.14.0 — a saved replay writes tap audio at 24 kHz where SCK writes 48 kHz.** A/B with
+  one variable: no mute → 48000 Hz, mute set → 24000 Hz. Half-rate plays back at half speed.
+  **Replay only** — plain muted recordings are 48 kHz. Suspects: `ReplayAudioRing`'s format capture
+  (armed before any tap buffer exists) and T4's keep-alive silence buffers. Evidence clip:
+  `~/Movies/Replay 2026-08-03 at 14.52.47.mov`. ⚠️ A second anomaly in it is unexplained: the newest
+  14 s of the window were silent.
+  🔴 **Also still open:** a long take (T2's deferred real-time allocation). ⚠️ **Don't run one while
+  Franco is on a call** — it captures the call.
 
 - **🔴 (superseded) M27 DID NOT WORK IN THE APP (2026-08-03) — G27's pass covers the CLI only.** Measured at one
   moment, Spotify playing, mute set: **the app records −∞ dBFS** (silence) while **the CLI records

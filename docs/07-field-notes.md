@@ -7,6 +7,19 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-03 (M27, open defect — blocks 1.14.0): 🔴 **A saved replay writes the tap's audio at
+  24 kHz, where SCK's writes 48 kHz.** Isolated by A/B with one variable, same rig minutes apart:
+  **no mute → `audio aac 48000Hz 2ch`; mute set → `audio aac 24000Hz 2ch`**. A half-rate track plays
+  back at half speed, an octave down. ⚠️ **Replay only:** plain recordings with a mute set measured
+  **48000 Hz** repeatedly the same day, and the tap reports 48 kHz when queried directly — so the
+  halving happens between the tap and the replay muxer, not in the tap. Suspects, unexamined:
+  `ReplayAudioRing`'s format capture (armed *before* any tap buffer exists, so it may weld a format
+  from something else) and the keep-alive silence buffers M27-T4 added.
+  ⚠️ **Second anomaly in the same clip, unexplained:** audio stopped ~14 s before the save — the
+  *newest* 14 s of a replay window were silent while the older 28 s were a steady −18 dBFS.
+  ✅ **What does work:** the ring receives tap audio at all (440 Hz at −22.1 dBFS in the saved clip),
+  which was the open question M27-T2 left — `SampleRouter` carries it with no consumer change.
+
 - 2026-08-03 (M27, Franco's catch): 🔴 **An app's audio usually belongs to a helper, not to the
   app.** Discord's call audio is reported as **`com.hnc.Discord.helper.Renderer`**, a nested `.app`
   at `/Applications/Discord.app/Contents/Frameworks/Discord Helper (Renderer).app` (measured while a
