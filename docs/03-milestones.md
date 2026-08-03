@@ -2186,7 +2186,8 @@ backgrounds all stay out. Amendment recorded in docs/05.
       asked for (**0.72%** differ at tolerance 6, against **30.13% at delta 255** for the bottom-left
       reading).
 
-**Gate G26**: an export can be cropped from the Trim window and from the CLI; the output's dimensions
+**Gate G26** — ✅ **PASSED 2026-08-03** (evidence in STATUS.md's gate table). The criterion as filed:
+an export can be cropped from the Trim window and from the CLI; the output's dimensions
 are what the UI promised and the Size cap still applies to them; the original is untouched; and a
 letterboxed capture's bars are found without anyone typing a rectangle.
 
