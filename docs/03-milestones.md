@@ -2201,7 +2201,7 @@ while its audio still lands at **full level (−9.1 dBFS, measured)**. Backgroun
 shape. The route is `AudioHardwareCreateProcessTap` + `CATapDescription(excludeProcesses:)`
 (macOS 14.2+): **a second system-audio source, not a filter change.** **MINOR.**
 
-- [ ] M27-T1 **Measure before designing anything else.** M21's lesson, already recorded in this file:
+- [x] M27-T1 **Measure before designing anything else.** M21's lesson, already recorded in this file:
       three of its four tasks were filed on a premise measurement moved. Answer, with numbers in
       docs/07: does a process tap capture system audio minus a chosen process, **including a
       windowless one**? What format and clock does the aggregate device present? What happens when

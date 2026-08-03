@@ -7,6 +7,37 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-03 (M27-T1, the spike the milestone was gated on): **A Core Audio process tap does what
+  SCK cannot — measured, all five questions.**
+  ✅ **① It excludes a *windowless* process, which is the whole point.** Two `afplay` tones (440 Hz
+  and 880 Hz, both windowless) playing together: tap everything → **both at −18.2 dBFS**; tap
+  excluding the 440 process → **440 at −106.0**, 880 untouched at −18.2; **swap the exclusion** →
+  880 at **−97.8**, 440 back at −18.2. The swap is the control — each exclusion removes its own
+  target and nothing else. ⚠️ G21 banned `afplay` as an SCK control precisely because a bare
+  windowless process never reaches SCK's track; for a tap that property is the measurement.
+  ✅ **② Format is exactly SCK's own audio format:** 48 000 Hz, 2 ch, 32-bit float (flags 0x9), in
+  **512-frame callbacks (~10.7 ms)** — against SCK system audio's 960-frame, 0.0200 s cadence, same
+  rate and same format. **They run simultaneously without conflict** (measured together for 10 s),
+  and each tracks wall clock to within ~2 buffers over 10–20 s. Epoch alignment is still
+  `TimestampRebaser`'s problem, but rate and format are not.
+  🔴 **③ The failure mode is a silent no-op, not an error.** Excluding a pid that has **no audio
+  process object** — a process that has never played — silently excludes *nothing*: the tap runs and
+  captures that app's audio in full. `kAudioHardwarePropertyProcessObjectList` only carries processes
+  the audio system knows, so **"exclude this app" is unperformable for an app that isn't in it**, and
+  a UI offering it would lie. By contrast the excluded process **quitting mid-take is graceful**:
+  468 callbacks over 4.99 s, uninterrupted, the other tone unaffected.
+  ✅ **④ It is nearly free:** 0.05 s user + 0.04 s sys over a 20.6 s run (**~0.4% of one core**),
+  27.6 MB RSS, from a compiled binary. ⚠️ Measure the *compiled* spike — `/usr/bin/time swift x.swift`
+  bills the compile too, and read 0.60 s user and 196 MB the first time.
+  ⚠️ **⑤ No TCC prompt appeared** creating the tap or the aggregate device from the CLI. **Unproven
+  for the shipped `.app`**, which is the version that matters — this terminal already holds Screen
+  Recording and Microphone, and which (if either) covers a tap was not isolated. Establish that
+  before T2 commits to the design.
+  **Shape of the working spike:** process objects → `CATapDescription(stereoGlobalTapButExcludeProcesses:)`
+  (that one initialiser covers both "everything" and the exclusion) → `AudioHardwareCreateProcessTap`
+  → private aggregate device with `kAudioAggregateDeviceTapListKey` → `AudioDeviceIOProcID`.
+  ⚠️ The arrays take **AudioObjectIDs, not pids** — map via `kAudioProcessPropertyPID`.
+
 - 2026-08-03 (M26-T3, the real sample): 🔴 **A synthetic letterbox cannot calibrate this — the real
   one broke two rules the fixture had no way to test.** ① **A watermark sits inside the bar.** On a
   real capture the bottom bar's rows carry one: the row's full **spread is 190** while only **1.6% of

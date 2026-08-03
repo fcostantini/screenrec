@@ -6,6 +6,21 @@
 
 ## Now
 
+- **✅ M27-T1 DONE (2026-08-03) — the premise holds; a tap does what SCK cannot. Next: M27-T2.**
+  A spike, no shipped code, all five questions answered in docs/07. Plan artifact:
+  `claude.ai/code/artifact/1af9516f-d319-482b-8493-0aeed7e2c18b`.
+  ✅ **The one the milestone rested on:** a tap **excludes a windowless process**. Two `afplay` tones,
+  the exclusion swapped between them as the control — the excluded one drops to **−106 / −97.8 dBFS**
+  while the other holds at −18.2. That is the case SCK structurally cannot reach.
+  ✅ **Format is SCK's own** (48 kHz, 2 ch, 32-bit float), 512-frame callbacks, and **tap and SCK run
+  together without conflict**. Cost **~0.4% of one core**, 27.6 MB.
+  🔴 **The finding that shapes T3/T4:** excluding a process with **no audio object** is a **silent
+  no-op** — that app's audio lands in full. The excludable list is *processes the audio system
+  knows*, not *running apps*. An excluded process quitting mid-take is graceful.
+  ⚠️ **Open, and T2 should close it first:** **no TCC prompt appeared for the CLI**, but this terminal
+  already holds Screen Recording and Microphone. **Whether the shipped `.app` can create a tap is
+  unproven** — and that answer decides whether M27 ships at all.
+
 - **✅ G26 PASSED (2026-08-03) — M26 is complete and v1.13.0 is tagged.** Crop on export ships:
   a rect from the CLI, a band drawn in the Trim window, a `Find bars` button that finds a real
   letterbox by itself, and a precise trim that crops while keeping HEVC and both audio tracks.
