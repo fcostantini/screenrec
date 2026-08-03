@@ -34,6 +34,20 @@ import Testing
         #expect(reported.count == 1)
     }
 
+    @Test func staysQuietWhenTheOnlyThingPlayingIsTheAppBeingSilenced() {
+        // Measured on a 5-minute take: with Discord muted and nothing else making noise, the tap is
+        // correctly silent while the Mac is genuinely playing something. Counting the silenced app
+        // as evidence fires the notice on a recording that is working perfectly — the "warning
+        // nobody believes" this design exists to avoid.
+        let clock = Clock(), reported = Reported()
+        // The probe already excludes what is being silenced, so it reports nothing playing.
+        let watchdog = makeWatchdog(playing: { false }, clock: clock, reported: reported)
+        watchdog.note(peak: 0)
+        clock.uptime += 300
+        watchdog.check()
+        #expect(reported.count == 0)
+    }
+
     @Test func staysQuietWhenTheMacIsSimplyQuiet() {
         // The control the whole design turns on: silence with nothing playing is not a fault, and
         // firing here would train the user to ignore the notice.

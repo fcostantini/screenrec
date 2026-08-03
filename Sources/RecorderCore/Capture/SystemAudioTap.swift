@@ -119,7 +119,8 @@ final class SystemAudioTap: @unchecked Sendable {
         // A tap that has lost permission is indistinguishable from a quiet Mac by status code
         // alone (docs/07), so the check is level plus a cross-check — see `TapSilenceWatchdog`.
         let watchdog = TapSilenceWatchdog(
-            isAnythingPlaying: { AudioProcesses.isAnythingPlaying() }, onSilent: onSilent)
+            isAnythingPlaying: { AudioProcesses.isAnythingPlaying(excluding: silencedBundleIDs) },
+            onSilent: onSilent)
         let timer = DispatchSource.makeTimerSource(queue: Self.pollQueue)
         timer.schedule(
             deadline: .now() + TapSilenceWatchdog.checkInterval,

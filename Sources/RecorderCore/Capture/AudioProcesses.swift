@@ -40,10 +40,15 @@ public enum AudioProcesses {
                 .map(parentBundleID(of:)))
     }
 
-    /// Whether anything on the Mac is producing output right now — the cross-check that separates
-    /// "the tap is broken" from "the room is quiet" (M27-T4). Unfiltered by app identity: a daemon
-    /// playing counts, because the question is whether sound exists, not whose it is.
-    static func isAnythingPlaying() -> Bool {
+    /// Whether anything **we are not silencing** is producing output — the cross-check that
+    /// separates "the tap is broken" from "the room is quiet" (M27-T4).
+    ///
+    /// 🔴 `excluding` is load-bearing, not a refinement. With it omitted, muting the only app that
+    /// happens to be playing makes the tap correctly silent while the probe still says "something
+    /// is playing", and the silence notice fires on a recording that is working perfectly —
+    /// measured on a 5-minute take with Discord muted (docs/07). Daemons still count: the question
+    /// is whether sound exists that we expect to capture, not whose it is.
+    static func isAnythingPlaying(excluding silenced: [String] = []) -> Bool {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyProcessObjectList,
             mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
@@ -56,7 +61,12 @@ public enum AudioProcesses {
         guard AudioObjectGetPropertyData(
             AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &objects) == noErr
         else { return false }
-        return objects.contains { isRunningOutput($0) }
+        let excluded = Set(silenced)
+        return objects.contains { object in
+            guard isRunningOutput(object) else { return false }
+            guard let id = bundleID(of: object) else { return true }
+            return !excluded.contains(parentBundleID(of: id))
+        }
     }
 
     /// The app a bundle ID belongs to: `com.hnc.Discord.helper.Renderer` → `com.hnc.Discord`.

@@ -20,6 +20,11 @@
   row would have silenced **nothing** (docs/07).
   ✅ **Armed replay does receive tap audio** (440 Hz at −22.1 dBFS in a saved clip) — the question
   M27-T2 left open.
+  ✅ **The long take passed (5 min):** ~5.7% of one core, RSS 185 MB, **0 dropped frames**, 48 kHz
+  throughout — closing both deferred questions (T2's IOProc allocation, T5's resampling).
+  🔴 **It also caught a false positive no unit test could:** the silence notice fired because the
+  **only app playing was the muted one**, so the tap was rightly silent while the cross-check said
+  otherwise. `isAnythingPlaying` now excludes the silenced family; reproduced and confirmed fixed.
   ✅ **M27-T5 SHIPPED: the tap is normalised to 48 kHz stereo** through the mic path's own converter,
   now with an injectable target (the mic's default is untouched by construction). **694 tests.**
   ✅ **The leg with teeth passed (Franco, 2026-08-03):** AirPods disconnected mid-arm → the saved

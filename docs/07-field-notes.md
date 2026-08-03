@@ -7,6 +7,18 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-03 (M27, the long take): ✅ **Five minutes, and the real-time thread is fine.** 300 s wall,
+  **11.8 s user + 5.2 s sys (~5.7% of one core)**, RSS 185 MB, **0 dropped frames**, audio track
+  48 kHz throughout. That closes both deferred questions at once: the per-buffer allocation M27-T2
+  shipped on the IOProc, and the resampling M27-T5 added beside it.
+  🔴 **And it exposed a false positive the unit tests could not.** The silence notice fired on a
+  recording that was working perfectly, because **the only app producing output was the one being
+  muted**: the tap was correctly silent while the cross-check still answered "something is playing".
+  `isAnythingPlaying` now takes the silenced family as an exclusion. ⚠️ **The cross-check needed its
+  own exclusion** — an obvious statement afterwards, invisible beforehand, and only a long take with
+  a real muted app in a real call surfaced it. Verified by reproducing the exact conditions: same
+  mute, same call, no notice.
+
 - 2026-08-03 (M27-T5, verified live): ✅ **An armed replay survives an output-device switch, and
   keeps one rate across it.** AirPods disconnected mid-arm with a mute set: the saved clip is
   **91.7 s with an 89 s audio track at 48000 Hz**, and audio recorded **before** the switch is still
