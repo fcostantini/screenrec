@@ -6,6 +6,16 @@
 
 ## Now
 
+- **🚢 v1.14.0 CUT (2026-08-03) — M27 ships: an app can be left out of a recording's audio while it
+  stays in the picture.** `Mute ▸` in the menu, `--mute-app` in the CLI, a Core Audio process tap
+  behind both. **695 tests**, release and signed bundle green, tagged and deployed.
+  ✅ **What it does that SCK cannot:** silence an app with **no window at all** — the case
+  `SCShareableContent` never lists, while its audio plays on at full level.
+  ⚠️ **The bump also carries M25's deferred patch**, as ruled on 2026-07-31.
+  ⚠️ **Known, recorded rather than fixed:** the pre-existing unused-value warning at
+  `AppState.swift:753`; G26's letterbox calibration still rests on one clip; and the tap-silent
+  notice's *positive* path can't be exercised without revoking a TCC grant.
+
 - **✅ M27 WORKS IN THE APP (2026-08-03) — one plist key was the whole blocker.**
   `NSAudioCaptureUsageDescription` + the grant Franco clicked: a **menu-driven** take now carries
   full-length audio (697 344 samples / 14.5 s, continuous) with the muted app at **−67.7 dBFS** and
