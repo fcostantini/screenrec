@@ -261,6 +261,7 @@ func describe(_ event: EngineEvent) -> String {
     case .excludedAppUnavailable(let bundleID): return "excludedAppUnavailable(\(bundleID))"
     case .silencedAppUnavailable(let bundleID): return "silencedAppUnavailable(\(bundleID))"
     case .audioTapUnavailable: return "audioTapUnavailable"
+    case .audioTapSilent: return "audioTapSilent"
     case .recordingFileRestored: return "recordingFileRestored"
     case .stopped(let reason): return "stopped(\(describe(reason)))"
     case .finished(let url, let reason, let dropped):
@@ -745,6 +746,8 @@ func performRecording(_ options: RecordOptions) async {
             print("\n  ⚠️  \(bundleID) isn't playing anything — its audio wasn't left out")
         case .audioTapUnavailable:
             print("\n  ⚠️  couldn't silence that app — recording the whole mix")
+        case .audioTapSilent:
+            print("\n  ⚠️  system audio is being recorded as silence — still recording")
         case .recordingFileRestored:
             print("\n  ⚠️  recording file was moved — moved it back (recording continues)")
         case .finished(let url, let reason, let dropped):

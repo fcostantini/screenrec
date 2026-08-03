@@ -179,6 +179,10 @@ public final class SessionModel {
             reportFailure?("That app wasn't playing anything — its audio wasn't left out.", false)
         case .audioTapUnavailable:
             reportFailure?("Couldn't silence that app — the recording has the whole mix.", false)
+        case .audioTapSilent:
+            // Something is playing and the tap hears none of it (M27-T4). A notice, not an ending:
+            // the picture is fine, and losing the take over audio would be the worse outcome.
+            reportFailure?("System audio isn't reaching the recording — it will be silent.", false)
         case .microphoneDroppedAtStart:
             // The wanted mic never started (M13-T4); the recording continues without it. Say so in
             // the menu, or the active-mic-name row would name a mic that isn't in the take.

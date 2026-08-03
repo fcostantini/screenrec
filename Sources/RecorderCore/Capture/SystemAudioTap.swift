@@ -19,14 +19,19 @@ final class SystemAudioTap: @unchecked Sendable {
     }
 
     private let router: SampleRouter
+    /// Fires when the tap runs but carries nothing while something is playing (M27-T4).
+    private let onSilent: @Sendable () -> Void
+    private var watchdog: TapSilenceWatchdog?
+    private var poll: DispatchSourceTimer?
     private let lock = NSLock()
     private var tap = AudioObjectID(kAudioObjectUnknown)
     private var device = AudioObjectID(kAudioObjectUnknown)
     private var procID: AudioDeviceIOProcID?
     private var format: CMAudioFormatDescription?
 
-    init(router: SampleRouter) {
+    init(router: SampleRouter, onSilent: @escaping @Sendable () -> Void = {}) {
         self.router = router
+        self.onSilent = onSilent
     }
 
     /// Starts tapping everything except `silencedBundleIDs`.
@@ -103,14 +108,30 @@ final class SystemAudioTap: @unchecked Sendable {
             stop()
             throw TapError.startFailed(startStatus)
         }
+        // A tap that has lost permission is indistinguishable from a quiet Mac by status code
+        // alone (docs/07), so the check is level plus a cross-check — see `TapSilenceWatchdog`.
+        let watchdog = TapSilenceWatchdog(
+            isAnythingPlaying: { AudioProcesses.isAnythingPlaying() }, onSilent: onSilent)
+        let timer = DispatchSource.makeTimerSource(queue: Self.pollQueue)
+        timer.schedule(
+            deadline: .now() + TapSilenceWatchdog.checkInterval,
+            repeating: TapSilenceWatchdog.checkInterval)
+        timer.setEventHandler { watchdog.check() }
+        timer.resume()
+
         lock.lock()
         procID = newProcID
+        self.watchdog = watchdog
+        poll = timer
         lock.unlock()
         return unsilenceable
     }
 
     func stop() {
         lock.lock()
+        poll?.cancel()
+        poll = nil
+        watchdog = nil
         let (currentDevice, currentProc, currentTap) = (device, procID, tap)
         device = AudioObjectID(kAudioObjectUnknown)
         procID = nil
@@ -137,6 +158,7 @@ final class SystemAudioTap: @unchecked Sendable {
     ) {
         lock.lock()
         let currentFormat = format
+        let currentWatchdog = watchdog
         lock.unlock()
         guard let currentFormat,
             let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(currentFormat)?.pointee
@@ -163,8 +185,20 @@ final class SystemAudioTap: @unchecked Sendable {
                 return true
             })
         else { return }
+        // Every 16th sample: enough to see whether anything is there at all, and this is a
+        // real-time thread.
+        if let currentWatchdog {
+            let floats = data.assumingMemoryBound(to: Float.self)
+            var peak: Float = 0
+            for index in stride(from: 0, to: byteLength / MemoryLayout<Float>.size, by: 16) {
+                peak = max(peak, abs(floats[index]))
+            }
+            currentWatchdog.note(peak: peak)
+        }
         router.route(sample, type: .systemAudio)
     }
+
+    private static let pollQueue = DispatchQueue(label: "dev.fcostantini.screenrec.tapwatch")
 
     // MARK: - Core Audio lookups
 

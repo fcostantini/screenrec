@@ -99,6 +99,13 @@ public enum RecordingNotifications {
                     + "Anything it plays will be in the recording.",
                 fileURL: nil)
 
+        case .audioTapSilent:
+            return RecordingNotification(
+                title: "Recording · no system audio",
+                body: "Something is playing, but none of it is reaching the recording. "
+                    + "The screen is still being recorded.",
+                fileURL: nil)
+
         case .audioTapUnavailable:
             return RecordingNotification(
                 title: "Recording started · nothing silenced",

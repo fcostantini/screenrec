@@ -2268,7 +2268,7 @@ shape. The route is `AudioHardwareCreateProcessTap` + `CATapDescription(excludeP
       the bundle ID), so silencing "the" object left the rest audible. All of them are taken now.
       ⚠️ **Left to T4 as planned:** the caveat that muting *adds* windowless audio belongs in a
       Settings caption, and the health check must measure level, never a status code.
-- [ ] M27-T4 **The failure modes are honest.** Tap permission refused, the aggregate device
+- [x] M27-T4 **The failure modes are honest.** Tap permission refused, the aggregate device
       disappearing, the excluded process quitting mid-take. **Verify:** each one observed, each one
       leaving a playable file and a true sentence.
       **Re-specified 2026-08-03.** 🔴 **"Permission refused" is not a failure code — it is silence.**
@@ -2280,6 +2280,25 @@ shape. The route is `AudioHardwareCreateProcessTap` + `CATapDescription(excludeP
       needed beyond not asserting the object still exists.
       ⚠️ **Still unmeasured:** the aggregate device disappearing (default output device changes, or
       AirPods disconnect mid-take — the M8 shape, and this hardware does it routinely).
+      ✅ **Done 2026-08-03.** `TapSilenceWatchdog` — pure, **6 tests** — plus `audioTapSilent` through
+      the four surfaces. **687 tests.**
+      🔴 **The design turns on a cross-check, because silence is not a signal.** An ungranted tap
+      streams zeros with `OSStatus 0`, and so does a quiet Mac: identical on the wire. The condition
+      is **something is playing** (`IsRunningOutput`, the property T3 already relies on) **and the tap
+      is silent for 5 s** — reported once per outage, cleared by any audible buffer. Verified both
+      ways: it fires on silence-with-audio-playing, and **stays quiet through a genuinely quiet
+      recording**, which is the control the whole design rests on.
+      ✅ **Ruled: no fallback to SCK audio.** SCK binds audio per stream, so a mid-take switch means
+      restarting the stream — and worse, the fallback *is* the content filter that cannot exclude an
+      app's audio without taking its windows, so it would **silently undo the mute**. Recording
+      continues and says so (ADR-012).
+      ⚠️ **Plan corrected on contact:** it put the "muting also captures windowless audio" caveat in a
+      Settings caption, on the belief that the system-audio explanation lives there. It lives in the
+      **menu**, so the caveat went beside its siblings as one short dimmed line.
+      🔴 **Not verified end to end, and not claimed:** the notice's *positive* path in a real
+      recording needs a genuinely ungranted tap, which cannot be produced from a granted binary
+      without revoking Franco's own TCC grants. The decision is unit-tested both ways and the
+      plumbing matches its three sibling events.
 
 **Gate G27**: a **windowless** app's audio is absent from a take while the rest of the system is
 present. ⚠️ Verified with two *windowed* apps as the control, **never `afplay`** — G21 nearly

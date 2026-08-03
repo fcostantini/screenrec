@@ -255,7 +255,8 @@ public actor CaptureEngine {
     /// (M27-T2). Only when something is actually silenced — otherwise the SCK path is untouched.
     private func startSystemAudioTapIfNeeded() {
         guard configuration.capturesSystemAudio, !configuration.silencedAudioApps.isEmpty else { return }
-        let tap = SystemAudioTap(router: router)
+        let continuation = self.continuation
+        let tap = SystemAudioTap(router: router) { continuation.yield(.audioTapSilent) }
         do {
             let unsilenceable = try tap.start(silencing: configuration.silencedAudioApps)
             systemAudioTap = tap

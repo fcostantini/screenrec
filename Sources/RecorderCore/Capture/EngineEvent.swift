@@ -51,6 +51,10 @@ public enum EngineEvent: Sendable, Equatable {
     case silencedAppUnavailable(bundleID: String)
     /// The process tap could not be started, so system audio is the whole mix (M27-T2).
     case audioTapUnavailable
+    /// The tap is running and delivering nothing while the Mac is playing something (M27-T4) —
+    /// the shape a tap without permission takes, since it reports success and streams zeros.
+    /// Recording continues (ADR-012): the video is fine and the take is worth keeping.
+    case audioTapSilent
     /// The in-progress file was moved (Trash included) and the sentinel renamed it back;
     /// recording continues. Deletion is not an event — it fails the session.
     case recordingFileRestored

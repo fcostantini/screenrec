@@ -34,6 +34,25 @@ public enum AudioProcesses {
                 .filter { !$0.isEmpty })
     }
 
+    /// Whether anything on the Mac is producing output right now — the cross-check that separates
+    /// "the tap is broken" from "the room is quiet" (M27-T4). Unfiltered by app identity: a daemon
+    /// playing counts, because the question is whether sound exists, not whose it is.
+    static func isAnythingPlaying() -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyProcessObjectList,
+            mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr, size > 0
+        else { return false }
+        var objects = [AudioObjectID](
+            repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &objects) == noErr
+        else { return false }
+        return objects.contains { isRunningOutput($0) }
+    }
+
     /// Every audio object belonging to `bundleID` — a browser or a music app usually has several,
     /// and silencing only the first would leave the rest audible.
     static func objects(forBundleIDs bundleIDs: [String]) -> [String: [AudioObjectID]] {

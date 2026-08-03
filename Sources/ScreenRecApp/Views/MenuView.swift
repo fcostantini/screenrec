@@ -167,6 +167,9 @@ struct MenuView: View {
         // already covers the app, so the stronger line stands alone rather than two arguing.
         if let muted = state.mutedAppName {
             Text("\(muted) will be seen but not heard")
+            // Muting switches system audio to a process tap, which carries apps SCK's own capture
+            // omits — so a muted take can hold *more* sound, not less (M27-T2, measured).
+            Text("Sound from apps with no window is captured too")
         }
 
         // Reads through `presentMicrophonePreference`: the checkmark sits on None while a picked

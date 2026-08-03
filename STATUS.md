@@ -6,6 +6,18 @@
 
 ## Now
 
+- **✅ M27-T4 SHIPPED (2026-08-03) — M27's four tasks are in. Next: G27.** `TapSilenceWatchdog`
+  (6 tests) plus `audioTapSilent`. **687 tests**, dev loop clean. Plan artifact:
+  `claude.ai/code/artifact/e15862e9-71c5-4af2-9ea8-b6338e74fd0f`.
+  🔴 **Silence cannot be the signal:** an ungranted tap streams zeros with `OSStatus 0`, and so does
+  a quiet Mac. The check is **something is playing AND the tap is silent for 5 s** — and the control
+  that matters passed: **a genuinely quiet recording raises nothing**.
+  ✅ **Ruled: no fallback to SCK audio** — it would restart the stream mid-take *and* silently undo
+  the mute, since that path is the very filter which can't drop audio without dropping windows.
+  ⚠️ **Two honest gaps:** the notice's positive path can't be exercised end to end without revoking
+  Franco's TCC grants (decision unit-tested both ways instead), and **the aggregate device
+  disappearing — AirPods connecting mid-take — is still unmeasured**. Both are G27's to weigh.
+
 - **✅ M27-T2 and T3 SHIPPED (2026-08-03) — an app can be muted from the menu. Next: M27-T4.**
   `SystemAudioTap` routes tapped audio as `.systemAudio` through `PCMSampleBuffer` (its third
   caller), host-clock stamped so `TimestampRebaser` needs no special case — **no consumer changed**.
