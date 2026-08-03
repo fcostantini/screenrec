@@ -14,9 +14,13 @@
   which the CLI legs never covered.
   ⚠️ **A late-clicked prompt mimics a delivery bug:** the first run granted mid-take gave 1.3 s of
   audio in a 24 s file. Check for an unanswered prompt before chasing a stall.
-  🔴 **Still open before a 1.14.0 cut:** a long take (the real-time allocation deferred in T2), armed
-  replay with a mute set, and the `Discord Helper (Renderer)` row — a helper whose name resolves to
-  itself and shouldn't be offered as a mutable app.
+  ✅ **Helpers now collapse onto their app (Franco's catch, 2026-08-03):** the menu shows **Discord**
+  and muting it silences `com.hnc.Discord.helper.Renderer`, where the call audio actually is. ⚠️ The
+  earlier framing was wrong twice over — the helper row was not noise to hide, and the plain Discord
+  row would have silenced **nothing** (docs/07).
+  🔴 **Still open before a 1.14.0 cut:** a long take (the real-time allocation deferred in T2) and
+  armed replay with a mute set. ⚠️ **Don't run a long take while Franco is on a call** — it captures
+  the call.
 
 - **🔴 (superseded) M27 DID NOT WORK IN THE APP (2026-08-03) — G27's pass covers the CLI only.** Measured at one
   moment, Spotify playing, mute set: **the app records −∞ dBFS** (silence) while **the CLI records

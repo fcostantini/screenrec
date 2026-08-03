@@ -7,9 +7,14 @@ import Foundation
 /// once it has played something and disappears again when it stops, so a menu built from
 /// `SCShareableContent` would offer exclusions a tap cannot perform — silently, since excluding an
 /// unknown process is a no-op (docs/07).
+///
+/// 🔴 **An app's audio often belongs to a helper, not to the app.** Discord's call audio comes from
+/// `com.hnc.Discord.helper.Renderer`, a nested `.app` inside `Discord.app/Contents/Frameworks`
+/// (measured). So a helper is reported under its own bundle ID, and silencing only the parent's
+/// would leave the call audible — the family is matched by prefix, and the menu shows the parent.
 public enum AudioProcesses {
-    /// Bundle IDs **currently producing output**, deduplicated. Helper processes share their app's
-    /// bundle ID, so a browser with three of them appears once.
+    /// Bundle IDs **currently producing output**, deduplicated and **collapsed onto their parent
+    /// app** — a menu offering "Discord Helper (Renderer)" would be naming an implementation detail.
     ///
     /// ⚠️ The process list alone is not this: it carries every process registered with the audio
     /// system — `caphost`, `audiomxd`, accessibility daemons — whether or not a sound is coming out.
@@ -31,7 +36,8 @@ public enum AudioProcesses {
             objects
                 .filter { isRunningOutput($0) }
                 .compactMap { bundleID(of: $0) }
-                .filter { !$0.isEmpty })
+                .filter { !$0.isEmpty }
+                .map(parentBundleID(of:)))
     }
 
     /// Whether anything on the Mac is producing output right now — the cross-check that separates
@@ -53,6 +59,19 @@ public enum AudioProcesses {
         return objects.contains { isRunningOutput($0) }
     }
 
+    /// The app a bundle ID belongs to: `com.hnc.Discord.helper.Renderer` → `com.hnc.Discord`.
+    /// Pure string work, so `RecorderCore` stays free of AppKit (docs/01) — and it holds for the
+    /// Electron/Chromium shape every app here uses, where a helper's id extends its parent's.
+    public static func parentBundleID(of bundleID: String) -> String {
+        // A whole component, not a substring: `com.example.helperbee` is an app called helperbee,
+        // and truncating it would silence something the user never named.
+        let parts = bundleID.split(separator: ".", omittingEmptySubsequences: false)
+        guard let index = parts.firstIndex(where: { $0.lowercased() == "helper" }), index > 0 else {
+            return bundleID
+        }
+        return parts[..<index].joined(separator: ".")
+    }
+
     /// Every audio object belonging to `bundleID` — a browser or a music app usually has several,
     /// and silencing only the first would leave the rest audible.
     static func objects(forBundleIDs bundleIDs: [String]) -> [String: [AudioObjectID]] {
@@ -72,8 +91,12 @@ public enum AudioProcesses {
         let wanted = Set(bundleIDs)
         var found: [String: [AudioObjectID]] = [:]
         for object in objects {
-            guard let bundleID = bundleID(of: object), wanted.contains(bundleID) else { continue }
-            found[bundleID, default: []].append(object)
+            // Match the family, not the name: silencing an app has to take its helpers with it,
+            // since that is where the audio usually is.
+            guard let bundleID = bundleID(of: object) else { continue }
+            let parent = parentBundleID(of: bundleID)
+            guard wanted.contains(parent) else { continue }
+            found[parent, default: []].append(object)
         }
         return found
     }

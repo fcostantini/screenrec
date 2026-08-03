@@ -7,6 +7,19 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-03 (M27, Franco's catch): 🔴 **An app's audio usually belongs to a helper, not to the
+  app.** Discord's call audio is reported as **`com.hnc.Discord.helper.Renderer`**, a nested `.app`
+  at `/Applications/Discord.app/Contents/Frameworks/Discord Helper (Renderer).app` (measured while a
+  call was live). ⚠️ **Two things follow, and the first version of M27-T3 got both wrong.** The menu
+  offered *"Discord Helper (Renderer)"* — an implementation detail nobody can act on — and worse,
+  **muting the plain `com.hnc.Discord` row would have silenced nothing**, because the audio isn't
+  there. The instinct to *hide* helper rows would have removed the ability to mute a Discord call
+  entirely. Collapse to the parent for display, match the **family by component prefix** for the
+  exclusion. ⚠️ The stripping is component-aware on purpose: `com.example.helperbee` is an app called
+  helperbee, and a substring match would silence something the user never named.
+  ⚠️ It also disproves a comment M27-T3 shipped — *"helper processes share their app's bundle ID"* —
+  which held for Spotify and Firefox and is false for the Electron/Chromium shape.
+
 - 2026-08-03 (M27, resolved): ✅ **The app needs `NSAudioCaptureUsageDescription`, and then it
   prompts and works.** Without the key the tap returns **silent zeros with no prompt and no error**
   — the exact shape below. With it, macOS raises a permission prompt and, once granted, a
