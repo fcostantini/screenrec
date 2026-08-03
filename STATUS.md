@@ -6,6 +6,22 @@
 
 ## Now
 
+- **✅ M27-T2 and T3 SHIPPED (2026-08-03) — an app can be muted from the menu. Next: M27-T4.**
+  `SystemAudioTap` routes tapped audio as `.systemAudio` through `PCMSampleBuffer` (its third
+  caller), host-clock stamped so `TimestampRebaser` needs no special case — **no consumer changed**.
+  `Mute ▸` sits beside `Everything Except ▸`, and the dimmed rows are one grammar: **`… won't be
+  seen or heard`** against **`… will be seen but not heard`**. **681 tests.** Plan artifacts:
+  `.../384bd51c-72d2-4f86-820a-2250378605b2` (T2), `.../55c6bd3a-d758-4e8c-9205-50c6eb429950` (T3).
+  ✅ **Measured:** silencing QuickTime by bundle ID took its tone **−18.5 → −102.4 dBFS** while the
+  rest of the mix held at −18.1; the no-exclusion control kept both; an ordinary take still lands
+  **3 tracks**, because nothing muted means the SCK path is untouched code.
+  🔴 **Two wrong assumptions, both caught by building:** the process object list is *every process
+  the audio system knows* (`caphost`, `audiomxd`, accessibility daemons) — `IsRunningOutput` plus a
+  resolvable-name filter took the menu from six daemons to one real app; and **one app owns several
+  audio objects**, so T2's "silence the object" left a browser's other helpers audible.
+  ⚠️ **T2's unplanned finding, which T4's copy must carry:** the tap *also* captures windowless
+  processes SCK omits, so muting one app can make a take hold **more** sound, not less (docs/07).
+
 - **✅ M27-T1 DONE (2026-08-03) — the premise holds; a tap does what SCK cannot. Next: M27-T2.**
   A spike, no shipped code, all five questions answered in docs/07. Plan artifact:
   `claude.ai/code/artifact/1af9516f-d319-482b-8493-0aeed7e2c18b`.

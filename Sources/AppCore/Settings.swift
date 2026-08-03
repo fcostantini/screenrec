@@ -189,6 +189,9 @@ public struct Settings: Sendable, Equatable {
     public var captureAppBundleID: String?
     /// The app left out of a whole-screen recording (M21-T4); nil ⇒ nothing is excluded.
     public var excludedAppBundleID: String?
+    /// The app whose audio is left out while its windows stay in frame (M27-T3). Persisted by
+    /// bundle ID: an `AudioObjectID` is not durable, and the app may not even be playing at start.
+    public var mutedAppBundleID: String?
     /// The Source pick when it's a region (docs/06 item 5, M11-T2). Nil ⇒ not a region pick. Like
     /// the app pick, not validated against the current displays at load — a start against a vanished
     /// display fails loud (M11-T1).
@@ -290,6 +293,7 @@ public struct Settings: Sendable, Equatable {
             capturesSystemAudio: true,
             captureAppBundleID: nil,
             excludedAppBundleID: nil,
+            mutedAppBundleID: nil,
             captureRegion: nil,
             captureWindow: nil,
             replayArmed: false,
@@ -327,6 +331,7 @@ public enum SettingsStore {
         /// Absent ⇒ entire screen (M7-T2).
         public static let captureAppBundleID = "captureAppBundleID"
         public static let excludedAppBundleID = "excludedAppBundleID"
+        public static let mutedAppBundleID = "mutedAppBundleID"
         /// Absent ⇒ not a region pick (M11-T2). A Dict of the inner keys below.
         public static let captureRegion = "captureRegion"
         /// Inner keys of `captureRegion` — the display id and the rect (SCK points, docs/02 §1b).
@@ -445,6 +450,9 @@ public enum SettingsStore {
         // Like the mic: no running-app validation — the pick survives the app being closed.
         if let bundleID = defaults.string(forKey: Key.captureAppBundleID), !bundleID.isEmpty {
             settings.captureAppBundleID = bundleID
+        }
+        if let bundleID = defaults.string(forKey: Key.mutedAppBundleID), !bundleID.isEmpty {
+            settings.mutedAppBundleID = bundleID
         }
         if let bundleID = defaults.string(forKey: Key.excludedAppBundleID), !bundleID.isEmpty {
             settings.excludedAppBundleID = bundleID
@@ -586,6 +594,7 @@ public enum SettingsStore {
         // `set(_:Any?)` removes the key for nil — absent ⇒ entire screen, per the table.
         defaults.set(settings.captureAppBundleID, forKey: Key.captureAppBundleID)
         defaults.set(settings.excludedAppBundleID, forKey: Key.excludedAppBundleID)
+        defaults.set(settings.mutedAppBundleID, forKey: Key.mutedAppBundleID)
         if let region = settings.captureRegion {
             var dict: [String: Any] = [
                 Key.regionX: Double(region.rect.origin.x), Key.regionY: Double(region.rect.origin.y),

@@ -56,6 +56,40 @@ public final class SourcesModel {
             onPickChanged?()
         }
     }
+    /// The app heard no more (M27-T3): its windows stay in frame, its audio doesn't reach the file.
+    /// A different idea from `excludedAppBundleID`, and a different list — only apps the audio
+    /// system knows can be silenced at all (docs/07), so the two menus visibly differ.
+    public var mutedAppBundleID: String? {
+        didSet {
+            guard mutedAppBundleID != oldValue, !isRehoming else { return }
+            onPickChanged?()
+        }
+    }
+
+    /// Apps a tap can silence right now — those carrying audio. Injected so tests need no real
+    /// Core Audio, the seam `appDisplayName` already uses.
+    public var silenceableBundleIDs: @Sendable () -> Set<String> = {
+        AudioProcesses.silenceableBundleIDs()
+    }
+
+    /// The `Mute ▸` list: apps currently playing, by name, plus the pick itself when it has gone
+    /// quiet — dropping it from the list would silently unset what the header still claims.
+    ///
+    /// ⚠️ Filtered to apps with a real identity. Audio comes from daemons a user has never heard of
+    /// (`caphost`, `audiomxd`, accessibility helpers); listing those would be noise, and the Source
+    /// picker keeps itself to recordable apps for the same reason.
+    public func silenceableApps() -> [(bundleID: String, name: String)] {
+        var ids = silenceableBundleIDs()
+        if let muted = mutedAppBundleID { ids.insert(muted) }
+        return ids
+            .compactMap { bundleID -> (bundleID: String, name: String)? in
+                let name = appName(for: bundleID)
+                // An unresolvable name means LaunchServices doesn't know it — a daemon, not an app.
+                guard name != bundleID || bundleID == mutedAppBundleID else { return nil }
+                return (bundleID: bundleID, name: name)
+            }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
     /// The Source pick when it's a region (docs/06 item 5, M11-T2); nil ⇒ not a region. Set via the
     /// drag overlay through `setRegion`; persisted, and — like the app pick — it survives its display
     /// vanishing (a start then fails loud, never a silent whole-screen fallback).

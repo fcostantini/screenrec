@@ -7,6 +7,17 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-03 (M27-T3): 🔴 **`kAudioHardwarePropertyProcessObjectList` is not "apps that play sound"
+  — it is every process the audio system knows.** Built the `Mute ▸` menu from it and got
+  `caphost`, `com.apple.audiomxd`, `com.apple.assistantd`, `AirPlayXPCHelper`, accessibility
+  daemons — a list nobody can act on. **`kAudioProcessPropertyIsRunningOutput` is what separates
+  playing from registered**, and after filtering, the same menu showed one row: `Firefox`. ⚠️ Filter
+  again on a resolvable app name (LaunchServices) or daemons with bundle IDs still leak through —
+  the Source picker keeps itself to recordable apps for exactly this reason.
+  ⚠️ **And one app owns several audio objects** (a browser's helpers all share its bundle ID), so
+  excluding "the" object for a bundle ID silences one helper and leaves the rest audible — take all
+  of them.
+
 - 2026-08-03 (M27-T2): **Switching to the tap changes what is *in* the recording, not just what is
   left out.** The exclusion works as designed — QuickTime silenced by bundle ID fell from **−18.5 to
   −102.4 dBFS** while the rest of the mix held at −18.1. But the control run exposed the other half:

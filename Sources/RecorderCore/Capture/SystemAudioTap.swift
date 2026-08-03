@@ -36,9 +36,11 @@ final class SystemAudioTap: @unchecked Sendable {
     /// (measured, docs/07). `unsilenceable` names those, so nothing has to guess later.
     @discardableResult
     func start(silencing silencedBundleIDs: [String]) throws -> [String] {
-        let objects = Self.processObjects()
-        let excluded = silencedBundleIDs.compactMap { objects[$0] }
-        let unsilenceable = silencedBundleIDs.filter { objects[$0] == nil }
+        // Every object for each app, not the first: a browser or a music app runs several audio
+        // helper processes under one bundle ID, and silencing one would leave the rest audible.
+        let objects = AudioProcesses.objects(forBundleIDs: silencedBundleIDs)
+        let excluded = silencedBundleIDs.flatMap { objects[$0] ?? [] }
+        let unsilenceable = silencedBundleIDs.filter { objects[$0]?.isEmpty ?? true }
 
         guard let outputUID = Self.defaultOutputDeviceUID() else { throw TapError.noDefaultOutputDevice }
 
@@ -166,32 +168,6 @@ final class SystemAudioTap: @unchecked Sendable {
 
     // MARK: - Core Audio lookups
 
-    /// Bundle ID → process object. ⚠️ The tap API takes **`AudioObjectID`s, not pids**, and only
-    /// processes the audio system already knows appear here at all.
-    private static func processObjects() -> [String: AudioObjectID] {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyProcessObjectList,
-            mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-        var size: UInt32 = 0
-        guard AudioObjectGetPropertyDataSize(
-            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr, size > 0
-        else { return [:] }
-        var objects = [AudioObjectID](
-            repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
-        guard AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &objects) == noErr
-        else { return [:] }
-
-        var byBundleID: [String: AudioObjectID] = [:]
-        for object in objects {
-            guard let bundleID = stringProperty(object, kAudioProcessPropertyBundleID),
-                !bundleID.isEmpty
-            else { continue }
-            byBundleID[bundleID] = object  // a later helper process must not displace the app
-        }
-        return byBundleID
-    }
-
     private static func defaultOutputDeviceUID() -> String? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
@@ -228,11 +204,13 @@ final class SystemAudioTap: @unchecked Sendable {
         var address = AudioObjectPropertyAddress(
             mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain)
-        var value: CFString? = nil
-        var size = UInt32(MemoryLayout<CFString?>.size)
-        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr else {
-            return nil
-        }
-        return value as String?
+        // `Unmanaged`, not `CFString?`: a raw pointer to a variable holding an object reference is
+        // what the compiler warns about, and these getters hand back a +1 string.
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr,
+            let value
+        else { return nil }
+        return value.takeRetainedValue() as String
     }
 }

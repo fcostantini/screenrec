@@ -2241,7 +2241,7 @@ shape. The route is `AudioHardwareCreateProcessTap` + `CATapDescription(excludeP
       `excludedAppUnavailable`, and the run prints it. ⚠️ **Unplanned finding, and T3's copy has to
       carry it:** the tap *also captures windowless processes SCK omits entirely*, so an exclusion
       can make more sound appear in a take, not less (docs/07).
-- [ ] M27-T3 **The UI, and the vocabulary.** Two ideas stop sharing one row: `Everything Except`
+- [x] M27-T3 **The UI, and the vocabulary.** Two ideas stop sharing one row: `Everything Except`
       keeps meaning *neither seen nor heard*; the new list means *heard no more*, and it can offer
       apps with no window — which the existing one structurally cannot. **Rulings:** what it is
       called; whether both can be set at once, and on the same app.
@@ -2256,6 +2256,18 @@ shape. The route is `AudioHardwareCreateProcessTap` + `CATapDescription(excludeP
       ⚠️ **And the list is not stable:** a process object appears when an app first plays and can
       disappear later, so the pick must survive its object vanishing (bundle ID is the durable key,
       the `AudioObjectID` is not — M17's "a reused window id is refused" is the precedent).
+      ✅ **Done 2026-08-03.** `Mute ▸` sits beside `Everything Except ▸`, and the two dimmed rows are
+      one grammar: **`… won't be seen or heard`** against **`… will be seen but not heard`**. Live:
+      the row renders, the submenu lists what is playing, and the idle menu is unchanged when nothing
+      is muted. **681 tests.**
+      🔴 **The list was wrong on the first build, and the fix is a field note:** the process object
+      list is *every process the audio system knows* — `caphost`, `audiomxd`, accessibility daemons —
+      not apps that play sound. **`kAudioProcessPropertyIsRunningOutput`** separates the two, plus a
+      resolvable-app-name filter; the menu went from six daemons to one real app.
+      🔴 **And T2 had a bug this task found:** one app owns **several** audio objects (helpers share
+      the bundle ID), so silencing "the" object left the rest audible. All of them are taken now.
+      ⚠️ **Left to T4 as planned:** the caveat that muting *adds* windowless audio belongs in a
+      Settings caption, and the health check must measure level, never a status code.
 - [ ] M27-T4 **The failure modes are honest.** Tap permission refused, the aggregate device
       disappearing, the excluded process quitting mid-take. **Verify:** each one observed, each one
       leaving a playable file and a true sentence.

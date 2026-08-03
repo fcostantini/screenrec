@@ -54,6 +54,14 @@ public final class AppState {
 
     /// The excluded app's name for the menu's honesty row (M21-T4), or nil when nothing is excluded.
     public var excludedAppName: String? { sources.excludedAppBundleID.map(sources.appName(for:)) }
+    /// The app that will be seen but not heard (M27-T3), for the menu's dimmed line. Nil when the
+    /// content exclusion already covers it — that sentence is the stronger one and wins.
+    public var mutedAppName: String? {
+        guard let muted = sources.mutedAppBundleID, muted != sources.excludedAppBundleID else {
+            return nil
+        }
+        return sources.appName(for: muted)
+    }
     /// The excluded pick when it isn't on screen to be excluded — the row says so, and the start
     /// will too (M21-T4).
     public func refreshCapturableApps() async { await sources.refreshCapturableApps() }
@@ -500,6 +508,7 @@ public final class AppState {
         // persist it back or rebuild an armed stream that doesn't exist yet.
         sources.selectedAppBundleID = settings.captureAppBundleID
         sources.excludedAppBundleID = settings.excludedAppBundleID
+        sources.mutedAppBundleID = settings.mutedAppBundleID
         sources.selectedRegion = settings.captureRegion
         sources.selectedWindow = settings.captureWindow
         isReplayArmed = settings.replayArmed
@@ -581,6 +590,7 @@ public final class AppState {
                 capturesSystemAudio: capturesSystemAudio,
                 captureAppBundleID: sources.selectedAppBundleID,
                 excludedAppBundleID: sources.excludedAppBundleID,
+                mutedAppBundleID: sources.mutedAppBundleID,
                 captureRegion: sources.selectedRegion,
                 captureWindow: sources.selectedWindow,
                 replayArmed: isReplayArmed, replaySeconds: replaySeconds,
@@ -1097,6 +1107,15 @@ public final class AppState {
 
     /// What the pickers currently describe. Pure, so the menu→capture translation is testable
     /// without starting anything.
+    /// The muted pick as the engine takes it. Empty when the content exclusion already covers that
+    /// app: its sound is gone either way, and two mechanisms for one job is the thing to avoid.
+    private var silencedAudioApps: [String] {
+        guard let muted = sources.mutedAppBundleID, muted != sources.excludedAppBundleID else {
+            return []
+        }
+        return [muted]
+    }
+
     public var captureConfiguration: CaptureConfiguration {
         let content: ContentSelection
         if let window = sources.selectedWindow {
@@ -1119,6 +1138,9 @@ public final class AppState {
             // follows the current system default at return time.
             microphoneRecovery: microphonePreference == .automatic ? .systemDefault : .sameDevice,
             capturesSystemAudio: capturesSystemAudio,
+            // The content exclusion already removes that app's sound, so muting it too would be a
+            // second mechanism doing the same job (M27-T3).
+            silencedAudioApps: silencedAudioApps,
             frameRateCap: frameRateCap,
             quality: quality)
     }

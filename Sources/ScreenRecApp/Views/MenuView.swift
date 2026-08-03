@@ -134,6 +134,23 @@ struct MenuView: View {
                 } label: { EmptyView() }
                     .pickerStyle(.inline)
             }
+            // Heard no more, while its windows stay in frame (M27-T3). A separate row from
+            // Everything Except because it is a separate idea — and a separate list: only apps the
+            // audio system knows can be silenced at all (docs/07).
+            Menu("Mute") {
+                let silenceable = state.sources.silenceableApps()
+                if silenceable.isEmpty {
+                    Text("Nothing is playing").disabled(true)
+                } else {
+                    Button("Nothing") { state.sources.mutedAppBundleID = nil }
+                    Divider()
+                    ForEach(silenceable, id: \.bundleID) { app in
+                        Button(state.sources.mutedAppBundleID == app.bundleID ? "✓ \(app.name)" : app.name) {
+                            state.sources.mutedAppBundleID = app.bundleID
+                        }
+                    }
+                }
+            }
             // No explicit Divider here: the inline Picker already renders a trailing separator, so
             // Select Region… is cleanly set apart from the options (a second divider would double up).
 
@@ -145,6 +162,11 @@ struct MenuView: View {
         // should discover that by watching the file. One row, only when something is excluded.
         if let excluded = state.excludedAppName {
             Text("\(excluded) won't be seen or heard")
+        }
+        // The other half of that sentence (M27-T3). `mutedAppName` is nil when the exclusion above
+        // already covers the app, so the stronger line stands alone rather than two arguing.
+        if let muted = state.mutedAppName {
+            Text("\(muted) will be seen but not heard")
         }
 
         // Reads through `presentMicrophonePreference`: the checkmark sits on None while a picked

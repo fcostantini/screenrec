@@ -88,6 +88,16 @@ Order and grouping (separators between groups):
    **`<App> (closed)`** — the app is all that can be said without a title, and the marker is what
    keeps it distinct from an app-scoped pick, in the row and in the `Source:` header alike. The
    `(not running)` app rule; Start then fails loud.
+   **Mute (M27-T3):** a nested `Mute ▸` row beside `Everything Except ▸`, listing **apps currently
+   playing** plus `Nothing` to undo it, and a disabled **`Nothing is playing`** when none are. The
+   pick shows one dimmed row — **`Spotify will be seen but not heard`** — the deliberate twin of the
+   exclusion's `won't be seen or heard`: one grammar, one word apart, and that word is the feature.
+   Zero extra rows when nothing is muted. ⚠️ **Its list is not `Everything Except`'s** and will
+   visibly differ: a tap can only silence a process the audio system knows, so an app that isn't
+   playing cannot be muted (docs/07) — the two menus answer different questions and that is why they
+   are two rows. Muting an app already covered by `Everything Except` is redundant, so only the
+   stronger sentence is shown. A pick that goes quiet before the take starts records anyway, with a
+   notice — the `excludedAppUnavailable` shape.
    **Everything Except (M21-T4):** a nested `Everything Except ▸` row (the `Window ▸` pattern, for
    the same reason — it must not lengthen the idle menu) listing the same on-screen apps, plus
    **`Nothing`** to undo it. The pick reads in the header as `Source: Entire Screen except Slack`, and
