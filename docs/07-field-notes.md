@@ -7,6 +7,20 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-03 (M27, the finding that undoes T1's Q5): 🔴 **The shipped app CANNOT read a process tap
+  — and the test that said it could was invalid.** Measured at one moment with Spotify playing and a
+  mute set: **the app's take is −∞ dBFS** (total silence, video fine) while **the CLI's is −6.8 dBFS**
+  with only the muted tone removed. ⚠️ **Why T1 got it wrong:** the probe ran
+  `dist/ScreenRec.app/Contents/MacOS/ScreenRec --tap-probe` **from the Terminal**, and macOS
+  attributes TCC to the **responsible process** — Terminal, which holds Screen Recording and
+  Microphone. It re-tested Terminal's grants under the app's name. **Launching a bundle's executable
+  from a granted parent never tests that bundle's own identity**; only launching it as an app does.
+  ✅ **The one good outcome: `TapSilenceWatchdog` caught it in the wild**, unprompted, with a true
+  sentence — *"Something is playing, but none of it is reaching the recording."* Exactly the failure
+  it was built for, and without it the app would have shipped recording silence. The cross-check
+  design (something is playing AND the tap is silent) is what made it trustworthy enough to believe.
+  🔴 **So M27 does not work in the app**, and G27's evidence covers the mechanism via the CLI only.
+
 - 2026-08-03 (M27-T4, closing G27's caveats): **Both device-change directions survive, and the
   reason is that a global tap is device-independent.** AirPods **connected** mid-take: audio
   unbroken across all 30 s (−19/−20 dBFS per 2 s window, no dropout at the switch). **Disconnected**
