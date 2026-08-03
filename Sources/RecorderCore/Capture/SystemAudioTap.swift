@@ -1,0 +1,238 @@
+import AudioToolbox
+import CoreAudio
+import CoreMedia
+import Foundation
+
+/// System audio as a Core Audio **process tap**, so one app can be silenced without its windows
+/// leaving the frame (M27). SCK's audio is a content filter and cannot do that; a tap can, including
+/// for an app with no window at all — the case `SCShareableContent` never lists (docs/02 §1a-ii).
+///
+/// Routed as `.systemAudio`, in SCK's own format, so no consumer knows the difference.
+/// ⚠️ An ungranted tap returns `noErr` and a stream of **zeros** — never infer health from a status
+/// code here (docs/07).
+final class SystemAudioTap: @unchecked Sendable {
+    enum TapError: Error, Equatable {
+        case noDefaultOutputDevice
+        case tapFailed(OSStatus)
+        case deviceFailed(OSStatus)
+        case startFailed(OSStatus)
+    }
+
+    private let router: SampleRouter
+    private let lock = NSLock()
+    private var tap = AudioObjectID(kAudioObjectUnknown)
+    private var device = AudioObjectID(kAudioObjectUnknown)
+    private var procID: AudioDeviceIOProcID?
+    private var format: CMAudioFormatDescription?
+
+    init(router: SampleRouter) {
+        self.router = router
+    }
+
+    /// Starts tapping everything except `silencedBundleIDs`.
+    ///
+    /// ⚠️ A bundle ID the audio system doesn't know **cannot be silenced** — it has no process
+    /// object until it first plays — and the exclusion is then a no-op the caller must surface
+    /// (measured, docs/07). `unsilenceable` names those, so nothing has to guess later.
+    @discardableResult
+    func start(silencing silencedBundleIDs: [String]) throws -> [String] {
+        let objects = Self.processObjects()
+        let excluded = silencedBundleIDs.compactMap { objects[$0] }
+        let unsilenceable = silencedBundleIDs.filter { objects[$0] == nil }
+
+        guard let outputUID = Self.defaultOutputDeviceUID() else { throw TapError.noDefaultOutputDevice }
+
+        let description = CATapDescription(stereoGlobalTapButExcludeProcesses: excluded)
+        description.name = "screenrec system audio"
+        description.uuid = UUID()
+        description.isPrivate = true  // not offered to other apps as an input device
+        description.muteBehavior = .unmuted  // the user still hears what is being recorded
+
+        var newTap = AudioObjectID(kAudioObjectUnknown)
+        let tapStatus = AudioHardwareCreateProcessTap(description, &newTap)
+        guard tapStatus == noErr else { throw TapError.tapFailed(tapStatus) }
+
+        guard let tapUID = Self.stringProperty(newTap, kAudioTapPropertyUID),
+            let streamFormat = Self.tapFormat(newTap)
+        else {
+            AudioHardwareDestroyProcessTap(newTap)
+            throw TapError.tapFailed(kAudioHardwareUnspecifiedError)
+        }
+
+        // Private, so it never appears in Sound settings; drift-compensated against the output it
+        // shadows.
+        let aggregate: [String: Any] = [
+            kAudioAggregateDeviceNameKey: "screenrec system audio",
+            kAudioAggregateDeviceUIDKey: UUID().uuidString,
+            kAudioAggregateDeviceMainSubDeviceKey: outputUID,
+            kAudioAggregateDeviceIsPrivateKey: true,
+            kAudioAggregateDeviceIsStackedKey: false,
+            kAudioAggregateDeviceTapAutoStartKey: true,
+            kAudioAggregateDeviceSubDeviceListKey: [[kAudioSubDeviceUIDKey: outputUID]],
+            kAudioAggregateDeviceTapListKey: [[
+                kAudioSubTapDriftCompensationKey: true, kAudioSubTapUIDKey: tapUID,
+            ]],
+        ]
+        var newDevice = AudioObjectID(kAudioObjectUnknown)
+        let deviceStatus = AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &newDevice)
+        guard deviceStatus == noErr else {
+            AudioHardwareDestroyProcessTap(newTap)
+            throw TapError.deviceFailed(deviceStatus)
+        }
+
+        lock.lock()
+        tap = newTap
+        device = newDevice
+        format = streamFormat
+        lock.unlock()
+
+        var newProcID: AudioDeviceIOProcID?
+        let procStatus = AudioDeviceCreateIOProcIDWithBlock(&newProcID, newDevice, nil) {
+            [weak self] _, inputData, inputTime, _, _ in
+            self?.emit(inputData, at: inputTime)
+        }
+        guard procStatus == noErr, let newProcID else {
+            stop()
+            throw TapError.startFailed(procStatus)
+        }
+        let startStatus = AudioDeviceStart(newDevice, newProcID)
+        guard startStatus == noErr else {
+            AudioDeviceDestroyIOProcID(newDevice, newProcID)
+            stop()
+            throw TapError.startFailed(startStatus)
+        }
+        lock.lock()
+        procID = newProcID
+        lock.unlock()
+        return unsilenceable
+    }
+
+    func stop() {
+        lock.lock()
+        let (currentDevice, currentProc, currentTap) = (device, procID, tap)
+        device = AudioObjectID(kAudioObjectUnknown)
+        procID = nil
+        tap = AudioObjectID(kAudioObjectUnknown)
+        format = nil
+        lock.unlock()
+
+        if let currentProc, currentDevice != AudioObjectID(kAudioObjectUnknown) {
+            AudioDeviceStop(currentDevice, currentProc)
+            AudioDeviceDestroyIOProcID(currentDevice, currentProc)
+        }
+        if currentDevice != AudioObjectID(kAudioObjectUnknown) {
+            AudioHardwareDestroyAggregateDevice(currentDevice)
+        }
+        if currentTap != AudioObjectID(kAudioObjectUnknown) {
+            AudioHardwareDestroyProcessTap(currentTap)
+        }
+    }
+
+    /// One IOProc buffer, as the router's `.systemAudio`. On the device's real-time thread: it takes
+    /// the lock only to read the format, and does no work that can block.
+    private func emit(
+        _ inputData: UnsafePointer<AudioBufferList>, at inputTime: UnsafePointer<AudioTimeStamp>
+    ) {
+        lock.lock()
+        let currentFormat = format
+        lock.unlock()
+        guard let currentFormat,
+            let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(currentFormat)?.pointee
+        else { return }
+
+        let buffers = UnsafeMutableAudioBufferListPointer(
+            UnsafeMutablePointer(mutating: inputData))
+        guard let first = buffers.first, let data = first.mData, first.mDataByteSize > 0 else { return }
+        let byteLength = Int(first.mDataByteSize)
+        let frames = asbd.mBytesPerFrame > 0 ? byteLength / Int(asbd.mBytesPerFrame) : 0
+        guard frames > 0 else { return }
+
+        // The host clock, which is what SCK's own buffers are stamped on — so `TimestampRebaser`
+        // sees one timeline and needs no special case (02 §5).
+        let stamp = inputTime.pointee
+        let pts = (stamp.mFlags.contains(.hostTimeValid))
+            ? CMClockMakeHostTimeFromSystemUnits(stamp.mHostTime)
+            : CMClockGetTime(CMClockGetHostTimeClock())
+
+        guard let sample = PCMSampleBuffer.make(
+            format: currentFormat, sampleCount: frames, pts: pts, byteLength: byteLength,
+            fill: { destination in
+                destination.copyMemory(from: data, byteCount: byteLength)
+                return true
+            })
+        else { return }
+        router.route(sample, type: .systemAudio)
+    }
+
+    // MARK: - Core Audio lookups
+
+    /// Bundle ID → process object. ⚠️ The tap API takes **`AudioObjectID`s, not pids**, and only
+    /// processes the audio system already knows appear here at all.
+    private static func processObjects() -> [String: AudioObjectID] {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyProcessObjectList,
+            mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr, size > 0
+        else { return [:] }
+        var objects = [AudioObjectID](
+            repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &objects) == noErr
+        else { return [:] }
+
+        var byBundleID: [String: AudioObjectID] = [:]
+        for object in objects {
+            guard let bundleID = stringProperty(object, kAudioProcessPropertyBundleID),
+                !bundleID.isEmpty
+            else { continue }
+            byBundleID[bundleID] = object  // a later helper process must not displace the app
+        }
+        return byBundleID
+    }
+
+    private static func defaultOutputDeviceUID() -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var deviceID = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID) == noErr
+        else { return nil }
+        return stringProperty(deviceID, kAudioDevicePropertyDeviceUID)
+    }
+
+    private static func tapFormat(_ tap: AudioObjectID) -> CMAudioFormatDescription? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioTapPropertyFormat, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var asbd = AudioStreamBasicDescription()
+        var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        guard AudioObjectGetPropertyData(tap, &address, 0, nil, &size, &asbd) == noErr else {
+            return nil
+        }
+        var format: CMAudioFormatDescription?
+        guard CMAudioFormatDescriptionCreate(
+            allocator: kCFAllocatorDefault, asbd: &asbd, layoutSize: 0, layout: nil,
+            magicCookieSize: 0, magicCookie: nil, extensions: nil,
+            formatDescriptionOut: &format) == noErr
+        else { return nil }
+        return format
+    }
+
+    private static func stringProperty(
+        _ object: AudioObjectID, _ selector: AudioObjectPropertySelector
+    ) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var value: CFString? = nil
+        var size = UInt32(MemoryLayout<CFString?>.size)
+        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr else {
+            return nil
+        }
+        return value as String?
+    }
+}

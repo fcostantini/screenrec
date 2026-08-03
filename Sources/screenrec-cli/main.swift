@@ -71,6 +71,11 @@ func printUsage() {
       --exclude-app <bundle-id>  Record the whole screen except one app: its windows and its
                          audio are both left out (SCK has no audio-only exclusion). An app with
                          nothing on screen can't be excluded — the run says so and records it.
+      --mute-app <bundle-id>  Leave one app's AUDIO out while its windows stay in frame (M27),
+                         via a Core Audio process tap instead of SCK's audio. Repeatable. Works
+                         for an app with no window at all — but an app that has never played
+                         anything has no audio process object and can't be silenced; the run
+                         says so rather than pretending.
       --region <x,y,w,h> Record a rectangle of the main display (display points, top-left
                          origin). Off-screen/empty fails.
       --window <id>      Record one window and nothing else — the capture follows it as it
@@ -254,6 +259,8 @@ func describe(_ event: EngineEvent) -> String {
     case .microphoneAudible: return "microphoneAudible"
     case .microphoneDroppedAtStart: return "microphoneDroppedAtStart"
     case .excludedAppUnavailable(let bundleID): return "excludedAppUnavailable(\(bundleID))"
+    case .silencedAppUnavailable(let bundleID): return "silencedAppUnavailable(\(bundleID))"
+    case .audioTapUnavailable: return "audioTapUnavailable"
     case .recordingFileRestored: return "recordingFileRestored"
     case .stopped(let reason): return "stopped(\(describe(reason)))"
     case .finished(let url, let reason, let dropped):
@@ -374,6 +381,7 @@ struct RecordOptions {
     var preset: QualityPreset = .balanced
     var appBundleID: String?
     var excludedBundleID: String?
+    var silencedBundleIDs: [String] = []
     var region: CGRect?
     var windowID: CGWindowID?
     var micID: String?
@@ -419,6 +427,11 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
         case "--app":
             guard let value = iterator.next() else { die("--app needs a bundle id (see list-apps)") }
             options.appBundleID = value
+        case "--mute-app":
+            guard let value = iterator.next() else {
+                die("--mute-app needs a bundle id (see list-apps)")
+            }
+            options.silencedBundleIDs.append(value)
         case "--exclude-app":
             guard let value = iterator.next() else {
                 die("--exclude-app needs a bundle id (see list-apps)")
@@ -665,7 +678,7 @@ func performRecording(_ options: RecordOptions) async {
     let configuration = CaptureConfiguration(
         content: content, microphone: mic.selection,
         microphoneRecovery: mic.recovery, capturesSystemAudio: options.systemAudioEnabled,
-        quality: options.preset)
+        silencedAudioApps: options.silencedBundleIDs, quality: options.preset)
     let session: RecordingSession
     do {
         session = try RecordingSession(
@@ -726,6 +739,12 @@ func performRecording(_ options: RecordOptions) async {
             print("\n  ⚠️  microphone is silent — still recording (check that it isn't muted)")
         case .microphoneAudible:
             print("\n  🎤 microphone is picking up sound again")
+        case .silencedAppUnavailable(let bundleID):
+            // An unperformable exclusion is invisible unless something says it (M27-T2): the app
+            // has no audio process object, so everything it plays is in the take.
+            print("\n  ⚠️  \(bundleID) isn't playing anything — its audio wasn't left out")
+        case .audioTapUnavailable:
+            print("\n  ⚠️  couldn't silence that app — recording the whole mix")
         case .recordingFileRestored:
             print("\n  ⚠️  recording file was moved — moved it back (recording continues)")
         case .finished(let url, let reason, let dropped):

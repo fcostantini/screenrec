@@ -65,6 +65,12 @@ public struct CaptureConfiguration: Sendable, Equatable {
     /// Whether the stream captures what the Mac is playing (ADR-019). Off records screen + mic
     /// only; off with `.none` mic is a legitimate silent recording.
     public var capturesSystemAudio: Bool
+    /// Bundle IDs whose audio is kept out of the take while their windows stay in frame (M27).
+    /// Non-empty routes system audio through a Core Audio process tap instead of SCK's, because
+    /// SCK's exclusion is a *content* filter and takes the windows with it (docs/02 §1a-ii).
+    /// ⚠️ An app the audio system has never seen has no process object and **cannot be silenced**;
+    /// `CaptureEngine` reports those rather than pretending (docs/07). Naming is M27-T3's to settle.
+    public var silencedAudioApps: [String]
     public var frameRateCap: Int
     public var quality: QualityPreset
 
@@ -73,6 +79,7 @@ public struct CaptureConfiguration: Sendable, Equatable {
         microphone: MicrophoneSelection = .none,
         microphoneRecovery: MicrophoneRecovery = .sameDevice,
         capturesSystemAudio: Bool = true,
+        silencedAudioApps: [String] = [],
         frameRateCap: Int = 60,
         quality: QualityPreset = .balanced
     ) {
@@ -80,6 +87,7 @@ public struct CaptureConfiguration: Sendable, Equatable {
         self.microphone = microphone
         self.microphoneRecovery = microphoneRecovery
         self.capturesSystemAudio = capturesSystemAudio
+        self.silencedAudioApps = silencedAudioApps
         self.frameRateCap = frameRateCap
         self.quality = quality
     }

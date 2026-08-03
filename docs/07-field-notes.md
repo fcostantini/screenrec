@@ -7,6 +7,15 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-03 (M27-T2): **Switching to the tap changes what is *in* the recording, not just what is
+  left out.** The exclusion works as designed — QuickTime silenced by bundle ID fell from **−18.5 to
+  −102.4 dBFS** while the rest of the mix held at −18.1. But the control run exposed the other half:
+  **SCK's audio path never carried the windowless `afplay` at all** (−97.7 dBFS, exactly docs/02
+  §1a-ii), while **the tap captures it at −18.1**. So turning an exclusion on can make *more* sound
+  appear in a take, not less — audio from windowless processes that SCK silently omits. ⚠️ Worth
+  saying out loud in T3's copy: "leave this app out" also means "capture everything else, including
+  things you never used to get".
+
 - 2026-08-03 (M27-T1, the spike the milestone was gated on): **A Core Audio process tap does what
   SCK cannot — measured, all five questions.**
   ✅ **① It excludes a *windowless* process, which is the whole point.** Two `afplay` tones (440 Hz

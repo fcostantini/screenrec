@@ -44,6 +44,13 @@ public enum EngineEvent: Sendable, Equatable {
     /// The app to leave out (M21-T4) had nothing on screen at start, so it could not be excluded:
     /// the recording runs, and everything it plays is in the file. Degraded, not failed (ADR-007).
     case excludedAppUnavailable(bundleID: String)
+    /// The app to silence (M27-T2) has no Core Audio process object — it has never played — so the
+    /// tap cannot exclude it and everything it plays is in the file. The audio twin of
+    /// `excludedAppUnavailable`: degraded, not failed (ADR-007), and said rather than left silent,
+    /// because an unperformable exclusion is otherwise invisible (docs/07).
+    case silencedAppUnavailable(bundleID: String)
+    /// The process tap could not be started, so system audio is the whole mix (M27-T2).
+    case audioTapUnavailable
     /// The in-progress file was moved (Trash included) and the sentinel renamed it back;
     /// recording continues. Deletion is not an event — it fails the session.
     case recordingFileRestored

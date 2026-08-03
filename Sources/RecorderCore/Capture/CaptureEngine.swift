@@ -37,6 +37,9 @@ public actor CaptureEngine {
     private let sleepGuard = SleepGuard()
     private var stream: SCStream?
     private var handler: StreamHandler?
+    /// System audio through a process tap, when an app is being silenced (M27-T2). Nil otherwise —
+    /// with nothing silenced, SCK's own audio path runs exactly as it always has.
+    private var systemAudioTap: SystemAudioTap?
 
     /// Emits `.microphoneLost` if a selected mic stops delivering (docs/02 §4, ADR-012); nil
     /// when no mic was selected.
@@ -187,6 +190,7 @@ public actor CaptureEngine {
             self.stream = stream
             self.handler = handler
             state = .running
+            startSystemAudioTapIfNeeded()
             sleepGuard.begin(reason: purpose.assertionReason)
             startWatchdogs()
             if let owningApp = scope.owningApp {
@@ -208,6 +212,8 @@ public actor CaptureEngine {
         case .starting:
             requestedStopReason = reason
         case .running:
+            systemAudioTap?.stop()
+            systemAudioTap = nil
             // Disarm before teardown: `stopCapture` halts delivery and can take seconds
             // (Bluetooth), so watchdogs still polling across it would false-fire on a
             // perfectly complete recording.
@@ -243,6 +249,24 @@ public actor CaptureEngine {
         sleepGuard.end()  // idempotent; failToStart precedes begin(), kept for symmetry
         continuation.yield(.failed(message: message))
         continuation.finish()
+    }
+
+    /// System audio through a process tap instead of SCK's, so a silenced app keeps its windows
+    /// (M27-T2). Only when something is actually silenced — otherwise the SCK path is untouched.
+    private func startSystemAudioTapIfNeeded() {
+        guard configuration.capturesSystemAudio, !configuration.silencedAudioApps.isEmpty else { return }
+        let tap = SystemAudioTap(router: router)
+        do {
+            let unsilenceable = try tap.start(silencing: configuration.silencedAudioApps)
+            systemAudioTap = tap
+            // An app the audio system has never seen cannot be excluded, and the exclusion is
+            // silently a no-op — so say it rather than let the take lie (docs/07).
+            for bundleID in unsilenceable {
+                continuation.yield(.silencedAppUnavailable(bundleID: bundleID))
+            }
+        } catch {
+            continuation.yield(.audioTapUnavailable)
+        }
     }
 
     private func startWatchdogs() {
@@ -425,7 +449,8 @@ public actor CaptureEngine {
         var microphoneID: String?
         if case .device(let id) = configuration.microphone { microphoneID = id }
         config.applyAudioCapture(
-            systemAudio: configuration.capturesSystemAudio, microphoneID: microphoneID)
+            systemAudio: configuration.capturesSystemAudio && configuration.silencedAudioApps.isEmpty,
+            microphoneID: microphoneID)
         return config
     }
 

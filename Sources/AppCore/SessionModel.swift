@@ -173,6 +173,12 @@ public final class SessionModel {
             // Degraded, not failed: the take runs, and the menu says what didn't happen. The
             // notification above carries the name; this row outlives nothing (M21-T4).
             reportFailure?("The app to leave out wasn't on screen — nothing was excluded.", false)
+        case .silencedAppUnavailable:
+            // The audio twin (M27-T2): an app that has never played has no process object, so the
+            // exclusion couldn't be performed and its sound is in the take.
+            reportFailure?("That app wasn't playing anything — its audio wasn't left out.", false)
+        case .audioTapUnavailable:
+            reportFailure?("Couldn't silence that app — the recording has the whole mix.", false)
         case .microphoneDroppedAtStart:
             // The wanted mic never started (M13-T4); the recording continues without it. Say so in
             // the menu, or the active-mic-name row would name a mic that isn't in the take.

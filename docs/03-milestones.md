@@ -2208,7 +2208,7 @@ shape. The route is `AudioHardwareCreateProcessTap` + `CATapDescription(excludeP
       the excluded process quits mid-take, or was never running? What does it cost against ADR-019's
       current path? **Verify:** a spike and a field note — **every task below is shaped by this, so
       none of them should be detailed further until it lands.**
-- [ ] M27-T2 **The tap as a second system-audio source.** **Seams:** `SampleRouter` (the one place
+- [x] M27-T2 **The tap as a second system-audio source.** **Seams:** `SampleRouter` (the one place
       consumers attach), `TimestampRebaser` (a tap has its own clock — this is the alignment risk),
       `CaptureConfiguration`. **Rulings:** whether the tap *replaces* SCK's audio whenever an
       exclusion is set or runs beside it; and what a mid-take tap failure does — ADR-012's shape
@@ -2228,6 +2228,19 @@ shape. The route is `AudioHardwareCreateProcessTap` + `CATapDescription(excludeP
       ⚠️ **The 512-frame callback (~10.7 ms) is not SCK's 960-frame, 20 ms cadence.** Same rate, twice
       the callback rate — check the writer's pacing assumptions rather than assuming they carry.
       **Cost is not a consideration:** ~0.4% of one core, 27.6 MB.
+      ✅ **Done 2026-08-03.** `SystemAudioTap` (RecorderCore/Capture) turns the tap into
+      `CMSampleBuffer`s through `PCMSampleBuffer` — its third caller, not a new mechanism — stamped on
+      the **host clock** so `TimestampRebaser` needs no special case, and routed as `.systemAudio`.
+      **No consumer changed**: the writer, the replay ring and the meter never learn the difference.
+      `screenrec-cli record --mute-app <bundle-id>` is the verify surface. **681 tests.**
+      **Measured:** silencing QuickTime by bundle ID dropped its tone **−18.5 → −102.4 dBFS** while
+      the rest of the mix held at −18.1; the no-exclusion control kept both paths intact and an
+      ordinary take still lands **3 tracks** (hvc1 + 2×AAC), because nothing silenced means the SCK
+      path is untouched. 🔴 **An unperformable exclusion is now said, not swallowed** — a bundle ID
+      the audio system has never seen yields `silencedAppUnavailable`, the audio twin of M21-T4's
+      `excludedAppUnavailable`, and the run prints it. ⚠️ **Unplanned finding, and T3's copy has to
+      carry it:** the tap *also captures windowless processes SCK omits entirely*, so an exclusion
+      can make more sound appear in a take, not less (docs/07).
 - [ ] M27-T3 **The UI, and the vocabulary.** Two ideas stop sharing one row: `Everything Except`
       keeps meaning *neither seen nor heard*; the new list means *heard no more*, and it can offer
       apps with no window — which the existing one structurally cannot. **Rulings:** what it is

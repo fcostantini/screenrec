@@ -90,6 +90,21 @@ public enum RecordingNotifications {
                     + "Anything it plays will be in this recording.",
                 fileURL: nil)
 
+        case .silencedAppUnavailable(let bundleID):
+            // The audio twin of the case above (M27-T2): no process object means the tap cannot
+            // exclude it, and the exclusion is otherwise silently a no-op (docs/07).
+            return RecordingNotification(
+                title: "Recording started · nothing silenced",
+                body: "\(bundleID) isn't playing any audio, so it couldn't be left out. "
+                    + "Anything it plays will be in the recording.",
+                fileURL: nil)
+
+        case .audioTapUnavailable:
+            return RecordingNotification(
+                title: "Recording started · nothing silenced",
+                body: "Couldn't silence that app's audio, so the recording has the whole mix.",
+                fileURL: nil)
+
         case .recordingFileRestored:
             // Same not-an-ending family as microphoneLost: lead with "still recording".
             return RecordingNotification(
