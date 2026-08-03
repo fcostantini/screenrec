@@ -2300,7 +2300,7 @@ shape. The route is `AudioHardwareCreateProcessTap` + `CATapDescription(excludeP
       without revoking Franco's own TCC grants. The decision is unit-tested both ways and the
       plumbing matches its three sibling events.
 
-**Gate G27**: a **windowless** app's audio is absent from a take while the rest of the system is
+**Gate G27** — ✅ **PASSED 2026-08-03** (evidence in STATUS.md's gate table; two caveats recorded there, not waived). The criterion as filed: a **windowless** app's audio is absent from a take while the rest of the system is
 present. ⚠️ Verified with two *windowed* apps as the control, **never `afplay`** — G21 nearly
 recorded a false negative that way, because a bare windowless process never appears in the captured
 track at all (docs/02 §1a-ii).
