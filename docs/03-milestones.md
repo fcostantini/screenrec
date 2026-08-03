@@ -2214,13 +2214,47 @@ shape. The route is `AudioHardwareCreateProcessTap` + `CATapDescription(excludeP
       exclusion is set or runs beside it; and what a mid-take tap failure does — ADR-012's shape
       (keep recording, say so) is the precedent, and a silent drop to no audio is the outcome to
       design against.
+      **Re-specified 2026-08-03 against T1's measurements** (the milestone deferred this until the
+      spike landed):
+      ✅ **Narrower than filed.** The tap presents **48 kHz, 2 ch, 32-bit float — byte-identical to
+      SCK's own system audio** — so no converter, no resampler, and no format negotiation. Tap and
+      SCK **run together without conflict**, measured. What survives of the "alignment risk" is
+      **epoch** alignment only: the tap counts in its own `mSampleTime`, so it needs the same
+      `TimestampRebaser` treatment SCK's sources get, not new machinery.
+      🔴 **The ruling now has an obvious answer: the tap REPLACES SCK's audio when an exclusion is
+      set.** Running both would double every sound in the file, since the tap is a global mixdown of
+      the same output the SCK tap already carries. So the choice is which single system-audio source
+      is attached, decided at `CaptureConfiguration` time.
+      ⚠️ **The 512-frame callback (~10.7 ms) is not SCK's 960-frame, 20 ms cadence.** Same rate, twice
+      the callback rate — check the writer's pacing assumptions rather than assuming they carry.
+      **Cost is not a consideration:** ~0.4% of one core, 27.6 MB.
 - [ ] M27-T3 **The UI, and the vocabulary.** Two ideas stop sharing one row: `Everything Except`
       keeps meaning *neither seen nor heard*; the new list means *heard no more*, and it can offer
       apps with no window — which the existing one structurally cannot. **Rulings:** what it is
       called; whether both can be set at once, and on the same app.
+      **Re-specified 2026-08-03 — wider than filed, and the honesty problem is new.**
+      🔴 **The list is not "running apps".** It is
+      `kAudioHardwarePropertyProcessObjectList` — *processes the audio system knows*. An app that has
+      never played audio **has no process object, and excluding it is a silent no-op**: its audio
+      lands in the take in full, with nothing saying so (measured, docs/07). A picker built from
+      `NSWorkspace`'s running applications would therefore **offer exclusions it cannot perform**.
+      **New ruling required:** what the UI does about an app the audio system doesn't know — omit it,
+      show it disabled with a reason, or offer it and warn when it turns out to be unperformable.
+      ⚠️ **And the list is not stable:** a process object appears when an app first plays and can
+      disappear later, so the pick must survive its object vanishing (bundle ID is the durable key,
+      the `AudioObjectID` is not — M17's "a reused window id is refused" is the precedent).
 - [ ] M27-T4 **The failure modes are honest.** Tap permission refused, the aggregate device
       disappearing, the excluded process quitting mid-take. **Verify:** each one observed, each one
       leaving a playable file and a true sentence.
+      **Re-specified 2026-08-03.** 🔴 **"Permission refused" is not a failure code — it is silence.**
+      An ungranted tap returns `OSStatus 0`, a valid UID and a full stream of **zeros** (measured).
+      **So the health check must measure level, not return values**, or a permission change ships as
+      an audio-less recording — the shape of failure this project has twice let through.
+      ✅ **One mode is already measured and benign:** the excluded process quitting mid-take is
+      graceful (468 callbacks over 4.99 s, uninterrupted, other audio unaffected) — no handling
+      needed beyond not asserting the object still exists.
+      ⚠️ **Still unmeasured:** the aggregate device disappearing (default output device changes, or
+      AirPods disconnect mid-take — the M8 shape, and this hardware does it routinely).
 
 **Gate G27**: a **windowless** app's audio is absent from a take while the rest of the system is
 present. ⚠️ Verified with two *windowed* apps as the control, **never `afplay`** — G21 nearly

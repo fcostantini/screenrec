@@ -5,6 +5,250 @@ the record of how the work went, not a description of how things are. For curren
 `STATUS.md`; for the per-task specification and tick boxes read `docs/03-milestones.md`; for measured
 platform behaviour read `docs/07-field-notes.md`.
 
+## Rotated from STATUS.md 2026-08-03 — M25 (Swift 6) and M26 (crop on export), with G25
+
+- **✅ M26-T3 CALIBRATED ON REAL BARS (2026-08-03) — and the real sample broke the detector twice.
+  M26's four tasks are in; G26 is next.** Franco put a video fullscreen and the CLI recorded 10 s
+  headlessly (`Recording 2026-08-03 at 10.22.08.mov`, ~/Movies) — a genuine letterbox, because a 16:9
+  video on this 16:10 display bars itself. **681 tests.**
+  🔴 **What only a real capture could show** (docs/07): ① **a watermark sits inside the bottom bar** —
+  the row's spread is **190** while just **1.6%** of its pixels move, so a min/max flatness test loses
+  the whole edge; the line test is now the fraction within ±tolerance of the line's **median** (bars
+  ≥ 98%, content ≤ 60%, threshold 95%). ② **Real recordings carry 2–10 px uniform edge runs** that
+  are not bars, so a **16 px minimum** now stands between the detector and shaving every ordinary
+  take. ⚠️ **The old negative fixture was invalid:** `testsrc2` is constant-colour vertical bands, so
+  its columns *are* pillars — fixtures are now real content padded with bars.
+  ✅ **Exact on the real thing:** true pillars **513/512** by an independent column scan against the
+  detector's **512/512**, top bar **128** against the 128.5 the aspect predicts, and the cropped
+  frame renders edge-to-edge with the black gone. **Four real negatives silent** (two screen takes,
+  two music-video clips).
+  ⚠️ **One honest imprecision:** on a fixture whose *content* has a uniform top edge the run
+  continues **3 px** into it. Those rows are, by any local measure, indistinguishable from bar; not
+  tuned away, because tuning to a fixture is what produced the wrong tolerance the first time.
+
+
+- **✅ M26-T1 SHIPPED (2026-07-31) — the exporter takes a source rect. Next: M26-T2 (crop in the
+  Trim window).** `--crop x,y,w,h` on `screenrec-cli export --to-mp4`, and a `crop:` parameter beside
+  `range:` on `Exporter.exportToMP4`. **664 tests.** Plan artifact:
+  `claude.ai/code/artifact/dd785060-1f81-488a-a763-48bf10ae9bbd`.
+  ✅ **RULED (Franco, 2026-07-31): source pixels, not a fraction; the Size cap measures the cropped
+  rect.** So a 3600×2200 crop capped at 1280 lands at **1280×782** — the crop's aspect, not the
+  source's — and "≈46 MB per minute" stays true because the rate model sees what is really encoded.
+  🔴 **The seam docs/03 named does not exist.** The MP4 path never had an `AVVideoComposition`: it
+  declares a smaller size on the writer input and the *encoder* scales. The composition it meant is
+  `VideoFrameReader`'s, one file over. **Measured before implementing** (docs/07): `420v` accepted so
+  no BGRA round-trip, **one frame per source frame** so VFR survives, the transform's origin is
+  **top-left**, crop and fit ride one transform. Cost: 2 s of 4112×2570 in 0.30–0.40 s against 0.91 s
+  for the uncropped export of the same 2 s.
+  ✅ **An uncropped export runs exactly the code it ran yesterday** — the composition branch is
+  reached only when a crop is set, the discipline `range` already uses.
+  ✅ **Three smaller calls, decided rather than drifted into:** an out-of-bounds crop is **refused,
+  not clamped**; crop dimensions round **down** to even, so the fit never upscales; naming is
+  unchanged, and a " cropped" suffix is T2's to decide.
+  ✅ **The content leg has a negative control:** the exported pixels differ from the same rect cut out
+  of a source frame by **0.36%** (tolerance 6), while the bottom-left reading differs by **29.86% at
+  delta 255**. Without that control a wrong-but-plausible crop passes.
+  🔴 **`loadTracks(withMediaType:)` segfaults from `RecorderCoreTests`** — deterministic, on any file,
+  with no export code involved, while the same call from production is fine. It surfaces as
+  `Exited with unexpected signal code 11` naming no test. Use `load(.tracks)` there (docs/07).
+  ⚠️ **The VERSION bump is still pending** — 1.13.0 rides with T2, the first half a user of the app
+  can reach, and M25's deferred patch rides in that cut.
+
+
+- **✅ M26-T3 SHIPPED (2026-08-03) — the bars are found without being told. M26's four tasks are all
+  in; G26 is next, with one criterion it cannot yet meet.** `Find bars` in the Trim window and
+  `export --to-mp4 --crop detect` in the CLI. **679 tests.** Plan artifact:
+  `claude.ai/code/artifact/7e8be23f-7ba6-4f04-9fcf-13948ecfe162`.
+  ⚠️ **Built against a synthetic letterbox (Franco's call) — there is still no real sample.**
+  🔴 **The premise was wrong twice, and measurement caught both.** ① **"luma 62–66" would have missed
+  its own fixture:** bars encoded at 64 decode to **73.0**, so the detector never tests the level —
+  only flatness, edge-anchoring and row-to-row agreement. ② **The tolerance is 24, not the 16 my own
+  plan proposed:** at 16 the five sampled frames disagree by up to 4 px and the conservative combine
+  inherits the worst; at 24 every frame lands exactly, and no negative fires below 32.
+  ✅ **Verified end to end on the release binary:** the fixture detected **1600 × 900 at 0,150 — the
+  true rect, to the pixel** — while a synthetic no-bars clip and **two of Franco's real recordings**
+  all reported no bars. The negative control is real even though the positive one isn't.
+  ✅ **Offered, not applied:** the button fills in the crop you already have, and says
+  `No bars found.` rather than appearing to do nothing.
+  🔴 **Not claimed, and it blocks G26:** that 24 holds for bars off a *real* stream.
+
+
+- **✅ M26-T4 SHIPPED (2026-07-31) — a precise trim can crop too.** From Franco's question, *"why
+  can't we trim and crop at the same time?"* The honest answer had two halves: **`Export & Copy`
+  already does both** in one pass, and a **lossless** trim never can — it copies encoded frames and a
+  crop must decode them. **Precise** mode already re-encodes through a composition, so a crop rides
+  it and produces what the MP4 export can't: **the source's codec and scale, both audio tracks
+  separate**. **673 tests.** Verified headlessly through the CLI (`trim --precise --crop`), unlike T2.
+  🔴 **The measurement that shaped it, and it is a trap:** an `AVAssetExportSession` **honours** the
+  composition's `frameDuration`, where the reader path (T1) ignores it. Hand-building one resampled a
+  19.4 fps capture to a constant 60 and cost **2.9× the bytes**. Derive from
+  `videoComposition(withPropertiesOf:)` — it carries `sourceTrackIDForFrameTiming` — then override
+  only `renderSize`/`instructions` (docs/07).
+  ✅ **One transform now serves both paths:** `CropComposition`, extracted from T1's exporter.
+  ⚠️ **No plan artifact for this one** — Franco chose it from an option whose preview showed the
+  states and the output, and the shape didn't move once measured.
+
+
+- **✅ M26-T2's live leg PASSED (2026-07-31, Franco at the keyboard).** He cropped a 4112 × 2570 take
+  in the Trim window and exported: `Recording 2026-07-28 at 17.19.30 trimmed.mp4`, **`avc1`
+  1920 × 812**, 129.12 s, 56 MB, one export receipt in the menu. **The crop reached the encoder and
+  the cap measured it** — an uncropped export of that take is 1920 × 1200, so the height followed the
+  *crop's* aspect (2.36), not the source's (1.60). The source `.mov` still probes 4112 × 2570 /
+  129.11 s. ✅ **And the caption matched, confirmed by Franco** — which is the criterion the task was
+  really filed on: what the window promises and what `probe` reads are the same numbers.
+  ✅ **A second take, 18:20, proves the pair in one pass:** `… trimmed 2.mp4`, **57.21 s of a 129.11 s
+  source at `avc1` 1920 × 1030** — a range *and* a crop in a single encode, no intermediate file,
+  one mixed AAC track, `public.mpeg-4`, `ftyp/moov/mdat` faststart, name collision-resolved off the
+  17:55 export. No `.partial` or `.sb-` left behind; the source still probes 4112 × 2570.
+
+
+- **🟡 M26-T2 BUILT (2026-07-31), awaiting Franco's live leg — then M26-T3.** The Trim window can
+  draw a crop: tick **Crop**, drag on the preview, read `1600 × 1000 px at 400,300`, `Reset` clears
+  it. **671 tests** (+6 `CropGeometry`, +1 wiring). `VERSION` → **1.13.0**, carrying M25's deferred
+  patch. Dev loop green; **not yet deployed** — the running app is still 1.12.0.
+  ✅ **Rulings, all as recommended in the artifact** (`claude.ai/code/artifact/1f4eb109-09a3-4cac-82b5-81f30da6a844`):
+  drag only, no numeric fields; **no persistence** between opens; the caption quotes the **cropped**
+  size live; **`Trim & Save` disabled while a crop is set**, saying why — a trim has no crop, so it
+  could only ignore one.
+  ⚠️ **Crop is a mode, not an always-on overlay** — `AVPlayerView`'s inline transport controls sit
+  underneath one. Off by default, so the window is unchanged until asked.
+  ✅ **The untestable part was made small:** `CropGeometry` (AppCore) is pure — drag rect in a
+  letterboxed preview → source pixels — with a round-trip test and a drag-in-any-direction test.
+  The crop is held in **source pixels** and converted back for drawing, never the reverse.
+  ⚠️ **`PlayerObservers` gained `@unchecked Sendable`** with its confinement stated. The diagnostic
+  was always true of that closure (a non-`Sendable` class captured in a `@Sendable` one) and my diff
+  surfaced it; it is main-queue confined, which is what `startPlayheadObserver` already relies on.
+  🔴 **Still Franco's:** deploy + drag + ⌘↩, then check the caption's size against `probe`.
+
+
+- **🗓️ M26-T2 planned (2026-07-31) — four rulings, all taken.** Artifact:
+  `claude.ai/code/artifact/1f4eb109-09a3-4cac-82b5-81f30da6a844`, with a real capture of today's Trim
+  window (preview blanked — it held Franco's own recording) beside the proposal. **Recommended:** drag
+  to draw with a live read-out and Reset, no numeric fields; the crop does **not** persist between
+  opens; the caption quotes the **cropped** size live; and **`Trim & Save` goes quiet while a crop is
+  set** and says why — a trim is `AVAssetExportSession`, it has no crop, and silently ignoring one is
+  the lie this project keeps refusing. ⚠️ **Crop drawing has to be a mode:** `AVPlayerView`'s inline
+  controls sit under any always-on overlay, so the toggle is off by default and today's window is
+  unchanged until it's asked for.
+  🔴 **The drag is a human leg** — synthetic input can't activate an `LSUIElement` app, and its
+  windows sit behind everything (docs/07). ⚠️ **The Trim window I opened for the screenshot is still
+  open** behind Discord/Slack — ⌘W it. A click I aimed at its close button landed in Discord.
+
+
+- **✅ G25 PASSED (2026-07-31) — M25 complete. Swift 6 is on for everything that ships.** Evidence
+  in the gate table. ✅ **RULED (Franco): no v1.12.1** — M25 has zero user-facing change, so there is
+  nothing to download; the bump rides into **M26's cut**. `VERSION` stays **1.12.0**. Recorded in
+  docs/03 too, so a later session doesn't "correct" it with a stray tag.
+  **Next: Franco's call.** M26 (crop on export) is the natural one — it has a named user, a measured
+  pain, and its ruling is already taken; M27 (Core Audio taps) and M28 (`NSMenu`) are the other two
+  encoded milestones.
+
+
+- **✅ M25-T3 SHIPPED (2026-07-31) — every shipping target compiles in Swift 6. M25 done; G25 next.**
+  `RecorderCore`, `AppCore`, `ScreenRecApp`, `screenrec-cli` and `AppCoreTests` are all v6. **660
+  tests**, release build and signed bundle green. Plan artifact:
+  `claude.ai/code/artifact/884dad3b-36bf-4197-9ca0-27cd03c8fa4d`.
+  ✅ **34 sites, and ~30 were one sentence:** these AppKit types were always main-actor-only and
+  nothing said so. `@MainActor` on `RegionSelectionController` (19 sites alone), `ShareActions`,
+  `QuickLookController`, `Relaunch`, `HotkeyCenter`, the meter's ticker. ⚠️ Unlike T1's
+  `@preconcurrency`, this **adds** checking — a future background-thread caller now fails to compile.
+  **No ripple into AppCore**, which was the risk the plan flagged.
+  ✅ **The stragglers took real answers, two by reusing what exists:** `TrimView` now calls
+  `MediaFile.dimensions` instead of loading tracks itself (deleting duplicated code); `OnboardingView`
+  crosses the `Sendable` status enum, not `UNNotificationSettings`; QuickLook crosses only the `URL`;
+  `CountInOverlay` uses `MainActor.assumeIsolated`, a pattern that file already had.
+  🔴 **RULED (Franco): `RecorderCoreTests` stays at v5, documented in `Package.swift`.** Its 8 sites
+  include three `DispatchGroup.wait(timeout:)` calls M15-T1 added **so a drain that never leaves
+  fails instead of hanging**; Swift 6 bans blocking waits in async contexts. Against this project's
+  two prior vacuous-test incidents, a uniform setting wasn't worth the risk.
+  ⚠️ **G25's criterion was amended before being run**, not quietly passed: it asked for zero `.v5`.
+  The amendment and its reason are in docs/03.
+  ✅ **Live on the v6 build:** menu Ready and armed, the **region overlay opened full-screen and
+  cancelled on Esc** (19 of the 34 sites, the least-exercised path), a 0:06 recording with its
+  receipt row, and a menu export probing `avc1` 1920×1200 + AAC. Test files cleaned up; replay still
+  armed. ⚠️ One screenshot of the overlay caught Franco's terminal content through the transparent
+  region and was **deleted**, not kept as evidence.
+
+
+- **✅ M25-T2 SHIPPED (2026-07-31) — `AppCore` compiles in Swift 6. Next: M25-T3.**
+  Five explicit-`self` lines in the replay-save closure, plus two `nonisolated` keywords on a test
+  fixture. **660 tests.** Verified live where it counts: a real replay save rendered
+  **`Replay saved · 27 s`** — that row *is* the closure that changed.
+  🔴 **`AppCore` cannot flip without `AppCoreTests`.** v6 mangles `@MainActor` into closure-property
+  types, so the v5 test target failed to **link** — `symbol(s) not found` for `copyToPasteboard`,
+  `notify`, `reportFailure`, `notifier`. ⚠️ It surfaces as a bare `error: fatalError` from
+  `swift test`, which reads like a crash and isn't one (docs/07).
+  🔴 **That flip breaks `@Test(arguments:)` on a `@MainActor` suite** — five declarations — because
+  the macro evaluates the argument closure outside the actor. Fixed with `nonisolated` on the shared
+  `endReasons` fixture. ✅ **RULED (Franco): the test edit is fine** — an isolation keyword, no
+  assertion or fixture value touched. ⚠️ But **M25-T1's "no test edited" property does not carry
+  forward**, by necessity rather than choice.
+  ⚠️ **The cluster was a double `[weak self]`** — outer closure *and* inner `Task`. Both kept (the
+  inner one stops the Task extending `AppState`'s lifetime across the hop) and made explicit; a
+  future reader should not "simplify" it away.
+  ⚠️ **Franco's replay disarmed itself during one redeploy and I re-armed it.** Not the Swift 6
+  build: a clean quit+relaunch of the same binary kept it armed. It is the **known transient
+  self-disarm** already recorded under G6 (bundle replaced mid-quit on a busy machine).
+
+
+- **✅ M25-T1 SHIPPED (2026-07-31) — `RecorderCore` compiles in Swift 6. Next: M25-T2.**
+  **660 tests, and no test file was edited** — that was the whole claim of a task whose point is
+  that nothing changes except who checks the rules. Real capture (3 tracks, hvc1 4112×2570), ranged
+  export and GIF all re-run, since three of the fixes are on the export path. Plan artifact:
+  `claude.ai/code/artifact/c1efcd9e-316d-4867-b1a6-d4ed4393078a`.
+  🔴 **The measured "7 sites" was a floor.** Fixing the first batch revealed **5 more** — 1 in
+  `MicrophoneRescue`, 4 `SCStream` sites in `CaptureEngine` — for **12 sites, 8 edits**. The
+  compiler stops after the first batch, so each fix unblocks the next wave. **T2's "5" and T3's
+  "unmeasured" are floors too**, and both now say so in docs/03.
+  🔴 **My plan was wrong about the mechanism, and the fix reversed twice.** I said I would not reach
+  for `nonisolated(unsafe)` in `CaptureEngine`; it turned out **not to work there at all** — that
+  diagnostic is region analysis on the *call's result*, not the binding's isolation. A narrow
+  `@unchecked Sendable` box worked for `forCapture()`, then four `SCStream` sites appeared behind
+  it. The real finding: **SCK carries no `Sendable` annotations at all**, so this was never one
+  value needing an assertion.
+  ✅ **RULED (Franco, 2026-07-31): `@preconcurrency import ScreenCaptureKit` in `CaptureEngine`** —
+  one true statement about an un-annotated SDK, rather than hand-written hatches scattered through
+  the capture path. ⚠️ It is file-wide, so future SCK-originated `Sendable` diagnostics there are
+  warnings; **our own types stay fully checked**, which is the milestone's whole value.
+  ✅ **The plan's per-site calls that survived contact:** `Exporter:411` was a real over-capture (the
+  drain closure held the whole `TranscodePlan` for three values) and got a real fix;
+  `ByteCountFormatter` is built per call rather than asserted safe — its thread-safety is
+  undocumented, and the pinned strings (`"1,8 GB"`, `"900 MB"`) stayed green; `AVAudioFormat` took
+  `nonisolated(unsafe)` because its immutability is real. `MicrophoneRescue` took **`sending`** —
+  a genuine ownership hand-off, and the one fix that needed no concession at all.
+
+
+- **🗓️ M25–M28 ENCODED (2026-07-31, Franco's call) — nothing started.** Four of the six parked
+  items are now milestones in docs/03, with tasks, seams, rulings and gates: **M25 Swift 6 language
+  mode** (debt, PATCH), **M26 Crop on export** (MINOR), **M27 Audio-only per-app exclusion via Core
+  Audio process taps** (MINOR), **M28 an `NSMenu`-backed status item** (MINOR).
+  ✅ **RULED: crop on export is in scope (Franco, 2026-07-31)** — the one parked item marked
+  🔴 *needs a ruling*. **ADR-015 is amended, not contradicted** (docs/05): crop goes in on the
+  mechanism — the export path already scales every frame, so a source rect is an argument to work
+  that happens anyway — and the render/composite/animate line does **not** move.
+  ⚠️ **Proposed order, his to change: M25 → M26 → M27 → M28.** Swift 6 first because M27 puts a
+  second audio clock into `SampleRouter` and the compiler should be checking docs/01's rules before
+  that lands — M22-before-M21's logic. M28 last: largest, and it buys polish rather than capability.
+  ✅ **Measured today, so the milestones quote facts:** Swift 6 is **7 distinct sites in
+  `RecorderCore`** (named in M25-T1) and **5 in `AppCore`**, all one cluster; `ScreenRecApp`, the CLI
+  and both test targets are **unmeasured**, because the build stops at the first failing target.
+  ⚠️ The 2026-07-30 count of "7" still holds by luck — its *composition* changed (M24-T4 added one,
+  `MicrophoneRescue` lost one).
+  🔴 **Deferred, and recorded as deferred:** multi-display region capture (no second monitor) and
+  cursor emphasis / auto-zoom (not wanted now). Both stay in docs/03's parked section with their
+  triggers — the auto-zoom entry says out loud that taking it up is a second product identity, not a
+  feature.
+
+
+- **M24's per-task detail and G24's run are in `docs/history/2026-07-sessions.md`** (rotated 2026-07-31). G24's evidence stays in the gate table below.
+
+
+- **M23's per-task detail and the 2026-07-30 review are in `docs/history/2026-07-sessions.md`** (rotated 2026-07-31, when "Now" reached 313 lines). G23's evidence stays in the gate table below.
+
+
+- **Per-task session logs for M15–M22 live in `docs/history/2026-07-sessions.md`.** This file keeps
+  current state, live decisions, the human-only list, and the gate table.
+
 ## Rotated from STATUS.md 2026-07-31 (later) — M24 (finish the share loop) and G24
 
 - **✅ G24 PASSED (2026-07-31) — M24 is complete, cut as v1.12.0.** Evidence in the gate table.
