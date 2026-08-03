@@ -7,6 +7,22 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-03 (M27-T4, closing G27's caveats): **Both device-change directions survive, and the
+  reason is that a global tap is device-independent.** AirPods **connected** mid-take: audio
+  unbroken across all 30 s (−19/−20 dBFS per 2 s window, no dropout at the switch). **Disconnected**
+  mid-take: a **~4 s gap** at 12–16 s, then audio resumes at level for the remaining 14 s — that is
+  Spotify pausing and resuming, not the tap dying, and the audio *track* stayed continuous
+  (30.00 s of a 30.04 s take). ⚠️ **The expectation was wrong:** the aggregate device is pinned to a
+  device UID at creation and nothing rebuilds it, so this looked certain to break. It doesn't —
+  `stereoGlobalTapButExcludeProcesses` taps process **output**, not a device, and keeps delivering
+  when the system moves to different hardware. The pinning is not load-bearing for capture.
+  ✅ The 4 s gap also exercised `TapSilenceWatchdog` in the wild: under its 5 s run, and the
+  cross-check would have found nothing playing anyway. It stayed quiet, which is the point.
+  🔴 **A tap delivers nothing when nothing plays, where SCK delivers silence** — so a muted take on a
+  quiet Mac came out with **no audio track at all**, while the same take with music had one. A file
+  whose shape depends on luck; fixed by emitting a 200 ms silent buffer whenever the tap has been
+  idle (Franco's ruling). Measured before: video only. After: `audio aac 48000Hz 2ch, 5.96 s`.
+
 - 2026-08-03 (M27-T3): 🔴 **`kAudioHardwarePropertyProcessObjectList` is not "apps that play sound"
   — it is every process the audio system knows.** Built the `Mute ▸` menu from it and got
   `caphost`, `com.apple.audiomxd`, `com.apple.assistantd`, `AirPlayXPCHelper`, accessibility

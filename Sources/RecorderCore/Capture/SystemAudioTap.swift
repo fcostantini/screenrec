@@ -23,6 +23,10 @@ final class SystemAudioTap: @unchecked Sendable {
     private let onSilent: @Sendable () -> Void
     private var watchdog: TapSilenceWatchdog?
     private var poll: DispatchSourceTimer?
+    /// Emits silence when the tap has nothing to deliver, so the file's shape doesn't depend on
+    /// whether anything happened to be playing (M27-T4).
+    private var keepAlive: DispatchSourceTimer?
+    private var lastDelivery: TimeInterval = 0
     private let lock = NSLock()
     private var tap = AudioObjectID(kAudioObjectUnknown)
     private var device = AudioObjectID(kAudioObjectUnknown)
@@ -119,10 +123,21 @@ final class SystemAudioTap: @unchecked Sendable {
         timer.setEventHandler { watchdog.check() }
         timer.resume()
 
+        // SCK's audio delivers buffers continuously, silence included; a tap only fires when a
+        // process is producing output. Without this, a take recorded on a quiet Mac has **no audio
+        // track at all** while the same take with music has one — a file whose shape depends on
+        // luck. So the gap is filled rather than left (Franco's ruling, 2026-08-03).
+        let silence = DispatchSource.makeTimerSource(queue: Self.pollQueue)
+        silence.schedule(deadline: .now() + Self.keepAliveInterval, repeating: Self.keepAliveInterval)
+        silence.setEventHandler { [weak self] in self?.emitSilenceIfIdle() }
+        silence.resume()
+
         lock.lock()
         procID = newProcID
         self.watchdog = watchdog
         poll = timer
+        keepAlive = silence
+        lastDelivery = ProcessInfo.processInfo.systemUptime
         lock.unlock()
         return unsilenceable
     }
@@ -131,6 +146,8 @@ final class SystemAudioTap: @unchecked Sendable {
         lock.lock()
         poll?.cancel()
         poll = nil
+        keepAlive?.cancel()
+        keepAlive = nil
         watchdog = nil
         let (currentDevice, currentProc, currentTap) = (device, procID, tap)
         device = AudioObjectID(kAudioObjectUnknown)
@@ -185,6 +202,9 @@ final class SystemAudioTap: @unchecked Sendable {
                 return true
             })
         else { return }
+        lock.lock()
+        lastDelivery = ProcessInfo.processInfo.systemUptime
+        lock.unlock()
         // Every 16th sample: enough to see whether anything is there at all, and this is a
         // real-time thread.
         if let currentWatchdog {
@@ -195,6 +215,36 @@ final class SystemAudioTap: @unchecked Sendable {
             }
             currentWatchdog.note(peak: peak)
         }
+        router.route(sample, type: .systemAudio)
+    }
+
+    /// One keep-alive buffer's worth. Short enough that a resuming tap interleaves cleanly —
+    /// `TimestampRebaser` keeps each track's PTS strictly monotonic, so a late real buffer is
+    /// handled rather than corrupting the writer.
+    private static let keepAliveInterval: TimeInterval = 0.2
+
+    /// A buffer of silence when the tap has delivered nothing since the last tick.
+    private func emitSilenceIfIdle() {
+        lock.lock()
+        let idle = ProcessInfo.processInfo.systemUptime - lastDelivery >= Self.keepAliveInterval
+        let currentFormat = format
+        if idle { lastDelivery = ProcessInfo.processInfo.systemUptime }
+        lock.unlock()
+        guard idle, let currentFormat,
+            let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(currentFormat)?.pointee,
+            asbd.mBytesPerFrame > 0
+        else { return }
+
+        let frames = Int(asbd.mSampleRate * Self.keepAliveInterval)
+        let byteLength = frames * Int(asbd.mBytesPerFrame)
+        guard let sample = PCMSampleBuffer.make(
+            format: currentFormat, sampleCount: frames,
+            pts: CMClockGetTime(CMClockGetHostTimeClock()), byteLength: byteLength,
+            fill: { destination in
+                memset(destination, 0, byteLength)
+                return true
+            })
+        else { return }
         router.route(sample, type: .systemAudio)
     }
 
