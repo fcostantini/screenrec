@@ -2155,8 +2155,15 @@ backgrounds all stay out. Amendment recorded in docs/05.
       binary:** `export --to-mp4 --crop detect` on a 1600 × 1200 letterboxed fixture landed
       **1600 × 900 at 0,150 — the true rect, to the pixel** — while three negatives (a synthetic
       no-bars clip and **two of Franco's real screen recordings**) all reported no bars.
-      🔴 **Still open, and not claimed:** that 24 is right for bars off a *real* stream. G26's last
-      criterion says a letterboxed capture's bars are found, which a synthetic one cannot satisfy.
+      ✅ **Calibrated against a real letterboxed capture 2026-08-03** — recorded headlessly by the CLI
+      while Franco held a video fullscreen (a 16:9 video on a 16:10 display bars itself). 🔴 **It broke
+      the detector twice, in ways a synthetic fixture structurally could not** (docs/07): a
+      **watermark inside the bottom bar** (spread 190, but only 1.6% of pixels moved) forced the line
+      test to become the fraction within ±tolerance of the line's **median**; and **2–10 px uniform
+      edge runs on ordinary recordings** forced a **16 px minimum bar**, without which every
+      un-letterboxed take gets shaved. ⚠️ The old negative fixture was invalid — `testsrc2`'s
+      constant-colour bands *are* pillars. **Result on the real thing: 512/512 pillars against a true
+      513/512, top bar 128 against a predicted 128.5**, four real negatives silent, **681 tests**.
 
 - [x] M26-T4 **A precise trim can crop too** (Franco's ask, 2026-07-31: *"why can't we trim and crop
       at the same time?"*). The answer split in two: `Export & Copy` **already** does both in one pass

@@ -20,10 +20,10 @@ import Testing
         // miss its own fixture. These are mid-grey and light-grey — both must be found.
         for level: UInt8 in [30, 73, 128, 200] {
             let frame = try #require(Self.image(width: 160, height: 100) { x, y in
-                (y < 15 || y >= 85) ? level : Self.content(x, y)
+                (y < 20 || y >= 80) ? level : Self.content(x, y)
             })
             #expect(
-                BarDetector.bars(in: frame) == CropRect(x: 0, y: 15, width: 160, height: 70),
+                BarDetector.bars(in: frame) == CropRect(x: 0, y: 20, width: 160, height: 60),
                 "level \(level)")
         }
     }
@@ -54,15 +54,36 @@ import Testing
         let twenty = try #require(Self.image(width: 200, height: 120) { x, y in
             (y < 20 || y >= 100) ? 64 : Self.content(x, y)
         })
-        let twelve = try #require(Self.image(width: 200, height: 120) { x, y in
-            (y < 12 || y >= 108) ? 64 : Self.content(x, y)
+        let sixteen = try #require(Self.image(width: 200, height: 120) { x, y in
+            (y < 16 || y >= 104) ? 64 : Self.content(x, y)
         })
         #expect(
-            BarDetector.bars(in: [twenty, twelve])
-                == CropRect(x: 0, y: 12, width: 200, height: 96))
+            BarDetector.bars(in: [twenty, sixteen])
+                == CropRect(x: 0, y: 16, width: 200, height: 88))
         // And one frame with no bars at all means no crop, whatever the others saw.
         let none = try #require(Self.image(width: 200, height: 120) { x, y in Self.content(x, y) })
         #expect(BarDetector.bars(in: [twenty, none]) == nil)
+    }
+
+    @Test func aWatermarkInsideABarDoesNotHideIt() throws {
+        // Measured on the real capture: a watermark drives the row's full spread to 190 while only
+        // 1.6% of its pixels move. A min/max test loses the whole edge to it.
+        let frame = try #require(Self.image(width: 200, height: 120) { x, y in
+            guard y >= 20, y < 100 else {
+                return (x > 193 && y > 108) ? 240 : 64  // the mark sits in the bottom bar
+            }
+            return Self.content(x, y)
+        })
+        #expect(BarDetector.bars(in: frame) == CropRect(x: 0, y: 20, width: 200, height: 80))
+    }
+
+    @Test func aFewUniformPixelsAtAnEdgeAreNotABar() throws {
+        // Real recordings produce 2–10 px uniform runs at their edges — a window border, a rounded
+        // corner, an aliased margin. Shaving those would crop every take that has no letterbox.
+        let frame = try #require(Self.image(width: 200, height: 120) { x, y in
+            (y < 4 || x < 3) ? 0 : Self.content(x, y)
+        })
+        #expect(BarDetector.bars(in: frame) == nil)
     }
 
     // MARK: - Fixtures

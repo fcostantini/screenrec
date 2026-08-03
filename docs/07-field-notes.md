@@ -7,6 +7,22 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-03 (M26-T3, the real sample): 🔴 **A synthetic letterbox cannot calibrate this — the real
+  one broke two rules the fixture had no way to test.** ① **A watermark sits inside the bar.** On a
+  real capture the bottom bar's rows carry one: the row's full **spread is 190** while only **1.6% of
+  its pixels move**. A min/max flatness test reads that as content and loses the entire edge, so the
+  test has to be **robust**: the fraction of a line within ±tolerance of its own **median**. Measured
+  separation is wide — real bars **≥ 98%**, real content **≤ 60%** — so the threshold sits at 95% in
+  open space. ② **Real recordings have uniform edge runs that are not bars:** 2–10 px of window
+  border, rounded corner or aliased margin, on every take checked. Without a **minimum bar thickness
+  (16 px)** the detector shaves every un-letterboxed recording. ⚠️ **And the negative fixture was
+  invalid:** `testsrc2` is made of constant-colour vertical bands, so its own columns read as pillars
+  — a synthetic "no bars" control that a correct detector must fail. Build fixtures by padding **real
+  content**, not a test pattern.
+  ✅ **On the real capture the result is exact:** true pillars 513/512 by an independent column scan,
+  detector 512/512, top bar 128 against the 128.5 the aspect arithmetic predicts (a 16:9 video
+  fullscreen on this 16:10 display). Four real negatives stayed silent.
+
 - 2026-07-31 (M26-T3): **Two things a letterbox detector must not assume.** ① **A bar's luma is not
   the luma you encoded:** bars written at 64 (`0x404040`) decode back to RGB at **73.0**, so the
   milestone's own "black-ish, luma 62–66" test would have found nothing on its own fixture. Test

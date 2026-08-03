@@ -79,6 +79,13 @@ public enum BarDetector {
     private static func crop(
         top: Int, bottom: Int, left: Int, right: Int, width: Int, height: Int
     ) -> CropRect? {
+        // A few uniform pixels at an edge are a window border, a rounded corner or an aliased
+        // margin — measured on real recordings, which produce 2–10 px runs and no letterbox.
+        // Below the floor an edge is left alone rather than shaved.
+        let top = top >= minimumBar ? top : 0
+        let bottom = bottom >= minimumBar ? bottom : 0
+        let left = left >= minimumBar ? left : 0
+        let right = right >= minimumBar ? right : 0
         guard top > 0 || bottom > 0 || left > 0 || right > 0 else { return nil }
         let keptWidth = width - left - right
         let keptHeight = height - top - bottom
@@ -88,6 +95,9 @@ public enum BarDetector {
 
     /// Below this the reading is noise, not a crop anyone wants.
     private static let minimumKept = 16
+
+    /// The thinnest run that counts as a bar rather than an edge artefact.
+    private static let minimumBar = 16
 }
 
 /// One decoded frame, as luma sampled along rows and columns. Every fourth pixel: a bar is a
@@ -121,32 +131,45 @@ private struct Frame {
         let start = (edge == .top || edge == .left) ? 0 : (horizontal ? height : width) - 1
         let step = (edge == .top || edge == .left) ? 1 : -1
 
-        let first = line(at: start, horizontal: horizontal)
-        guard first.spread <= tolerance else { return 0 }
+        let first = line(at: start, horizontal: horizontal, tolerance: tolerance)
+        guard first.flatness >= Frame.minimumFlatness else { return 0 }
         var count = 0
         var index = start
         while count < limit {
-            let stats = line(at: index, horizontal: horizontal)
-            guard stats.spread <= tolerance, abs(stats.mean - first.mean) <= tolerance else { break }
+            let stats = line(at: index, horizontal: horizontal, tolerance: tolerance)
+            guard stats.flatness >= Frame.minimumFlatness,
+                abs(stats.level - first.level) <= tolerance
+            else { break }
             count += 1
             index += step
         }
         return count
     }
 
-    /// Mean and range of luma along one row or column.
-    private func line(at index: Int, horizontal: Bool) -> (mean: Double, spread: Double) {
-        var sum = 0.0, lowest = 255.0, highest = 0.0, count = 0
+    /// A line's level (its median) and how much of it sits within `tolerance` of that level.
+    ///
+    /// Measured, not chosen: a real capture's bottom bar carries a **watermark**, which drives the
+    /// row's full spread to 190 while only 1.6% of its pixels move — a min/max test reads that as
+    /// content and loses the whole edge. The fraction separates cleanly instead: real bars measure
+    /// **≥ 98%**, real content **≤ 60%** (docs/07).
+    private func line(
+        at index: Int, horizontal: Bool, tolerance: Double
+    ) -> (level: Double, flatness: Double) {
+        var values: [Double] = []
+        values.reserveCapacity((horizontal ? width : height) / 4 + 1)
         for other in stride(from: 0, to: horizontal ? width : height, by: 4) {
-            let value = luma(horizontal ? other : index, horizontal ? index : other)
-            sum += value
-            lowest = min(lowest, value)
-            highest = max(highest, value)
-            count += 1
+            values.append(luma(horizontal ? other : index, horizontal ? index : other))
         }
-        guard count > 0 else { return (0, .infinity) }
-        return (sum / Double(count), highest - lowest)
+        guard !values.isEmpty else { return (0, 0) }
+        values.sort()
+        let level = values[values.count / 2]
+        let near = values.filter { abs($0 - level) <= tolerance }.count
+        return (level, Double(near) / Double(values.count))
     }
+
+    /// How much of a line must sit at its own level for it to count as part of a bar. The gap
+    /// between bars and content is wide (98% against 60%), so this sits in open space.
+    static let minimumFlatness = 0.95
 
     private func luma(_ x: Int, _ y: Int) -> Double {
         let offset = (y * width + x) * 4

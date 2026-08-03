@@ -6,6 +6,25 @@
 
 ## Now
 
+- **✅ M26-T3 CALIBRATED ON REAL BARS (2026-08-03) — and the real sample broke the detector twice.
+  M26's four tasks are in; G26 is next.** Franco put a video fullscreen and the CLI recorded 10 s
+  headlessly (`Recording 2026-08-03 at 10.22.08.mov`, ~/Movies) — a genuine letterbox, because a 16:9
+  video on this 16:10 display bars itself. **681 tests.**
+  🔴 **What only a real capture could show** (docs/07): ① **a watermark sits inside the bottom bar** —
+  the row's spread is **190** while just **1.6%** of its pixels move, so a min/max flatness test loses
+  the whole edge; the line test is now the fraction within ±tolerance of the line's **median** (bars
+  ≥ 98%, content ≤ 60%, threshold 95%). ② **Real recordings carry 2–10 px uniform edge runs** that
+  are not bars, so a **16 px minimum** now stands between the detector and shaving every ordinary
+  take. ⚠️ **The old negative fixture was invalid:** `testsrc2` is constant-colour vertical bands, so
+  its columns *are* pillars — fixtures are now real content padded with bars.
+  ✅ **Exact on the real thing:** true pillars **513/512** by an independent column scan against the
+  detector's **512/512**, top bar **128** against the 128.5 the aspect predicts, and the cropped
+  frame renders edge-to-edge with the black gone. **Four real negatives silent** (two screen takes,
+  two music-video clips).
+  ⚠️ **One honest imprecision:** on a fixture whose *content* has a uniform top edge the run
+  continues **3 px** into it. Those rows are, by any local measure, indistinguishable from bar; not
+  tuned away, because tuning to a fixture is what produced the wrong tolerance the first time.
+
 - **✅ M26-T1 SHIPPED (2026-07-31) — the exporter takes a source rect. Next: M26-T2 (crop in the
   Trim window).** `--crop x,y,w,h` on `screenrec-cli export --to-mp4`, and a `crop:` parameter beside
   `range:` on `Exporter.exportToMP4`. **664 tests.** Plan artifact:
