@@ -7,6 +7,18 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-07-31 (M26-T3): **Two things a letterbox detector must not assume.** ① **A bar's luma is not
+  the luma you encoded:** bars written at 64 (`0x404040`) decode back to RGB at **73.0**, so the
+  milestone's own "black-ish, luma 62–66" test would have found nothing on its own fixture. Test
+  **flatness across the line, anchored to a frame edge, agreeing row to row** — never the level.
+  ② **The tolerance is set by compression, not by the bar:** HEVC ringing makes a bar's last rows
+  noisier than its middle, so a strict ≤ 6 stops **6 px short** of the boundary. Per-frame readings
+  across one clip: **tol 16 → 146…150** (they disagree, and a conservative combine inherits the
+  worst), **tol 24 → 150/150 on every frame**. False positives never appeared at all — six negative
+  frames (synthetic, plus five of a real 4112 × 2570 screen recording) stayed silent up to **32**.
+  So the safe window is wide and the number to pick is where the *frames stop disagreeing*, not where
+  detection first works. ⚠️ Calibrated on synthetic bars; unverified against a real stream capture.
+
 - 2026-07-31 (M26-T4): 🔴 **`AVAssetExportSession` honours a composition's `frameDuration`; the
   asset-reader path ignores it.** The same crop, the same source (19.4 fps variable-rate capture),
   the same 4 s range: a hand-built `AVMutableVideoComposition` with `frameDuration` 1/60 produced a

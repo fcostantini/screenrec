@@ -33,6 +33,23 @@
   ⚠️ **The VERSION bump is still pending** — 1.13.0 rides with T2, the first half a user of the app
   can reach, and M25's deferred patch rides in that cut.
 
+- **✅ M26-T3 SHIPPED (2026-08-03) — the bars are found without being told. M26's four tasks are all
+  in; G26 is next, with one criterion it cannot yet meet.** `Find bars` in the Trim window and
+  `export --to-mp4 --crop detect` in the CLI. **679 tests.** Plan artifact:
+  `claude.ai/code/artifact/7e8be23f-7ba6-4f04-9fcf-13948ecfe162`.
+  ⚠️ **Built against a synthetic letterbox (Franco's call) — there is still no real sample.**
+  🔴 **The premise was wrong twice, and measurement caught both.** ① **"luma 62–66" would have missed
+  its own fixture:** bars encoded at 64 decode to **73.0**, so the detector never tests the level —
+  only flatness, edge-anchoring and row-to-row agreement. ② **The tolerance is 24, not the 16 my own
+  plan proposed:** at 16 the five sampled frames disagree by up to 4 px and the conservative combine
+  inherits the worst; at 24 every frame lands exactly, and no negative fires below 32.
+  ✅ **Verified end to end on the release binary:** the fixture detected **1600 × 900 at 0,150 — the
+  true rect, to the pixel** — while a synthetic no-bars clip and **two of Franco's real recordings**
+  all reported no bars. The negative control is real even though the positive one isn't.
+  ✅ **Offered, not applied:** the button fills in the crop you already have, and says
+  `No bars found.` rather than appearing to do nothing.
+  🔴 **Not claimed, and it blocks G26:** that 24 holds for bars off a *real* stream.
+
 - **✅ M26-T4 SHIPPED (2026-07-31) — a precise trim can crop too.** From Franco's question, *"why
   can't we trim and crop at the same time?"* The honest answer had two halves: **`Export & Copy`
   already does both** in one pass, and a **lossless** trim never can — it copies encoded frames and a

@@ -2131,7 +2131,7 @@ backgrounds all stay out. Amendment recorded in docs/05.
       not the source's (an uncropped export of that take is 1920 × 1200), so the cap measured the
       crop. **The caption matched the file — confirmed by Franco**, which is the criterion the task
       was filed on. Source untouched, `public.mpeg-4`, faststart intact, no `.partial`/`.sb-`.
-- [ ] M26-T3 **Find the bars without being told.** This is why it is a milestone and not a one-liner.
+- [x] M26-T3 **Find the bars without being told.** This is why it is a milestone and not a one-liner.
       **Seams:** `VideoFrameReader` decodes frames off the main thread already, and M24-T4 measured
       what frame extraction costs (keyframe spacing × count, not take length) — sample a handful and
       look for constant-luma bands rather than black ones. **Rulings:** how many frames, and what
@@ -2141,6 +2141,22 @@ backgrounds all stay out. Amendment recorded in docs/05.
       negative control, without which a detector that always fires looks like it works).
       ⚠️ **Needs a letterboxed sample from Franco** — there is none in the repo, and the task is
       calibration against real bars.
+      ✅ **Done 2026-07-31, against a synthetic letterbox (Franco's call).** ⚠️ **Measured first, and
+      the premise was wrong twice.** ① **The "luma 62–66" test would have missed its own fixture:**
+      bars encoded at luma 64 decode to **73.0**, so the detector tests *flatness and edge-anchoring*
+      and never the level. ② **The tolerance is 24, not the 16 the plan proposed:** at 6 the run stops
+      6 px short (HEVC ringing at the bar boundary), at 16 the five sampled frames disagree by up to
+      4 px — which the conservative combine inherits — and **at 24 every frame lands on the boundary
+      exactly**, while no negative fires below 32. **Rulings:** 5 frames, combined by the **smallest**
+      bar any of them shows (a dark scene reads like a bar, so one misleading frame can only
+      under-crop, never eat content); the crop is **offered, not applied** — a `Find bars` button
+      fills in the crop you already have, and says `No bars found.` rather than appearing to do
+      nothing. **679 tests** (+6 pure, frames built in memory). **Verified end to end on the release
+      binary:** `export --to-mp4 --crop detect` on a 1600 × 1200 letterboxed fixture landed
+      **1600 × 900 at 0,150 — the true rect, to the pixel** — while three negatives (a synthetic
+      no-bars clip and **two of Franco's real screen recordings**) all reported no bars.
+      🔴 **Still open, and not claimed:** that 24 is right for bars off a *real* stream. G26's last
+      criterion says a letterboxed capture's bars are found, which a synthetic one cannot satisfy.
 
 - [x] M26-T4 **A precise trim can crop too** (Franco's ask, 2026-07-31: *"why can't we trim and crop
       at the same time?"*). The answer split in two: `Export & Copy` **already** does both in one pass

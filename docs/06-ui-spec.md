@@ -606,6 +606,10 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   `Export & Copy` can't produce. With it unticked the button is disabled, because lossless copies the
   encoded frames and a crop must decode them: *"A crop has to re-encode, so a lossless trim can't have
   one. Tick Re-encode to trim and crop, or use Export & Copy."* The export caption states the
+  **`Find bars`** (M26-T3) sits under the crop row while Crop is ticked and fills the rect in from
+  the letterbox the clip arrived with — offered, not applied, so it lands as a band you can adjust or
+  Reset like any dragged one. It says **`No bars found.`** when there are none, because a button that
+  appears to do nothing reads as broken. The export caption states the
   **cropped** size, live —
   *"Export & Copy writes only the range, cropped — H.264 1600 × 1000 — …"* — and that figure is the
   gate: what it says and what `probe` reads off the file are the same numbers.

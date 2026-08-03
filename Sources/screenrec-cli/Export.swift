@@ -54,6 +54,7 @@ func runExport(_ args: [String]) async {
     var from: Double?
     var to: Double?
     var crop: CropRect?
+    var detectsCrop = false
 
     var index = 0
     func value(after flag: String) -> String {
@@ -82,7 +83,10 @@ func runExport(_ args: [String]) async {
                 die("--to must be M:SS or seconds (≥ 0)")
             }
             to = parsed
-        case "--crop": crop = parseCropRect(value(after: "--crop"))
+        case "--crop":
+            // `detect` finds the letterbox itself (M26-T3); anything else is an explicit rect.
+            let spec = value(after: "--crop")
+            if spec == "detect" { detectsCrop = true } else { crop = parseCropRect(spec) }
         case let flag where flag.hasPrefix("--"): die("Unknown export option: \(flag)")
         default: positionals.append(args[index])
         }
@@ -92,7 +96,7 @@ func runExport(_ args: [String]) async {
     guard !toMP4 || (gifFPS == nil && gifSeconds == nil) else {
         die("--fps/--seconds only apply to --to-gif")
     }
-    guard !toGIF || (from == nil && to == nil && crop == nil) else {
+    guard !toGIF || (from == nil && to == nil && crop == nil && !detectsCrop) else {
         die("--from/--to/--crop only apply to --to-mp4")
     }
     guard (from == nil) == (to == nil) else { die("a range needs both --from and --to") }
@@ -122,7 +126,7 @@ func runExport(_ args: [String]) async {
             }
             try await runMP4(
                 input: input, explicitOutput: explicitOutput, width: width, range: range,
-                crop: crop)
+                crop: crop, detectsCrop: detectsCrop)
         }
     } catch {
         die(exportErrorMessage(error), code: 70)
@@ -130,8 +134,15 @@ func runExport(_ args: [String]) async {
 }
 
 private func runMP4(
-    input: URL, explicitOutput: URL?, width: Int?, range: ExportRange?, crop: CropRect?
+    input: URL, explicitOutput: URL?, width: Int?, range: ExportRange?, crop: CropRect?,
+    detectsCrop: Bool = false
 ) async throws {
+    var crop = crop
+    if detectsCrop {
+        crop = try await BarDetector.detect(in: input)
+        print(crop.map { "Detected  bars → \($0.width) × \($0.height) px at \($0.x),\($0.y)" }
+            ?? "Detected  no bars — exporting the whole frame")
+    }
     let output = explicitOutput
         ?? Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: input, range: range))
     let progress = ProgressPrinter()

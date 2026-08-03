@@ -19,7 +19,8 @@ func printUsage() {
                                        Level 5.2); bitrate scales with the output size. --from/--to
                                        (M:SS or seconds) export only that range, which the file then
                                        holds exactly — no intermediate trim. --crop keeps only that
-                                       rectangle of each frame, in source pixels from the top-left;
+                                       rectangle of each frame, in source pixels from the top-left,
+                                       or `--crop detect` to find the letterbox bars itself;
                                        --width then caps the crop, not the source. Default <out> is
                                        the input's .mp4 sibling, or its " trimmed" one for a range.
                                        The source is read-only.

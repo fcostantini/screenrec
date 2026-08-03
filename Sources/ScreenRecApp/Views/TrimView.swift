@@ -65,6 +65,9 @@ struct TrimView: View {
     @State private var crop: CropRect?
     /// The drag in flight, in preview coordinates.
     @State private var dragged: CGRect?
+    /// What the bar search had to say — only when it found nothing, or couldn't look (M26-T3).
+    @State private var barsMessage: String?
+    @State private var findingBars = false
 
     private static let previewSize = CGSize(width: 480, height: 300)
     /// One row of thumbnails across the player's width. 16 measured at 785 ms on a recording,
@@ -109,7 +112,7 @@ struct TrimView: View {
         .onChange(of: state.exports.trimTarget) { load(state.exports.trimTarget) }
         // Unticking is how a crop is discarded: leaving one set but undrawn would crop an export
         // with nothing on screen saying so.
-        .onChange(of: cropping) { if !cropping { crop = nil; dragged = nil } }
+        .onChange(of: cropping) { if !cropping { crop = nil; dragged = nil; barsMessage = nil } }
         .onDisappear { unload() }
     }
 
@@ -186,8 +189,17 @@ struct TrimView: View {
                     Text("\(crop.width) × \(crop.height) px at \(crop.x),\(crop.y)")
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
-                    Button("Reset") { self.crop = nil }
+                    Button("Reset") { self.crop = nil; barsMessage = nil }
                         .buttonStyle(.link)
+                }
+            }
+            if cropping {
+                HStack(spacing: 8) {
+                    Button(findingBars ? "Finding bars…" : "Find bars") { findBars(url) }
+                        .disabled(findingBars)
+                    if let barsMessage {
+                        Text(barsMessage).font(.callout).foregroundStyle(.secondary)
+                    }
                 }
             }
             if crop != nil, !reencodes {
@@ -260,6 +272,24 @@ struct TrimView: View {
                     })
         }
         .accessibilityLabel("Crop region")
+    }
+
+    /// Fills the crop in from the letterbox the clip arrived with (M26-T3). Says so when it finds
+    /// nothing: a button that appears to do nothing reads as broken.
+    private func findBars(_ url: URL) {
+        findingBars = true
+        barsMessage = nil
+        Task {
+            defer { findingBars = false }
+            do {
+                let found = try await BarDetector.detect(in: url)
+                guard loadedURL == url else { return }  // superseded while looking
+                crop = found
+                barsMessage = found == nil ? "No bars found." : nil
+            } catch {
+                barsMessage = "Couldn't check for bars."
+            }
+        }
     }
 
     /// The rectangle between two drag points, in any direction. Not `CGRect.union`, which treats an
@@ -504,6 +534,7 @@ struct TrimView: View {
         cropping = false
         crop = nil
         dragged = nil
+        barsMessage = nil
         Task {
             let asset = item.asset
             let duration = (try? await asset.load(.duration).seconds) ?? 0
