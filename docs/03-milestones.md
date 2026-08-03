@@ -2300,6 +2300,25 @@ shape. The route is `AudioHardwareCreateProcessTap` + `CATapDescription(excludeP
       without revoking Franco's own TCC grants. The decision is unit-tested both ways and the
       plumbing matches its three sibling events.
 
+- [x] M27-T5 **One rate, whatever the hardware is doing** (added 2026-08-03 from a measurement, not
+      the plan). A tap's sample rate **follows the output device** — 48 kHz and 24 kHz both measured
+      on one Mac in a day — where SCK's system audio is always 48 kHz. So a muted take's audio
+      quality depended on the hardware, and `ReplayAudioRing` **empties its window** when a format
+      changes under it. **Seams:** `ResampledMicInput`, which already solves exactly this for the
+      microphone. **Ruling (Franco):** resample rather than accept the device's rate.
+      ✅ **Done 2026-08-03.** The converter takes an **injectable target**, defaulting to the mic's —
+      so the mic path is unchanged by construction rather than by inspection — and the tap asks for
+      **interleaved stereo 48 kHz**, one contiguous block so `PCMSampleBuffer` still writes a single
+      buffer. The emitted length now comes from the target's own `mBytesPerFrame`, which is what
+      makes mono and interleaved stereo both correct. **694 tests** (+4). ⚠️ **The rename was
+      skipped:** `ResampledMicInput` is referenced 22 times across ten gate-verified files, and the
+      churn buys nothing the doc comment can't say.
+      ⚠️ **Not proven against real 24 kHz hardware:** by the time the code was ready the device had
+      returned to 48 kHz, so the live run exercised the **pass-through**. The conversion is pinned by
+      a unit test instead (24 kHz stereo in → 48 kHz stereo out, ~2× the frames).
+      🔴 **Still owed:** the device-switch-while-armed leg, which is the failure this task exists to
+      prevent, and needs Franco's AirPods.
+
 **Gate G27** — ✅ **PASSED 2026-08-03** (evidence in STATUS.md's gate table; two caveats recorded there, not waived). The criterion as filed: a **windowless** app's audio is absent from a take while the rest of the system is
 present. ⚠️ Verified with two *windowed* apps as the control, **never `afplay`** — G21 nearly
 recorded a false negative that way, because a bare windowless process never appears in the captured

@@ -19,6 +19,10 @@ final class SystemAudioTap: @unchecked Sendable {
     }
 
     private let router: SampleRouter
+    /// A tap's rate follows the output device, so it is normalised to one format before the router
+    /// sees it (M27-T5). Touched only from the IOProc — `convert` holds converter state and is not
+    /// thread-safe, which is why the keep-alive below builds its silence already in the target.
+    private let resampler = ResampledMicInput(target: ResampledMicInput.systemAudioTarget)
     /// Fires when the tap runs but carries nothing while something is playing (M27-T4).
     private let onSilent: @Sendable () -> Void
     private var watchdog: TapSilenceWatchdog?
@@ -202,6 +206,7 @@ final class SystemAudioTap: @unchecked Sendable {
                 return true
             })
         else { return }
+        guard let normalized = resampler.convert(sample) else { return }
         lock.lock()
         lastDelivery = ProcessInfo.processInfo.systemUptime
         lock.unlock()
@@ -215,7 +220,7 @@ final class SystemAudioTap: @unchecked Sendable {
             }
             currentWatchdog.note(peak: peak)
         }
-        router.route(sample, type: .systemAudio)
+        router.route(normalized, type: .systemAudio)
     }
 
     /// One keep-alive buffer's worth. Short enough that a resuming tap interleaves cleanly —
@@ -230,15 +235,13 @@ final class SystemAudioTap: @unchecked Sendable {
         let currentFormat = format
         if idle { lastDelivery = ProcessInfo.processInfo.systemUptime }
         lock.unlock()
-        guard idle, let currentFormat,
-            let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(currentFormat)?.pointee,
-            asbd.mBytesPerFrame > 0
-        else { return }
-
+        guard idle, currentFormat != nil else { return }
+        let target = ResampledMicInput.systemAudioTarget
+        let asbd = target.streamDescription.pointee
         let frames = Int(asbd.mSampleRate * Self.keepAliveInterval)
         let byteLength = frames * Int(asbd.mBytesPerFrame)
         guard let sample = PCMSampleBuffer.make(
-            format: currentFormat, sampleCount: frames,
+            format: target.formatDescription, sampleCount: frames,
             pts: CMClockGetTime(CMClockGetHostTimeClock()), byteLength: byteLength,
             fill: { destination in
                 memset(destination, 0, byteLength)

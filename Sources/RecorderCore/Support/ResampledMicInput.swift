@@ -24,7 +24,21 @@ public final class ResampledMicInput {
     public nonisolated(unsafe) static let targetFormat =
         AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
 
-    public init() {}
+    /// The target a process tap normalises to (M27-T5): interleaved stereo, so the emitted buffer
+    /// stays one contiguous block. ⚠️ A tap's own rate **follows the output device** — 24 kHz and
+    /// 48 kHz both measured on one Mac in a day — where SCK's system audio is always 48 kHz, and
+    /// `ReplayAudioRing` empties its window when a format changes under it (docs/07).
+    public nonisolated(unsafe) static let systemAudioTarget =
+        AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 2,
+                      interleaved: true)!
+
+    /// `target` is injected so one converter serves both the microphone and a process tap; the
+    /// default is the mic's, so that path is unchanged by construction.
+    public init(target: AVAudioFormat = ResampledMicInput.targetFormat) {
+        self.target = target
+    }
+
+    private let target: AVAudioFormat
 
     private var converter: AVAudioConverter?
     private var output: AVAudioPCMBuffer?
@@ -35,12 +49,12 @@ public final class ResampledMicInput {
         guard let formatDescription = CMSampleBufferGetFormatDescription(buffer),
               let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription)?.pointee
         else { return nil }
-        if asbd.hasSameIdentity(as: Self.targetFormat.streamDescription.pointee) { return buffer }
+        if asbd.hasSameIdentity(as: target.streamDescription.pointee) { return buffer }
 
         // (Re)build on any input-format change — a converter's state is format-specific.
         if converter.map({ !asbd.hasSameIdentity(as: $0.inputFormat.streamDescription.pointee) }) ?? true {
             let format = AVAudioFormat(cmAudioFormatDescription: formatDescription)
-            guard let fresh = AVAudioConverter(from: format, to: Self.targetFormat) else { return nil }
+            guard let fresh = AVAudioConverter(from: format, to: target) else { return nil }
             fresh.primeMethod = .none
             converter = fresh
         }
@@ -48,10 +62,10 @@ public final class ResampledMicInput {
 
         // Slack over the exact ratio: an SRC's per-call output can wobble by a filter length.
         let frames = CMSampleBufferGetNumSamples(buffer)
-        let ratio = Self.targetFormat.sampleRate / asbd.mSampleRate
+        let ratio = target.sampleRate / asbd.mSampleRate
         let needed = AVAudioFrameCount((Double(frames) * ratio).rounded(.up)) + 64
         if output == nil || output!.frameCapacity < needed {
-            output = AVAudioPCMBuffer(pcmFormat: Self.targetFormat, frameCapacity: needed)
+            output = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: needed)
         }
         guard let output else { return nil }
         output.frameLength = 0
@@ -73,10 +87,12 @@ public final class ResampledMicInput {
                   let channel = output.floatChannelData?[0] else { return nil }
 
             // Copied out, because `output` is reused for the next conversion while the emitted
-            // buffer escapes downstream for arbitrarily long.
-            let length = Int(output.frameLength) * MemoryLayout<Float>.size
+            // buffer escapes downstream for arbitrarily long. The length comes from the target's
+            // own frame size, so a mono plane and an interleaved stereo one both measure right.
+            let length = Int(output.frameLength)
+                * Int(target.streamDescription.pointee.mBytesPerFrame)
             return PCMSampleBuffer.make(
-                format: Self.targetFormat.formatDescription,
+                format: target.formatDescription,
                 sampleCount: Int(output.frameLength), pts: pts, byteLength: length
             ) { destination in
                 memcpy(destination, channel, length)

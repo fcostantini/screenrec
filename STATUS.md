@@ -20,8 +20,14 @@
   row would have silenced **nothing** (docs/07).
   ✅ **Armed replay does receive tap audio** (440 Hz at −22.1 dBFS in a saved clip) — the question
   M27-T2 left open.
-  ⚠️ **A tap's sample rate follows the output device (24 kHz measured, 48 kHz in T1) — SCK's is
-  always 48 kHz.** So a muted take's audio quality now depends on the hardware. **Not the
+  ✅ **M27-T5 SHIPPED: the tap is normalised to 48 kHz stereo** through the mic path's own converter,
+  now with an injectable target (the mic's default is untouched by construction). **694 tests.**
+  ⚠️ **The conversion is unit-pinned, not hardware-proven** — the device had returned to 48 kHz by
+  the time the code was ready, so the live run was a pass-through. 🔴 **Still owed: switch the output
+  device while replay is armed** and confirm the ring keeps its window — the failure T5 exists to
+  prevent.
+  ⚠️ **Background: a tap's sample rate follows the output device (24 kHz measured, 48 kHz in T1) —
+  SCK's is always 48 kHz.** So a muted take's audio quality now depends on the hardware. **Not the
   half-speed bug it was first written up as** — the track is correctly labelled and plays correctly;
   the retraction and the reasoning are in docs/07. **Open design question:** resample the tap to
   48 kHz (the `ResampledMicInput` precedent) or accept the device's rate — Franco's call.
