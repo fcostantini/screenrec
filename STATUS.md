@@ -15,6 +15,15 @@
   ✅ **`TapSilenceWatchdog` caught it unprompted, in the wild**, with a true sentence — the failure
   it was designed for, found by a human running the feature normally. Without T4 this ships as
   silent audio.
+  ✅ **Feasibility is likely, and does not hinge on notarization:** TCC keys on a stable code
+  identity, not on Gatekeeper — **this app already holds Screen Recording, Microphone and
+  Notifications while self-signed** (M0-T3's stable designated requirement). The ladder, cheapest
+  first: ① add **`NSAudioCaptureUsageDescription`** to the bundle plist, re-sign, **launch it as an
+  app** (never from Terminal — that is what invalidated T1's probe) and create a tap; a missing usage
+  string is the commonest cause of exactly this silent-zeros shape. ② If not, test whether an
+  **entitlement** is needed — most audio entitlements are unrestricted and a self-signed build can
+  carry them. ③ Only if both fail is "not without notarization" a real answer rather than a guess.
+  ⚠️ **No TCC denial appears in the log**, consistent with silent zeros rather than a refusal.
   🔴 **Next: find what the app needs** (`NSAudioCaptureUsageDescription`? an entitlement? a grant
   that only a notarised build can hold?) — and if it can't have it, **M27 does not ship** and that is
   a product decision, not a bug fix. **No 1.14.0 cut until then.**
