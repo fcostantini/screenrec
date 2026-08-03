@@ -7,6 +7,16 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-03 (M27, resolved): ✅ **The app needs `NSAudioCaptureUsageDescription`, and then it
+  prompts and works.** Without the key the tap returns **silent zeros with no prompt and no error**
+  — the exact shape below. With it, macOS raises a permission prompt and, once granted, a
+  menu-driven take carries **full-length audio** (697 344 samples over 14.5 s, every 2 s window
+  between −12 and −25 dBFS) with the muted app absent at **−67.7 dBFS** and everything else present
+  at −12.2. **No notarization, no entitlement — one plist key and a grant.**
+  ⚠️ **A grant clicked late looks like a delivery bug:** the first attempt was granted mid-take and
+  produced 1.3 s of audio inside a 24 s file, which reads exactly like a tap that stalls. Before
+  chasing a delivery fault, check whether a prompt was answered late.
+
 - 2026-08-03 (M27, the finding that undoes T1's Q5): 🔴 **The shipped app CANNOT read a process tap
   — and the test that said it could was invalid.** Measured at one moment with Spotify playing and a
   mute set: **the app's take is −∞ dBFS** (total silence, video fine) while **the CLI's is −6.8 dBFS**

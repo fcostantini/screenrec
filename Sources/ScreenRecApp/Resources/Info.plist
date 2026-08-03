@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>ScreenRec records the audio your Mac is playing, so it can leave one app's sound out of a recording.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>ScreenRec records your microphone alongside the screen.</string>
 </dict>
