@@ -6,7 +6,23 @@
 
 ## Now
 
-- **✅ M28-T2 SHIPPED (2026-08-04) — the menu is AppKit, and it is the same menu. Next: M28-T3.**
+- **✅ M28-T3 SHIPPED (2026-08-04) — the recents rows carry a frame each. Next: M28-T4.**
+  `MenuThumbnails` + `RecentRowView` (167 lines): a 36 × 22 pt well, the frame taken 10% into the
+  clip, decoded off-main and cached until the file changes. **695 tests.** Plan artifact:
+  `claude.ai/code/artifact/d2544888-a090-4389-93e7-c7184c2bd468`.
+  ✅ **The dump is byte-identical** — all **98 rows** of `Recordings ▸`. A view-based row is invisible
+  to `menudriver` as long as the item keeps its `title`.
+  ✅ **No slower to open:** 0.39–0.40 s over five runs against G18's recorded 0.57–0.60 s (0.90 s on
+  the first, cold). ⚠️ Historical baseline, not a same-session A/B.
+  🔴 **A defect only a screenshot could catch:** the chevrons did not line up, because a row's view
+  keeps its created width and the chevron tracked the title length. `autoresizingMask` fixed it.
+  ⚠️ **The live-arrival path is unobservable in the app** — a probe file already had its frame by
+  the time the row was visible. Implemented, and proven on the harness (docs/07); its value is T4.
+  🔴 **Correction to the T2 entry below: "zero warnings" was wrong** — incremental builds don't
+  re-emit warnings for unchanged files. A forced rebuild still shows the one known pre-existing
+  warning, now at **`AppState.swift:766`** (this file said 753). Nothing new was added.
+
+- **✅ M28-T2 SHIPPED (2026-08-04) — the menu is AppKit, and it is the same menu.**
   `MenuBarExtra` is gone: `StatusItemController` + `MenuBuilder` + `MenuRow` (756 lines) replace
   `MenuView` and the SwiftUI status-item label (829). The app's entry point is AppKit, and the seven
   launch jobs that hung off the status item's `.task` run in `applicationDidFinishLaunching`.

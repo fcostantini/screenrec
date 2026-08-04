@@ -2389,10 +2389,25 @@ rather than two. T2–T4 below are the old T1–T3, renumbered.
       after launch had no app list, no window list and no recents detail. Those come from async
       reads; the SwiftUI menu filled them in **while open**, which is exactly the M6-T10 corruption.
       The caches are primed at launch instead, so the first open matches every later one.
-- [ ] M28-T3 **A thumbnail per recents row.** **Seams:** `FilmstripThumbnails` (M24-T4) already
+- [x] M28-T3 **A thumbnail per recents row.** **Seams:** `FilmstripThumbnails` (M24-T4) already
       decodes a frame off the main thread and its cost is measured — first frame ~80 ms, and cost
       tracks keyframe spacing × count, not take length. **Rulings:** thumbnail size; whether it is
       cached across menu opens (rows are stamped at open, so a re-decode per open is the naive cost).
+      ✅ **Done 2026-08-04.** `MenuThumbnails` (AppCore) + `RecentRowView` (167 lines). **695 tests.**
+      **Rulings taken as recommended** (Franco, "let's go"): a **36 × 22 pt** well in a 28 pt row,
+      an **empty well** where no frame can be read so titles stay aligned, exports thumbnailed too,
+      and the frame taken **10% into the clip** rather than frame 0.
+      ✅ **The dump is byte-identical** — all **98 rows** of `Recordings ▸`, unchanged. A view row is
+      invisible to `menudriver` as long as the item keeps its `title`, exactly as the spike predicted.
+      ✅ **No slower to open:** 0.39–0.40 s over five runs against **G18's recorded 0.57–0.60 s**
+      (0.90 s on the first open, which is the cold cache). ⚠️ Same instrument and machine, a
+      different day — not a same-session A/B.
+      🔴 **A defect only a screenshot could catch:** the chevrons did not line up. A row's view keeps
+      the width it was created with, so the chevron tracked the **title length** instead of the
+      menu's edge; `autoresizingMask = [.width]` fixed it. No test would have seen this.
+      ⚠️ **The live-arrival path is unobservable in the app**, though it is implemented and proven on
+      the harness (docs/07): a probe file copied into `~/Movies` already had its frame by the time
+      the row could be seen. Its value is the safety net and T4, not thumbnails.
 - [ ] M28-T4 **A progress row that advances while the menu is open.** The M6-T10 constraint —
       nothing may tick into an open menu — dies here, and with it the stamped-at-open `Exporting …`
       row. **Rulings:** what else may now tick, and what deliberately still should not (a live clock

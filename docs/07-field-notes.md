@@ -7,6 +7,23 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-04 (M28-T3): **What a view-based row costs, once you actually build one.** The
+  Accessibility half was free (the spike below); the drawing half is not:
+  - 🔴 **A row's view keeps the width you create it with, so anything you draw at `bounds.maxX`
+    tracks the *title length*, not the menu's edge.** The chevrons stepped in and out per row.
+    `autoresizingMask = [.width]` makes AppKit stretch each view to the menu's content width.
+    **Only a screenshot catches this** — the dump is identical either way.
+  - **AppKit draws none of a view row's furniture**: no highlight, no checkmark, no submenu
+    chevron. Measured on the harness — a `state = .on` view row reports `✓` to Accessibility and
+    renders nothing. All three are yours to draw.
+  - **`draw(_:)` runs on every highlight change**, so lay text out once at init. Two attributed
+    strings (normal and selected ink) plus a cached size beat measuring per redraw.
+  - ⚠️ **The live-arrival path is real but unobservable here**: a probe file copied into `~/Movies`
+    already had its decoded frame by the time its row could be seen. ~80 ms beats the eye and beats
+    a synthetic screenshot. Worth keeping for T4's progress row, not for thumbnails.
+  - **Menu open cost did not move**: 0.39–0.40 s over five runs (0.90 s cold), against G18's
+    recorded 0.57–0.60 s. Eight `NSView`s per open is not a cost this menu can feel.
+
 - 2026-08-04 (M28-T3 spike): ✅ **A view-based `NSMenuItem` does NOT lose its Accessibility title —
   provided you still set `title`.** Measured on a throwaway status-item harness, reading the same
   attributes `tools/menudriver.swift` does:
