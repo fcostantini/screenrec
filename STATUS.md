@@ -6,7 +6,21 @@
 
 ## Now
 
-- **✅ M28-T3 SHIPPED (2026-08-04) — the recents rows carry a frame each. Next: M28-T4.**
+- **✅ M28-T4 SHIPPED (2026-08-04) — the export row advances while you watch it. Next: M28-T5,
+  the last of the milestone.** `ExportModel.exportProgress` + `ExportProgressRowView`. **700 tests.**
+  Plan artifact: `claude.ai/code/artifact/29e741a2-701b-4a1a-98ad-7ffc9acd97df`.
+  ✅ **Proven the only way that counts:** one menu open, eight samples, **six distinct values** —
+  `Exporting… 1% → 6%` read off `AXTitle` with the menu held open throughout. M6-T10's constraint is
+  dead for this row and, deliberately, no other.
+  ✅ **The percentage is in the title, not only the bar** — the title is what VoiceOver reads, and a
+  bar alone would have left that reader the frozen row this task exists to fix.
+  ⚠️ **`Exporter` had been reporting progress to nobody since M10-T2** — the seam existed the whole
+  time. GIF and trim still report nothing, so they keep the plain row rather than a fake figure.
+  🔴 **Two defects the review caught, both mine:** stacked observer registrations (progress is nil
+  almost always, so they never fired to clear themselves), and a generation stamp captured *before*
+  the generation moved — which would have silently dropped every report.
+
+- **✅ M28-T3 SHIPPED (2026-08-04) — the recents rows carry a frame each.**
   `MenuThumbnails` + `RecentRowView` (167 lines): a 36 × 22 pt well, the frame taken 10% into the
   clip, decoded off-main and cached until the file changes. **695 tests.** Plan artifact:
   `claude.ai/code/artifact/d2544888-a090-4389-93e7-c7184c2bd468`.

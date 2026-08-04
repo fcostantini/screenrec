@@ -7,6 +7,24 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-04 (M28-T4): **A row that ticks needs its title to tick too, and `withObservationTracking`
+  needs a leash.**
+  - **The percentage belongs in `NSMenuItem.title`, not only in the drawn bar.** The title is what
+    VoiceOver reads and what `menudriver` sees; a bar alone gives a screen-reader user exactly the
+    frozen row the work was meant to fix. Setting the title on a live menu is a light mutation — it
+    is the *view's* frame that sizes the row, so a changing number does not resize anything.
+  - 🔴 **`withObservationTracking` is one-shot, so re-arming it from a lifecycle hook stacks
+    registrations.** Re-arming on every `menuWillOpen` looked right and was not: the tracked value
+    is nil almost all the time, so nothing ever fires to clear the old registration, and each open
+    leaves another armed. One flag bounds it to a single outstanding registration.
+  - 🔴 **A capture list runs before the function it is passed to.** A generation stamp read in
+    `[report = progressReporter()]` was captured *before* `performExport` bumped the generation, so
+    every report would have been dropped as stale. The fix is ownership, not ordering: whatever
+    creates the run creates the sink. **A bounded-poll test caught this** — it fails rather than
+    hangs, which is the only reason it was a red test and not a silent one.
+  - **The seam had been there since M10-T2**: `Exporter.exportToMP4` took a `progress` callback and
+    every caller passed nil. Worth grepping for reported-but-unconsumed values before building one.
+
 - 2026-08-04 (M28-T3): **What a view-based row costs, once you actually build one.** The
   Accessibility half was free (the spike below); the drawing half is not:
   - 🔴 **A row's view keeps the width you create it with, so anything you draw at `bounds.maxX`

@@ -2408,10 +2408,25 @@ rather than two. T2–T4 below are the old T1–T3, renumbered.
       ⚠️ **The live-arrival path is unobservable in the app**, though it is implemented and proven on
       the harness (docs/07): a probe file copied into `~/Movies` already had its frame by the time
       the row could be seen. Its value is the safety net and T4, not thumbnails.
-- [ ] M28-T4 **A progress row that advances while the menu is open.** The M6-T10 constraint —
+- [x] M28-T4 **A progress row that advances while the menu is open.** The M6-T10 constraint —
       nothing may tick into an open menu — dies here, and with it the stamped-at-open `Exporting …`
       row. **Rulings:** what else may now tick, and what deliberately still should not (a live clock
       in an open menu was never the ask).
+      ✅ **Done 2026-08-04.** `ExportModel.exportProgress` + `ExportProgressRowView`. **700 tests**
+      (+5). **Rulings taken as recommended:** a bar *and* a percentage, **nothing else starts
+      ticking**, and GIF/trim keep the plain row rather than an invented figure — only the MP4 path
+      can report, and `Exporter` had been reporting to nobody since M10-T2.
+      ✅ **Proven the only way that counts: one menu open, eight samples, six distinct values** —
+      `Exporting… 1% → 2% → 3% → 4% → 5% → 6%` read straight off `AXTitle` while the menu was held
+      open. The percentage is in the **title**, not just the drawn bar, so VoiceOver gets the same
+      row a sighted user does.
+      🔴 **Two defects the review caught, both mine:** `menuWillOpen` re-armed the observer on every
+      open, so registrations stacked up (progress is nil almost always, so they never fired to
+      clear); and the generation stamp I added to fix a stale-report race was captured **before**
+      the generation moved, which would have dropped every report. The second is why
+      `aReportedFractionReachesTheMenu` exists — it fails rather than hangs.
+      ⚠️ **`ScreenRecApp` has no test target**, so the observer logic is covered by the live probe
+      and nothing else.
 - [ ] M28-T5 **More than five recents, legibly.** `RecentRecordings.limit = 5` exists because a
       longer list of identical timestamps is unreadable, not because five is right. **Rulings:** the
       new cap, and whether rows group by day.
