@@ -6,6 +6,18 @@
 
 ## Now
 
+- **✅ M29-T1 SHIPPED (2026-08-04) — the menu code finally lives somewhere a test can reach.
+  Next: M29-T2.** `Sources/ScreenRecApp` was an executable target, which SPM cannot link into a test
+  target; its 17 files moved verbatim into an **`AppShell` library**, leaving `main.swift` plus the
+  bundle's `Resources/`. **708 tests.** Plan artifact:
+  `claude.ai/code/artifact/0ca0e2be-82a6-40b9-8ad7-61f3f7bf530b`.
+  ✅ **Nothing moved but the files:** dump **byte-identical across 199 rows**, and
+  `Scripts/bundle.sh` needed **no edit** — the product keeps its name, the payload stayed put.
+  ✅ **One `public` symbol in the whole module** (`ScreenRec.run()`), verified by grep. `AppDelegate`
+  moved too: leaving it in the executable would have forced a dozen types `public` to wire it.
+  ✅ **The point, demonstrated:** `MenuBuilder.rows()` is asserted **in-process** — no app deployed,
+  no menu open, no Accessibility. That is the loop M29-T2 turns into real coverage.
+
 - **✅ M28 COMPLETE and G28 PASSED (2026-08-04) — the menu is AppKit's, and it does things the
   bridge never could.** Five tasks: the windows off the scene graph, the menu at parity, a thumbnail
   per recents row, an export row that advances while you watch it, and ten recents under day

@@ -2471,7 +2471,7 @@ the menu's whole structure could be asserted **in-process in milliseconds** inst
 the app, driving it over Accessibility and diffing a dump. Every parity check M28 ran by hand becomes
 an ordinary test. **PATCH** — no user-facing change at all.
 
-- [ ] M29-T1 **A target the menu code can be tested in.** `ScreenRecApp` is an `.executableTarget`
+- [x] M29-T1 **A target the menu code can be tested in.** `ScreenRecApp` is an `.executableTarget`
       carrying `@main`, which SPM cannot link into a test target. Move the testable surface —
       `MenuBuilder`, `MenuRow`, the two row views, `StatusIconImage`, `WindowPresenter` — into a new
       **library** target. ⚠️ **Ruled at plan time: `AppDelegate` moves too**, so the executable is one
@@ -2481,6 +2481,14 @@ an ordinary test. **PATCH** — no user-facing change at all.
       `Sources/ScreenRecApp/Resources/{Info.plist,AppIcon.icns}`; both paths move with the split.
       **Verify:** `menudriver dump` **identical** — nothing here is a behaviour change, so any diff
       is a mistake — plus the signed bundle still launching and recording.
+      ✅ **Done 2026-08-04.** 17 files moved verbatim (`git mv`, so history follows them); the
+      executable is `main.swift` plus `Resources/`. **708 tests**, dump **byte-identical across 199
+      rows**, and `Scripts/bundle.sh` needed **no edit** — the product keeps its name and the bundle
+      payload stayed with the executable.
+      ✅ **`AppShell` has exactly one `public` symbol, `ScreenRec.run()`** — verified by grep, not
+      asserted. Everything else stays internal and the tests reach it through `@testable`.
+      ✅ **The point, demonstrated:** `MenuBuilder.rows()` is now built and asserted **in a test**,
+      with no app deployed, no menu open and no Accessibility.
 - [ ] M29-T2 **The menu's structure, asserted in-process.** Tests over `MenuBuilder.rows()` for the
       states M28 verified by hand: idle, idle+armed, recording, paused, an export in flight, a muted
       app, a picked-but-missing app, and an empty recents folder. **Verify: break a row and watch the
