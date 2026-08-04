@@ -26,9 +26,15 @@ file every session is required to read.
     AX identity to the view and would blind `menudriver`, and shipped plain rows partly on that
     basis. Plain rows were still right for a parity task — but the stated reason was a guess, and it
     was wrong. Only `NSMenuItem()` with no title loses the title, which is just "no title set".
+  - ✅ **And a view-based row updates LIVE under an open menu.** A label inside a row's view, driven
+    by a `.common`-mode timer, read **`tick 4` → `tick 7`** while the menu was held open throughout.
+    **This is the end of the M6-T10 constraint, for view rows only:** that rule exists because a
+    state publish made AppKit rebuild the open menu's rows and garble hover — mutating a view
+    rebuilds nothing, so there is nothing to garble. It is what lets T3's thumbnails arrive late and
+    T4's progress row genuinely advance.
   - ⚠️ **Still unmeasured, and the real cost of view rows:** a custom view draws its own highlight
     and handles its own clicks — AppKit does neither for you. That, not Accessibility, is what T3
-    has to budget for.
+    has to budget for. Hover behaviour under a live update is likewise eyeballed by nobody yet.
 
 - 2026-08-04 (M28-T2): **Porting a SwiftUI menu to `NSMenu` is mostly mechanical; the state timing
   is not.** Row-for-row the translation is one-to-one (`Picker(.inline)` → `item.state`, `Toggle` →
