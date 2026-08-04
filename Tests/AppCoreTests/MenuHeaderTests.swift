@@ -77,4 +77,19 @@ import RecorderCore
         #expect(shown.count <= 41)
         #expect(shown.hasSuffix("x"))   // the end survives — the most specific part
     }
+
+    // MARK: - The export row (M28-T4)
+
+    @Test func exportRowStatesHowFarWhenItCanAndWhatItIsDoingWhenItCannot() {
+        // GIF and trim report nothing, so the row keeps the filename rather than inventing a figure.
+        #expect(MenuHeader.exporting("Clip.mov", fraction: nil) == "Exporting Clip.mov…")
+        #expect(MenuHeader.exporting("Clip.mov", fraction: 0) == "Exporting… 0%")
+        #expect(MenuHeader.exporting("Clip.mov", fraction: 0.425) == "Exporting… 43%")
+        #expect(MenuHeader.exporting("Clip.mov", fraction: 1) == "Exporting… 100%")
+    }
+
+    @Test func anOutOfRangeFractionIsClampedRatherThanPrinted() {
+        #expect(MenuHeader.exporting("Clip.mov", fraction: 1.4) == "Exporting… 100%")
+        #expect(MenuHeader.exporting("Clip.mov", fraction: -0.3) == "Exporting… 0%")
+    }
 }

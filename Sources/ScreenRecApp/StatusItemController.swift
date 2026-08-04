@@ -29,6 +29,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private var pulseTimer: Timer?
     private var pulsePhase = 0.0
     private var levelBars = 0
+    private var menuIsOpen = false
+    private var observingProgress = false
 
     init(state: AppState, windows: WindowPresenter) {
         self.state = state
@@ -60,6 +62,43 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         let builder = MenuBuilder(state: state, windows: windows, thumbnails: thumbnails)
         for item in builder.rows() { menu.addItem(item) }
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        menuIsOpen = true
+        observeExportProgress()
+    }
+
+    func menuDidClose(_ menu: NSMenu) { menuIsOpen = false }
+
+    /// Advances the export row in place while the menu is up — nothing else in the menu ticks
+    /// (M28-T4).
+    ///
+    /// At most one registration exists at a time: tracking is one-shot and only *re-arms* while the
+    /// menu is open, so without the flag every open would stack another one that outlives it.
+    private func observeExportProgress() {
+        guard menuIsOpen, !observingProgress else { return }
+        observingProgress = true
+        withObservationTracking {
+            _ = state.exports.exportProgress
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.observingProgress = false
+                self.advanceExportRow()
+                self.observeExportProgress()
+            }
+        }
+    }
+
+    private func advanceExportRow() {
+        guard let fraction = state.exports.exportProgress,
+              let name = state.exports.exportInProgress,
+              let row = menu.items.first(where: { $0.view is ExportProgressRowView })
+        else { return }
+        // The title as well as the bar: it is what VoiceOver reads.
+        row.title = MenuHeader.exporting(name, fraction: fraction)
+        (row.view as? ExportProgressRowView)?.show(fraction)
     }
 
     /// Hands a just-decoded frame to the row showing that file, wherever it currently sits.

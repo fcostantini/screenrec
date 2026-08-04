@@ -21,6 +21,19 @@ public enum MenuHeader {
         return "Stop & Copy MP4 · up to \(ApproximateBytes.formatted(maximumBytes))"
     }
 
+    /// The export row (M28-T4). The percentage rides in the title, not only in the drawn bar,
+    /// because the title is what VoiceOver reads — a bar alone leaves that reader the frozen row
+    /// this row exists to fix. Nil progress keeps the filename, since there is nothing else to say.
+    public static func exporting(_ name: String, fraction: Double?) -> String {
+        guard let fraction else { return "Exporting \(name)…" }
+        return "Exporting… \(exportPercent(fraction))%"
+    }
+
+    /// One rounding rule, so the drawn bar and the number it sits beside can never disagree.
+    public static func exportPercent(_ fraction: Double) -> Int {
+        Int((min(1, max(0, fraction)) * 100).rounded())
+    }
+
     /// The idle header's right-hand status: `Ready`, or the blocking condition.
     ///
     /// Every non-ready verdict collapses to one short phrase; `RecordingReadiness.blocked`'s

@@ -181,7 +181,12 @@ struct MenuBuilder {
             items.append(MenuRow.separator())
         }
         if let name = state.exports.exportInProgress {
-            items.append(MenuRow.label("Exporting \(name)…"))
+            let fraction = state.exports.exportProgress
+            let row = MenuRow.label(MenuHeader.exporting(name, fraction: fraction))
+            // Only the path that can report gets a bar; GIF and trim say what they are doing and
+            // nothing they cannot know (M28-T4).
+            if let fraction { row.view = ExportProgressRowView(fraction: fraction) }
+            items.append(row)
             items.append(MenuRow.separator())
         } else if let last = state.exports.lastExport {
             items.append(MenuRow.submenu(last.menuTitle, fileActions(last.url)))

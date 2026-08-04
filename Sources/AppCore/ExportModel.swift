@@ -22,6 +22,14 @@ public final class ExportModel {
     /// shows an "Exporting…" row and blocks a second export. One at a time, either format.
     public private(set) var exportInProgress: String?
 
+    /// How far the export in flight has got, 0…1 — or nil for one whose progress cannot be known
+    /// (GIF and trim report none), where the row says only that it is running (M28-T4).
+    public private(set) var exportProgress: Double?
+
+    /// Distinguishes one export from the next, so a straggling report from a cancelled transcode
+    /// cannot land on its successor.
+    private var exportGeneration = 0
+
     /// The most recent export, for the menu receipt (reveals the file). Replaced by the next, and
     /// persisted so it survives relaunch (M12-T2) — the didSet mirrors every change to the store;
     /// a rename re-points it, a trash clears it. Seeded in `init` (validated), where the didSet
@@ -35,8 +43,9 @@ public final class ExportModel {
 
     /// The transcode and the GIF encode, injected so tests exercise the wiring without the hardware
     /// codecs. Each returns where it wrote. Default to the production `Exporter`/`GifExporter`/`Trimmer`.
-    public var exportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: ExportConfiguration, _ range: ExportRange?, _ crop: CropRect?) async throws -> URL = {
-        try await Exporter.exportToMP4(from: $0, to: $1, configuration: $2, range: $3, crop: $4).url
+    public var exportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: ExportConfiguration, _ range: ExportRange?, _ crop: CropRect?, _ progress: @escaping @Sendable (Double) -> Void) async throws -> URL = {
+        try await Exporter.exportToMP4(
+            from: $0, to: $1, configuration: $2, range: $3, crop: $4, progress: $5).url
     }
     public var gifExportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: GifConfiguration) async throws -> URL = {
         try await GifExporter.exportGIF(from: $0, to: $1, configuration: $2).url
@@ -79,9 +88,10 @@ public final class ExportModel {
         performExport(
             source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source, range: range)),
             estimate: { await Self.mp4Bytes(of: source, configuration: configuration, range: range) },
-            using: { try await export($0, $1, configuration, range, nil) },
+            using: { try await export($0, $1, configuration, range, nil, $2) },
             success: { RecordingNotifications.exported(url: $0) },
-            failure: RecordingNotifications.exportFailed)
+            failure: RecordingNotifications.exportFailed,
+            reportsProgress: true)
     }
 
     /// Exports `source` — or just `range` of it (M24-T1), or just `crop` of each frame (M26-T2) —
@@ -104,9 +114,10 @@ public final class ExportModel {
                 await Self.mp4Bytes(
                     of: source, configuration: configuration, range: range, crop: crop)
             },
-            using: { try await export($0, $1, configuration, range, crop) },
+            using: { try await export($0, $1, configuration, range, crop, $2) },
             success: notice,
             failure: RecordingNotifications.exportFailed,
+            reportsProgress: true,
             completion: copy)
     }
 
@@ -120,7 +131,7 @@ public final class ExportModel {
         let gifExport = gifExportFunction  // snapshot the value; the closure captures no `self`
         performExport(
             source, to: Exporter.availableURL(basedOn: GifExporter.gifSibling(of: source)),
-            using: { try await gifExport($0, $1, configuration) },
+            using: { source, output, _ in try await gifExport(source, output, configuration) },
             success: { RecordingNotifications.savedAsGIF(url: $0) },
             failure: RecordingNotifications.gifExportFailed)
     }
@@ -136,7 +147,7 @@ public final class ExportModel {
             // A trim keeps a subset of the source's samples, so the whole source is a ceiling for
             // it — no rate model needed, and it can only over-quote.
             estimate: { Self.fileBytes(of: source) },
-            using: { try await trim($0, $1, start, end, mode, crop) },
+            using: { source, output, _ in try await trim(source, output, start, end, mode, crop) },
             success: { RecordingNotifications.trimmed(url: $0) },
             failure: RecordingNotifications.trimFailed)
     }
@@ -153,14 +164,19 @@ public final class ExportModel {
         _ source: URL,
         to output: URL,
         estimate: (@Sendable () async -> Int64?)? = nil,
-        using export: @escaping @Sendable (URL, URL) async throws -> URL,
+        using export: @escaping @Sendable (URL, URL, @escaping @Sendable (Double) -> Void) async throws -> URL,
         success: @escaping (URL) -> RecordingNotification,
         failure: @escaping () -> RecordingNotification,
+        reportsProgress: Bool = false,
         completion: (@MainActor (URL) -> Void)? = nil
     ) {
         guard exportInProgress == nil else { return }
+        exportGeneration += 1
         exportInProgress = source.lastPathComponent
+        exportProgress = reportsProgress ? 0 : nil
         let availableBytes = self.availableBytes
+        // Built here, after the generation moves, so the sink belongs to this run and no other.
+        let report = progressReporter()
         exportTask = Task { [weak self, export] in
             // Before a byte is written: an export knows its own length, so a job that cannot land
             // is refused rather than failed part-way (the recording path's floor is the other
@@ -169,21 +185,38 @@ public final class ExportModel {
                 writing: output, estimate: estimate, availableBytes: availableBytes) {
                 guard let self else { return }
                 exportInProgress = nil
+                exportProgress = nil
                 notify?(RecordingNotifications.exportNoRoom(shortfall))
                 return
             }
             do {
-                let url = try await export(source, output)
+                let url = try await export(source, output, report)
                 guard let self else { return }
                 exportInProgress = nil
+                exportProgress = nil
                 lastExport = LastExport(url: url, date: Date())
                 completion?(url)      // before the notice, so "Copied" is true when it is read
                 notify?(success(url))
             } catch {
                 guard let self else { return }
                 exportInProgress = nil
+                exportProgress = nil
                 Self.log.error("export failed: \(error.localizedDescription, privacy: .public)")
                 notify?(failure())
+            }
+        }
+    }
+
+    /// The sink handed to the exporter, which reports from a background queue — every update lands
+    /// on the main actor, where the menu reads it.
+    private func progressReporter() -> @Sendable (Double) -> Void {
+        let generation = exportGeneration
+        return { [weak self] fraction in
+            Task { @MainActor in
+                // A cancelled export's transcode keeps running and keeps reporting; without the
+                // generation it could resurrect a stale bar, or overwrite the next export's.
+                guard let self, generation == self.exportGeneration else { return }
+                self.exportProgress = fraction
             }
         }
     }
@@ -253,6 +286,7 @@ public final class ExportModel {
         exportTask?.cancel()
         exportTask = nil
         exportInProgress = nil
+        exportProgress = nil
     }
 
     // MARK: - The receipt
