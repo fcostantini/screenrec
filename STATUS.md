@@ -6,7 +6,28 @@
 
 ## Now
 
-- **✅ M28-T1 SHIPPED (2026-08-04) — the windows no longer need a SwiftUI scene. Next: M28-T2.**
+- **✅ M28-T2 SHIPPED (2026-08-04) — the menu is AppKit, and it is the same menu. Next: M28-T3.**
+  `MenuBarExtra` is gone: `StatusItemController` + `MenuBuilder` + `MenuRow` (756 lines) replace
+  `MenuView` and the SwiftUI status-item label (829). The app's entry point is AppKit, and the seven
+  launch jobs that hung off the status item's `.task` run in `applicationDidFinishLaunching`.
+  **695 tests, no test edited, zero warnings.** Plan artifact:
+  `claude.ai/code/artifact/4c5a7233-c222-48f5-bd31-b1930d5ac58d`.
+  ✅ **The bar was met on all three menus.** Idle **byte-identical**, proven in both audio states
+  (160 rows with an app playing; 157 + a matching `Mute ▸` block with none). Recording and paused
+  identical row for row, the only differences being **live values** — bytes written and the
+  `Stop & Copy` figure off sub-second elapsed. The recording legs are Franco's runs.
+  🔴 **Measurement caught the one thing parity would have shipped broken:** the first open after
+  launch had no app list, no window list and no recents detail — those come from async reads, and
+  the SwiftUI menu filled them in **while open**, which is the M6-T10 corruption relied on as a
+  feature. Caches are primed at launch instead. **A second dump would have hidden this.**
+  ⚠️ **None of the three declared diffs was exercised** — nothing muted, no picked app missing, and
+  the `Source ▸` rules turned out to reproduce the `Picker`'s own separators exactly. They are real
+  in code and specced in docs/06, and **unevidenced**; so are the **armed-replay rows**, since
+  replay is off and a session does not touch that setting.
+  ⚠️ **`M28` is a MINOR and `VERSION` is still 1.14.0** — T1 and T2 are no user-facing change, so the
+  bump belongs with T3–T5, which are.
+
+- **✅ M28-T1 SHIPPED (2026-08-04) — the windows no longer need a SwiftUI scene.**
   Settings, Onboarding and Trim are `NSWindow`s hosting the same views (`WindowPresenter`, 68 lines
   against 40 deleted). **695 tests**, dev loop clean. Plan artifact:
   `claude.ai/code/artifact/0b23f84a-32db-41e6-8afe-67c40efa9583`.

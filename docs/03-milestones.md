@@ -2357,7 +2357,7 @@ rather than two. T2–T4 below are the old T1–T3, renumbered.
       pressed through AX closed the window and wrote a playable 10.04 s file, both tracks.
       ⚠️ **Rebuilt per open on purpose:** Trim's player teardown hangs off `onDisappear`, so the
       window has to genuinely go away.
-- [ ] M28-T2 **Parity: the same menu, drawn by AppKit.** An `NSStatusItem` + `NSMenu` replacing
+- [x] M28-T2 **Parity: the same menu, drawn by AppKit.** An `NSStatusItem` + `NSMenu` replacing
       `MenuBarExtra`. **Seams:** `MenuView` (602 lines) and all of docs/06's menu spec, which is
       written in its terms; the inline `Picker` checkmark behaviour in `Source ▸` is load-bearing and
       has to be rebuilt by hand. **Plain `NSMenuItem`s, not custom views:** a view-based item hands
@@ -2367,6 +2367,22 @@ rather than two. T2–T4 below are the old T1–T3, renumbered.
       has leaned on that instrument** — bar three declared diffs: `Mute ▸` stops faking its checkmark
       into the title, the `(not running)` row finally dims (M7-T2, "accepted" in docs/06), and
       `Source ▸`'s trailing rule stops being a side effect of the inline `Picker`.
+      ✅ **Done 2026-08-04.** `StatusItemController` + `MenuBuilder` + `MenuRow` (756 lines) against
+      `MenuView` and the SwiftUI status-item label (829). **695 tests**, no test edited, zero
+      warnings, dev loop clean. **`AppState`'s surface never moved** — M22's forwards are why.
+      ✅ **The bar was met on all three menus.** Idle: **byte-identical**, proven twice, in both
+      audio states (160 rows with an app playing, 157 + a matching `Mute ▸` block with none).
+      Recording and paused: identical row for row, the only differences being **live values** —
+      bytes written and the `Stop & Copy` estimate off sub-second elapsed.
+      ⚠️ **None of the three declared diffs was actually exercised**: nothing was muted, no picked
+      app was missing, and the leading/trailing rules turned out to reproduce the `Picker`'s own
+      separators exactly, so the dump shows no diff at all. They are real in code and in docs/06,
+      and unevidenced. Likewise the **armed-replay rows** — Franco's replay is off and a session
+      does not touch that setting.
+      🔴 **The one thing measurement caught, which parity would have shipped broken:** the first open
+      after launch had no app list, no window list and no recents detail. Those come from async
+      reads; the SwiftUI menu filled them in **while open**, which is exactly the M6-T10 corruption.
+      The caches are primed at launch instead, so the first open matches every later one.
 - [ ] M28-T3 **A thumbnail per recents row.** **Seams:** `FilmstripThumbnails` (M24-T4) already
       decodes a frame off the main thread and its cost is measured — first frame ~80 ms, and cost
       tracks keyframe spacing × count, not take length. **Rulings:** thumbnail size; whether it is

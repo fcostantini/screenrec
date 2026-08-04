@@ -7,6 +7,31 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-04 (M28-T2): **Porting a SwiftUI menu to `NSMenu` is mostly mechanical; the state timing
+  is not.** Row-for-row the translation is one-to-one (`Picker(.inline)` → `item.state`, `Toggle` →
+  `item.state`, `Text` → `isEnabled = false`, `Menu` → `submenu`, `.keyboardShortcut` →
+  `keyEquivalent`). What does not port is *when* the rows are computed:
+  - 🔴 **A SwiftUI menu re-renders itself while open; an `NSMenu` built in `menuNeedsUpdate` does
+    not.** The Source app list, the window list and the recents' `— 0:10 · 19,7 MB` details all
+    arrive from async reads, and under SwiftUI they appeared *into the open menu* — which is the
+    M6-T10 corruption, relied on as a feature. Stamped rows are the documented contract, so the fix
+    is to **prime those caches at launch**, not to rebuild under an open menu. Without it, only the
+    first open after launch is wrong — which is exactly the kind of thing a second dump hides.
+  - **`autoenablesItems` defaults to true** and keys off whether the target responds to the action,
+    which silently re-enables dimmed info rows. Set it false on every menu built by hand.
+  - **A menu item can be its own target.** `NSMenuItem.target` is weak and the menu owns its items,
+    so a closure-carrying `NSMenuItem` subclass needs no separate action object.
+  - **The inline `Picker` emitted a leading *and* a trailing separator** around its group — visible
+    in the dump as `---` on both sides of `Source ▸`'s screens and inside `Window ▸`. Reproducing
+    them by hand is what parity means here; a reviewer reading only the new code will call them
+    stray copy-paste, and the dump is the authority that says otherwise.
+  - **AX uppercases a key equivalent for display**: `keyEquivalent = "q"` dumps as `[⌘Q]`, matching
+    what SwiftUI's `.keyboardShortcut("q")` produced. Setting `"Q"` would instead imply Shift.
+  - ⚠️ **`menudriver` is only as good as the state you dump in.** Two runs differed because Discord
+    started playing (`Mute ▸` lists what is audible) and because window titles retitle themselves
+    between opens. Normalise titles, note the audio state, and compare a menu against itself in the
+    *same* state — a diff here reads as a regression when it is the machine living its life.
+
 - 2026-08-04 (M28-T1): **A SwiftUI `Window` scene has four behaviours you have to rebuild by hand**
   when you host the same view in a plain `NSWindow`. Each was measured on the live app, not assumed:
   - **Content sizing survives** via `NSHostingController.sizingOptions = [.preferredContentSize]`,
