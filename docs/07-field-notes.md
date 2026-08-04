@@ -7,6 +7,29 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-04 (M29): **Three things about making an untested target testable, all learned the hard
+  way in one session.**
+  - 🔴 **A break that doesn't compile reads as "nothing went red".** The break-it-and-watch-it-fail
+    sweep reported a test as unable to see its own row; the truth was that the edit left unbalanced
+    braces, so the build failed and no test ran. **A harness that parses test output must treat a
+    build failure as an error, not as an absence of failures** — otherwise the exercise designed to
+    catch dead tests produces exactly the false confidence it exists to remove.
+  - 🔴 **A solved problem comes back with a new target.** `AppCoreTests`' `TestDefaults` exists
+    because throwaway `UserDefaults` suites reached **49,668 plists**. A new test target, unable to
+    import it across the target boundary, reimplemented the naive version and had leaked **256**
+    before a reviewer counted them. The fix is unavoidable duplication; the lesson is that a
+    per-target guard is only as good as the next target's author knowing it exists — which is why
+    this note is here rather than only in that file's doc comment.
+  - ⚠️ **`AppState.apply(.started)` does not make the session active.** It moves the status icon;
+    `session.isActive` is `capture != nil`, and `capture` needs a real `RecordingSession` (a
+    `CaptureEngine` plus an `AVAssetWriter`). A "recording menu" test written against `apply` would
+    assert the **idle** menu and pass. Measured before writing any, which is the only reason a
+    whole suite of vacuous tests doesn't exist.
+  - ⚠️ **What a test still cannot see:** two of M28's defects were a misaligned chevron and a
+    highlight in the wrong blue. Neither is a row, so structure tests miss them; asserting the flag
+    that fixes them (`autoresizingMask`, `material = .selection`) pins the fix against removal but
+    proves nothing about how it looks. **The screenshot is not redundant with the suite.**
+
 - 2026-08-04 (M28-T4): **A row that ticks needs its title to tick too, and `withObservationTracking`
   needs a leash.**
   - **The percentage belongs in `NSMenuItem.title`, not only in the drawn bar.** The title is what

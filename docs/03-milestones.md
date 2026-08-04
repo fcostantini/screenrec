@@ -2509,15 +2509,28 @@ an ordinary test. **PATCH** — no user-facing change at all.
       satisfied by a *filename* rather than the day header it claimed to check; and the throwaway
       `UserDefaults` suites were never swept — **256 stray plists had already accumulated**, the
       exact failure `AppCoreTests`' `TestDefaults` was written for after it reached 49,668.
-- [ ] M29-T3 **The decisions that actually broke.** The observation flag that bounds registrations to
+- [x] M29-T3 **The decisions that actually broke.** The observation flag that bounds registrations to
       one, the pulse timer's start/stop condition, the clock tick's guard, and each row view's width
       and aspect-fit arithmetic. Where a decision is entangled with `NSStatusItem`, extract the
       decision rather than test the widget — the `AppCore` pattern. **Verify:** re-introduce M28's two
       defects and watch the new tests go red.
+      ✅ **Done 2026-08-04.** `StatusItemPolicy` (three rules) plus the row's width and aspect-fit,
+      out of the view. **728 tests.**
+      ✅ **18 breaks applied, 18 turned the named test red — including both of M28's real defects
+      put back.** Dropping the observation flag and dropping `autoresizingMask` each fail the test
+      that names them, so the two that needed a reviewer would now fail `swift test`.
+      ✅ **The pulse still runs and still stops**, measured not eyeballed: the status item rendered
+      **1 distinct bitmap in 6 samples while idle and 6 of 6 while recording**.
+      ⚠️ **Two tests assert only that a flag is set** — they cannot prove the chevrons align or the
+      blue matches, and say so. They pin measured facts against silent removal; the screenshot stays
+      the instrument for how it looks.
+      ⚠️ **One of my own assertions was too weak to catch its defect** (removing the chevron's
+      trailing room left it green) and was rewritten to assert what the space is *for*.
 
-**Gate G29**: the menu's structure, the observation rules and the row geometry each fail a test when
-broken — proven by breaking them, not asserted — while `menudriver dump` is unchanged throughout,
-because none of this is a behaviour change.
+**Gate G29** — ✅ **PASSED 2026-08-04** (evidence in STATUS.md's gate table). The criterion as filed:
+the menu's structure, the observation rules and the row geometry each fail a test when broken —
+proven by breaking them, not asserted — while `menudriver dump` is unchanged throughout, because
+none of this is a behaviour change.
 
 ## Dependency graph
 
