@@ -7,17 +7,20 @@ let trimWindowTitle = "Trim"
 
 /// The menu-bar app (docs/06 "Shell"): `LSUIElement`, so the status item and its menu are the app's
 /// surface. Onboarding, Settings and Trim are the only windows, and `WindowPresenter` builds them.
-@main
+///
+/// The module's whole public surface: everything else stays internal, which is what lets the tests
+/// reach it through `@testable import`.
 @MainActor
-enum ScreenRecMain {
-    /// `NSApplication.delegate` is weak, so the app's owner has to be this.
-    private static let delegate = AppDelegate()
-
-    static func main() {
+public enum ScreenRec {
+    /// Hands control to AppKit; does not return until the app quits.
+    public static func run() {
         let application = NSApplication.shared
         application.delegate = delegate
         application.run()
     }
+
+    /// `NSApplication.delegate` is weak, so the app's owner has to be this.
+    private static let delegate = AppDelegate()
 }
 
 /// Owns the one `AppState` and everything AppKit that hangs off it.

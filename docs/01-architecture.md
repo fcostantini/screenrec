@@ -30,23 +30,30 @@ screenrec-app/
 │   │   │                     #   RecordingClock, MicrophoneLevel, StatusIcon, DisplayOption,
 │   │   │                     #   LoginItem, MenuHeader, CountInOutcome, RenameTarget,
 │   │   │                     #   FileIdentity, LastExport, LastReplay, RecentRecordings
-│   └── ScreenRecApp/          # Menu-bar app. AppKit shell, SwiftUI windows. Depends on AppCore.
-│       │                     #   App (@main NSApplication + AppDelegate), StatusItemController +
-│       │                     #   MenuBuilder + MenuRow (the NSMenu, M28), StatusIconImage,
-│       │                     #   WindowPresenter (Settings/Onboarding/Trim, M28), Notifier,
-│       │                     #   Relaunch, HotkeyCenter (Carbon), RegionSelectionOverlay (M11),
-│       │                     #   CountInOverlay (M12), NotificationSettings, LoginItem
-│       └── Views/            #   SettingsView, OnboardingView, TrimView, HotkeyRecorderButton,
-│                             #   ShareActions (pasteboard/share sheet/alerts), Finder
+│   ├── AppShell/              # Library. The AppKit shell + SwiftUI windows (M29-T1 — a library,
+│   │   │                     #   not the executable, because SPM can't link one into a test target).
+│   │   │                     #   AppMain (ScreenRec.run + AppDelegate), StatusItemController +
+│   │   │                     #   MenuBuilder + MenuRow (the NSMenu, M28), StatusIconImage,
+│   │   │                     #   RecentRowView + ExportProgressRowView (M28-T3/T4),
+│   │   │                     #   WindowPresenter (Settings/Onboarding/Trim, M28), Notifier,
+│   │   │                     #   Relaunch, HotkeyCenter (Carbon), RegionSelectionOverlay (M11),
+│   │   │                     #   CountInOverlay (M12), NotificationSettings, LoginItem
+│   │   └── Views/            #   SettingsView, OnboardingView, TrimView, HotkeyRecorderButton,
+│   │                         #   ShareActions (pasteboard/share sheet/alerts), Finder
+│   └── ScreenRecApp/          # The executable: main.swift calls `ScreenRec.run()`, and Resources/
+│                             #   (Info.plist, AppIcon.icns) which bundle.sh copies from this path
 ├── Scripts/                   # bundle.sh, devsign.sh, release.sh, smoke.sh (M13), hooks/pre-push
 ├── Tests/                     # RecorderCoreTests + AppCoreTests (pure-decision + integration)
+│                              #   + AppShellTests (the menu, built and asserted in-process — M29)
 ├── tools/                     # probe, frames, menudriver, settingsdriver, hoverprobe, axdump,
 │                              #   busyscene (load stimulus), makeicon
 └── docs/                      # you are here
 ```
 
 **Rule for agents:** `RecorderCore` must never import AppKit/SwiftUI (CoreGraphics is
-fine), and `AppCore` never imports either. Everything testable lives there. The CLI stays the
+fine), and `AppCore` never imports either. Everything testable lives there — **and since M29-T1 the
+AppKit shell is testable too**: `AppShell` is a library, so `AppShellTests` reaches its internals
+through `@testable`. `AppShell`'s only `public` symbol is `ScreenRec.run()`; keep it that way. The CLI stays the
 headless verification surface (ADR-011) — most gate evidence is easier to get through it than
 through the menu.
 

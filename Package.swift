@@ -24,12 +24,19 @@ let package = Package(
             dependencies: ["RecorderCore"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        // Menu-bar app: SwiftUI views only, over AppCore.
-        // Info.plist is copied into the .app bundle by Scripts/bundle.sh, not compiled —
-        // exclude it so SPM doesn't treat it as an unhandled resource.
+        // The app's AppKit shell and SwiftUI windows. A library, not part of the executable, for
+        // one reason: SPM cannot link an executable target into a test target, and this is where
+        // the menu's decisions live (M29-T1).
+        .target(
+            name: "AppShell",
+            dependencies: ["AppCore"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        // Three lines and the bundle's payload. `Resources/` stays here because Scripts/bundle.sh
+        // copies it from this path, and it is bundle payload rather than code.
         .executableTarget(
             name: "ScreenRecApp",
-            dependencies: ["AppCore"],
+            dependencies: ["AppShell"],
             // Both are assembled into the .app bundle by Scripts/bundle.sh, not compiled —
             // exclude them so SPM doesn't treat them as unhandled resources.
             exclude: ["Resources/Info.plist", "Resources/AppIcon.icns"],
@@ -52,6 +59,12 @@ let package = Package(
         .testTarget(
             name: "AppCoreTests",
             dependencies: ["AppCore", "RecorderCore"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        // Reaches `AppShell` through `@testable`, so the menu's types stay internal (M29-T1).
+        .testTarget(
+            name: "AppShellTests",
+            dependencies: ["AppShell", "AppCore"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]

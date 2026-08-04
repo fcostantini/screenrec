@@ -2474,7 +2474,9 @@ an ordinary test. **PATCH** — no user-facing change at all.
 - [ ] M29-T1 **A target the menu code can be tested in.** `ScreenRecApp` is an `.executableTarget`
       carrying `@main`, which SPM cannot link into a test target. Move the testable surface —
       `MenuBuilder`, `MenuRow`, the two row views, `StatusIconImage`, `WindowPresenter` — into a new
-      **library** target, leaving the executable as `@main` plus `AppDelegate`. **Seams:**
+      **library** target. ⚠️ **Ruled at plan time: `AppDelegate` moves too**, so the executable is one
+      call and `AppShell` has exactly one `public` symbol; leaving the delegate behind would have
+      forced a dozen types `public` just to wire it. **Seams:**
       `Scripts/bundle.sh` builds the product `ScreenRecApp` and copies
       `Sources/ScreenRecApp/Resources/{Info.plist,AppIcon.icns}`; both paths move with the split.
       **Verify:** `menudriver dump` **identical** — nothing here is a behaviour change, so any diff
