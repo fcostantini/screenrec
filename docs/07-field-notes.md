@@ -34,6 +34,17 @@ file every session is required to read.
   - **AppKit draws none of a view row's furniture**: no highlight, no checkmark, no submenu
     chevron. Measured on the harness — a `state = .on` view row reports `✓` to Accessibility and
     renders nothing. All three are yours to draw.
+  - 🔴 **The menu's selection is a vibrancy material, not a colour, and no fill can match it.**
+    `NSColor.selectedContentBackgroundColor` is the *table* blue: measured against an AppKit-drawn
+    row in the same menu it read **rgb(36, 88, 202) against rgb(50, 102, 185)**. The semantically
+    right `selectedMenuItemColor` is deprecated **in favour of `NSVisualEffectMaterialSelection`**,
+    which is the actual answer — an `NSVisualEffectView` with `material = .selection` measured
+    **rgb(47, 98, 179) against rgb(47, 98, 179), delta (0, 0, 0)**. A flat fill also samples
+    *non-uniformly* (60 px of the modal colour against 272), which is the tell that it is sitting on
+    vibrancy it isn't part of.
+    ⚠️ It forces a second view: **a subview always draws above its superview's own `draw(_:)`**, so
+    the material and the row's ink cannot share one view. Geometry, for anyone rebuilding this:
+    AppKit insets its row highlight **5 pt left and right, 0 pt top and bottom**, corner radius 4.
   - **`draw(_:)` runs on every highlight change**, so lay text out once at init. Two attributed
     strings (normal and selected ink) plus a cached size beat measuring per redraw.
   - ⚠️ **The live-arrival path is real but unobservable here**: a probe file copied into `~/Movies`

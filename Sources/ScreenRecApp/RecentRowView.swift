@@ -9,38 +9,88 @@ final class RecentRowView: NSView {
 
     static let thumbnailSize = NSSize(width: 36, height: 22)
     static let height: CGFloat = 28
-    /// Matches the horizontal inset AppKit gives an ordinary row's title.
-    private static let inset: CGFloat = 21
-    private static let gap: CGFloat = 8
+    /// AppKit insets a row's own highlight by this much; measured against one it draws itself.
+    fileprivate static let highlightInset: CGFloat = 5
+    fileprivate static let inset: CGFloat = 21
+    fileprivate static let gap: CGFloat = 8
 
     let url: URL
-    /// Both inks laid out once: `draw(_:)` runs on every highlight change, and measuring text is a
-    /// full layout pass.
-    private let text: NSAttributedString
-    private let highlightedText: NSAttributedString
-    private let textSize: NSSize
-    private var thumbnail: CGImage?
+    /// The selection is a vibrancy material, not a fill: a flat colour measures visibly different
+    /// beside an AppKit-drawn row, which is what `selectedMenuItemColor` was deprecated in favour of.
+    private let selection = NSVisualEffectView()
+    private let content: RowContent
 
     init(url: URL, title: String, thumbnail: CGImage?) {
         self.url = url
-        self.thumbnail = thumbnail
-        text = Self.rendered(title, ink: .labelColor)
-        highlightedText = Self.rendered(title, ink: .selectedMenuItemTextColor)
-        textSize = text.size()
-        super.init(frame: NSRect(
-            x: 0, y: 0, width: Self.inset + Self.thumbnailSize.width + Self.gap
-                + ceil(text.size().width) + Self.trailing,
-            height: Self.height))
+        content = RowContent(title: title, thumbnail: thumbnail)
+        super.init(frame: NSRect(x: 0, y: 0, width: content.width, height: Self.height))
         // The width above only sizes the menu; without this each row keeps it, and the chevrons
         // step in and out with the title length instead of lining up at the menu's edge.
         autoresizingMask = [.width]
+
+        selection.material = .selection
+        selection.state = .active
+        selection.isEmphasized = true
+        selection.blendingMode = .behindWindow
+        selection.wantsLayer = true
+        selection.layer?.cornerRadius = 4
+        selection.isHidden = true
+        addSubview(selection)
+        addSubview(content)
     }
 
     /// Invariant: rows are built in code, never decoded from a nib.
     required init?(coder: NSCoder) { fatalError("RecentRowView is never decoded") }
 
+    func show(_ image: CGImage) { content.show(image) }
+
+    override func layout() {
+        super.layout()
+        selection.frame = bounds.insetBy(dx: Self.highlightInset, dy: 0)
+        content.frame = bounds
+    }
+
+    override func viewWillDraw() {
+        super.viewWillDraw()
+        let highlighted = enclosingMenuItem?.isHighlighted ?? false
+        selection.isHidden = !highlighted
+        content.setHighlighted(highlighted)
+    }
+}
+
+/// The row's ink, over the selection material rather than under it: a subview draws above its
+/// superview, so the two cannot share one view.
+private final class RowContent: NSView {
+
+    private let text: NSAttributedString
+    private let highlightedText: NSAttributedString
+    private let textSize: NSSize
+    private var thumbnail: CGImage?
+    private var highlighted = false
+
+    let width: CGFloat
+
+    init(title: String, thumbnail: CGImage?) {
+        self.thumbnail = thumbnail
+        text = Self.rendered(title, ink: .labelColor)
+        highlightedText = Self.rendered(title, ink: .selectedMenuItemTextColor)
+        textSize = text.size()
+        width = RecentRowView.inset + RecentRowView.thumbnailSize.width + RecentRowView.gap
+            + ceil(textSize.width) + Self.trailing
+        super.init(frame: NSRect(x: 0, y: 0, width: width, height: RecentRowView.height))
+        autoresizingMask = [.width, .height]
+    }
+
+    required init?(coder: NSCoder) { fatalError("RowContent is never decoded") }
+
     func show(_ image: CGImage) {
         thumbnail = image
+        needsDisplay = true
+    }
+
+    func setHighlighted(_ value: Bool) {
+        guard value != highlighted else { return }
+        highlighted = value
         needsDisplay = true
     }
 
@@ -53,15 +103,10 @@ final class RecentRowView: NSView {
     private static let trailing: CGFloat = 28
 
     override func draw(_ dirtyRect: NSRect) {
-        let highlighted = enclosingMenuItem?.isHighlighted ?? false
-        if highlighted {
-            NSColor.selectedContentBackgroundColor.setFill()
-            NSBezierPath(roundedRect: bounds.insetBy(dx: 5, dy: 0), xRadius: 4, yRadius: 4).fill()
-        }
-
         let well = NSRect(
-            x: Self.inset, y: (bounds.height - Self.thumbnailSize.height) / 2,
-            width: Self.thumbnailSize.width, height: Self.thumbnailSize.height)
+            x: RecentRowView.inset,
+            y: (bounds.height - RecentRowView.thumbnailSize.height) / 2,
+            width: RecentRowView.thumbnailSize.width, height: RecentRowView.thumbnailSize.height)
         if let thumbnail {
             NSGraphicsContext.current?.cgContext.draw(thumbnail, in: aspectFitted(thumbnail, in: well))
         } else {
@@ -72,7 +117,7 @@ final class RecentRowView: NSView {
         }
 
         (highlighted ? highlightedText : text).draw(at: NSPoint(
-            x: well.maxX + Self.gap, y: (bounds.height - textSize.height) / 2))
+            x: well.maxX + RecentRowView.gap, y: (bounds.height - textSize.height) / 2))
 
         drawChevron(ink: highlighted ? .selectedMenuItemTextColor : .tertiaryLabelColor)
     }

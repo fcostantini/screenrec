@@ -2408,6 +2408,11 @@ rather than two. T2–T4 below are the old T1–T3, renumbered.
       ⚠️ **The live-arrival path is unobservable in the app**, though it is implemented and proven on
       the harness (docs/07): a probe file copied into `~/Movies` already had its frame by the time
       the row could be seen. Its value is the safety net and T4, not thumbnails.
+      🔴 **The hover highlight was wrong and Franco's eye is what caught it** (2026-08-04). Measured
+      against an AppKit-drawn row in the same menu: geometry already matched exactly (5/5 pt sides,
+      0/0 vertical), but the **colour did not** — a flat `selectedContentBackgroundColor` is the
+      *table* blue. The menu's selection is a **vibrancy material**; an `NSVisualEffectView` with
+      `material = .selection` measures **delta (0, 0, 0)** against the real thing (docs/07).
 - [x] M28-T4 **A progress row that advances while the menu is open.** The M6-T10 constraint —
       nothing may tick into an open menu — dies here, and with it the stamped-at-open `Exporting …`
       row. **Rulings:** what else may now tick, and what deliberately still should not (a live clock
