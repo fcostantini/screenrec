@@ -41,7 +41,8 @@ private final class PlayerObservers: @unchecked Sendable {
 /// `AppState.trim`; this view picks the range and the mode (M18-T1).
 struct TrimView: View {
     @Bindable var state: AppState
-    @Environment(\.dismiss) private var dismiss
+    /// Closes the window. `@Environment(\.dismiss)` does nothing inside a plain `NSWindow`.
+    let onFinish: () -> Void
 
     @State private var player: AVPlayer?
     @State private var loadedURL: URL?
@@ -163,7 +164,7 @@ struct TrimView: View {
                 Button("Export & Copy") {
                     state.exportAndCopy(
                         url, range: ExportRange(start: inSeconds, end: outSeconds), crop: crop)
-                    dismiss()
+                    onFinish()
                 }
                 // ⌘↩ so the whole loop is keyboard-only (G24): ←/→ to find the moment, I/O to set
                 // the range, this to copy it. Return stays on Trim & Save — ADR-015 keeps lossless
@@ -173,7 +174,7 @@ struct TrimView: View {
                 Button("Trim & Save") {
                     state.trim(url, from: inSeconds, to: outSeconds,
                                mode: reencodes ? .precise : .lossless, crop: crop)
-                    dismiss()
+                    onFinish()
                 }
                 .keyboardShortcut(.defaultAction)
                 // A crop has to decode and re-encode every frame, which is what lossless doesn't do
@@ -428,10 +429,10 @@ struct TrimView: View {
         }
     }
 
-    /// Closing the window does not tear down a `Window` scene's state, so the player would go on
-    /// playing — audible, with nothing on screen to stop it (measured: 13 s of playback across a
-    /// 10 s closed window). Dropping it here also frees the decode pipeline of a multi-GB source;
-    /// `loadedURL` goes with it so reopening the same recording rebuilds instead of resuming.
+    /// The player goes on playing behind a closed window unless it is stopped here — audible, with
+    /// nothing on screen to stop it (measured: 13 s of playback across a 10 s closed window).
+    /// Dropping it also frees the decode pipeline of a multi-GB source; `loadedURL` goes with it so
+    /// reopening the same recording rebuilds instead of resuming.
     private func unload() {
         stopRangePlayback()
         stopPlayheadObserver()

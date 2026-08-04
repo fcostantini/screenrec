@@ -33,7 +33,8 @@ screenrec-app/
 │   └── ScreenRecApp/          # Menu-bar app. SwiftUI + AppKit. Depends on AppCore.
 │       │                     #   App (@main, MenuBarExtra + AppDelegate), Notifier, Relaunch,
 │       │                     #   HotkeyCenter (Carbon), RegionSelectionOverlay (M11),
-│       │                     #   CountInOverlay (M12), NotificationSettings, LoginItem
+│       │                     #   CountInOverlay (M12), NotificationSettings, LoginItem,
+│       │                     #   WindowPresenter (M28 — Settings/Onboarding/Trim, no scene)
 │       └── Views/            #   StatusIconView, MenuView, SettingsView, OnboardingView, TrimView,
 │                             #   ShareActions (pasteboard/share sheet/alerts), Finder,
 │                             #   HotkeyRecorderButton

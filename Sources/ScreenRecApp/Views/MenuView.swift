@@ -9,12 +9,11 @@ import SwiftUI
 /// rather than subscribing to timers that would tick behind a closed menu.
 struct MenuView: View {
     @Bindable var state: AppState
+    let windows: WindowPresenter
 
     /// The source pickers bind into `SourcesModel`, and `state.sources` is a `let` — so the binding
     /// is taken on the sub-model itself rather than through a path SwiftUI can't write.
     private var sources: Bindable<SourcesModel> { Bindable(state.sources) }
-
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         if state.session.isActive {
@@ -28,6 +27,8 @@ struct MenuView: View {
         //
         // A synthetic click (`tools/menudriver.swift`) can't confer activation, so window
         // ordering can only be verified by hand.
+        //
+        // ⌘, is bound on this row because an LSUIElement app has no app menu to route it through.
         Button("Settings…") { showSettings() }
             .keyboardShortcut(",")
         Button("Quit") { quit() }
@@ -390,8 +391,7 @@ struct MenuView: View {
             if derives.canTrim {
                 fileButton("Trim…", url) { url in
                     state.exports.trimTarget = url
-                    openWindow(id: trimWindowID)
-                    NSApplication.shared.activate(ignoringOtherApps: true)
+                    windows.show(.trim)
                 }
             }
         }
@@ -473,16 +473,9 @@ struct MenuView: View {
         Button("ScreenRec — \(MenuHeader.idleStatus(state.readiness))") { showOnboarding() }
     }
 
-    private func showOnboarding() {
-        openWindow(id: onboardingWindowID)
-        NSApplication.shared.activate(ignoringOtherApps: true)
-    }
+    private func showOnboarding() { windows.show(.onboarding) }
 
-    /// Opens Settings; see App.swift for why it's a plain `Window`.
-    private func showSettings() {
-        openWindow(id: settingsWindowID)
-        NSApplication.shared.activate(ignoringOtherApps: true)
-    }
+    private func showSettings() { windows.show(.settings) }
 
     // MARK: - Lifecycle
 

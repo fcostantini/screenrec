@@ -2,15 +2,12 @@ import AppCore
 import ServiceManagement
 import SwiftUI
 
-/// Window IDs for `openWindow`.
-let onboardingWindowID = "onboarding"
-let settingsWindowID = "settings"
-let trimWindowID = "trim"
 /// The Trim window's title, shared with `TrimView`'s key monitor, which scopes itself by it.
 let trimWindowTitle = "Trim"
 
 /// The menu-bar app (docs/06 "Shell"): `LSUIElement`, so the status item and its menu are the
-/// app's surface. Owns the one `AppState`; the only windows are Onboarding and Settings.
+/// app's surface. Owns the one `AppState`; Onboarding, Settings and Trim are the only windows,
+/// and `WindowPresenter` builds them.
 @main
 struct ScreenRecApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
@@ -20,6 +17,9 @@ struct ScreenRecApp: App {
         // So a non-menu quit (logout/shutdown/⌘Q-from-a-window) finalizes an in-progress recording
         // (M13-T2). Read on the main thread from `applicationShouldTerminate`.
         delegate.appState = state
+        // Onboarding/Settings/Trim read the same one state; the presenter holds it as a
+        // back-reference so a caller never has to hand it over.
+        ScreenRecApp.windows.state = state
         let notifier = ScreenRecApp.notifier
         // Posting is the app's job; AppCore may not import UserNotifications (docs/01).
         state.notifier = { [weak notifier] in notifier?.post($0) }
@@ -94,36 +94,16 @@ struct ScreenRecApp: App {
     fileprivate static let regionSelector = RegionSelectionController()
     /// One count-in overlay controller, reused per recording start (M12-T6).
     fileprivate static let countIn = CountInController(hotkeys: hotkeys)
+    /// Onboarding, Settings and Trim — AppKit windows, so opening one needs no scene.
+    fileprivate static let windows = WindowPresenter()
 
     var body: some Scene {
         MenuBarExtra {
-            MenuView(state: state)
+            MenuView(state: state, windows: ScreenRecApp.windows)
         } label: {
-            StatusIconLabel(state: state)
+            StatusIconLabel(state: state, windows: ScreenRecApp.windows)
         }
         .menuBarExtraStyle(.menu)
-
-        Window("Set Up ScreenRec", id: onboardingWindowID) {
-            OnboardingView(state: state)
-        }
-        .windowResizability(.contentSize)
-        .defaultPosition(.center)
-
-        // A plain `Window`, not SwiftUI's `Settings` scene: `Settings` exists to route ⌘, through
-        // the app menu, which an LSUIElement app doesn't have — ⌘, is bound on the menu item.
-        Window("ScreenRec Settings", id: settingsWindowID) {
-            SettingsView(state: state)
-        }
-        .windowResizability(.contentSize)
-        .defaultPosition(.center)
-
-        // The Trim window (M10-T4): a fixed window that reads `state.exports.trimTarget`, set by the menu's
-        // "Trim…" — a plain `Window`, like Settings, since an LSUIElement app has no ⌘N to spawn one.
-        Window(trimWindowTitle, id: trimWindowID) {
-            TrimView(state: state)
-        }
-        .windowResizability(.contentSize)
-        .defaultPosition(.center)
     }
 }
 
@@ -167,8 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// menu content isn't built until the menu opens.
 private struct StatusIconLabel: View {
     let state: AppState
-
-    @Environment(\.openWindow) private var openWindow
+    let windows: WindowPresenter
 
     var body: some View {
         StatusIconView(
@@ -193,12 +172,7 @@ private struct StatusIconLabel: View {
                 state.recoverInterruptedRecordings()
                 // docs/06: appears on first launch or any missing permission, never once
                 // satisfied.
-                if state.needsOnboarding {
-                    openWindow(id: onboardingWindowID)
-                    // An accessory (LSUIElement) app's windows open behind the frontmost app
-                    // unless it activates.
-                    NSApplication.shared.activate(ignoringOtherApps: true)
-                }
+                if state.needsOnboarding { windows.show(.onboarding) }
                 await relaunchWhenScreenGrantLands()
             }
     }
