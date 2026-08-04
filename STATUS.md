@@ -16,8 +16,8 @@
   ⚠️ **What this milestone cost, in one line:** two of its defects were found by *looking* — the
   chevrons that didn't line up, and a highlight in the wrong blue. Neither shows in a dump, and the
   second surfaced only because Franco asked what the highlight was.
-  ⚠️ **`ScreenRecApp` still has no test target.** Four new files (the controller, the builder, both
-  row views) are covered by live probes and screenshots only. Worth filing if the menu grows again.
+  ⚠️ **`ScreenRecApp` still has no test target** — the controller, the builder and both row views are
+  covered by live probes and screenshots only. **Filed as M29 (Franco, 2026-08-04): next up.**
 
 - **✅ M28-T5 SHIPPED (2026-08-04) — ten recents, under the day they were made.** Day headers
   (`Today` / `Yesterday` / a weekday / `17 July`), caps 5 → 10 and 3 → 5. The dump changed by

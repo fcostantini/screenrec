@@ -2453,6 +2453,48 @@ rather than two. T2–T4 below are the old T1–T3, renumbered.
 capability lands — plus a thumbnail on every recents row, a progress row that advances while the menu
 is open, and a recents list longer than five that is still readable.
 
+## M29 — The menu can be tested without a menu (from M28's own defects, 2026-08-04)
+
+M28 moved about a thousand lines of real decision-making into `ScreenRecApp` — `MenuBuilder` decides
+which rows exist under which conditions, `StatusItemController` owns an observation lifecycle and
+three timers, and two row views compute their own layout. **`ScreenRecApp` has no test target**, so
+`swift test`'s 707 tests execute none of it. That arrangement was right while the module was thin
+glue over SwiftUI and every decision lived in `AppCore` (docs/01's rule); M28 ended it.
+
+🔴 **The trigger is not theoretical — both defects a reviewer caught in M28 lived exactly there**:
+`menuWillOpen` stacking observation registrations, and a row view whose chevron tracked the title
+length because it kept its created width. Neither is reachable by any test that exists, and neither
+shows in a `menudriver dump`.
+
+✅ **The prize is bigger than coverage.** `MenuBuilder.rows()` is a pure function of `AppState`, so
+the menu's whole structure could be asserted **in-process in milliseconds** instead of by deploying
+the app, driving it over Accessibility and diffing a dump. Every parity check M28 ran by hand becomes
+an ordinary test. **PATCH** — no user-facing change at all.
+
+- [ ] M29-T1 **A target the menu code can be tested in.** `ScreenRecApp` is an `.executableTarget`
+      carrying `@main`, which SPM cannot link into a test target. Move the testable surface —
+      `MenuBuilder`, `MenuRow`, the two row views, `StatusIconImage`, `WindowPresenter` — into a new
+      **library** target, leaving the executable as `@main` plus `AppDelegate`. **Seams:**
+      `Scripts/bundle.sh` builds the product `ScreenRecApp` and copies
+      `Sources/ScreenRecApp/Resources/{Info.plist,AppIcon.icns}`; both paths move with the split.
+      **Verify:** `menudriver dump` **identical** — nothing here is a behaviour change, so any diff
+      is a mistake — plus the signed bundle still launching and recording.
+- [ ] M29-T2 **The menu's structure, asserted in-process.** Tests over `MenuBuilder.rows()` for the
+      states M28 verified by hand: idle, idle+armed, recording, paused, an export in flight, a muted
+      app, a picked-but-missing app, and an empty recents folder. **Verify: break a row and watch the
+      test fail** — G22's discipline, and the only thing that distinguishes a test from a decoration.
+      **Ruling:** whether these assertions replace the dump as the parity instrument, or sit beside
+      it (a dump still proves what AppKit *rendered*, which a row list cannot).
+- [ ] M29-T3 **The decisions that actually broke.** The observation flag that bounds registrations to
+      one, the pulse timer's start/stop condition, the clock tick's guard, and each row view's width
+      and aspect-fit arithmetic. Where a decision is entangled with `NSStatusItem`, extract the
+      decision rather than test the widget — the `AppCore` pattern. **Verify:** re-introduce M28's two
+      defects and watch the new tests go red.
+
+**Gate G29**: the menu's structure, the observation rules and the row geometry each fail a test when
+broken — proven by breaking them, not asserted — while `menudriver dump` is unchanged throughout,
+because none of this is a behaviour change.
+
 ## Dependency graph
 
 ```
