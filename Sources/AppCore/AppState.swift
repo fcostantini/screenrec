@@ -389,6 +389,10 @@ public final class AppState {
 
     public private(set) var recentRecordings: [URL] = []
 
+    /// When each recent recording was written, for the menu's day headers (M28-T5). Read from the
+    /// same directory scan that orders the rows, so the two can't disagree.
+    public private(set) var recentRecordingDates: [URL: Date] = [:]
+
     /// The Recent Exports group (M12-T2): the most-recent `.mp4`/`.gif` in the output directory, so
     /// derived share files have an in-menu home and inherit the file submenu. Refreshed with recents.
     public private(set) var recentExports: [URL] = []
@@ -990,8 +994,12 @@ public final class AppState {
     }
 
     public func refreshRecentRecordings() {
-        let recents = RecentRecordings.inDirectory(outputDirectory)
+        let entries = RecentRecordings.entriesInDirectory(outputDirectory)
+        let recents = entries.map(\.url)
         if recentRecordings != recents { recentRecordings = recents }
+        // Kept from the same scan, for the menu's day headers (M28-T5).
+        let dates = Dictionary(entries.map { ($0.url, $0.modified) }, uniquingKeysWith: { a, _ in a })
+        if recentRecordingDates != dates { recentRecordingDates = dates }
         let exportFiles = RecentRecordings.inDirectory(
             outputDirectory, extensions: RecentRecordings.exportExtensions,
             limit: RecentRecordings.exportLimit)

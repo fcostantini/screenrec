@@ -352,12 +352,17 @@ struct MenuBuilder {
                 Finder.open(state.outputDirectory)
             }
         ]
+        // Under the day each was made (M28-T5): ten near-identical timestamps are a wall without it.
         if !state.recentRecordings.isEmpty {
             items.append(MenuRow.separator())
-            items += fileRows(state.recentRecordings)
+            for group in RecentRecordings.grouped(
+                state.recentRecordings, dates: state.recentRecordingDates, now: Date()) {
+                if !group.label.isEmpty { items.append(MenuRow.label(group.label)) }
+                items += fileRows(group.urls)
+            }
         }
-        // Recent Exports (M12-T2): derived files get their own group so they don't crowd the
-        // recordings out of the 5-row window.
+        // Recent Exports (M12-T2): derived files get their own group, and a smaller cap, so they
+        // don't crowd out the recordings. No day headers — over five files they read as noise.
         if !state.recentExports.isEmpty {
             items.append(MenuRow.separator())
             items.append(MenuRow.label("Recent Exports"))

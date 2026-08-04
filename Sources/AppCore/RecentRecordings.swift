@@ -6,18 +6,20 @@ import RecorderCore
 /// group (M12-T2, `.mp4`/`.gif`) — same scan, different extension filter.
 public enum RecentRecordings {
 
-    /// docs/06: "up to 5 most-recent files".
-    public static let limit = 5
+    /// docs/06 item 10. Ten since M28-T5: five was a cap on how many near-identical timestamps a
+    /// reader could tell apart, and thumbnails plus day headers removed that limit, not a taste for
+    /// five.
+    public static let limit = 10
 
-    /// The Recent Exports group is smaller so derived files don't crowd the menu (M12-T2).
-    public static let exportLimit = 3
+    /// The Recent Exports group stays smaller so derived files don't crowd the menu (M12-T2).
+    public static let exportLimit = 5
 
     /// The share-format exports (M12-T2, M10): the sibling files `Export as MP4` / `Save as GIF` write.
     /// Aliases the writers' own list, so this and the orphan sweep can't drift apart (M15-T3).
     public static let exportExtensions = OutputLocation.exportExtensions
 
     /// A directory entry, reduced to the two things the choosing depends on.
-    struct Entry: Equatable {
+    struct Entry: Equatable, Sendable {
         let url: URL
         let modified: Date
     }
@@ -48,11 +50,10 @@ public enum RecentRecordings {
     /// Ties break on filename descending, for determinism only: `sorted(by:)` isn't guaranteed
     /// stable, so same-second files could otherwise swap places between menu openings. This is
     /// not a recency order — "Recording.mov" sorts above the later-written "Recording 2.mov".
-    static func newest(_ entries: [Entry], limit: Int = limit) -> [URL] {
-        entries
+    static func newest(_ entries: [Entry], limit: Int = limit) -> [Entry] {
+        Array(entries
             .sorted { ($0.modified, $0.url.lastPathComponent) > ($1.modified, $1.url.lastPathComponent) }
-            .prefix(limit)
-            .map(\.url)
+            .prefix(limit))
     }
 
     /// Live probe of `directory`, keeping only files whose extension is in `extensions` (lowercased).
@@ -63,6 +64,14 @@ public enum RecentRecordings {
     public static func inDirectory(
         _ directory: URL, extensions: Set<String> = ["mov"], limit: Int = limit
     ) -> [URL] {
+        entriesInDirectory(directory, extensions: extensions, limit: limit).map(\.url)
+    }
+
+    /// The same scan, keeping the modification dates it already reads — the day headers (M28-T5)
+    /// need them, and re-reading them per row would be a second pass over the same files.
+    static func entriesInDirectory(
+        _ directory: URL, extensions: Set<String> = ["mov"], limit: Int = limit
+    ) -> [Entry] {
         let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: directory, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles])
@@ -77,6 +86,49 @@ public enum RecentRecordings {
             return Entry(url: url, modified: modified)
         }
         return newest(entries, limit: limit)
+    }
+
+    /// The rows under the day they were made (M28-T5), in the order given. Pure: the caller
+    /// supplies the dates, so grouping and its copy are testable without a disk.
+    ///
+    /// A file whose date is unknown joins the group above it rather than inventing one, and an
+    /// empty label means the group takes no header at all.
+    public static func grouped(
+        _ urls: [URL], dates: [URL: Date], now: Date,
+        calendar: Calendar = .current, locale: Locale = .current
+    ) -> [(label: String, urls: [URL])] {
+        var groups: [(label: String, urls: [URL])] = []
+        for url in urls {
+            let label = dates[url].map {
+                dayLabel(for: $0, now: now, calendar: calendar, locale: locale)
+            }
+            // No date and nothing above it: a header would be a guess, so the rows go bare.
+            let resolved = label ?? groups.last?.label ?? ""
+            if groups.last?.label == resolved {
+                groups[groups.count - 1].urls.append(url)
+            } else {
+                groups.append((label: resolved, urls: [url]))
+            }
+        }
+        return groups
+    }
+
+    /// `Today` · `Yesterday` · a weekday inside the last week · `17 July` beyond it. The weekday
+    /// only reads unambiguously within seven days, which is what bounds it.
+    public static func dayLabel(
+        for date: Date, now: Date, calendar: Calendar = .current, locale: Locale = .current
+    ) -> String {
+        if calendar.isDate(date, inSameDayAs: now) { return "Today" }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+           calendar.isDate(date, inSameDayAs: yesterday) { return "Yesterday" }
+
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = calendar
+        let days = calendar.dateComponents(
+            [.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)).day ?? 0
+        formatter.setLocalizedDateFormatFromTemplate((1...6).contains(days) ? "EEEE" : "dMMMM")
+        return formatter.string(from: date)
     }
 
     /// Size and duration for each of `urls`, reusing `cached` for any file whose size and

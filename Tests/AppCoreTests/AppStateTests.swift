@@ -712,6 +712,7 @@ import RecorderCore
             _ = state.sources.displays
             _ = state.microphones
             _ = state.recentRecordings
+            _ = state.recentRecordingDates
         } onChange: {
             published.raise()
         }

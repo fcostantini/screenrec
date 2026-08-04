@@ -22,13 +22,13 @@ import Testing
         let picked = RecentRecordings.newest([
             Self.entry("old.mov", 30), Self.entry("newest.mov", 1), Self.entry("middle.mov", 10),
         ])
-        #expect(picked.map(\.lastPathComponent) == ["newest.mov", "middle.mov", "old.mov"])
+        #expect(picked.map(\.url.lastPathComponent) == ["newest.mov", "middle.mov", "old.mov"])
     }
 
     @Test func capsAtTheLimit() {
-        let entries = (1...12).map { Self.entry("rec\($0).mov", TimeInterval($0)) }
+        let entries = (1...20).map { Self.entry("rec\($0).mov", TimeInterval($0)) }
         #expect(RecentRecordings.newest(entries).count == RecentRecordings.limit)
-        #expect(RecentRecordings.limit == 5)          // docs/06 item 10
+        #expect(RecentRecordings.limit == 10)         // docs/06 item 10, raised in M28-T5
     }
 
     @Test func emptyDirectoryIsNotAnError() {
@@ -83,26 +83,32 @@ import Testing
         ])
     }
 
-    @Test func capsARealDirectoryAtFive() throws {
-        let directory = try makeFixture((1...9).map { ("Recording \($0).mov", TimeInterval($0)) })
+    @Test func capsARealDirectoryAtTheLimit() throws {
+        let directory = try makeFixture((1...16).map { ("Recording \($0).mov", TimeInterval($0)) })
         defer { try? FileManager.default.removeItem(at: directory) }
-        #expect(RecentRecordings.inDirectory(directory).count == 5)
+        #expect(RecentRecordings.inDirectory(directory).count == 10)
+        // The newest ten, not just any ten (the fixture's number is seconds ago, so 1 is newest).
+        #expect(RecentRecordings.inDirectory(directory).first?.lastPathComponent == "Recording 1.mov")
+        #expect(RecentRecordings.inDirectory(directory).last?.lastPathComponent == "Recording 10.mov")
     }
 
-    @Test func exportsScanKeepsMp4AndGifNewestFirstAndCapsAtThree() throws {
+    @Test func exportsScanKeepsMp4AndGifNewestFirstAndCapsAtItsOwnLimit() throws {
         // The Recent Exports group (M12-T2): the same scan, filtered to the export extensions —
         // recordings are excluded, and its own smaller limit keeps the menu compact.
         let directory = try makeFixture([
             ("clip.mov", 1),               // a recording — excluded from exports
-            ("a.mp4", 50), ("b.gif", 40), ("c.mp4", 30), ("d.gif", 20),
+            ("a.mp4", 60), ("b.gif", 50), ("c.mp4", 40), ("d.gif", 30),
+            ("e.mp4", 20), ("f.gif", 10),
         ])
         defer { try? FileManager.default.removeItem(at: directory) }
 
         let exports = RecentRecordings.inDirectory(
             directory, extensions: RecentRecordings.exportExtensions,
             limit: RecentRecordings.exportLimit)
-        #expect(exports.map(\.lastPathComponent) == ["d.gif", "c.mp4", "b.gif"])
-        #expect(RecentRecordings.exportLimit == 3)
+        #expect(exports.map(\.lastPathComponent) == ["f.gif", "e.mp4", "d.gif", "c.mp4", "b.gif"])
+        // Smaller than the recordings' cap on purpose: derived files must not crowd the menu.
+        #expect(RecentRecordings.exportLimit == 5)
+        #expect(RecentRecordings.exportLimit < RecentRecordings.limit)
         // Symmetry: the default recordings scan ignores the exports.
         #expect(RecentRecordings.inDirectory(directory).map(\.lastPathComponent) == ["clip.mov"])
     }
@@ -170,5 +176,92 @@ import Testing
         let details = await RecentRecordings.details(
             for: [Self.url("Gone.mov")], cached: [:])
         #expect(details.isEmpty)
+    }
+
+    // MARK: - Day headers (M28-T5)
+
+    /// A fixed clock and a fixed calendar: "Today" must not depend on when the suite runs.
+    private static let noon = Date(timeIntervalSince1970: 1_754_308_800)   // Mon 2025-08-04 12:00 UTC
+    private static var utc: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }
+    private static func daysBefore(_ days: Double, hours: Double = 0) -> Date {
+        noon.addingTimeInterval(-days * 86_400 - hours * 3_600)
+    }
+
+    @Test func todayAndYesterdayAreNamedRatherThanDated() {
+        let label = { (d: Date) in
+            RecentRecordings.dayLabel(
+                for: d, now: Self.noon, calendar: Self.utc, locale: Locale(identifier: "en_GB"))
+        }
+        #expect(label(Self.noon) == "Today")
+        #expect(label(Self.daysBefore(0, hours: 11)) == "Today")        // 01:00, same day
+        #expect(label(Self.daysBefore(1)) == "Yesterday")
+    }
+
+    @Test func aDayInsideTheWeekIsItsWeekdayAndOlderIsADate() {
+        let label = { (d: Date) in
+            RecentRecordings.dayLabel(
+                for: d, now: Self.noon, calendar: Self.utc, locale: Locale(identifier: "en_GB"))
+        }
+        // The fixture's "now" is a Monday, so three days back is the Friday.
+        #expect(label(Self.daysBefore(3)) == "Friday")
+        #expect(label(Self.daysBefore(6)) == "Tuesday")
+        // Past a week a weekday name stops being unambiguous, so it becomes a date. Seven days back
+        // is the *previous* Monday — the case a weekday label would render indistinguishable.
+        #expect(label(Self.daysBefore(7)) != "Monday")
+        #expect(label(Self.daysBefore(7)).contains("28"))
+        #expect(label(Self.daysBefore(30)).contains("5"))
+    }
+
+    @Test func midnightIsADayBoundaryNotATwentyFourHourWindow() {
+        // 00:30 today and 23:30 yesterday are 60 minutes apart and belong to different days.
+        let label = { (d: Date) in
+            RecentRecordings.dayLabel(for: d, now: Self.noon, calendar: Self.utc, locale: .init(identifier: "en_GB"))
+        }
+        #expect(label(Self.daysBefore(0, hours: 11.5)) == "Today")       // 00:30
+        #expect(label(Self.daysBefore(0, hours: 12.5)) == "Yesterday")   // 23:30 the day before
+    }
+
+    @Test func aFileDatedInTheFutureGetsADateRatherThanToday() {
+        // Clock skew, or a file copied in with a future mtime: the day arithmetic goes negative,
+        // which must not read as "Today" and must not crash. A plain date is the honest answer.
+        let ahead = Self.noon.addingTimeInterval(2 * 86_400)
+        let label = RecentRecordings.dayLabel(
+            for: ahead, now: Self.noon, calendar: Self.utc, locale: Locale(identifier: "en_GB"))
+        #expect(label != "Today")
+        #expect(label != "Yesterday")
+        #expect(label.contains("6"))        // 6 August, two days on from the fixture's Monday
+    }
+
+    @Test func rowsGroupUnderTheirDayInTheOrderGiven() {
+        let a = Self.url("a.mov"), b = Self.url("b.mov"), c = Self.url("c.mov")
+        let groups = RecentRecordings.grouped(
+            [a, b, c],
+            dates: [a: Self.noon, b: Self.noon.addingTimeInterval(-60), c: Self.daysBefore(1)],
+            now: Self.noon, calendar: Self.utc, locale: Locale(identifier: "en_GB"))
+
+        #expect(groups.map(\.label) == ["Today", "Yesterday"])
+        #expect(groups.first?.urls == [a, b])      // same day, one header, order preserved
+        #expect(groups.last?.urls == [c])
+    }
+
+    @Test func aRowWithNoKnownDateJoinsTheGroupAboveRatherThanInventingOne() {
+        let a = Self.url("a.mov"), b = Self.url("b.mov")
+        let groups = RecentRecordings.grouped(
+            [a, b], dates: [a: Self.noon], now: Self.noon,
+            calendar: Self.utc, locale: Locale(identifier: "en_GB"))
+        #expect(groups.count == 1)
+        #expect(groups.first?.label == "Today")
+        #expect(groups.first?.urls == [a, b])
+    }
+
+    @Test func anUndatedFirstRowTakesNoHeaderAtAll() {
+        // An empty label is how the builder knows to emit no header — better than a wrong one.
+        let a = Self.url("a.mov")
+        let groups = RecentRecordings.grouped([a], dates: [:], now: Self.noon, calendar: Self.utc)
+        #expect(groups.map(\.label) == [""])
     }
 }

@@ -151,7 +151,7 @@ Order and grouping (separators between groups):
    **`Open Folder — <~/path>`**, which reveals the output dir in Finder and **shows the current
    destination** as a home-relative path (e.g. `~/Movies`) so it's visible without opening (Franco,
    2026-07-16). One title string — a SwiftUI `.menu` can't two-tone the path.
-10. Recent recordings: up to 5 most-recent files from the output dir, inside `Recordings ▸` under a
+10. Recent recordings: up to 10 most-recent files from the output dir, inside `Recordings ▸` under a
     divider — until M18-T3 they were top-level rows **faked** one level in, since a SwiftUI menu
     exposes no `NSMenuItem.indentationLevel`; nesting them makes the indent real and the
     leading-space titles (and their accessibility labels) go away. Each row carries **what
@@ -161,6 +161,13 @@ Order and grouping (separators between groups):
     its length and size when the read lands — measured 1–8 ms per file, and a repeat open re-reads
     nothing. ⚠️ `URL` caches resource values per instance and the menu holds its URLs across opens,
     so the cache check clears them first or a re-recorded file keeps a stale size forever.
+    **M28-T5 grouped them by day and raised the cap from five**: a dimmed header row —
+    **`Today`** / **`Yesterday`** / a weekday inside the last week / **`17 July`** beyond it — sits
+    above each day's rows. Five was a bound on how many near-identical timestamps a reader could
+    tell apart; M28-T3's thumbnails and these headers are what removed it. Exports keep their flat
+    group (day headers over five derived files would be noise), and **names are still shown exactly
+    as on disk** — trimming the date out of a row under a dated header would read better and would
+    contradict this document's own copy rule, so it stays a separate decision.
     (Franco, 2026-07-15: they read as the folder's contents rather than as more commands.) **M10-T2/T3/T4 made each a submenu**, then **M12-T1 added the share/preview
     row** — `<name> ▸ { Reveal in Finder · Quick Look · Share… · Copy | Export as MP4 · Save as GIF ·
     Trim… }` (the `|` is a divider: act-on-this-file above, derive-a-new-file below) — so the
@@ -174,7 +181,7 @@ Order and grouping (separators between groups):
     (Start is the first actionable row) and **expires a stale one**: a persisted receipt older than one hour
     (`LastExport.date`, checked at menu open) is dropped, so it can't reappear as fresh from an earlier
     session — the file still lives in Recent Exports. **M12-T2** gave exports a
-    real home: a **`Recent Exports`** group below the recordings (up to 3 most-recent `.mp4`/`.gif` in the
+    real home: a **`Recent Exports`** group below the recordings (up to 5 most-recent `.mp4`/`.gif` in the
     output dir, same submenu), and the receipt now **survives relaunch** (persisted `lastExportPath`,
     validated — a receipt whose file was moved/trashed is dropped). The submenu also gained a third,
     **manage** group: **`Rename…`** (an `NSAlert` text field, extension preserved, collisions → ` 2`) and
