@@ -2432,9 +2432,22 @@ rather than two. T2–T4 below are the old T1–T3, renumbered.
       `aReportedFractionReachesTheMenu` exists — it fails rather than hangs.
       ⚠️ **`ScreenRecApp` has no test target**, so the observer logic is covered by the live probe
       and nothing else.
-- [ ] M28-T5 **More than five recents, legibly.** `RecentRecordings.limit = 5` exists because a
+- [x] M28-T5 **More than five recents, legibly.** `RecentRecordings.limit = 5` exists because a
       longer list of identical timestamps is unreadable, not because five is right. **Rulings:** the
       new cap, and whether rows group by day.
+      ✅ **Done 2026-08-04.** Ten recordings and five exports, under dimmed day headers — `Today` /
+      `Yesterday` / a weekday inside the last week / `17 July` beyond it. **707 tests** (+7).
+      **Rulings (Franco):** group by day, the caps above, exports stay flat, and **names stay exactly
+      as on disk** — trimming the date out of a row under a dated header would read better and would
+      contradict docs/06's own copy rule, so it stays a separate decision.
+      ✅ **The dump changed, as it should, and every added row is accounted for:** 98 → 138 rows in
+      `Recordings ▸` = **4 day headers + 3 newly visible recordings × 12 rows** each (the row plus
+      its action submenu). No parity claim, an accounting.
+      ✅ **It fits and it is no slower:** the submenu measures **503 × 472 pt with 788 pt of headroom**
+      on a 1260 pt screen, and opens in **0.40 s** against T3's 0.39–0.40.
+      ⚠️ The day arithmetic goes through `Calendar` throughout, so DST is handled by construction;
+      the boundaries that are pinned are midnight, exactly seven days back (the previous *same
+      weekday*, which is why the weekday label stops there), and a **future-dated file**.
 
 **Gate G28**: the menu does everything it did — proven by dump parity at T2, before any new
 capability lands — plus a thumbnail on every recents row, a progress row that advances while the menu
