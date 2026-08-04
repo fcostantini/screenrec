@@ -22,6 +22,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let windows: WindowPresenter
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = MenuRow.menu()
+    private let thumbnails = MenuThumbnails()
 
     /// The only timer that is started and stopped; the other two run for the app's life, and the
     /// run loop owns them.
@@ -37,6 +38,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.delegate = self
         statusItem.menu = menu
         statusItem.button?.setAccessibilityRole(.menuButton)
+        // A frame that lands while the menu is open fills its own row in; only the view redraws,
+        // so the menu is not rebuilt under the cursor (M6-T10, docs/07).
+        thumbnails.onThumbnail = { [weak self] url in self?.showThumbnail(for: url) }
 
         repeating(every: 1, tolerance: 0.1) { [weak self] in
             MainActor.assumeIsolated { self?.tickClock() }
@@ -54,7 +58,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         refreshMenuData()
         menu.removeAllItems()
-        for item in MenuBuilder(state: state, windows: windows).rows() { menu.addItem(item) }
+        let builder = MenuBuilder(state: state, windows: windows, thumbnails: thumbnails)
+        for item in builder.rows() { menu.addItem(item) }
+    }
+
+    /// Hands a just-decoded frame to the row showing that file, wherever it currently sits.
+    private func showThumbnail(for url: URL) {
+        guard let image = thumbnails.image(for: url) else { return }
+        for view in Self.recentRows(in: menu) where view.url == url { view.show(image) }
+    }
+
+    private static func recentRows(in menu: NSMenu) -> [RecentRowView] {
+        menu.items.flatMap { item -> [RecentRowView] in
+            let here = (item.view as? RecentRowView).map { [$0] } ?? []
+            return here + (item.submenu.map(recentRows(in:)) ?? [])
+        }
     }
 
     /// Also run once at launch: the Source rows and the recents' details arrive from async reads,
@@ -74,6 +92,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             Task { await state.refreshCapturableWindows() }
         }
         state.session.refreshProgress()
+        thumbnails.prime(state.recentRecordings + state.recentExports)
     }
 
     // MARK: - Icon

@@ -86,11 +86,7 @@ public enum RecentRecordings {
     static func details(for urls: [URL], cached: [URL: RowDetail]) async -> [URL: RowDetail] {
         var fresh: [URL: RowDetail] = [:]
         for url in urls {
-            // `URL` caches resource values per instance, and the menu holds the same URLs across
-            // opens — without this, a re-recorded file keeps its first size and length forever.
-            var probe = url
-            probe.removeAllCachedResourceValues()
-            guard let values = try? probe.resourceValues(
+            guard let values = url.freshResourceValues(
                     forKeys: [.fileSizeKey, .contentModificationDateKey]),
                   let bytes = values.fileSize, let modified = values.contentModificationDate
             else { continue }

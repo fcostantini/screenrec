@@ -10,6 +10,7 @@ import RecorderCore
 struct MenuBuilder {
     let state: AppState
     let windows: WindowPresenter
+    let thumbnails: MenuThumbnails
 
     func rows() -> [NSMenuItem] {
         var items = state.session.isActive ? recordingItems() : idleItems()
@@ -360,8 +361,16 @@ struct MenuBuilder {
         return MenuRow.submenu("Recordings", items)
     }
 
+    /// Each row keeps its `title` — that is what leaves it identical to a plain row under
+    /// `menudriver` — and gains a view carrying the frame (M28-T3).
     private func fileRows(_ urls: [URL]) -> [NSMenuItem] {
-        urls.map { MenuRow.submenu(state.rowTitle(for: $0), fileActions($0)) }
+        urls.map { url in
+            let title = state.rowTitle(for: url)
+            let item = MenuRow.submenu(title, fileActions(url))
+            item.view = RecentRowView(
+                url: url, title: title, thumbnail: thumbnails.image(for: url))
+            return item
+        }
     }
 
     /// The per-file submenu shared by recents and every receipt: act on this file (M12-T1), then

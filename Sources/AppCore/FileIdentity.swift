@@ -9,4 +9,13 @@ extension URL {
     func isSameFile(as other: URL) -> Bool {
         standardizedFileURL == other.standardizedFileURL
     }
+
+    /// Resource values read past `URL`'s per-instance cache. The menu holds the same URLs across
+    /// opens, so without this a re-recorded file keeps its first size, length and frame forever
+    /// (M18-T3).
+    func freshResourceValues(forKeys keys: Set<URLResourceKey>) -> URLResourceValues? {
+        var probe = self
+        probe.removeAllCachedResourceValues()
+        return try? probe.resourceValues(forKeys: keys)
+    }
 }
