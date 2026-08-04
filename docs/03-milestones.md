@@ -2489,12 +2489,26 @@ an ordinary test. **PATCH** — no user-facing change at all.
       asserted. Everything else stays internal and the tests reach it through `@testable`.
       ✅ **The point, demonstrated:** `MenuBuilder.rows()` is now built and asserted **in a test**,
       with no app deployed, no menu open and no Accessibility.
-- [ ] M29-T2 **The menu's structure, asserted in-process.** Tests over `MenuBuilder.rows()` for the
+- [x] M29-T2 **The menu's structure, asserted in-process.** Tests over `MenuBuilder.rows()` for the
       states M28 verified by hand: idle, idle+armed, recording, paused, an export in flight, a muted
       app, a picked-but-missing app, and an empty recents folder. **Verify: break a row and watch the
       test fail** — G22's discipline, and the only thing that distinguishes a test from a decoration.
-      **Ruling:** whether these assertions replace the dump as the parity instrument, or sit beside
-      it (a dump still proves what AppKit *rendered*, which a row list cannot).
+      **Ruling (Franco, 2026-08-04): they sit beside the dump, they do not replace it** — and
+      measurement gave that a hard reason: the tests **cannot reach the recording or paused menus at
+      all**, so retiring the dump would leave a whole layout unverified.
+      ✅ **Done 2026-08-04.** 11 tests, **719 total**, and **no production file changed** — a stronger
+      claim than a matching dump, since nothing could have moved the menu.
+      ✅ **Verified the only way that counts: 10 breaks applied, 10 turned the named test red.**
+      A row deleted, a checkmark dropped, a dimming removed, a group reordered, a view detached —
+      each turned exactly its own test.
+      🔴 **The measurement that shaped the task:** `apply(.started)` moves the status icon but does
+      **not** make the session active (`capture != nil` needs a real `RecordingSession`), so a
+      recording-menu test written against it would have asserted the **idle** menu and passed.
+      🔴 **Three defects the review caught, all mine:** the header row asserted `ScreenRec — Ready`,
+      which reads **live TCC** and would go red on any machine without the grant; one predicate was
+      satisfied by a *filename* rather than the day header it claimed to check; and the throwaway
+      `UserDefaults` suites were never swept — **256 stray plists had already accumulated**, the
+      exact failure `AppCoreTests`' `TestDefaults` was written for after it reached 49,668.
 - [ ] M29-T3 **The decisions that actually broke.** The observation flag that bounds registrations to
       one, the pulse timer's start/stop condition, the clock tick's guard, and each row view's width
       and aspect-fit arithmetic. Where a decision is entangled with `NSStatusItem`, extract the

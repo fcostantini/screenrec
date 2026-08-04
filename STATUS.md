@@ -6,6 +6,20 @@
 
 ## Now
 
+- **✅ M29-T2 SHIPPED (2026-08-04) — the menu's shape is now a test, not a deployment. Next: M29-T3.**
+  11 tests build the real menu from a real `AppState` and assert it. **719 tests**, **no production
+  file changed**. Plan artifact: `claude.ai/code/artifact/22a2996c-713d-4a87-9c2e-c050d6838ae7`.
+  ✅ **10 breaks applied, 10 turned the named test red** — the only evidence that distinguishes a
+  test from a decoration.
+  ✅ **Ruled (Franco): these sit beside `menudriver dump`, they don't replace it.** The tests cannot
+  reach the **recording or paused** menus — those need a real `RecordingSession` — so the dump keeps
+  a job. ⚠️ `apply(.started)` moves the icon but not the session; a test written against it would
+  have asserted the idle menu and passed.
+  🔴 **Three defects the review caught, all mine:** a header assertion that read **live TCC** (green
+  here, red on any ungranted machine), a predicate satisfied by a *filename*, and **256 stray
+  preference plists** — the exact leak `TestDefaults` exists to prevent. Swept, and a run now leaves
+  zero.
+
 - **✅ M29-T1 SHIPPED (2026-08-04) — the menu code finally lives somewhere a test can reach.
   Next: M29-T2.** `Sources/ScreenRecApp` was an executable target, which SPM cannot link into a test
   target; its 17 files moved verbatim into an **`AppShell` library**, leaving `main.swift` plus the
