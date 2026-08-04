@@ -7,6 +7,32 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-04 (M28-T1): **A SwiftUI `Window` scene has four behaviours you have to rebuild by hand**
+  when you host the same view in a plain `NSWindow`. Each was measured on the live app, not assumed:
+  - **Content sizing survives** via `NSHostingController.sizingOptions = [.preferredContentSize]`,
+    and it keeps re-fitting as the content's ideal size changes: walking Settings' four tabs moved
+    the window **292 → 372 → 437 → 327 → 292 pt**, and that 437 is the same figure docs/06 records
+    as the tallest tab. Nothing else was needed to replace `.windowResizability(.contentSize)`.
+  - **Window position is NOT free.** A scene remembers where you dragged it; a rebuilt-per-open
+    `NSWindow` re-centres every time. `setFrameAutosaveName` restores parity (moved to 240,180 →
+    closed → reopened at 240,180) and does **not** fight `preferredContentSize` — the tab walk
+    above was re-run with autosave on and gave identical numbers.
+  - **`@Environment(\.dismiss)` silently does nothing** inside a plain `NSWindow` — no crash, no
+    warning, the button just stops closing anything. It has to become an injected closure.
+  - **Rebuilding per open is what keeps `onAppear`/`onDisappear` bracketing the view.** Trim's
+    player teardown hangs off `onDisappear`, so the window must genuinely go away, not be hidden.
+    `isReleasedWhenClosed = false` plus dropping the reference in `windowWillClose` is the ARC-safe
+    way to get that.
+  - ⚠️ **Instrument note: `CGWindowListCopyWindowInfo` races the order-in.** It reported *no window*
+    for one that AX listed and that was on screen — a false negative that reads exactly like the
+    feature being broken. Use the **AX window list** to answer "is it up"; `CGWindowList` is for
+    getting a window id to `screencapture -l`, which does capture a window that isn't frontmost
+    (the only way to shoot one of these, since a synthetic click can't confer activation).
+  - ⚠️ **The relaunch self-disarm is real and reproduced**: repeated kill/relaunch cycles left
+    `replayArmed` persisted as **0**. Known since G6 and still unfixed; if a session restarts the
+    app, check `defaults read … replayArmed` before finishing, because STATUS's standing warning
+    says that setting is Franco's.
+
 - 2026-08-03 (M27, the long take): ✅ **Five minutes, and the real-time thread is fine.** 300 s wall,
   **11.8 s user + 5.2 s sys (~5.7% of one core)**, RSS 185 MB, **0 dropped frames**, audio track
   48 kHz throughout. That closes both deferred questions at once: the per-buffer allocation M27-T2

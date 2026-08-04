@@ -2340,13 +2340,23 @@ loses seven launch-time jobs, and `TrimView`'s `dismiss()` becomes a no-op in a 
 The windows therefore move first, under an untouched menu, so a dump diff has one candidate cause
 rather than two. T2–T4 below are the old T1–T3, renumbered.
 
-- [ ] M28-T1 **The windows stop needing a scene.** Settings, Onboarding and Trim become
-      `NSWindowController`s hosting the same SwiftUI views; `MenuBarExtra` is untouched.
+- [x] M28-T1 **The windows stop needing a scene.** Settings, Onboarding and Trim become
+      `NSWindow`s hosting the same SwiftUI views; `MenuBarExtra` is untouched.
       **Seams:** `RegionSelectionOverlay` and `CountInOverlay` already hand-build `NSWindow`s in
       this module. `TrimView`'s `@Environment(\.dismiss)` becomes an injected closure — it does
       nothing inside a plain `NSWindow`. **Verify:** `menudriver dump` identical (nothing about the
       menu moved, so any diff is a mistake), plus the three windows opening, coming forward and
       dismissing.
+      ✅ **Done 2026-08-04.** `WindowPresenter` (68 lines) against 40 deleted; **695 tests**, dev
+      loop clean. **Dump byte-identical** across 161 rows against the pre-change baseline.
+      ✅ **Measured rather than assumed** (docs/07): content sizing survives through
+      `sizingOptions = [.preferredContentSize]` — the four Settings tabs still re-fit the window
+      292 → 372 → **437** → 327 pt, that 437 being docs/06's own figure — while **window position
+      does not survive** a rebuild-per-open and needed `setFrameAutosaveName` to reach parity.
+      ✅ **The `dismiss()` replacement was driven end to end**, not just compiled: `Trim & Save`
+      pressed through AX closed the window and wrote a playable 10.04 s file, both tracks.
+      ⚠️ **Rebuilt per open on purpose:** Trim's player teardown hangs off `onDisappear`, so the
+      window has to genuinely go away.
 - [ ] M28-T2 **Parity: the same menu, drawn by AppKit.** An `NSStatusItem` + `NSMenu` replacing
       `MenuBarExtra`. **Seams:** `MenuView` (602 lines) and all of docs/06's menu spec, which is
       written in its terms; the inline `Picker` checkmark behaviour in `Source ▸` is load-bearing and

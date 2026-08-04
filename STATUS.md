@@ -6,6 +6,27 @@
 
 ## Now
 
+- **✅ M28-T1 SHIPPED (2026-08-04) — the windows no longer need a SwiftUI scene. Next: M28-T2.**
+  Settings, Onboarding and Trim are `NSWindow`s hosting the same views (`WindowPresenter`, 68 lines
+  against 40 deleted). **695 tests**, dev loop clean. Plan artifact:
+  `claude.ai/code/artifact/0b23f84a-32db-41e6-8afe-67c40efa9583`.
+  ✅ **The bar was met exactly: `menudriver dump` is byte-identical across 161 rows** against a
+  baseline captured before any code changed. A later dump differed in one place — `Mute ▸` listing
+  Discord instead of `Nothing is playing` — because Discord had started playing; the same build had
+  already produced an identical dump when nothing was.
+  🔴 **M28-T1 exists because `openWindow` dies with the scene graph** (the ruling in the artifact,
+  Franco's go-ahead 2026-08-04): the parity task was split so the windows move first and a dump diff
+  has one candidate cause. **docs/03's M28 tasks are renumbered — the menu swap is now T2.**
+  ✅ **Four scene behaviours measured, not assumed** (docs/07): content sizing survives via
+  `sizingOptions`, and the Settings tabs still re-fit 292 → 372 → **437** → 327 pt — 437 being
+  docs/06's own recorded tallest; **window position does not survive** and needed
+  `setFrameAutosaveName`; `@Environment(\.dismiss)` is a **silent no-op** in a plain `NSWindow`.
+  ⚠️ **`replayArmed` was self-disarmed by my relaunches and has been set back to 1** — the known G6
+  relaunch behaviour, reproduced. Verified against `defaults read`.
+  ⚠️ **Instrument trap worth knowing:** `CGWindowListCopyWindowInfo` races the order-in and reported
+  no window for one that was on screen. AX is the authority; `CGWindowList` is only for getting an id
+  to `screencapture -l`.
+
 - **🚢 v1.14.0 CUT (2026-08-03) — M27 ships: an app can be left out of a recording's audio while it
   stays in the picture.** `Mute ▸` in the menu, `--mute-app` in the CLI, a Core Audio process tap
   behind both. **695 tests**, release and signed bundle green, tagged and deployed.
