@@ -7,6 +7,29 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-04 (M28-T3 spike): ✅ **A view-based `NSMenuItem` does NOT lose its Accessibility title —
+  provided you still set `title`.** Measured on a throwaway status-item harness, reading the same
+  attributes `tools/menudriver.swift` does:
+
+  | Row | `AXTitle` | `AXMenuItemMarkChar` |
+  |---|---|---|
+  | plain item | `Plain Row` | — |
+  | `NSMenuItem()` + view, **no title** | **`<nil>`** | — |
+  | item with `title` + view | `View Row With Title` | — |
+  | item with `title` + image/text view | `View Row Labelled` | — |
+  | item with `title` + view, `state = .on` | `View Row Checked` | **✓** |
+
+  - The view's own subviews appear as AX **children** of the row, but `menudriver` only recurses
+    into children whose role is `AXMenu`, so it never sees them — **a thumbnail row dumps exactly
+    like a plain one**. The instrument every gate since G4 leans on survives M28-T3.
+  - 🔴 **This retracts the reasoning in M28-T2's plan**, which asserted a view-based item hands its
+    AX identity to the view and would blind `menudriver`, and shipped plain rows partly on that
+    basis. Plain rows were still right for a parity task — but the stated reason was a guess, and it
+    was wrong. Only `NSMenuItem()` with no title loses the title, which is just "no title set".
+  - ⚠️ **Still unmeasured, and the real cost of view rows:** a custom view draws its own highlight
+    and handles its own clicks — AppKit does neither for you. That, not Accessibility, is what T3
+    has to budget for.
+
 - 2026-08-04 (M28-T2): **Porting a SwiftUI menu to `NSMenu` is mostly mechanical; the state timing
   is not.** Row-for-row the translation is one-to-one (`Picker(.inline)` → `item.state`, `Toggle` →
   `item.state`, `Text` → `isEnabled = false`, `Menu` → `submenu`, `.keyboardShortcut` →

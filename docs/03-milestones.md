@@ -2360,9 +2360,12 @@ rather than two. T2–T4 below are the old T1–T3, renumbered.
 - [x] M28-T2 **Parity: the same menu, drawn by AppKit.** An `NSStatusItem` + `NSMenu` replacing
       `MenuBarExtra`. **Seams:** `MenuView` (602 lines) and all of docs/06's menu spec, which is
       written in its terms; the inline `Picker` checkmark behaviour in `Source ▸` is load-bearing and
-      has to be rebuilt by hand. **Plain `NSMenuItem`s, not custom views:** a view-based item hands
-      its Accessibility identity to the view, which would blind the instrument this task is verified
-      with — views arrive with T3/T4, which need them. **Verify:** `menudriver dump` **identical**
+      has to be rebuilt by hand. **Plain `NSMenuItem`s, not custom views** — parity needs none, and
+      they arrive with T3/T4, which do. ⚠️ **The reason first given for this was wrong and is
+      retracted:** a view-based item was said to hand its Accessibility identity to the view and so
+      blind `menudriver`. Measured 2026-08-04 (docs/07): it keeps both its `AXTitle` and its
+      checkmark as long as `title` is still set, and dumps identically to a plain row.
+      **Verify:** `menudriver dump` **identical**
       before and after — M22's bar, and the one that matters most here, because **every gate since G4
       has leaned on that instrument** — bar three declared diffs: `Mute ▸` stops faking its checkmark
       into the title, the `(not running)` row finally dims (M7-T2, "accepted" in docs/06), and
