@@ -2331,27 +2331,45 @@ compromises have accumulated: rows are **stamped at open and cannot tick** (M6-T
 `Picker` row **will not dim** (M7-T2), and a label renders **only its first `Image`** — which is why
 the clock, the level meter, the armed badge and the saved tick are composited into one bitmap by hand
 (M16-T5, M23-T3). Its trigger — "the next feature that needs custom row rendering" — is **met three
-times over**. **MINOR** (T1 alone is no user-facing change).
+times over**. **MINOR** (T1 and T2 alone are no user-facing change).
 
-- [ ] M28-T1 **Parity first: the same menu, drawn by AppKit.** An `NSStatusItem` + `NSMenu` with
-      custom `NSView` rows, replacing `MenuBarExtra`. **Seams:** `MenuView` (~470 lines) and all of
-      docs/06's menu spec, which is written in its terms; the inline `Picker` checkmark behaviour in
-      `Source ▸` is load-bearing and has to be rebuilt by hand. **Verify:** `menudriver dump`
-      **identical** before and after — M22's bar, and the one that matters most here, because
-      **every gate since G4 has leaned on that instrument**.
-- [ ] M28-T2 **A thumbnail per recents row.** **Seams:** `FilmstripThumbnails` (M24-T4) already
+⚠️ **The parity task was split in two before it started (Franco, 2026-08-04).** Removing
+`MenuBarExtra` removes the app's only always-alive view, and `@Environment(\.openWindow)` is only
+reachable from one — so Settings, Onboarding and Trim lose their opener, `StatusIconLabel`'s `.task`
+loses seven launch-time jobs, and `TrimView`'s `dismiss()` becomes a no-op in a plain `NSWindow`.
+The windows therefore move first, under an untouched menu, so a dump diff has one candidate cause
+rather than two. T2–T4 below are the old T1–T3, renumbered.
+
+- [ ] M28-T1 **The windows stop needing a scene.** Settings, Onboarding and Trim become
+      `NSWindowController`s hosting the same SwiftUI views; `MenuBarExtra` is untouched.
+      **Seams:** `RegionSelectionOverlay` and `CountInOverlay` already hand-build `NSWindow`s in
+      this module. `TrimView`'s `@Environment(\.dismiss)` becomes an injected closure — it does
+      nothing inside a plain `NSWindow`. **Verify:** `menudriver dump` identical (nothing about the
+      menu moved, so any diff is a mistake), plus the three windows opening, coming forward and
+      dismissing.
+- [ ] M28-T2 **Parity: the same menu, drawn by AppKit.** An `NSStatusItem` + `NSMenu` replacing
+      `MenuBarExtra`. **Seams:** `MenuView` (602 lines) and all of docs/06's menu spec, which is
+      written in its terms; the inline `Picker` checkmark behaviour in `Source ▸` is load-bearing and
+      has to be rebuilt by hand. **Plain `NSMenuItem`s, not custom views:** a view-based item hands
+      its Accessibility identity to the view, which would blind the instrument this task is verified
+      with — views arrive with T3/T4, which need them. **Verify:** `menudriver dump` **identical**
+      before and after — M22's bar, and the one that matters most here, because **every gate since G4
+      has leaned on that instrument** — bar three declared diffs: `Mute ▸` stops faking its checkmark
+      into the title, the `(not running)` row finally dims (M7-T2, "accepted" in docs/06), and
+      `Source ▸`'s trailing rule stops being a side effect of the inline `Picker`.
+- [ ] M28-T3 **A thumbnail per recents row.** **Seams:** `FilmstripThumbnails` (M24-T4) already
       decodes a frame off the main thread and its cost is measured — first frame ~80 ms, and cost
       tracks keyframe spacing × count, not take length. **Rulings:** thumbnail size; whether it is
       cached across menu opens (rows are stamped at open, so a re-decode per open is the naive cost).
-- [ ] M28-T3 **A progress row that advances while the menu is open.** The M6-T10 constraint —
+- [ ] M28-T4 **A progress row that advances while the menu is open.** The M6-T10 constraint —
       nothing may tick into an open menu — dies here, and with it the stamped-at-open `Exporting …`
       row. **Rulings:** what else may now tick, and what deliberately still should not (a live clock
       in an open menu was never the ask).
-- [ ] M28-T4 **More than five recents, legibly.** `RecentRecordings.limit = 5` exists because a
+- [ ] M28-T5 **More than five recents, legibly.** `RecentRecordings.limit = 5` exists because a
       longer list of identical timestamps is unreadable, not because five is right. **Rulings:** the
       new cap, and whether rows group by day.
 
-**Gate G28**: the menu does everything it did — proven by dump parity at T1, before any new
+**Gate G28**: the menu does everything it did — proven by dump parity at T2, before any new
 capability lands — plus a thumbnail on every recents row, a progress row that advances while the menu
 is open, and a recents list longer than five that is still readable.
 
