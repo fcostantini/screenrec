@@ -9,6 +9,22 @@ final class RecentRowView: NSView {
 
     static let thumbnailSize = NSSize(width: 36, height: 22)
     static let height: CGFloat = 28
+    /// Room for the chevron, so the menu still sizes to its longest row.
+    fileprivate static let trailing: CGFloat = 28
+
+    /// The furniture plus the title's own width. Static so it can be checked without a row.
+    static func width(forTitleWidth titleWidth: CGFloat) -> CGFloat {
+        inset + thumbnailSize.width + gap + ceil(titleWidth) + trailing
+    }
+
+    /// Fills the well while keeping the frame's aspect — a region capture is not 16∶10.
+    static func aspectFitted(_ image: NSSize, in well: NSRect) -> NSRect {
+        let scale = min(well.width / image.width, well.height / image.height)
+        let size = NSSize(width: image.width * scale, height: image.height * scale)
+        return NSRect(
+            x: well.midX - size.width / 2, y: well.midY - size.height / 2,
+            width: size.width, height: size.height)
+    }
     /// AppKit insets a row's own highlight by this much; measured against one it draws itself.
     fileprivate static let highlightInset: CGFloat = 5
     fileprivate static let inset: CGFloat = 21
@@ -75,8 +91,7 @@ private final class RowContent: NSView {
         text = Self.rendered(title, ink: .labelColor)
         highlightedText = Self.rendered(title, ink: .selectedMenuItemTextColor)
         textSize = text.size()
-        width = RecentRowView.inset + RecentRowView.thumbnailSize.width + RecentRowView.gap
-            + ceil(textSize.width) + Self.trailing
+        width = RecentRowView.width(forTitleWidth: textSize.width)
         super.init(frame: NSRect(x: 0, y: 0, width: width, height: RecentRowView.height))
         autoresizingMask = [.width, .height]
     }
@@ -99,8 +114,6 @@ private final class RowContent: NSView {
     }
 
     private static let font = NSFont.menuFont(ofSize: 0)
-    /// Room for the chevron, so the menu still sizes to its longest row.
-    private static let trailing: CGFloat = 28
 
     override func draw(_ dirtyRect: NSRect) {
         let well = NSRect(
@@ -108,7 +121,9 @@ private final class RowContent: NSView {
             y: (bounds.height - RecentRowView.thumbnailSize.height) / 2,
             width: RecentRowView.thumbnailSize.width, height: RecentRowView.thumbnailSize.height)
         if let thumbnail {
-            NSGraphicsContext.current?.cgContext.draw(thumbnail, in: aspectFitted(thumbnail, in: well))
+            let size = NSSize(width: thumbnail.width, height: thumbnail.height)
+            NSGraphicsContext.current?.cgContext.draw(
+                thumbnail, in: RecentRowView.aspectFitted(size, in: well))
         } else {
             // The well is drawn even when empty, so a row without a readable frame keeps its title
             // in line with the rows around it.
@@ -120,15 +135,6 @@ private final class RowContent: NSView {
             x: well.maxX + RecentRowView.gap, y: (bounds.height - textSize.height) / 2))
 
         drawChevron(ink: highlighted ? .selectedMenuItemTextColor : .tertiaryLabelColor)
-    }
-
-    /// Fills the well while keeping the frame's aspect — a region capture is not 16∶10.
-    private func aspectFitted(_ image: CGImage, in well: NSRect) -> NSRect {
-        let scale = min(well.width / CGFloat(image.width), well.height / CGFloat(image.height))
-        let size = NSSize(width: CGFloat(image.width) * scale, height: CGFloat(image.height) * scale)
-        return NSRect(
-            x: well.midX - size.width / 2, y: well.midY - size.height / 2,
-            width: size.width, height: size.height)
     }
 
     private func drawChevron(ink: NSColor) {

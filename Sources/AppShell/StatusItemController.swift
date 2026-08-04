@@ -77,7 +77,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// At most one registration exists at a time: tracking is one-shot and only *re-arms* while the
     /// menu is open, so without the flag every open would stack another one that outlives it.
     private func observeExportProgress() {
-        guard menuIsOpen, !observingProgress else { return }
+        guard StatusItemPolicy.registersObservation(
+            menuIsOpen: menuIsOpen, alreadyObserving: observingProgress) else { return }
         observingProgress = true
         withObservationTracking {
             _ = state.exports.exportProgress
@@ -152,7 +153,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let exporting = state.exports.exportInProgress != nil
         let bars = state.showsMicrophoneLevel ? levelBars : nil
 
-        let pulsing = icon == .recording && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let pulsing = StatusItemPolicy.pulses(
+            icon: icon, reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
         syncPulseTimer(running: pulsing)
 
         let base = pulsing
@@ -189,7 +191,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// Advances the drawn clock, and only then: a still icon has nothing to redraw, and while the
     /// pulse runs it is already redrawing faster than this.
     private func tickClock() {
-        guard pulseTimer == nil, clockText != nil else { return }
+        guard StatusItemPolicy.redrawsOnClockTick(
+            isPulsing: pulseTimer != nil, hasClock: clockText != nil) else { return }
         renderIcon()
     }
 
