@@ -20,10 +20,16 @@
   launch had no app list, no window list and no recents detail — those come from async reads, and
   the SwiftUI menu filled them in **while open**, which is the M6-T10 corruption relied on as a
   feature. Caches are primed at launch instead. **A second dump would have hidden this.**
-  ⚠️ **None of the three declared diffs was exercised** — nothing muted, no picked app missing, and
-  the `Source ▸` rules turned out to reproduce the `Picker`'s own separators exactly. They are real
-  in code and specced in docs/06, and **unevidenced**; so are the **armed-replay rows**, since
-  replay is off and a session does not touch that setting.
+  ✅ **The gaps this entry first recorded as unevidenced are closed.** **Franco drove all three
+  declared diffs himself (2026-08-04) and confirmed them** — the muted app's tick now sits in the
+  checkmark gutter rather than typed into the label, and a picked-but-quit app's `(not running)` row
+  genuinely dims. Those two are his visual check, not a dump. **The armed-replay block is dump
+  evidence:** armed, the whole menu is **identical to the SwiftUI baseline** bar `Mute ▸` listing a
+  playing app — checkmark, both dimmed rows and `Save Replay Now  [⌥⌘R]` byte for byte. ✅ **And the
+  level meter composites in AppKit too:** the status item measures **39 × 24 armed against 27 × 24
+  disarmed**, which is M16-T5's own figure for icon-plus-meter.
+  ⚠️ The third declared diff turned out not to be one: `Source ▸`'s leading and trailing rules
+  reproduce the inline `Picker`'s own separators exactly, so the dump shows no difference at all.
   ⚠️ **`M28` is a MINOR and `VERSION` is still 1.14.0** — T1 and T2 are no user-facing change, so the
   bump belongs with T3–T5, which are.
 
@@ -184,11 +190,11 @@
 
 - **M25's and M26's per-task detail, and G25's run, are in `docs/history/2026-07-sessions.md`** (rotated 2026-08-03, when "Now" reached 295 lines). Gate evidence for G25 and G26 stays in the gate table below. Per-task logs for M15–M24 are in the same file; per-task specs and tick boxes are in `docs/03-milestones.md`.
 
-- **⚠️ Franco's current settings — do not "restore" these.** Instant replay is **DISARMED**: he
-  disarmed it himself on 2026-08-04 (`replayArmed` 0), having armed it on 2026-07-31. ⚠️ **Twice now
-  a session has re-armed it on a wrong inference and had to undo that** — the second time (M28-T1)
-  by reading his own disarm as a known bug reproducing. Read the live value, and if it changed while
-  you weren't looking, **he changed it**. Never write this key to "restore" a state.
+- **⚠️ Franco's current settings — do not "restore" these.** Instant replay is **ARMED** as of
+  2026-08-04 — he disarmed it that morning and re-armed it the same afternoon, both himself.
+  ⚠️ **Twice a session has re-armed it on a wrong inference and had to undo that** — the second time
+  (M28-T1) by reading his own disarm as a known bug reproducing. Read the live value, and if it
+  changed while you weren't looking, **he changed it**. Never write this key to "restore" a state.
   `Ask for a name when a recording stops` is **off**; the start/stop and pause/resume shortcuts are
   **off** (`recordHotkey`/`pauseHotkey` absent) and `stopHotkeyCopies` is **0**; `Launch at login`
   is **on**; Source is **Entire Screen**. If a session changes any of them for a test leg, change

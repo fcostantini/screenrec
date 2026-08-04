@@ -2374,11 +2374,14 @@ rather than two. T2–T4 below are the old T1–T3, renumbered.
       audio states (160 rows with an app playing, 157 + a matching `Mute ▸` block with none).
       Recording and paused: identical row for row, the only differences being **live values** —
       bytes written and the `Stop & Copy` estimate off sub-second elapsed.
-      ⚠️ **None of the three declared diffs was actually exercised**: nothing was muted, no picked
-      app was missing, and the leading/trailing rules turned out to reproduce the `Picker`'s own
-      separators exactly, so the dump shows no diff at all. They are real in code and in docs/06,
-      and unevidenced. Likewise the **armed-replay rows** — Franco's replay is off and a session
-      does not touch that setting.
+      ✅ **All three declared diffs exercised by Franco (2026-08-04) and confirmed**: the muted app's
+      tick sits in the checkmark gutter instead of typed into the label, and a picked-but-quit app's
+      `(not running)` row genuinely dims. ⚠️ The third was not a diff after all — `Source ▸`'s
+      leading and trailing rules reproduce the inline `Picker`'s own separators exactly.
+      ✅ **The armed-replay block is dump evidence, not a claim:** armed, the whole menu is identical
+      to the SwiftUI baseline bar `Mute ▸` listing a playing app. ✅ **The level meter composites in
+      AppKit too** — the status item measures **39 × 24 armed against 27 × 24 disarmed**, M16-T5's
+      own figure for icon-plus-meter.
       🔴 **The one thing measurement caught, which parity would have shipped broken:** the first open
       after launch had no app list, no window list and no recents detail. Those come from async
       reads; the SwiftUI menu filled them in **while open**, which is exactly the M6-T10 corruption.
