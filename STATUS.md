@@ -21,8 +21,11 @@
   `sizingOptions`, and the Settings tabs still re-fit 292 → 372 → **437** → 327 pt — 437 being
   docs/06's own recorded tallest; **window position does not survive** and needed
   `setFrameAutosaveName`; `@Environment(\.dismiss)` is a **silent no-op** in a plain `NSWindow`.
-  ⚠️ **`replayArmed` was self-disarmed by my relaunches and has been set back to 1** — the known G6
-  relaunch behaviour, reproduced. Verified against `defaults read`.
+  🔴 **RETRACTED, same day: `replayArmed` going to 0 was Franco disarming it, not the G6 relaunch
+  bug.** I read a disarm I hadn't caused as a reproduction of a known defect, and **re-armed it on
+  that inference — the exact move this file's standing warning exists to forbid**, for the second
+  time in the project's history. The setting is his; a session that sees it change should assume he
+  changed it. Live value now **0**, left alone.
   ⚠️ **Instrument trap worth knowing:** `CGWindowListCopyWindowInfo` races the order-in and reported
   no window for one that was on screen. AX is the authority; `CGWindowList` is only for getting an id
   to `screencapture -l`.
@@ -160,10 +163,11 @@
 
 - **M25's and M26's per-task detail, and G25's run, are in `docs/history/2026-07-sessions.md`** (rotated 2026-08-03, when "Now" reached 295 lines). Gate evidence for G25 and G26 stays in the gate table below. Per-task logs for M15–M24 are in the same file; per-task specs and tick boxes are in `docs/03-milestones.md`.
 
-- **⚠️ Franco's current settings — do not "restore" these.** Instant replay is **ARMED**: he armed
-  it himself on 2026-07-31 (`replayArmed` 1). ⚠️ **This entry said OFF until then, and it was
-  right at the time** — an earlier session had re-armed it on a wrong inference and had to undo
-  that, which is why the warning exists. Read the live value before acting on this line either way.
+- **⚠️ Franco's current settings — do not "restore" these.** Instant replay is **DISARMED**: he
+  disarmed it himself on 2026-08-04 (`replayArmed` 0), having armed it on 2026-07-31. ⚠️ **Twice now
+  a session has re-armed it on a wrong inference and had to undo that** — the second time (M28-T1)
+  by reading his own disarm as a known bug reproducing. Read the live value, and if it changed while
+  you weren't looking, **he changed it**. Never write this key to "restore" a state.
   `Ask for a name when a recording stops` is **off**; the start/stop and pause/resume shortcuts are
   **off** (`recordHotkey`/`pauseHotkey` absent) and `stopHotkeyCopies` is **0**; `Launch at login`
   is **on**; Source is **Entire Screen**. If a session changes any of them for a test leg, change

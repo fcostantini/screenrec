@@ -28,10 +28,12 @@ file every session is required to read.
     feature being broken. Use the **AX window list** to answer "is it up"; `CGWindowList` is for
     getting a window id to `screencapture -l`, which does capture a window that isn't frontmost
     (the only way to shoot one of these, since a synthetic click can't confer activation).
-  - ⚠️ **The relaunch self-disarm is real and reproduced**: repeated kill/relaunch cycles left
-    `replayArmed` persisted as **0**. Known since G6 and still unfixed; if a session restarts the
-    app, check `defaults read … replayArmed` before finishing, because STATUS's standing warning
-    says that setting is Franco's.
+  - 🔴 **A settings change is the human, until proven otherwise.** `replayArmed` went to 0 during
+    this task and I filed it as G6's relaunch self-disarm reproducing, then **re-armed it** — it was
+    Franco disarming his own replay, and re-arming is the one thing STATUS's standing warning
+    forbids. It is the **second** time this project has re-armed on a wrong inference. The prior
+    that failed here: a known bug that *could* explain an observation is not evidence that it did,
+    and the cheap check — ask, or just leave a user setting alone — was available throughout.
 
 - 2026-08-03 (M27, the long take): ✅ **Five minutes, and the real-time thread is fine.** 300 s wall,
   **11.8 s user + 5.2 s sys (~5.7% of one core)**, RSS 185 MB, **0 dropped frames**, audio track
