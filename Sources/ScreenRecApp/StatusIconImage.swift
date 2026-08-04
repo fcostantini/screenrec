@@ -1,7 +1,6 @@
 import AppCore
 import AppKit
 import RecorderCore
-import SwiftUI
 
 /// Draws the status item (docs/06 "Status item").
 ///
@@ -249,6 +248,14 @@ enum StatusIconImage {
         return pulseFloor + (1 - pulseFloor) * eased
     }
 
+    /// The clock and the save mark, in the order they stack: glyph, then time, then the tick
+    /// furthest right.
+    static func decorated(_ base: NSImage, clock: String?, showsSavedMark: Bool) -> NSImage {
+        var image = clock.map { withClock(base, text: $0) } ?? base
+        if showsSavedMark { image = withSavedMark(image) }
+        return image
+    }
+
     /// Idle stays a template: the system tints it for light/dark and menu-bar highlight.
     private static func template(_ name: String) -> NSImage {
         // Invariant: every name passed here is a compile-time constant present in macOS 15, the
@@ -268,133 +275,5 @@ enum StatusIconImage {
         }
         coloured.isTemplate = false        // keep the colour; see the type comment
         return coloured
-    }
-}
-
-/// The status item's label: the icon (pulsing while recording unless Reduce Motion is on), plus a
-/// live elapsed clock (M9-T3) and a brief save confirmation. The clock and flash live here, not in
-/// the menu, because the label isn't subject to the `.menu` bridge that freezes the in-menu clock
-/// (M6-T10).
-struct StatusIconView: View {
-    let icon: StatusIcon
-    var isReplayArmed = false
-    /// An export or trim is running (M23-T3) — orthogonal to the session, like `isReplayArmed`,
-    /// so it is a flag rather than a `StatusIcon` case: a take can be recording and exporting.
-    var isExporting = false
-    var recordingClock: RecordingClock? = nil
-    var showsTimer = true
-    var replaySavedFlash = false
-    /// Pull for the input meter (M16-T5): returns the peak since the last call. Nil ⇒ no meter.
-    var microphoneLevel: (() -> Float)? = nil
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Lit bars, updated only when the bucket changes (M16-T5) — never per sample, which is the
-    /// M6-T10 rule that also froze the in-menu clock.
-    @State private var levelBars = 0
-
-    /// Drives the drawn clock. The text lives inside the icon image now (see `withClock`), so the
-    /// tick has to rebuild the image rather than update a `Text`.
-    @State private var now = Date()
-    private let clockTicker = Timer.publish(
-        every: 1, tolerance: 0.1, on: .main, in: .common).autoconnect()
-
-    var body: some View {
-        iconImage
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
-        .onReceive(MenuBarLevelMeter.ticker) { _ in
-            guard let microphoneLevel else { return }
-            let lit = MicrophoneLevel.bars(forPeak: microphoneLevel())
-            if lit != levelBars { levelBars = lit }
-        }
-        .onReceive(clockTicker) { now = $0 }
-    }
-
-    /// The elapsed clock to draw beside the glyph, or nil when it isn't shown.
-    private var clockText: String? {
-        guard showsTimer, let recordingClock else { return nil }
-        return Timecode.clock(recordingClock.elapsed(now: now))
-    }
-
-    @ViewBuilder private var iconImage: some View {
-        if icon == .recording && !reduceMotion {
-            PulsingRecordingIcon(
-                label: accessibilityLabel, isReplayArmed: isReplayArmed, isExporting: isExporting,
-                levelBars: shownBars, clock: clockText, showsSavedMark: replaySavedFlash)
-        } else {
-            let base = StatusIconImage.image(
-                for: icon, isReplayArmed: isReplayArmed, isExporting: isExporting,
-                levelBars: shownBars)
-            Image(nsImage: Self.decorated(
-                base, clock: clockText, showsSavedMark: replaySavedFlash))
-        }
-    }
-
-    /// The clock and the save mark, in the order the label used to stack them: glyph, then time,
-    /// then the tick furthest right.
-    static func decorated(_ base: NSImage, clock: String?, showsSavedMark: Bool) -> NSImage {
-        var image = clock.map { StatusIconImage.withClock(base, text: $0) } ?? base
-        if showsSavedMark { image = StatusIconImage.withSavedMark(image) }
-        return image
-    }
-
-    /// Nil when the meter is off, which is what tells the drawing to omit it entirely.
-    private var shownBars: Int? { microphoneLevel == nil ? nil : levelBars }
-
-    /// The whole item as one VoiceOver element: the icon state, plus elapsed time and a
-    /// just-saved note when shown.
-    private var accessibilityLabel: String {
-        var label = StatusIconImage.label(
-            for: icon, isReplayArmed: isReplayArmed, isExporting: isExporting)
-        if showsTimer, let recordingClock {
-            label += ", " + Timecode.clock(recordingClock.elapsed(now: Date()))
-        }
-        if replaySavedFlash { label += ", saved" }
-        return label
-    }
-}
-
-/// The live elapsed clock in the status-item label (M9-T3). Redraws once a second off its own
-/// The input meter's clock (M16-T5). Polls rather than subscribes: a per-buffer publish is what
-/// M6-T10 forbids, and the poll only writes state when the bar count changes — so a silent room
-/// costs no redraws at all.
-@MainActor
-private enum MenuBarLevelMeter {
-    static let framesPerSecond: Double = 8
-    static let ticker = Timer.publish(
-        every: 1 / framesPerSecond, tolerance: 0.02, on: .main, in: .common).autoconnect()
-}
-
-/// Redraws the recording icon frame by frame, alive only while recording: SwiftUI's implicit
-/// animations don't drive a `MenuBarExtra` label, so the pulse must be timer-driven.
-private struct PulsingRecordingIcon: View {
-    /// Slow enough to read as breathing rather than as an alert.
-    private static let cycle: TimeInterval = 2
-    private static let framesPerCycle: Double = 12
-
-    let label: String
-    let isReplayArmed: Bool
-    let isExporting: Bool
-    let levelBars: Int?
-    /// Drawn into the image beside the glyph — see `StatusIconImage.withClock`.
-    let clock: String?
-    let showsSavedMark: Bool
-
-    @State private var phase: Double = 0
-
-    private let ticker = Timer.publish(
-        every: cycle / framesPerCycle, tolerance: 0.05, on: .main, in: .common
-    ).autoconnect()
-
-    var body: some View {
-        let faded = StatusIconImage.recordingImage(
-            fadedTo: StatusIconImage.pulseAlpha(atPhase: phase), isReplayArmed: isReplayArmed,
-            isExporting: isExporting, levelBars: levelBars)
-        Image(nsImage: StatusIconView.decorated(
-            faded, clock: clock, showsSavedMark: showsSavedMark))
-            .accessibilityLabel(label)
-            .onReceive(ticker) { _ in
-                phase = (phase + 1 / Self.framesPerCycle).truncatingRemainder(dividingBy: 1)
-            }
     }
 }

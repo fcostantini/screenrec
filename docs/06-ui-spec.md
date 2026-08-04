@@ -7,9 +7,10 @@ the UI adds no behavior of its own.
 
 ## Shell
 
-SwiftUI `MenuBarExtra` with `.menuBarExtraStyle(.menu)`. `LSUIElement = true` (no Dock
-icon, no main window). Windows that exist: Settings (⌘,) and Onboarding (first launch /
-missing permissions only).
+An AppKit `NSStatusItem` with an `NSMenu`, rebuilt on each open (M28-T2; it was a SwiftUI
+`MenuBarExtra(.menu)` through v1.14.0, and the bridge's limits are what the notes below record).
+`LSUIElement = true` (no Dock icon, no main window). Windows that exist — Settings (⌘,), Onboarding
+(first launch / missing permissions only) and Trim — are `NSWindow`s hosting SwiftUI views (M28-T1).
 
 ## Status item (the menu-bar icon)
 
@@ -18,8 +19,8 @@ missing permissions only).
 | idle | outline record circle (`record.circle`) | template image, adapts to menu bar |
 | recording | filled red circle | subtle pulse; respect Reduce Motion (static red) |
 | paused | half-filled circle, amber | |
-| input level (M16-T5) | three rising bars right of the glyph, lit by peak level | **composited into the icon image** — a MenuBarExtra label renders only its first `Image` (measured, docs/07). Shown while recording or armed with a mic; opt-out `showsMenuBarLevel`. Lit/unlit by opacity, not colour: the idle icon is a template, where only alpha survives |
-| elapsed clock (M9-T3) | `HH:MM:SS` right of the glyph while recording | **drawn into the icon image**, not carried as a `Text`: the `.menu` bridge renders a label's `Text` as the status item's AppKit *title* and discards SwiftUI layout and styling, leaving the digits 1.5 px high at 2× with no way to move them (measured, docs/07). Centred on the font's cap height, since digits have no descenders. Opt-out `showsMenuBarTimer` |
+| input level (M16-T5) | three rising bars right of the glyph, lit by peak level | **composited into the icon image** — an `NSStatusItem` button carries one image, and before M28-T2 a MenuBarExtra label rendered only its first `Image` (measured, docs/07). Shown while recording or armed with a mic; opt-out `showsMenuBarLevel`. Lit/unlit by opacity, not colour: the idle icon is a template, where only alpha survives |
+| elapsed clock (M9-T3) | `HH:MM:SS` right of the glyph while recording | **drawn into the icon image**, not carried as the button's title: the `.menu` bridge left the digits 1.5 px high at 2× with no way to move them (measured, docs/07), and drawing them keeps the clock on the glyph's optical line. A title is available again since M28-T2 and deliberately unused — moving it would be visible, which parity forbade. Centred on the font's cap height, since digits have no descenders. Opt-out `showsMenuBarTimer` |
 | replay armed (idle) | outline circle + small dot badge, **bottom-trailing** | armed is orthogonal to recording. **M5** — see the Settings amendment: the badge ships with the feature that can be armed, not before (it had been re-homed T1→T2→T4 before Franco ruled) |
 | export in flight (M23-T3) | a second dot badge, **top-trailing** | orthogonal again — an export can run while idle *or* recording, so it is a flag composited in, never a fourth `StatusIcon` case. The corner is the only free one: armed keeps the one it has shipped in since M5 (Franco's ruling, 2026-07-30) |
 | saved (M9-T3, fixed M23-T3) | a tick right of everything else, ~2 s | ⚠️ **had never rendered**: it was a second `Image` in the label's `HStack`, and a MenuBarExtra draws only the first (measured, docs/07). Now composited like the badge, meter and clock. Raised by a replay save, and by a take that stops **while replay is armed** — the case that was otherwise silent on every channel, since an armed stream keeps the display captured and macOS suppresses banners then (M5-T5). An ordinary stop does not flash: its banner works, and two confirmations of one event is noise. Not raised for `.writeFailed`, whose notice is a problem to read rather than a tick to glance at |
@@ -61,9 +62,10 @@ Order and grouping (separators between groups):
    first open, like the recents). **A picked app that isn't running stays listed** as
    `<name> (not running)` with the checkmark — the pick survives absence (the mic rule), Start
    then fails loud (never a silent whole-screen fallback), and an armed replay retries until the
-   app returns (measured: quit → relaunch re-arms unaided). ⚠️ `.disabled(true)` on a Picker row
-   does not survive the `.menu` bridge (measured M7-T2) — the not-running row renders undimmed;
-   accepted. Hidden while recording (see recording item 7).
+   app returns (measured: quit → relaunch re-arms unaided). **The row is dimmed** — M7-T2 measured
+   that `.disabled(true)` on a Picker row did not survive the `.menu` bridge and accepted an
+   undimmed row; M28-T2 sets `isEnabled` on a real `NSMenuItem`, which does dim.
+   Hidden while recording (see recording item 7).
    **System audio (M16-T3, ADR-019):** below `Microphone ▸`, a checkmark row **`Capture System
    Audio`** — a boolean gets a checkmark, not a submenu, and the menu is already under M18-T3's
    diet. Persisted (`capturesSystemAudio`, absent ⇒ on). Changing it while armed restarts the armed
@@ -90,6 +92,8 @@ Order and grouping (separators between groups):
    `(not running)` app rule; Start then fails loud.
    **Mute (M27-T3):** a nested `Mute ▸` row beside `Everything Except ▸`, listing **apps currently
    playing** plus `Nothing` to undo it, and a disabled **`Nothing is playing`** when none are. The
+   muted app carries a **real checkmark** (M28-T2; M27-T3 had to type a `✓` into the title, since
+   the `.menu` bridge would not mark a hand-built row). The
    pick shows one dimmed row — **`Spotify will be seen but not heard`** — the deliberate twin of the
    exclusion's `won't be seen or heard`: one grammar, one word apart, and that word is the feature.
    Zero extra rows when nothing is muted. ⚠️ **Its list is not `Everything Except`'s** and will
@@ -190,12 +194,11 @@ Order and grouping (separators between groups):
     stop that leaves a file (`.writeFailed` is already withheld by `SessionModel.finishedRecording`), is
     **not persisted** — a recording already lives in `Recordings ▸`, so the row is prominence, not access —
     and expires at menu open on the export receipt's own one-hour clock, or when its file goes, or when the
-    next take starts. A rename re-points it keeping its original date; a trash clears it. ⚠️
-    Implementation notes from M4-T2: a SwiftUI `.menu`
-    `MenuBarExtra` exposes neither `NSMenuItem.indentationLevel` (the indent is leading
-    whitespace in the title, with an explicit accessibility label so VoiceOver reads the
-    filename) nor a dimmed-but-clickable style — "dimmed style" is **not** currently met and
-    can't be without dropping to a hand-built NSMenu. Revisit in M6 polish if it matters.
+    next take starts. A rename re-points it keeping its original date; a trash clears it.
+    ⚠️ **"Dimmed but clickable" is still not offered**, though the reason changed: M4-T2 recorded it
+    as unreachable without a hand-built `NSMenu`, and M28-T2 built one — so it is now a choice
+    nobody has asked for rather than a limit. `NSMenuItem.indentationLevel` is likewise available
+    now; M18-T3's nesting made the leading-whitespace indent unnecessary before it arrived.
 11. — separator —
 12. `Settings…` (⌘,) · `Quit` (⌘Q). Quit while recording → confirm, then clean
     finalize before exit (never abandon a writer). **Every OTHER quit route while recording**
@@ -257,18 +260,13 @@ Order and grouping (separators between groups):
 
 Paused state: header dot goes amber, timer freezes, `Resume` primary.
 
-### Menu text styling (`.menu` MenuBarExtra bridge)
+### Menu text styling
 
-The `.menu`-style `MenuBarExtra` renders rows through AppKit and keeps only their text: SwiftUI
-`.foregroundStyle`/`.foregroundColor` and `Button(role: .destructive)` are **dropped** (measured,
-M6-T12 — a destructive role rendered plain gray). To color a row, give the `Button` an
-**attributed** label whose color is an `NSColor`, which the bridge *does* honor:
-
-```swift
-Button(role: .destructive) { … } label: { Text(discardTitle) }
-// discardTitle = AttributedString(NSAttributedString(
-//     string: "Discard Recording…", attributes: [.foregroundColor: NSColor.systemRed]))
-```
+A row that is anything but the default ink sets `NSMenuItem.attributedTitle` (`MenuRow.destructive`)
+— today because that is simply how AppKit colours a row, and before M28-T2 because it was the *only*
+thing the `.menu` `MenuBarExtra` bridge honoured: it rendered rows through AppKit and kept only their
+text, dropping SwiftUI `.foregroundStyle`/`.foregroundColor` and `Button(role: .destructive)`
+(measured, M6-T12 — a destructive role rendered plain gray).
 
 **Quitting with work in flight (M23-T2).** A recording confirms (`Stop recording and quit?`) and is
 finalized first. An **export** confirms too — `An export is still running.` / `Quitting now throws it

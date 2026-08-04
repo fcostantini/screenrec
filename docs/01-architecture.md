@@ -30,14 +30,14 @@ screenrec-app/
 │   │   │                     #   RecordingClock, MicrophoneLevel, StatusIcon, DisplayOption,
 │   │   │                     #   LoginItem, MenuHeader, CountInOutcome, RenameTarget,
 │   │   │                     #   FileIdentity, LastExport, LastReplay, RecentRecordings
-│   └── ScreenRecApp/          # Menu-bar app. SwiftUI + AppKit. Depends on AppCore.
-│       │                     #   App (@main, MenuBarExtra + AppDelegate), Notifier, Relaunch,
-│       │                     #   HotkeyCenter (Carbon), RegionSelectionOverlay (M11),
-│       │                     #   CountInOverlay (M12), NotificationSettings, LoginItem,
-│       │                     #   WindowPresenter (M28 — Settings/Onboarding/Trim, no scene)
-│       └── Views/            #   StatusIconView, MenuView, SettingsView, OnboardingView, TrimView,
-│                             #   ShareActions (pasteboard/share sheet/alerts), Finder,
-│                             #   HotkeyRecorderButton
+│   └── ScreenRecApp/          # Menu-bar app. AppKit shell, SwiftUI windows. Depends on AppCore.
+│       │                     #   App (@main NSApplication + AppDelegate), StatusItemController +
+│       │                     #   MenuBuilder + MenuRow (the NSMenu, M28), StatusIconImage,
+│       │                     #   WindowPresenter (Settings/Onboarding/Trim, M28), Notifier,
+│       │                     #   Relaunch, HotkeyCenter (Carbon), RegionSelectionOverlay (M11),
+│       │                     #   CountInOverlay (M12), NotificationSettings, LoginItem
+│       └── Views/            #   SettingsView, OnboardingView, TrimView, HotkeyRecorderButton,
+│                             #   ShareActions (pasteboard/share sheet/alerts), Finder
 ├── Scripts/                   # bundle.sh, devsign.sh, release.sh, smoke.sh (M13), hooks/pre-push
 ├── Tests/                     # RecorderCoreTests + AppCoreTests (pure-decision + integration)
 ├── tools/                     # probe, frames, menudriver, settingsdriver, hoverprobe, axdump,

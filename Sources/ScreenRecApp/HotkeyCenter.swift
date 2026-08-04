@@ -1,7 +1,6 @@
 import AppCore
+import AppKit
 import Carbon.HIToolbox
-import Foundation
-import SwiftUI
 
 /// Every Carbon hotkey this app registers.
 ///
@@ -76,7 +75,7 @@ final class HotkeyCenter {
     }
 }
 
-/// Human-readable form of a `Hotkey` (the settings pill, the menu hint) and its SwiftUI
+/// Human-readable form of a `Hotkey` (the settings pill, the menu hint) and its AppKit
 /// key equivalent. Key codes are Carbon kVK_* constants; the map covers the keys a shortcut
 /// plausibly uses, with a stated fallback rather than a silent blank.
 enum HotkeyDisplay {
@@ -84,32 +83,32 @@ enum HotkeyDisplay {
         modifierSymbols(for: hotkey.modifiers) + (keyNames[hotkey.keyCode] ?? "key \(hotkey.keyCode)")
     }
 
-    /// The key as a SwiftUI equivalent for menu display; nil for keys SwiftUI can't represent.
-    /// Special keys map to their semantic constants — a literal "↩" character is not Return.
-    static func keyEquivalent(for hotkey: Hotkey) -> KeyEquivalent? {
+    /// The key as an `NSMenuItem.keyEquivalent`; nil for keys AppKit can't represent, which fall
+    /// back to the combo in the row's title. Special keys are their function-key constants —
+    /// a literal "↩" is not Return.
+    static func menuKeyEquivalent(for hotkey: Hotkey) -> String? {
         switch hotkey.keyCode {
-        case kVK_Return: return .return
-        case kVK_Tab: return .tab
-        case kVK_Space: return .space
-        case kVK_LeftArrow: return .leftArrow
-        case kVK_RightArrow: return .rightArrow
-        case kVK_UpArrow: return .upArrow
-        case kVK_DownArrow: return .downArrow
+        case kVK_Return: return "\r"
+        case kVK_Tab: return "\t"
+        case kVK_Space: return " "
+        case kVK_LeftArrow: return String(UnicodeScalar(NSLeftArrowFunctionKey)!)
+        case kVK_RightArrow: return String(UnicodeScalar(NSRightArrowFunctionKey)!)
+        case kVK_UpArrow: return String(UnicodeScalar(NSUpArrowFunctionKey)!)
+        case kVK_DownArrow: return String(UnicodeScalar(NSDownArrowFunctionKey)!)
         default:
-            guard let name = keyNames[hotkey.keyCode], name.count == 1,
-                  let character = name.lowercased().first else { return nil }
-            return KeyEquivalent(character)
+            guard let name = keyNames[hotkey.keyCode], name.count == 1 else { return nil }
+            return name.lowercased()
         }
     }
 
-    /// The Carbon modifier mask as SwiftUI modifiers — one decoder, shared by every view.
-    static func eventModifiers(for hotkey: Hotkey) -> SwiftUI.EventModifiers {
-        var modifiers: SwiftUI.EventModifiers = []
-        if hotkey.modifiers & cmdKey != 0 { modifiers.insert(.command) }
-        if hotkey.modifiers & optionKey != 0 { modifiers.insert(.option) }
-        if hotkey.modifiers & controlKey != 0 { modifiers.insert(.control) }
-        if hotkey.modifiers & shiftKey != 0 { modifiers.insert(.shift) }
-        return modifiers
+    /// The Carbon modifier mask as AppKit flags, for a menu row's shortcut column.
+    static func modifierFlags(for hotkey: Hotkey) -> NSEvent.ModifierFlags {
+        var flags: NSEvent.ModifierFlags = []
+        if hotkey.modifiers & cmdKey != 0 { flags.insert(.command) }
+        if hotkey.modifiers & optionKey != 0 { flags.insert(.option) }
+        if hotkey.modifiers & controlKey != 0 { flags.insert(.control) }
+        if hotkey.modifiers & shiftKey != 0 { flags.insert(.shift) }
+        return flags
     }
 
     static func modifierSymbols(for carbonModifiers: Int) -> String {
