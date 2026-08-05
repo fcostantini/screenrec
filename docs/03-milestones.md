@@ -2972,7 +2972,7 @@ flattened. **MINOR.**
       ⚠️ **Franco's own settings make this unreachable for him today** (`recordHotkey` unset,
       `stopHotkeyCopies` off), so the live confirmation is owed only if he ever turns both on.
 
-**Gate G33** — three exports queued from one menu open all land in order with their own receipts, and
+**Gate G33** — ✅ **PASSED 2026-08-05** (evidence in STATUS.md's gate table; two items recorded there as unit-tested-only rather than waived). The criteria as filed: three exports queued from one menu open all land in order with their own receipts, and
 quitting waits for all of them; an export can be produced without the microphone's content in it,
 proven by level rather than by track count; the default export is unchanged.
 
