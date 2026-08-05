@@ -2737,7 +2737,7 @@ TCC once a second forever; and no doc or comment in the tree names a target or a
 removed. The standing bar applies — **each rule that can be broken has a test that goes red when it
 is**, and where no test can reach it, the task says so.
 
-## M31 — The file says what colour it is (from the 2026-08-05 audit)
+## M31 — The file says what colour it is — **CLOSED "won't do" 2026-08-05 (the premise was false)**
 
 `MovieRecorder.videoSettings` sets codec, dimensions, bitrate and keyframe interval and **no
 `AVVideoColorPropertiesKey`**. Neither does `Exporter`'s writer input, and
@@ -2749,6 +2749,25 @@ an NLE — and that lands on the `.mp4` share path, which is the one thing ADR-0
 🔴 **Colour appears nowhere in this repository** — not in docs/02, not in the field notes, not in a
 gate. It is not a measured trade-off that was accepted; it is an axis nobody has looked at.
 **PATCH** — a fix, not a capability.
+
+🔴 **RETRACTED IN FULL, same day. Recordings and exports were correctly tagged all along, and the
+audit's measurement was a bug in its own probe.** It looked up extension keys named
+`"ColorPrimaries"`, `"TransferFunction"`, `"YCbCrMatrix"`; the real keys are
+**`"CVImageBufferColorPrimaries"`** and friends. A wrong key returns nil, so it printed "absent" for
+every file and read as a confident finding.
+✅ **What the files actually carry**, on takes made *before* any change here, confirmed by two
+independent tools: `ITU_R_709_2` for all three, and `ffprobe` reads `bt709,bt709,bt709` on the `.mov`
+**and** both `.mp4` exports.
+✅ **Why, without anyone asking:** SCK stamps all three on every buffer, and `AVAssetWriter`
+propagates them into the file. An explicit `AVVideoColorPropertiesKey` is a **measured no-op** — T2's
+implementation was written, produced an identical result, and was reverted rather than shipped as
+surface that does nothing.
+⚠️ **T1's own conclusions are superseded**: "the conversion happens inside SCK under an unstated
+matrix" was wrong (it is stated on every buffer), and the synthetic reproduction encoded a pixel
+buffer carrying no colour attachments — so it reproduced a situation that does not occur in this
+product. The surviving platform facts are in docs/07.
+**T2 and T3 are closed with this milestone. Do not re-file without a measurement that uses the
+`kCMFormatDescriptionExtension_*` constants.**
 
 - [x] M31-T1 **Measure before changing anything.** M21's lesson, in M27-T1's shape: the rest of this
       milestone is only worth doing if the difference is visible. Answer, with numbers in docs/07:
@@ -2777,7 +2796,7 @@ gate. It is not a measured trade-off that was accepted; it is an axis nobody has
       ⚠️ **A methodology limit, recorded not buried:** cross-decoder absolute numbers in this spike
       are confounded (the sampler colour-manages the AVFoundation path and not the ffmpeg one). The
       confound-free comparisons are same-decoder, tagged vs untagged. Full detail in docs/07.
-- [ ] M31-T2 **A recording states its colour.** *(Shape depends on T1.)* **Seams:**
+- [x] ~~M31-T2 **A recording states its colour.**~~ — **CLOSED "won't do" 2026-08-05:** it already does. *(Shape depends on T1.)* **Seams:**
       `MovieRecorder.videoSettings`; `CaptureEngine.makeStreamConfiguration` for `colorSpaceName`.
       **Rulings:** which tag set — `ITU_R_709_2` across primaries/transfer/matrix is the honest
       default for BT.709-range HD output, and P3 is a different and much larger answer.
@@ -2786,7 +2805,7 @@ gate. It is not a measured trade-off that was accepted; it is an axis nobody has
       regression capture is owed. **Verify:** probe a fresh take for the three extensions; a
       synthetic-buffer writer test pins the settings dictionary; track layout, dimensions and
       duration unchanged against a control recording.
-- [ ] M31-T3 **An export and a re-encoding trim state theirs.** *(Shape depends on T1.)* **Seams:**
+- [x] ~~M31-T3 **An export and a re-encoding trim state theirs.**~~ — **CLOSED "won't do" 2026-08-05:** they already do. *(Shape depends on T1.)* **Seams:**
       `Exporter`'s writer input; `Trimmer`'s precise path. ⚠️ **A lossless trim is passthrough and
       inherits whatever the source carries** — so it needs no change, which is itself worth asserting,
       because it means a lossless trim of an untagged file stays untagged and the fix has to reach the
@@ -2795,7 +2814,7 @@ gate. It is not a measured trade-off that was accepted; it is an axis nobody has
       content, decode a frame with `tools/frames.swift`, and compare the two with
       `tools/pixdiff.swift`.
 
-**Gate G31** — either T1 closes the milestone with evidence that an untagged file is already read
+**Gate G31** — ❌ **not run; the milestone is closed.** As filed: either T1 closes the milestone with evidence that an untagged file is already read
 identically everywhere it goes, **or**: a recording, an MP4 export and a re-encoding trim each carry
 stated colour primaries, transfer function and matrix, and a decoded frame of a recording matches a
 `screencapture` of the same content more closely than the pre-change build did — measured with
