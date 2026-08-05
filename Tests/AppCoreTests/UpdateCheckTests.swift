@@ -108,6 +108,7 @@ import Testing
         // …and the case the milestone exists for: someone still on an old build IS told.
         let old = UpdateCheck.newestRelease(among: tags, laterThan: "1.7.0")
         #expect(old != nil, "a recipient on 1.7.0 should be offered something newer")
-        Issue.record("LIVE: \(tags.count) tags; this build \(CoreInfo.version); a 1.7.0 build would see \(old ?? "nothing")")
+        // Printed, not `Issue.record`: a diagnostic must not turn a passing test red.
+        print("LIVE: \(tags.count) tags; this build \(CoreInfo.version); a 1.7.0 build sees \(old ?? "nothing")")
     }
 }

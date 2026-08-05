@@ -2849,7 +2849,7 @@ is rebuilding from source. **MINOR.**
       export; silent when current *and* when it fails.
       ⚠️ **The cost is recorded, not buried:** the request tells `github.com` this machine's IP. For a
       deliberately private tool that earns a way to switch the check off — **a ruling left to T3.**
-- [ ] M32-T2 **The check.** 🔴 **BLOCKED 2026-08-05 — the premise is false, see below.** **Seams:** `CoreInfo.version` is the single
+- [x] M32-T2 **The check.** **Seams:** `CoreInfo.version` is the single
       source and is already pinned against `VERSION` by a test and by `release.sh`; `URLSession` is
       Foundation, so this stays zero-dep (ADR-010). **Rulings:** what a failed or offline check does
       — *nothing at all* is the likely honest answer — and the hard constraint that it can never
@@ -2885,6 +2885,21 @@ is rebuilding from source. **MINOR.**
       M32. Honest, and cheaper than any of the above.
       ⚠️ **ADR-020 is not invalidated** — it authorised *a read*, and (c) is squarely inside its
       bounds. What it could not anticipate is that there was nothing public to read.
+      ✅ **UNBLOCKED and done 2026-08-05 — Franco chose (b) and made the repo public (`ADR-021`).**
+      The API now answers unauthenticated, and the launch call is live.
+      ✅ **Measured against the real list:** **7 releases**, this build (1.16.0) correctly told
+      **nothing**, and **a recipient still on 1.7.0 is offered v1.16.0** — the case the milestone
+      exists for. Gated behind `SCREENREC_LIVE_UPDATE_CHECK=1` so the default run stays offline and
+      deterministic; a test that needs a network is a test that fails on a train.
+      ✅ **10 pure tests over the decision**, covering every way it could tell someone something false
+      about their own build: `1.9.0` vs `1.10.0` (where a string compare inverts), a build **ahead**
+      of every release, an unparseable own version, a bad tag beside a good one, and an empty list.
+      🔴 **A defect of my own, caught by running it:** the live test used `Issue.record` to print its
+      diagnostic, which turns a passing test **red**. Diagnostics are `print`; `Issue.record` is for
+      failures.
+      ⚠️ **Launch-only remains the cadence, and it is still the weak part** — Franco's own app ran
+      **18 h+** without a relaunch, so the machine most likely to be behind is the one least likely to
+      re-check. A daily re-check is the honest version and is one timer away. **T3's call.**
 - [ ] M32-T3 **The surface.** *(Re-specified 2026-08-05 against ADR-020.)* A **dimmed menu row**,
       present only when a newer release exists — Franco's pick. 🔴 **Ruling owed here: a way to turn
       the check off.** ADR-020 records the privacy cost and deliberately leaves the opt-out to this

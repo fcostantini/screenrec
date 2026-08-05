@@ -113,6 +113,9 @@ structure already maps cleanly onto MINOR bumps, and a human-readable `defaults 
 was the point of M4-T6's stamping.
 
 ## ADR-014 ✅ Distribution: self-signed, privately shared, no notarization (Franco, 2026-07-21)
+⚠️ **Amended by ADR-021 (2026-08-05): the repository is now PUBLIC.** Signing and distribution
+are unchanged by that; the "never public" clause below is superseded, and this ADR's own
+widened-audience trigger has fired — see ADR-021.
 Resolves the review's "personal tool or product?" fork. screenrec is a **personal tool Franco may
 hand to a small number of people directly — never public, never commercial.** So the Apple Developer
 Program ($99/yr) and `notarytool` are **not** worth it; M6-T4's notarization item is closed as "won't
@@ -216,6 +219,36 @@ worth a way to turn the check off — a ruling left to M32-T3, not assumed here.
 **A reversal is a new ADR.** The line this draws is *reading public metadata about the software
 itself*; anything that sends information about the user, the machine, or a recording is on the other
 side of it and is not authorised by this.
+
+## ADR-021 ✅ The repository is public; distribution and signing are unchanged (Franco, 2026-08-05)
+ADR-014 said screenrec is **"never public"**, and M32 ran straight into the consequence: the update
+check it needed could not read a private repo's releases, and — the part that reshaped the milestone
+— **recipients of a handed-over `.app` have no GitHub access at all**, so even a link to the releases
+page 404s for them. The options were ship a token (a leaked credential, never), publish a separate
+version manifest, drop the feature, or make the repo public. **Franco made it public.**
+
+**What this changes:** the source, the history and the release assets are readable by anyone, and
+`api.github.com/.../releases` now answers unauthenticated — which is what unblocks M32-T2 within
+ADR-020's existing bounds.
+
+**What it does NOT change.** ADR-014's *distribution* posture stands: builds are **self-signed**
+(`screenrec-dev`), **not notarized**, and the intended path is still a build handed to someone
+directly, or cloned and built from source (README's four commands). Nothing about the app, its
+signing, or its TCC behaviour moves because the repo moved.
+
+🔴 **The open question this fires, recorded rather than settled.** ADR-014 closed notarization "won't
+do" *on audience size*, and wrote its own trigger: *"If the audience ever widens beyond a handful of
+direct recipients, revisit."* A public repo means publicly downloadable release zips, so a stranger
+can now get a build that macOS blocks on first launch until they use System Settings → **Open
+Anyway**. That was a fair ask of someone Franco handed a build to; it is a poor first contact for
+someone who found it. **Notarization (Developer ID, $99/yr) is not decided here** — the choice is
+between paying it, marking releases source-only, or accepting the friction knowingly.
+
+⚠️ **Checked before the switch, and worth recording so nobody re-checks in a panic:** the tree and the
+full history carry **no credentials, keys or tokens**; no window titles or channel names ever reached
+the docs (M19-T5's discipline held in the prose, not only in the plist); the one email is Franco's own
+in docs/00, deliberately. The ~61 `claude.ai/code/artifact/…` links throughout the docs are public but
+**unreadable to anyone else** — dead links, not leaks.
 
 ## ADR-018 ✅ Armed replay keeps the Mac awake, deliberately — and the assertion says so (Franco, 2026-07-27)
 The 2026-07-24 review filed armed replay's sleep assertion as a bug (M16-T1): arm once and the machine

@@ -36,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: StatusItemController?
     /// Held so the watch outlives `applicationDidFinishLaunching`.
     private var screenGrantWatch: Task<Void, Never>?
+    /// Held for the same reason; dropping the reference would not cancel it.
+    private var updateCheck: Task<Void, Never>?
 
     override init() {
         super.init()
@@ -145,6 +147,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // docs/06: appears on first launch or any missing permission, never once satisfied.
         if state.needsOnboarding { windows.show(.onboarding) }
         screenGrantWatch = Task { [weak self] in await self?.relaunchWhenScreenGrantLands() }
+        // ADR-020: reads the release list, says nothing when current or when it fails, and
+        // never blocks — the menu reads whatever answer this leaves behind.
+        updateCheck = Task { [weak state] in await state?.checkForUpdate() }
 
     }
 

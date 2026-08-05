@@ -6,6 +6,28 @@
 
 ## Now
 
+- **✅ M32-T2 SHIPPED (2026-08-05) — a build can tell it's out of date. Next: M32-T3 (the menu row).**
+  🔴 **The repo is now PUBLIC** (Franco, 2026-08-05) — recorded as **`ADR-021`**, which amends
+  ADR-014's "never public". Signing and distribution are **unchanged**: still self-signed, still not
+  notarized, still handed over directly or built from source.
+  🔴 **Why it moved:** T2 was blocked because the releases API 404s on a private repo — and worse,
+  **recipients of a handed-over `.app` have no GitHub access at all**, so even a link to the releases
+  page 404s for them. Token (never), separate manifest, drop it, or go public: Franco went public.
+  ✅ **Measured against the real list:** **7 releases**, this build (1.16.0) told **nothing**, and a
+  recipient still on **1.7.0 is offered v1.16.0** — the case the milestone exists for. Live leg gated
+  behind `SCREENREC_LIVE_UPDATE_CHECK=1`; the default run stays offline. **760 tests.**
+  🔴 **Fired by going public, and NOT settled:** ADR-014 closed notarization "won't do" *on audience
+  size*, and wrote its own trigger — *"if the audience widens beyond a handful of direct recipients,
+  revisit"*. Release zips are now publicly downloadable, so a stranger gets a build macOS blocks until
+  they use **Open Anyway**. **Pay for Developer ID, mark releases source-only, or accept the friction
+  knowingly — Franco's call, recorded in ADR-021.**
+  ⚠️ **Pre-publication scan, so nobody re-runs it in a panic:** no credentials/keys/tokens in the tree
+  **or the full history**; no window titles or channel names ever reached the docs (M19-T5's
+  discipline held in prose too); the one email is Franco's own in docs/00, deliberate. ~61
+  `claude.ai/code/artifact/…` links are public but unreadable — dead links, not leaks.
+  ⚠️ **Launch-only is still the weak cadence** — his app ran 18 h+ without a relaunch, so the machine
+  most likely to be behind is the least likely to re-check. One timer away. **T3's call.**
+
 - **✅ M33 COMPLETE and G33 PASSED (2026-08-05) — the share loop stops refusing work it can do.**
   Three tasks: a queue so a second export waits instead of being dropped, a Settings toggle that
   leaves your narration out of shared clips, and the collapse of the arm that withheld a copy it can
@@ -380,19 +402,6 @@
 
 **Open:**
 
-- [ ] 🔴 **M32-T2 is BLOCKED on a ruling, and the premise was false** (2026-08-05). The update check's
-      comparison is built and tested; the **source is unreachable**: the releases API returns **404**
-      because **the repo is private**, and — the part that reshapes the milestone — **recipients have
-      no GitHub access at all**, so the releases page 404s for them too. Even a manual
-      `Check for Updates…` only works for Franco. **Options in docs/03 under M32-T2:** ship a token
-      (❌ never), make the repo public (contradicts ADR-014), publish a one-line version manifest
-      that `release.sh` pushes (repo stays private, ~15 lines), or drop the check and close M32.
-
-- [x] ~~**M32-T1 — is a network read acceptable at all?**~~ **RULED 2026-08-05 → `ADR-020`.** Yes,
-      as an automatic background read on launch surfacing a dimmed row only when behind. The non-goal
-      is about *recordings*; this sends nothing about the user or the machine. **M32 is unblocked.**
-      🔴 **One ruling still owed, at M32-T3:** whether the check can be switched off. ADR-020 records
-      the cost (the request reveals this machine's IP to GitHub) and leaves the opt-out to Franco.
 
 - [ ] **The replay-save confirmation — pick a direction** (audit, 2026-08-05; parked in docs/03 with
       🔴 *needs a ruling*). (a) onboarding walks the user through the banner-suppression toggle and

@@ -9,10 +9,9 @@ public enum UpdateCheck {
 
     private static let log = Logger(subsystem: "dev.fcostantini.screenrec", category: "update")
 
-    /// 🔴 **Not reachable as written — the repo is private, and this returns 404 unauthenticated**
-    /// (measured 2026-08-05). Nothing calls `fetchTags` yet for that reason: a request known to fail
-    /// on every launch is not worth making. Where the version actually comes from is a ruling
-    /// (M32-T2); the comparison below is independent of it and stands either way.
+    /// The releases ADR-014 hands people a build from — the same list a recipient is sent to.
+    /// ⚠️ Readable only because the repo is public (ADR-021); unauthenticated it 404s on a private
+    /// one, which is what blocked this task until Franco made the repo public.
     static let releasesURL = URL(
         string: "https://api.github.com/repos/fcostantini/screenrec/releases")!
 
