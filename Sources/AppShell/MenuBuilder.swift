@@ -112,12 +112,9 @@ struct MenuBuilder {
         items.append(MenuRow.action("Stop & Save", hotkey: state.stopAndSaveHotkey) {
             Task { await state.stop() }
         })
-        // Disabled while an export runs — `performExport` would drop the second one, and a dropped
-        // action must be visible rather than silent (M17-T2).
-        items.append(MenuRow.action(
-            state.stopAndCopyTitle, hotkey: state.stopAndCopyHotkey,
-            enabled: state.exports.exportInProgress == nil
-        ) { Task { await state.stopAndShare() } })
+        items.append(MenuRow.action(state.stopAndCopyTitle, hotkey: state.stopAndCopyHotkey) {
+            Task { await state.stopAndShare() }
+        })
 
         items.append(MenuRow.separator())
 

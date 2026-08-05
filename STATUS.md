@@ -6,6 +6,18 @@
 
 ## Now
 
+- **✅ M33-T3 SHIPPED (2026-08-05) — the shortcut stops withholding a copy it can now queue.**
+  Franco's ruling. M24-T2's `stopWithoutCopy` arm existed only because a second export would be
+  dropped; T1 removed that reason. **749 tests.**
+  🔴 **The trap: collapsing the arm alone would have been worse than leaving it.** `stopAndShare()`
+  carried its own `exportInProgress == nil` guard with a **silent** `return` — so removing the arm
+  without removing that guard would have made the shortcut stop and say *nothing*, which is exactly
+  what M24-T2 was built to prevent. Four sites moved together: the arm, its `isExporting` parameter,
+  the silent guard, and the menu row's disabled state. `stopCopySkipped` is deleted, callerless.
+  ⚠️ **One removal is not unit-reachable, and the sweep proved it** — re-adding `stopAndShare`'s
+  silent guard leaves the suite green, because that path needs a real `RecordingSession` (the M23-T3
+  shape). Covered by the type system and the live leg, not by a test.
+
 - **✅ M33 COMPLETE (2026-08-05) — an export queue, and an export that can leave you out of it.**
   T1: a second export waits its turn instead of being refused. T2: `Include the microphone` in
   Settings, off leaves your narration out of shared clips. **748 tests.** ⚠️ **G33 not yet run** —

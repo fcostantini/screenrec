@@ -1291,10 +1291,10 @@ public final class AppState {
 
     /// Stop & Copy MP4 (M21-T2): finalize the take, then export it and leave the result on the
     /// pasteboard. The recording is kept (ADR-004) — the `.mp4` is derived beside it, exactly as
-    /// `Export as MP4` derives one. The in-flight guard is belt and braces: the menu row is
-    /// disabled while an export runs, so the press it would swallow can't be made.
+    /// `Export as MP4` derives one. An export already running is no obstacle since M33-T1: this one
+    /// queues behind it.
     public func stopAndShare() async {
-        guard session.isActive, exports.exportInProgress == nil else { return }
+        guard session.isActive else { return }
         await stopAndWaitForFinalize()
         // `lastRecording` is where the take actually ended up: the naming prompt (M21-T3)
         // runs inside the same task, so the `.mp4` inherits the chosen name instead of landing
@@ -1350,41 +1350,30 @@ public final class AppState {
     public func toggleRecording() async {
         switch Self.recordToggleAction(
             isSessionActive: session.isActive, isReady: readiness == .ready,
-            copiesOnStop: stopHotkeyCopies, isExporting: exports.exportInProgress != nil
+            copiesOnStop: stopHotkeyCopies
         ) {
         case .start: await start()
         case .stop: await stop()
         case .stopAndCopy: await stopAndShare()
-        case .stopWithoutCopy:
-            // Waits for finalize, not just `stop()`: the take's own "Recording saved" is posted
-            // when `.finished` drains, so notifying any earlier puts this notice on screen first
-            // and lets the next banner bury it (measured — it lasted under 0.3 s).
-            await stopAndWaitForFinalize()
-            notifier?(RecordingNotifications.stopCopySkipped())
         case .blockedNotify: notifier?(RecordingNotifications.recordingHotkeyBlocked())
         }
     }
 
     enum RecordToggleAction: Equatable {
-        case start, stop, stopAndCopy, stopWithoutCopy, blockedNotify
+        case start, stop, stopAndCopy, blockedNotify
     }
 
     /// Pure so every branch is unit-tested without live capture (which `start`/`stop` need).
     ///
-    /// `stopWithoutCopy` is the one non-obvious arm (M24-T2): an export is already running, and
-    /// `performExport` would drop a second one. Stopping is the shortcut's primary contract, so it
-    /// still stops — but the missing half has to be said, since a hotkey can't grey itself out the
-    /// way the menu row does (M17-T2).
-    /// Neither flag is defaulted: a caller that passed `copiesOnStop` and forgot `isExporting`
-    /// would land in `stopAndShare`, whose own guard returns silently.
+    /// The shortcut does not consult the export state: since M33-T1 a second export queues rather
+    /// than being dropped, so there is nothing to warn about and nothing to withhold.
     static func recordToggleAction(
-        isSessionActive: Bool, isReady: Bool, copiesOnStop: Bool, isExporting: Bool
+        isSessionActive: Bool, isReady: Bool, copiesOnStop: Bool
     ) -> RecordToggleAction {
         guard isSessionActive else {   // a paused session is still active — stop wins
             return isReady ? .start : .blockedNotify
         }
-        guard copiesOnStop else { return .stop }
-        return isExporting ? .stopWithoutCopy : .stopAndCopy
+        return copiesOnStop ? .stopAndCopy : .stop
     }
 
     /// What the global pause/resume shortcut does (M12-T6): a live recording pauses, a paused one

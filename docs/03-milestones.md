@@ -2895,10 +2895,7 @@ flattened. **MINOR.**
       the suite **hang** rather than fail, because the tests waited on the queue with no bound. Both
       helpers are bounded now (M15-T1's rule) and the same break turns red in 0.4 s. ⚠️ The sweep
       harness needs a per-break timeout too — a break that hangs kills the sweep, not just the test.
-      ⚠️ **`stopWithoutCopy` is deliberately left alone.** M24-T2 added it because a second export
-      would be *dropped*; with a queue that reason is gone and the arm is now conservative rather than
-      necessary. Collapsing it removes a case, its tests and a notice, all verified in G24 — **it is a
-      one-line follow-up and Franco's call**, not a silent change.
+      ⚠️ **`stopWithoutCopy` was left alone here and collapsed in T3** — Franco's ruling, 2026-08-05.
 - [x] M33-T2 **An export can leave the microphone out.** **Seams:** `Exporter`'s
       `AVAssetReaderAudioMixOutput` already takes the track list, so this is an argument to work that
       happens anyway — which is exactly the test ADR-015 set for what may come through that door;
@@ -2953,6 +2950,27 @@ flattened. **MINOR.**
       Recorded so nobody rebuilds it expecting an answer.
       ⚠️ **`screenrec-cli export --to-mp4 --no-microphone` was added for this** — the option existed
       with no headless surface, which ADR-011 makes a gap rather than a nicety.
+
+- [x] M33-T3 **The shortcut stops withholding a copy it can now queue** (added 2026-08-05 on
+      Franco's ruling). M24-T2's `stopWithoutCopy` arm existed for one reason: with an export already
+      running, a second would be **dropped**, and a hotkey cannot grey itself out the way a menu row
+      does — so the shortcut stopped, skipped the copy, and said so. T1 removed that reason.
+      🔴 **The collapse is four coordinated changes, not one — and the trap is that doing only the
+      obvious one is worse than doing nothing.** `stopAndShare()` had its own
+      `exportInProgress == nil` guard with a **silent** `return`: dropping the toggle's arm while
+      leaving that guard would have made the shortcut stop and say nothing at all, which is precisely
+      the outcome M24-T2 existed to prevent. So: the arm and its `isExporting` parameter go, the
+      silent guard goes, the `Stop & Copy MP4` row stops being disabled during an export, and
+      `stopCopySkipped` — now callerless — is deleted.
+      ✅ **749 tests.** `recordToggleAction` no longer takes an export state at all, so re-adding the
+      old behaviour cannot be done without changing a signature the tests pin.
+      ⚠️ **One removal is NOT unit-reachable, and the sweep proved it:** re-introducing
+      `stopAndShare`'s silent guard leaves the suite **green**. That path needs `session.isActive`,
+      i.e. a real `RecordingSession`, which no test can build — the M23-T3 shape. It is covered by the
+      type system (the method no longer mentions `exports`) and by the live leg, not by a test, and
+      this says so rather than implying otherwise.
+      ⚠️ **Franco's own settings make this unreachable for him today** (`recordHotkey` unset,
+      `stopHotkeyCopies` off), so the live confirmation is owed only if he ever turns both on.
 
 **Gate G33** — three exports queued from one menu open all land in order with their own receipts, and
 quitting waits for all of them; an export can be produced without the microphone's content in it,

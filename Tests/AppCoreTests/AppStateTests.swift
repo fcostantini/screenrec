@@ -88,7 +88,7 @@ import RecorderCore
         // Pure, so the three branches are testable without live capture (which start/stop need).
         let plain = { (active: Bool, ready: Bool) in
             AppState.recordToggleAction(
-                isSessionActive: active, isReady: ready, copiesOnStop: false, isExporting: false)
+                isSessionActive: active, isReady: ready, copiesOnStop: false)
         }
         #expect(plain(false, true) == .start)
         #expect(plain(true, true) == .stop)
@@ -97,24 +97,25 @@ import RecorderCore
     }
 
     @Test func theStopEndingDecidesWhetherTheShortcutAlsoCopies() {
-        // M24-T2: one combo, two endings — plus the arm for a copy that can't run.
+        // M24-T2: one combo, two endings. The third arm — a copy that couldn't run because another
+        // export held the slot — went with M33-T3, since a second export now queues instead.
         #expect(AppState.recordToggleAction(
-            isSessionActive: true, isReady: true, copiesOnStop: true, isExporting: false)
-            == .stopAndCopy)
+            isSessionActive: true, isReady: true, copiesOnStop: true) == .stopAndCopy)
         #expect(AppState.recordToggleAction(
-            isSessionActive: true, isReady: true, copiesOnStop: false, isExporting: false) == .stop)
-        // An export already holds the one-at-a-time slot. Stopping is the combo's primary
-        // contract, so it still stops — and the dropped copy is announced, not swallowed.
-        #expect(AppState.recordToggleAction(
-            isSessionActive: true, isReady: true, copiesOnStop: true, isExporting: true)
-            == .stopWithoutCopy)
+            isSessionActive: true, isReady: true, copiesOnStop: false) == .stop)
         // The ending never leaks into the idle branches: with nothing recording there is no stop
         // to give an ending to.
         #expect(AppState.recordToggleAction(
-            isSessionActive: false, isReady: true, copiesOnStop: true, isExporting: true) == .start)
+            isSessionActive: false, isReady: true, copiesOnStop: true) == .start)
         #expect(AppState.recordToggleAction(
-            isSessionActive: false, isReady: false, copiesOnStop: true, isExporting: false)
-            == .blockedNotify)
+            isSessionActive: false, isReady: false, copiesOnStop: true) == .blockedNotify)
+    }
+
+    /// The point of collapsing the arm (M33-T3): an export already running must no longer change
+    /// what the shortcut does. Before, this returned `.stopWithoutCopy` and withheld the copy.
+    @Test func anExportAlreadyRunningNoLongerChangesWhatTheShortcutDoes() {
+        #expect(AppState.recordToggleAction(
+            isSessionActive: true, isReady: true, copiesOnStop: true) == .stopAndCopy)
     }
 
     // MARK: - Global pause/resume shortcut (M12-T6)
