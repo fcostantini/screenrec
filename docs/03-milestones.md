@@ -2940,6 +2940,11 @@ is rebuilding from source. **MINOR.**
       ⚠️ **G32 does not need re-running:** none of its criteria mention the row's clickability, and
       the row's presence and absence are unchanged.
 
+⚠️ **What M32 cannot do, and never could:** a check cannot announce the release that shipped it.
+Builds at or before **1.16.0** carry no check, so their holders are never told about 1.17.0 or later —
+the feature works **from 1.17.0 forward only**, and the existing cohort needs one manual nudge.
+Recorded in `ADR-020` rather than left to be rediscovered.
+
 **Gate G32** — ✅ **PASSED 2026-08-05** (evidence in STATUS.md's gate table; the method note about the faked version is recorded there, not waived). As filed: a decision is recorded; a build behind the latest release says so on a surface Franco
 chose, a current build says nothing, and an offline machine behaves exactly like a current one; the
 check never blocks launch, a recording, or an export.

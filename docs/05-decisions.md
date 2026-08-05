@@ -216,6 +216,13 @@ Reading a public list of tags sends nothing about the user and nothing about the
 address. That is the whole privacy cost, it is not zero, and for a deliberately private tool it is
 worth a way to turn the check off — a ruling left to M32-T3, not assumed here.
 
+🔴 **The bootstrap this cannot solve, recorded so it is not rediscovered:** a version check **can
+never announce the release that introduced it**. Every build at or before **1.16.0** has no check in
+it, so nobody holding one will be told about 1.17.0 or anything after — they will go on believing they
+are current forever. The feature works **from 1.17.0 forward only**, and the existing cohort has to be
+told once, by hand, exactly as before. That is not a defect and there is no version of this feature
+that avoids it; it is the reason the first upgrade is always the owner's job.
+
 **A reversal is a new ADR.** The line this draws is *reading public metadata about the software
 itself*; anything that sends information about the user, the machine, or a recording is on the other
 side of it and is not authorised by this.
