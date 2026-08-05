@@ -2579,7 +2579,7 @@ five. **PATCH** (ADR-013): no new capability.
       unit test can reach it (the engine builds its tap internally and needs a live `SCStream`).
       `--audit-tap` ships as the standing instrument for that claim, and `SystemAudioTapTests`' doc
       comment states the gap rather than implying coverage it doesn't have.
-- [ ] M30-T2 **The filmstrip's counter cannot lose a decrement.** `FilmstripThumbnails` decrements a
+- [x] M30-T2 **The filmstrip's counter cannot lose a decrement.** `FilmstripThumbnails` decrements a
       captured `var outstanding` inside `generateCGImagesAsynchronously`'s handler and finishes the
       `AsyncStream` at zero. `AVAssetImageGenerator` promises no serialisation of that handler, so a
       lost decrement means the count never reaches zero, the stream never finishes, and the Trim
@@ -2589,6 +2589,30 @@ five. **PATCH** (ADR-013): no new capability.
       other option. **Rulings:** whether `continuation.yield` needs the same (it is documented
       thread-safe, so probably not — say so rather than guard it twice). **Verify:** both warnings
       gone from a clean build, and the strip still fills **16/16** on a real take (G24's own figure).
+      ✅ **Done 2026-08-05.** `OSAllocatedUnfairLock<Int>` makes decrement-and-test one operation;
+      the count is unreachable outside the lock, and `continuation.finish()` is called outside it.
+      **733 tests** (+1). Plan artifact: `claude.ai/code/artifact/9d40deee-65c0-47a4-bb1e-215e6aede97b`.
+      🔴 **The task as filed was wrong about the blast radius.** `stream` has **three** consumers, not
+      one: `TrimView` (16 thumbnails), **`BarDetector` via `--crop detect` — on G26's verified path**,
+      and `MenuThumbnails` (1 thumbnail, structurally immune — one callback cannot race). A hang here
+      stalls a crop-detect export, not just a window.
+      ✅ **Verified headlessly, so no Trim window leg was needed.** Both warnings gone from a
+      clean-scratch build (5 warning sites → 4, the rest being T3/T4's); the new gated test asks for
+      16 and receives 16 distinct indices **and terminates**; and `--crop detect` on G26's letterboxed
+      sample still reports **3088 × 2314 at 512,128** → `H.264 1920×1438`, its recorded figures exactly,
+      with the source md5 unchanged.
+      ⚠️ **The test is bounded (20 s), per M15-T1:** "the stream never finishes" is a hang, and a
+      regression has to *fail* the suite rather than wedge it. Verified by breaking it — a handler
+      that never calls `finish()` goes red on the bound.
+      ⚠️ **2 of 3 breaks go red, and the third is the honest one:** never-finishing and
+      decrement-by-two each fail; **genuinely reverting the fix stays green**, because nothing can
+      force two callbacks to collide. The test says so in its own doc comment rather than implying
+      coverage it lacks. 🔴 A first attempt at that third break was invalid — it added a dead variable
+      instead of reverting — and its "green" proved nothing until it was redone properly.
+      ⚠️ **`OSAllocatedUnfairLock` is new to this codebase** (24 `NSLock`s, zero of these). Chosen
+      because it makes the value unreachable outside the lock, and docs/01 already sanctions
+      `os_unfair_lock`; the consistent alternative was an ~8-line `NSLock` class like
+      `WriterDrain.FirstError`.
 - [ ] M30-T3 **The remaining warnings are closed or explained, one each.** `ReplayEncoder.swift:69`
       captures a non-Sendable `CMSampleBuffer` in a `@Sendable` closure; `WriterDrain.swift:24–27`
       captures `var done`, a non-Sendable `AVAssetWriterInput` and a non-Sendable `pump`;

@@ -190,3 +190,23 @@ func makeAudioOnlyClip(seconds: Int) async throws -> URL {
     await writer.finishWriting()
     return url
 }
+
+/// A video-only `.mov` written through the real `MovieRecorder`, for suites that need a decodable
+/// file rather than buffers. 30 fps, so `frames` frames is `frames / 30` seconds.
+func makeVideoOnlyMovie(width: Int = 320, height: Int = 180, frames: Int = 90) async throws -> URL {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("filmstrip-src-\(UUID().uuidString).mov")
+    try? FileManager.default.removeItem(at: url)
+    let recorder = try MovieRecorder(
+        outputURL: url, frameRate: 30, preset: .balanced,
+        includesMicrophone: false, includesSystemAudio: false)
+    for index in 0..<frames {
+        recorder.consume(
+            makeVideoSampleBuffer(
+                width: width, height: height,
+                pts: CMTime(value: CMTimeValue(index), timescale: 30),
+                shade: UInt8(truncatingIfNeeded: index &* 3)),
+            type: .screen)
+    }
+    return try await recorder.finish()
+}

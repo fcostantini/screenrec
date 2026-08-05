@@ -6,7 +6,26 @@
 
 ## Now
 
-- **✅ M30-T1 SHIPPED (2026-08-05) — a terminated engine leaves no tap behind. Next: M30-T2.**
+- **✅ M30-T2 SHIPPED (2026-08-05) — the filmstrip's counter cannot lose a decrement. Next: M30-T3.**
+  `OSAllocatedUnfairLock<Int>` makes decrement-and-test one operation. **733 tests** (+1). Plan
+  artifact: `claude.ai/code/artifact/9d40deee-65c0-47a4-bb1e-215e6aede97b`.
+  🔴 **The task I filed was wrong about the blast radius:** `FilmstripThumbnails.stream` has **three**
+  consumers, not just the Trim window — `BarDetector` via `--crop detect` is **on G26's verified
+  path**, and `MenuThumbnails` is structurally immune (one thumbnail ⇒ one callback).
+  ✅ **All three legs headless, so your desktop wasn't touched:** warnings gone from a clean-scratch
+  build (**5 sites → 4**, the rest T3/T4's); a new gated test asks for 16, gets 16 distinct indices
+  **and terminates**; `--crop detect` on the G26 sample still reports **3088 × 2314 at 512,128 →
+  1920×1438**, its recorded figures exactly, source md5 unchanged.
+  ⚠️ **2 of 3 breaks red, third green for a stated reason** — reverting the fix outright can't be
+  caught, since nothing forces two callbacks to collide. 🔴 My first version of that third break was
+  invalid (added a dead variable rather than reverting); redone properly before believing it.
+  ⚠️ **The incremental-warning trap bit again** (M28-T3 recorded it): a second `swift build` against
+  an already-populated scratch path re-emits nothing, which briefly read as "zero warnings
+  everywhere". One clean build per inventory, or the number is fiction.
+  ⚠️ **`OSAllocatedUnfairLock` is new here** — 24 `NSLock`s and none of these. Picked for
+  correct-by-construction over idiom-consistency; the `NSLock` alternative is a 2-minute swap.
+
+- **✅ M30-T1 SHIPPED (2026-08-05) — a terminated engine leaves no tap behind.**
   The teardown moved **into `cancelWatchdogs()`** — the one site both `stop()` and `terminate()`
   already call — rather than being copied into `terminate()`, plus `SystemAudioTap.deinit` for an
   engine released without terminating. **732 tests** (+4). Plan artifact:

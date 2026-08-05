@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreGraphics
 import Foundation
+import os
 
 /// The Trim window's filmstrip (M24-T4): a fixed number of thumbnails spread across a clip.
 ///
@@ -45,15 +46,22 @@ public enum FilmstripThumbnails {
             let stamps = times.map { CMTime(seconds: $0, preferredTimescale: Self.timescale) }
             let byTime = Dictionary(
                 zip(stamps.map(\.value), stamps.indices), uniquingKeysWith: { first, _ in first })
-            var outstanding = stamps.count
+            // Locked because the count is read-modify-write and AVFoundation does not promise to
+            // serialise the handler below: a lost decrement never reaches zero, so the stream never
+            // finishes and its consumer waits forever. `continuation` needs no guard of its own —
+            // an `AsyncStream.Continuation` is safe for concurrent use.
+            let outstanding = OSAllocatedUnfairLock(initialState: stamps.count)
 
             generator.generateCGImagesAsynchronously(forTimes: stamps.map(NSValue.init(time:))) {
                 requestedTime, image, _, _, _ in
                 if let image, let index = byTime[requestedTime.value] {
                     continuation.yield((index: index, image: image))
                 }
-                outstanding -= 1
-                if outstanding == 0 { continuation.finish() }
+                let finished = outstanding.withLock { remaining in
+                    remaining -= 1
+                    return remaining == 0
+                }
+                if finished { continuation.finish() }
             }
             // Cancelling the consuming task must stop the decode: a superseded strip would
             // otherwise keep a multi-GB asset's pipeline alive behind the new one.
