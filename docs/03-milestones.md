@@ -2927,7 +2927,7 @@ is rebuilding from source. **MINOR.**
       action — a reader still goes to Releases themselves. Making it *open* that page downloads
       nothing and is one line; **left as filed rather than widened without asking.**
 
-**Gate G32** — ⏳ **not yet run.** As filed: a decision is recorded; a build behind the latest release says so on a surface Franco
+**Gate G32** — ✅ **PASSED 2026-08-05** (evidence in STATUS.md's gate table; the method note about the faked version is recorded there, not waived). As filed: a decision is recorded; a build behind the latest release says so on a surface Franco
 chose, a current build says nothing, and an offline machine behaves exactly like a current one; the
 check never blocks launch, a recording, or an export.
 
