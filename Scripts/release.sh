@@ -34,6 +34,16 @@ step() {
   fi
 }
 
+# The `## <version>` section of CHANGELOG.md, without its heading. Defined up here because the
+# consistency checks use it, long before the notes are assembled.
+changelog_section() {
+  awk -v heading="## $VERSION" '
+    $0 == heading { inside = 1; next }
+    inside && /^## / { exit }
+    inside { print }
+  ' CHANGELOG.md
+}
+
 # --- consistency checks (fail fast, before the slow gate) ---
 [ -z "$(git status --porcelain)" ] || die "working tree is dirty — commit or stash first"
 ok "clean working tree"
@@ -46,6 +56,12 @@ ok "VERSION = $VERSION"
 grep -q "\"$VERSION\"" Sources/RecorderCore/CoreInfo.swift \
   || die "CoreInfo.version != VERSION ($VERSION) — bump both in the release commit"
 ok "CoreInfo.version matches VERSION"
+
+# The notes are CHANGELOG.md's now, with no `git log` left to fall back on, so a missing section
+# would publish a release that says nothing. Checked before anything is tagged, pushed or uploaded.
+[ -n "$(changelog_section | tr -d '[:space:]')" ] \
+  || die "CHANGELOG.md has no '## $VERSION' section — write the release notes first"
+ok "CHANGELOG.md has notes for $VERSION"
 
 TAG="v$VERSION"
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then die "tag $TAG already exists"; fi
@@ -66,11 +82,11 @@ step "bundle + sign"        ./Scripts/bundle.sh
 # The install note is not decoration: this build is signed by us and deliberately NOT notarized
 # (ADR-014), so a *downloaded* zip is quarantined and macOS 15 refuses it — without these steps
 # the download is a trap.
+#
+# What changed comes from CHANGELOG.md, never from `git log`: commit subjects are the per-task audit
+# trail and read as one — task IDs, `docs:` bookkeeping, internal nouns (M32-T5). Anyone who wants the
+# commits has them on the tag, one click away.
 release_notes() {
-  local previous
-  # The tag directly below this one in version order — found by locating $TAG rather than assuming
-  # it sorts first, so cutting a patch while a higher minor exists still gets the right range.
-  previous=$(git tag --sort=-v:refname | grep -A1 -Fx "$TAG" | sed -n 2p)
   cat <<'NOTES'
 ## Install
 
@@ -80,11 +96,9 @@ release_notes() {
    **Open Anyway** (macOS 15 removed the old Control-click shortcut).
 3. Grant Screen Recording and Microphone when asked.
 
-## Changes
-
+## What's new
 NOTES
-  if [ -n "$previous" ]; then git log --pretty='- %s' "$previous..$TAG"
-  else git log --pretty='- %s' -20 "$TAG"; fi
+  changelog_section
 }
 
 # --- the downloadable build (M22-T6) ---

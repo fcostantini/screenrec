@@ -109,6 +109,12 @@ the task ID: `M0-T2: devsign.sh finds stable identity`. Doc-only changes: prefix
 `docs:`. Push to origin at session end. Never force-push main. The git history is the
 per-task audit trail — one task, one commit.
 
+**A subject names the user-visible effect, not an internal noun.** `M32-T3: say when a newer build
+exists, and let it be switched off`, not `M32-T3: the row, and the switch that turns the check off` —
+"the row" means nothing to anyone reading it later. The `Mx-Ty:` and `docs:` prefixes stay; they are
+how a commit maps back to its task. Release notes are **not** what this is for — those live in
+`CHANGELOG.md` (M32-T5), so a subject never has to double as prose for a stranger.
+
 **Versioning (semver, ADR-013):** bump the `VERSION` file in the same commit as the change that
 warrants it — MINOR for a new user-facing feature (a milestone like M7/M8), PATCH for fixes with no
 new feature, MAJOR for a breaking user-facing change. Tag releases (`git tag v1.2.0`). `1.0.0` = v1.
