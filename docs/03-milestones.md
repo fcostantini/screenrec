@@ -2829,7 +2829,7 @@ and a recipient on v1.7 has no signal of any kind. The app already knows its own
 this roadmap reaches the people who were handed a build**, since today the only route to a newer one
 is rebuilding from source. **MINOR.**
 
-- [ ] M32-T1 **The ruling, before any code.** The brief's non-goals list *"Streaming, cloud
+- [x] M32-T1 **The ruling, before any code.** The brief's non-goals list *"Streaming, cloud
       anything"*, and ADR-014 settled distribution without settling this. Reading a list of release
       tags is not uploading a recording — but that distinction is **Franco's to draw, and it wants an
       ADR, not an assumption**. Questions: is a network read acceptable at all; if so, when (launch,
@@ -2840,14 +2840,32 @@ is rebuilding from source. **MINOR.**
       in a browser and makes no request of its own — worth pricing against the others, because it is
       close to free and needs no ADR at all. **Verify:** an ADR in docs/05 (or a recorded ruling that
       none is needed), and T2/T3 re-specified against it.
-- [ ] M32-T2 **The check.** *(Shape depends on T1.)* **Seams:** `CoreInfo.version` is the single
+      ✅ **Done 2026-08-05 — ruled, and it is `ADR-020`.** Franco chose the **automatic** shape: a
+      background read on launch, a dimmed menu row only when a newer release exists, silence
+      otherwise. The non-goal turned out not to be in the way — *"cloud anything"* is about
+      **recordings**, and this sends nothing about the user, the machine or any capture.
+      ✅ **The ADR's bounds are the spec for T2/T3:** reads never writes (no telemetry, no identifier,
+      no analytics); **never downloads or installs**; never blocks launch, recording, replay or
+      export; silent when current *and* when it fails.
+      ⚠️ **The cost is recorded, not buried:** the request tells `github.com` this machine's IP. For a
+      deliberately private tool that earns a way to switch the check off — **a ruling left to T3.**
+- [ ] M32-T2 **The check.** *(Re-specified 2026-08-05 against ADR-020.)* **Seams:** `CoreInfo.version` is the single
       source and is already pinned against `VERSION` by a test and by `release.sh`; `URLSession` is
       Foundation, so this stays zero-dep (ADR-010). **Rulings:** what a failed or offline check does
       — *nothing at all* is the likely honest answer — and the hard constraint that it can never
       block launch, a recording, or an export. **Verify:** a pure comparison over injected version
       strings (semver ordering, a malformed answer, a version ahead of the latest), plus one live
       check against the real releases list.
-- [ ] M32-T3 **The surface.** *(Shape depends on T1.)* Where it says so, and how quietly.
+      **Against the ruling:** GitHub's releases API, unauthenticated (60 req/hour per IP — a
+      launch-time check is nothing against that). 🔴 **Rulings left:** whether launch-only is enough —
+      ⚠️ **Franco's own app ran 18 h+ without a relaunch**, so a launch-only check goes stale on
+      exactly the machine that needs it, and a once-a-day re-check may be the honest version; and what
+      a non-semver tag does (ignore it, never guess). ⚠️ **The comparison must be pure** and tested
+      over injected strings, because the live half can only ever be smoke-tested.
+- [ ] M32-T3 **The surface.** *(Re-specified 2026-08-05 against ADR-020.)* A **dimmed menu row**,
+      present only when a newer release exists — Franco's pick. 🔴 **Ruling owed here: a way to turn
+      the check off.** ADR-020 records the privacy cost and deliberately leaves the opt-out to this
+      task rather than assuming one. Where it says so, and how quietly.
       ⚠️ M6-T10's rule holds — a menu row is stamped at open and must not tick — and a version check
       is exactly the async read M28-T2 had to prime at launch rather than let fill in under an open
       menu. **Verify:** `menudriver dump` in both states (current, and a forced out-of-date), with

@@ -380,11 +380,12 @@
 
 **Open:**
 
-- [ ] **M32-T1 — is a network read acceptable at all?** (audit, 2026-08-05) The update check needs an
-      **ADR**, not an assumption: the brief's non-goals say "Streaming, cloud anything", and reading a
-      list of release tags is arguably not that — but the line is yours to draw. ⚠️ Worth pricing the
-      cheap end first: a manual `Check for Updates…` in Settings that just opens the releases page
-      makes **no request at all** and needs no ADR. **M32 is blocked on this**; M30, M31 and M33 are not.
+- [x] ~~**M32-T1 — is a network read acceptable at all?**~~ **RULED 2026-08-05 → `ADR-020`.** Yes,
+      as an automatic background read on launch surfacing a dimmed row only when behind. The non-goal
+      is about *recordings*; this sends nothing about the user or the machine. **M32 is unblocked.**
+      🔴 **One ruling still owed, at M32-T3:** whether the check can be switched off. ADR-020 records
+      the cost (the request reveals this machine's IP to GitHub) and leaves the opt-out to Franco.
+
 - [ ] **The replay-save confirmation — pick a direction** (audit, 2026-08-05; parked in docs/03 with
       🔴 *needs a ruling*). (a) onboarding walks the user through the banner-suppression toggle and
       verifies it took, or (b) the 2 s flash becomes something a person notices. ⚠️ An agent owes you
