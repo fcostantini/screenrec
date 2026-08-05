@@ -25,6 +25,12 @@ suite per invocation so they don't oversubscribe VideoToolbox — 02 field notes
 release`. Install once per clone: `git config core.hooksPath Scripts/hooks`. Signing (`bundle.sh`)
 is left to the release path; bypass with `git push --no-verify`. This is the standing regression
 gate — the milestone §-gates below stay the source of truth for feature/behaviour verification.
+
+⚠️ **A plain `swift test` reports a total that includes the skips.** The encode tests use
+`.enabled(if:)`, so without `SCREENREC_HW_ENCODE_TESTS=1` the run still prints
+`Test run with 728 tests passed` while **8 of them are skipped** — the only ones that drive a real
+encoder. Nothing ships unverified (the hook and `release.sh` both run them), but a test count quoted
+from a normal dev loop is 8 lower than it reads. Measured 2026-08-05.
 **Future (public-repo only):** a GitHub Actions macOS job running the same four steps (minus signing —
 no identity in CI) as an unbypassable backstop; skipped now because a private repo bills macOS
 runner minutes at a 10× multiplier for no added authority when Franco is the sole committer.

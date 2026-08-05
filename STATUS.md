@@ -6,6 +6,31 @@
 
 ## Now
 
+- **📋 AUDIT FILED (2026-08-05) — M30–M33 are the roadmap. Next: M30-T1.** A full read of the tree
+  (code health + product), filed as four milestones in `docs/03`. Artifact:
+  `claude.ai/code/artifact/5faea78f-6d9f-42f7-936e-8e1d6ad00c17`. **No code changed** — this is a
+  `docs:` commit.
+  ✅ **What held, checked rather than assumed:** module boundaries (RecorderCore/AppCore import no
+  AppKit or SwiftUI, by grep), **zero** TODO/FIXME/HACK/XXX in Sources+tools+Scripts, Swift 6 on every
+  shipping target, 728 tests green in **2.50 s** (3.07 s with `SCREENREC_HW_ENCODE_TESTS=1`), one
+  stray `!` in 16,784 lines.
+  🔴 **The two that cost something.** **(1) `CaptureEngine.terminate()` never stops the system-audio
+  tap** and `SystemAudioTap` has no `deinit`, so any stream death that isn't a user Stop leaks a live
+  process tap, a private aggregate device and two timers — reachable only with `Mute ▸` set, which is
+  why G27 couldn't see it. **(2) Nothing sets colour tags anywhere:** three real files in `~/Movies`
+  probe `ColorPrimaries=— TransferFunction=— YCbCrMatrix=—` on both `hvc1` and `avc1`, so every player
+  guesses — and that lands on the `.mp4` share path ADR-016 exists for. Colour appears in **no** doc,
+  field note or gate: an unexamined axis, not an accepted trade.
+  ⚠️ **"One known warning" is five.** A clean-scratch build emits 10 lines over 5 sites; three are
+  Swift 6 data-race **errors** downgraded because their types cross AVFoundation — i.e. where the
+  compiler stopped checking docs/01 and said so. `FilmstripThumbnails:55/56` is a real race with a
+  hang behind it.
+  ⚠️ **`swift test` prints "728 tests passed" with 8 of them skipped** — the encode suites are gated
+  behind `SCREENREC_HW_ENCODE_TESTS=1`. The pre-push hook and `release.sh` both run them, so nothing
+  ships unverified, but the headline number is 720 in a normal loop.
+  ✅ **The parked list was reviewed and endorsed unchanged** — nothing on this roadmap crosses
+  ADR-015's line.
+
 - **✅ M29 COMPLETE and G29 PASSED (2026-08-04) — the menu is testable, and the tests can fail.**
   Three tasks: a library target the menu code lives in, its structure asserted in-process, and the
   decisions that broke in M28 extracted from the widget that made them untestable. **728 tests**
@@ -183,6 +208,16 @@
 
 **Open:**
 
+- [ ] **M32-T1 — is a network read acceptable at all?** (audit, 2026-08-05) The update check needs an
+      **ADR**, not an assumption: the brief's non-goals say "Streaming, cloud anything", and reading a
+      list of release tags is arguably not that — but the line is yours to draw. ⚠️ Worth pricing the
+      cheap end first: a manual `Check for Updates…` in Settings that just opens the releases page
+      makes **no request at all** and needs no ADR. **M32 is blocked on this**; M30, M31 and M33 are not.
+- [ ] **The replay-save confirmation — pick a direction** (audit, 2026-08-05; parked in docs/03 with
+      🔴 *needs a ruling*). (a) onboarding walks the user through the banner-suppression toggle and
+      verifies it took, or (b) the 2 s flash becomes something a person notices. ⚠️ An agent owes you
+      one measurement first — whether that setting is readable at all (M12-T5 says no public API),
+      since it may rule out (a)'s verifying half. Not filed as a milestone until you rule.
 
 - [ ] **Display-sleep lever** (declined 2026-07-27 — "headless legs only"): two questions need
       `pmset displaysleepnow` while armed, which blanks the screen mid-session. Does

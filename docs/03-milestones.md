@@ -2532,6 +2532,223 @@ the menu's structure, the observation rules and the row geometry each fail a tes
 proven by breaking them, not asserted — while `menudriver dump` is unchanged throughout, because
 none of this is a behaviour change.
 
+## M30 — Nothing leaks, and every warning means something (from the 2026-08-05 audit)
+
+Five findings that share one shape: **a signal the machine is already producing and nobody is
+reading.** A Core Audio tap that outlives the stream it belonged to, a counter mutated off two
+threads, three Swift 6 data-race diagnostics downgraded to warnings because their types cross an
+AVFoundation boundary — and a record in STATUS saying there is *one* warning when a clean build emits
+five. **PATCH** (ADR-013): no new capability.
+
+- [ ] M30-T1 **A terminated engine leaves no tap behind.** `CaptureEngine.stop()` tears the
+      system-audio tap down; `terminate()` does not, and `SystemAudioTap` has no `deinit`. Every path
+      that ends a session without a user Stop — display unplug, display sleep, lid close, any
+      `SCStream.didStopWithError` — leaves a live process tap, a private aggregate device, a running
+      IOProc and two `DispatchSourceTimer`s, all owned by `coreaudiod` on this process's behalf and
+      never destroyed. It only bites when `Mute ▸` is set, which is why G27 could not have caught it:
+      the gate stopped its takes cleanly. **Seams:** `CaptureEngine.terminate()` — its own doc comment
+      calls it the single termination authority, and it already carries `cancelWatchdogs()`;
+      `SystemAudioTap.stop()` reads-and-clears under the lock and is safe to call twice.
+      **Rulings:** whether the teardown line belongs beside `cancelWatchdogs()` or inside it.
+      ⚠️ **The obvious verify does not work:** the aggregate is created with
+      `kAudioAggregateDeviceIsPrivateKey`, so an external scan of `kAudioHardwarePropertyDevices`
+      will not see it. **Verify:** in-process — a CLI leg that runs `record --mute-app`, kills the
+      stream with a real death (`pmset displaysleepnow`, G3 §4.3's headless lever), and then asserts
+      the tap is down; plus a unit test over whatever seam that assertion needs, and a control take
+      stopped normally that reports the same.
+- [ ] M30-T2 **The filmstrip's counter cannot lose a decrement.** `FilmstripThumbnails` decrements a
+      captured `var outstanding` inside `generateCGImagesAsynchronously`'s handler and finishes the
+      `AsyncStream` at zero. `AVAssetImageGenerator` promises no serialisation of that handler, so a
+      lost decrement means the count never reaches zero, the stream never finishes, and the Trim
+      window's filmstrip task waits forever. Two Swift 6 warnings sit on the exact lines
+      (`FilmstripThumbnails.swift:55` and `:56`). **Seams:** `WriterDrain`'s `FirstError` is the shape
+      already in the tree — a small `final class` behind an `NSLock`; `OSAllocatedUnfairLock` is the
+      other option. **Rulings:** whether `continuation.yield` needs the same (it is documented
+      thread-safe, so probably not — say so rather than guard it twice). **Verify:** both warnings
+      gone from a clean build, and the strip still fills **16/16** on a real take (G24's own figure).
+- [ ] M30-T3 **The remaining warnings are closed or explained, one each.** `ReplayEncoder.swift:69`
+      captures a non-Sendable `CMSampleBuffer` in a `@Sendable` closure; `WriterDrain.swift:24–27`
+      captures `var done`, a non-Sendable `AVAssetWriterInput` and a non-Sendable `pump`;
+      `RecordingFileSentinel.swift:115` uses a deprecated `String(cString:)`. The first two are Swift
+      6 **errors** downgraded to warnings only because their types cross an AVFoundation boundary —
+      i.e. the two places where the compiler has stopped checking docs/01's concurrency rules and is
+      saying so out loud. Both look safe on inspection (VideoToolbox's own callback thread with the
+      lock released; a serial queue that also serialises the registration), but *safe on inspection*
+      is the state this project refuses to accept silently everywhere else. **Seams:** the three
+      sites; docs/07 for any closed by explanation rather than by code. **Rulings:** per site — fix,
+      or write the invariant down with a pointer from the code. ⚠️ **A file-wide `@preconcurrency
+      import` is the answer to avoid**: it silences the next one too. **Verify:** a clean-scratch
+      `swift build` emits **zero** warnings, or only ones whose invariant is stated in docs/07.
+- [ ] M30-T4 **The force-unwrap, and the comments M28/M29 left behind.**
+      `AppState.replayConfigurationChanged()` binds `if let capture = session.capture` and then reads
+      `session.capture!.router` inside the branch — an unused binding (the warning STATUS has tracked
+      since M28-T3, recorded then at line 766, now **`AppState.swift:770`**) and a `!` in shipping
+      code, which CLAUDE.md's quality pass forbids without a stated invariant. Alongside it: an
+      orphaned doc comment at `AppState.swift:1026` describing a method that no longer exists;
+      `LoginItem.swift:5` placing the concrete wrapper in `ScreenRecApp` when M29-T1 moved it to
+      `AppShell`; `WindowPresenter.swift:18` naming both `ScreenRecApp.init` and a SwiftUI `@State`
+      M28 deleted; and README describing the project as **M0–M22**, and docs/03 as an "M0–M22 task
+      breakdown", seven milestones later. **Seams:** one line each. **Rulings:** none.
+      **Verify:** `grep -rn "ScreenRecApp" Sources/ docs/ README.md` returns only the executable
+      target's own references; the tree builds warning-free with T3.
+- [ ] M30-T5 **A second copy hands over instead of competing.** There is no single-instance check
+      anywhere in `AppDelegate`. Two copies means two status items; the second one's
+      `RegisterEventHotKey` fails and posts *"shortcut unavailable"* at the user (M9-T4's notice,
+      firing for the wrong reason); two armed ring buffers holding two copies of the memory the
+      Settings caption quotes; and two sleep assertions carrying the same reason string, which is the
+      thing ADR-018 made honest. Entirely plausible for an app distributed by handing over a `.app` —
+      one in `~/Downloads`, one in `/Applications`. **Seams:**
+      `AppDelegate.applicationWillFinishLaunching`, before `notifier.install()`;
+      `NSRunningApplication.runningApplications(withBundleIdentifier:)`. **Rulings:** which copy wins
+      — the incumbent, always, is the safe answer since it may be recording; and whether the newcomer
+      says anything before exiting. 🔴 **The trap that makes a naive guard worse than nothing:**
+      `Relaunch.now()` runs `open -n` — it spawns a second instance **deliberately**, and terminates
+      the first only afterwards, so the two overlap by design. A guard that simply exits the newcomer
+      would break the screen-grant relaunch permanently and strand a first-run user at onboarding.
+      **Verify:** `open dist/ScreenRec.app` twice → one status item, one hotkey registration, no
+      notice; **and** the grant→relaunch path still works (G4 §5.1's leg) — that second half is the
+      one that matters.
+- [ ] M30-T6 **The grant poll gives up, or backs off.**
+      `AppDelegate.relaunchWhenScreenGrantLands()` loops with a 1 s sleep for the whole process
+      lifetime whenever screen recording was not granted at launch. The job is real — it catches a
+      grant made directly in System Settings, which needs the same relaunch (02 §2) — but it is an
+      unbounded 1 Hz TCC query with no back-off, sitting in the one state a brand-new user occupies.
+      **Seams:** the loop; `Permissions.screenRecordingState()`. **Rulings:** back off (1 s → 5 s
+      after the first minute) versus stop after N minutes and let the onboarding window's own refresh
+      carry it. ⚠️ Whichever is chosen **must not make the grant→relaunch feel slow**: G4 §5.1
+      measured it as immediate, and that is the leg a first-run user actually experiences.
+      **Verify:** the transition still relaunches promptly after a grant, and an app left ungranted
+      shows the reduced rate.
+
+**Gate G30** — a clean-scratch `swift build` emits no warnings; a muted take ended by a *real* stream
+death leaves no live tap, aggregate device or timer behind, proven in-process against a control take;
+the filmstrip still fills on a real recording; two launches leave one running app, one status item and
+one set of shortcuts **while the screen-grant relaunch still works**; an ungranted app does not query
+TCC once a second forever; and no doc or comment in the tree names a target or a framework M28/M29
+removed. The standing bar applies — **each rule that can be broken has a test that goes red when it
+is**, and where no test can reach it, the task says so.
+
+## M31 — The file says what colour it is (from the 2026-08-05 audit)
+
+`MovieRecorder.videoSettings` sets codec, dimensions, bitrate and keyframe interval and **no
+`AVVideoColorPropertiesKey`**. Neither does `Exporter`'s writer input, and
+`SCStreamConfiguration.colorSpaceName` is never set. Measured on three real files in `~/Movies`
+(2026-08-05): the `.mov` (`hvc1`) and both `.mp4`s (`avc1`) all read
+`ColorPrimaries=— TransferFunction=— YCbCrMatrix=—`. An untagged stream is interpreted by whatever
+heuristic each player happens to use, so one clip can render differently in QuickTime, a browser and
+an NLE — and that lands on the `.mp4` share path, which is the one thing ADR-016 exists for.
+🔴 **Colour appears nowhere in this repository** — not in docs/02, not in the field notes, not in a
+gate. It is not a measured trade-off that was accepted; it is an axis nobody has looked at.
+**PATCH** — a fix, not a capability.
+
+- [ ] M31-T1 **Measure before changing anything.** M21's lesson, in M27-T1's shape: the rest of this
+      milestone is only worth doing if the difference is visible. Answer, with numbers in docs/07:
+      does a tagged export actually render differently from today's untagged one, and in which
+      players (QuickTime, a browser, and whatever `tools/frames.swift` decodes)? What does SCK
+      actually hand us — is `colorSpaceName` defaulting to sRGB with the RGB→YCbCr conversion
+      unstated, or is the conversion itself the variable? Is the capture display sRGB or Display P3,
+      and does that change the answer? **Verify:** a spike, a field note, and an explicit **go/no-go**
+      — if the untagged file is already read identically everywhere it goes, T2 and T3 close
+      "won't do" and this milestone ends here. **Nothing below should be detailed further until it
+      lands.**
+- [ ] M31-T2 **A recording states its colour.** *(Shape depends on T1.)* **Seams:**
+      `MovieRecorder.videoSettings`; `CaptureEngine.makeStreamConfiguration` for `colorSpaceName`.
+      **Rulings:** which tag set — `ITU_R_709_2` across primaries/transfer/matrix is the honest
+      default for BT.709-range HD output, and P3 is a different and much larger answer.
+      ⚠️ **This is the one task here that edits the capture path**, so M18's rule applies: the diff
+      against `RecorderCore/Capture` and `RecorderCore/Recording` is the thing to state, and a
+      regression capture is owed. **Verify:** probe a fresh take for the three extensions; a
+      synthetic-buffer writer test pins the settings dictionary; track layout, dimensions and
+      duration unchanged against a control recording.
+- [ ] M31-T3 **An export and a re-encoding trim state theirs.** *(Shape depends on T1.)* **Seams:**
+      `Exporter`'s writer input; `Trimmer`'s precise path. ⚠️ **A lossless trim is passthrough and
+      inherits whatever the source carries** — so it needs no change, which is itself worth asserting,
+      because it means a lossless trim of an untagged file stays untagged and the fix has to reach the
+      recorder (T2) to reach those. **Verify:** probe an `.mp4` export and both trim modes; and the
+      real question, answered directly — `screencapture` a still of known content, record the same
+      content, decode a frame with `tools/frames.swift`, and compare the two with
+      `tools/pixdiff.swift`.
+
+**Gate G31** — either T1 closes the milestone with evidence that an untagged file is already read
+identically everywhere it goes, **or**: a recording, an MP4 export and a re-encoding trim each carry
+stated colour primaries, transfer function and matrix, and a decoded frame of a recording matches a
+`screencapture` of the same content more closely than the pre-change build did — measured with
+`tools/pixdiff.swift`, not judged by eye.
+
+## M32 — A build that knows it is out of date (from the 2026-08-05 audit)
+
+ADR-014's distribution is "hand someone the signed `.app`". There have been **20 tagged releases**,
+and a recipient on v1.7 has no signal of any kind. The app already knows its own version —
+`AppState.versionLabel` exists for exactly the question *"am I on the build with the fix?"* (M16-T6)
+— it just never compares that to anything. 🔴 **This is the gap that decides whether anything else on
+this roadmap reaches the people who were handed a build**, since today the only route to a newer one
+is rebuilding from source. **MINOR.**
+
+- [ ] M32-T1 **The ruling, before any code.** The brief's non-goals list *"Streaming, cloud
+      anything"*, and ADR-014 settled distribution without settling this. Reading a list of release
+      tags is not uploading a recording — but that distinction is **Franco's to draw, and it wants an
+      ADR, not an assumption**. Questions: is a network read acceptable at all; if so, when (launch,
+      menu open, a timer, or only when asked); against what (the GitHub releases API, unauthenticated
+      and IP-rate-limited, or a static file); what it does with the answer; and whether anything ever
+      *downloads*, or it only ever says there is something newer. ⚠️ **The shape that satisfies the
+      non-goal completely** is a manual `Check for Updates…` in Settings that opens the releases page
+      in a browser and makes no request of its own — worth pricing against the others, because it is
+      close to free and needs no ADR at all. **Verify:** an ADR in docs/05 (or a recorded ruling that
+      none is needed), and T2/T3 re-specified against it.
+- [ ] M32-T2 **The check.** *(Shape depends on T1.)* **Seams:** `CoreInfo.version` is the single
+      source and is already pinned against `VERSION` by a test and by `release.sh`; `URLSession` is
+      Foundation, so this stays zero-dep (ADR-010). **Rulings:** what a failed or offline check does
+      — *nothing at all* is the likely honest answer — and the hard constraint that it can never
+      block launch, a recording, or an export. **Verify:** a pure comparison over injected version
+      strings (semver ordering, a malformed answer, a version ahead of the latest), plus one live
+      check against the real releases list.
+- [ ] M32-T3 **The surface.** *(Shape depends on T1.)* Where it says so, and how quietly.
+      ⚠️ M6-T10's rule holds — a menu row is stamped at open and must not tick — and a version check
+      is exactly the async read M28-T2 had to prime at launch rather than let fill in under an open
+      menu. **Verify:** `menudriver dump` in both states (current, and a forced out-of-date), with
+      the idle menu otherwise byte-identical.
+
+**Gate G32** — a decision is recorded; a build behind the latest release says so on a surface Franco
+chose, a current build says nothing, and an offline machine behaves exactly like a current one; the
+check never blocks launch, a recording, or an export.
+
+## M33 — More than one file to share (from the 2026-08-05 audit)
+
+Two limits in the loop that gets used every day. `ExportModel.performExport` guards
+`exportInProgress == nil` and returns, so three takes to share is three round trips of
+open-menu-wait-open-menu — the *handling* is careful (rows disable, and M24-T2 gave the hotkey path a
+real notice rather than a silent drop) but there is no queue. And every share export mixes system
+audio and mic down to one stereo stream, which is right for messaging and is the only thing on offer
+— so the separate mic track ADR-003 calls **the point of Tier 2** is captured and then always
+flattened. **MINOR.**
+
+- [ ] M33-T1 **A second export waits its turn instead of being refused.** **Seams:**
+      `ExportModel.performExport` is the one entry point every MP4, GIF and trim already passes
+      through; `exportInProgress`, `exportProgress`, `exportTask`, the `ExportRoom` pre-check and the
+      receipt all keep their shapes. **Rulings:** what the menu shows for a queued item (the progress
+      row is singular today, and M28-T4 made it the one row that may tick); what `cancelExport()`
+      means with a queue behind it, and what *"Quit Anyway"* then throws away — M23-T2's confirmation
+      copy names **one** export; and whether the queue survives relaunch (almost certainly not — the
+      `.partial` discipline is not a job store). ⚠️ **The disk pre-check must run per item at its
+      turn, not at enqueue**, or the second job is judged against space the first has not spent yet.
+      **Verify:** three exports requested from one menu open all land, in order, each with its own
+      receipt and notice; `applicationShouldTerminate` waits for the whole queue.
+- [ ] M33-T2 **An export can leave the microphone out.** **Seams:** `Exporter`'s
+      `AVAssetReaderAudioMixOutput` already takes the track list, so this is an argument to work that
+      happens anyway — which is exactly the test ADR-015 set for what may come through that door;
+      `DeriveOptions` already decides which derives a file can take, and a single-audio-track source
+      can offer none of these. **Rulings:** which options exist (mix / no mic / mic only / both tracks
+      kept separate), where they live (the file submenu, Settings, or the Trim window), and the
+      default — which stays **mix**, unchanged, because this must not alter what today's
+      `Export as MP4` produces. **Verify:** probe each option's track count; ⚠️ **prove the excluded
+      source is genuinely absent by level, never by the absence of a track** — G21's own trap, where
+      a silent control nearly passed the gate on nothing; and the default path unchanged in track
+      layout and dimensions against a control export.
+
+**Gate G33** — three exports queued from one menu open all land in order with their own receipts, and
+quitting waits for all of them; an export can be produced without the microphone's content in it,
+proven by level rather than by track count; the default export is unchanged.
+
 ## Dependency graph
 
 ```
@@ -2593,6 +2810,31 @@ failure modes. M28 (`NSMenu`) last — the largest, and it buys polish rather th
 should not sit in front of things that buy capability. The two items that stayed parked are below the
 graph.
 
+**The 2026-08-05 audit roadmap — M30, M31, M32, M33.** Audit artifact:
+`claude.ai/code/artifact/5faea78f-6d9f-42f7-936e-8e1d6ad00c17`. Four milestones from one read of the
+whole tree. ⚠️ **The audit's own write-up sequenced six things; this is deliberately fewer**, because
+three of them were a task each and one was a ruling wearing a milestone's clothes:
+- **M30 first**, on the rule that put M19 and M23 ahead of their roadmaps: its T1 is the only finding
+  here that leaks a system resource, and most of the rest is the compiler already saying so.
+  **It absorbs three of the audit's separate steps.** The mechanical fixes and the judgement-needing
+  warnings were split in the write-up by commit size, not by dependency, and the two app-shell guards
+  (T5/T6) were a milestone of their own for no reason but tidiness. One theme covers all six:
+  **housekeeping the process doesn't do.** The task order preserves the original priority.
+- **M31 second**, because an untagged file quietly degrades the output of the thing the product
+  exists to produce — and because **T1 may close the whole milestone**, which is cheap to find out.
+- **M32 third**: it is the gap that decides whether anything else here ever reaches the people who
+  were handed a build rather than a repo. It stays separate because its T1 is an **ADR**, not work.
+- **M33** is independent of everything above and pays back daily.
+- 🔴 **One audit finding is deliberately NOT a milestone** — the armed-replay confirmation. It was
+  ranked critical and then left out of the audit's own ordering, because its shape is a taste call.
+  It sits in the parked list below with 🔴 *needs a ruling*, which is where crop-on-export waited
+  until ADR-015 was amended and it became M26. **File it as a milestone after the ruling, not
+  before.**
+- ✅ **The rest of the parked list was reviewed and endorsed unchanged** (audit, 2026-08-05):
+  multi-display region, cursor emphasis / auto-zoom, the webcam fork (ADR-017) and Marks all keep
+  their reasons, and **nothing on this roadmap crosses ADR-015's line** — every task above reuses a
+  stage the app already runs.
+
 **Parked, with the trigger that would un-park each (updated 2026-07-31).** Four of the six were
 **encoded as M25–M28 on 2026-07-31 (Franco)** and are no longer parked. What remains:
 
@@ -2612,3 +2854,29 @@ graph.
   not wanted for now — kept on this list deliberately, not dropped.** ⚠️ If it is ever taken up, the
   honest framing is that it is not a feature but a **second product identity**, and it wants its own
   review before any milestone: it changes what every other decision was optimising for.
+
+- 🔴 **The replay save is only visible if the user has done a settings dance — NEEDS A RULING**
+  (audit, 2026-08-05). Armed replay captures the display; macOS suppresses banners while the display
+  is captured; the `.timeSensitive` break-through needs an entitlement a self-signed build cannot
+  carry (measured 2026-07-16 — AMFI refuses to launch the app with it, docs/07). So the answers today
+  are M9-T3's two-second menu-bar flash and M12-T5's one-time alert asking the user to go and enable
+  *"Allow notifications when mirroring or sharing the display"* themselves. Every piece is honest and
+  documented; the net effect is still that **the flagship feature's only reliable success signal is a
+  2 s icon change** unless a person completed a manual step they were told about once, ever.
+  **Two directions, not exclusive:** (a) onboarding walks them through the toggle and then *verifies
+  it took* — the M16 thesis; (b) the flash is promoted into something a person notices, the way
+  M28-T4 promoted the export row. ⚠️ **Both turn on one unmeasured fact:** M12-T5 recorded that the
+  suppression setting has no public API — which is why the shipped copy says banners *"may"* be
+  hidden. If that still holds, (a) can prompt but **cannot** verify, and its honest form is a deep
+  link plus a "did that work?" self-test, not a checkmark. **Trigger:** Franco picks a direction —
+  and the measurement above is owed first, since it may rule one out.
+
+- **Localisation, in-app diagnostics, and a settings-schema version** — three limits that bind only
+  if the audience grows (audit, 2026-08-05). Roughly **330 English string literals** sit inline across
+  `AppCore` and `AppShell` with no `Localizable.strings`; everything logs to `Logger` and therefore to
+  Console.app, so a recipient with a problem has **nothing to hand back**; and `SettingsStore`
+  validates every value carefully but stamps **no schema version**, so ADR-013's "a settings
+  migration" MAJOR trigger has nothing to migrate *from*. **Triggers:** a non-English user; a second
+  person reporting a bug Franco can't reproduce; the first breaking settings change. ⚠️ The third is
+  the one worth paying **before** it is needed — a version key written today is one line, and written
+  later it is a heuristic over unversioned plists.
