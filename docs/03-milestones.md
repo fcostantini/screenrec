@@ -2958,7 +2958,7 @@ is rebuilding from source. **MINOR.**
       `Fatal error: Index out of range` instead of failing one test. Now `dropFirst(index + 1).first`.
       ⚠️ **The destination is now the weak link, not the row** — see M32-T5.
 
-- [ ] M32-T5 **The release notes are unreadable to the person the row now sends there** (added
+- [x] M32-T5 **The release notes are unreadable to the person the row now sends there** (added
       2026-08-05 — Franco, on landing on the page T4 opens). `Scripts/release.sh:86` generates notes
       with `git log --pretty='- %s'`, so the page inherits every convention that exists for the audit
       trail and none that exist for a reader: **`docs:` commits** (`docs: G32 passed`), **task IDs**
@@ -2978,6 +2978,28 @@ is rebuilding from source. **MINOR.**
       summaries; **rulings owed:** all seven or only the recent few, and whether the older ones keep
       their raw log. **Verify:** the notes of the newest release read as product changes with no task
       IDs and no `docs:` lines, and a release with no CHANGELOG section still publishes.
+      ✅ **Done 2026-08-05 — `CHANGELOG.md` is the source, and all 8 published releases are rewritten.**
+      **769 tests.** Franco's rulings, all four: backfill **all eight**, **both guards**, the thin
+      releases get an **honest one-liner**, and the CLAUDE.md commit-subject line is **in**.
+      🔴 **The commit list is gone, not collapsed** (Franco). The plan proposed a `<details>` block "for
+      the audit trail"; that rationale doesn't hold — the audit trail is **git**, which the tag already
+      links, and a list that is only honest when it is unreadable does not belong on a page meant to be
+      read. Dropping it also deleted the `$previous` range-finding, so `release_notes()` shrank.
+      🔴 **It also deleted the fallback, which is why the guards are not a nicety:** with no `git log`
+      left, a missing section would publish notes that are **empty**. So (1) a test pins a non-empty
+      `## <VERSION>` section — red when the section is missing *and* when it is present but empty, both
+      proven — and (2) a **preflight in `release.sh`** refuses the release, sitting with the existing
+      `CoreInfo.version` check **before anything is tagged, pushed or uploaded**, so it can never
+      half-publish. Not a warning: measured with `VERSION=9.9.9`.
+      ✅ **Measured live, all 8:** `gh release edit --notes-file` per tag, then **0 commit-style lines**
+      across every published release (was 9 bullets on v1.17.0, four of them `docs:`). The **Install
+      block was byte-identical across all eight**, so the Gatekeeper *Open Anyway* steps — the most
+      useful thing on those pages — survive untouched.
+      ⚠️ **The copy is written from docs/03's task lists, not from using the app**, and two entries are
+      deliberate anticlimaxes: v1.10.2 says "No user-facing changes" and v1.15.1's tap-leak fix is
+      qualified to `Mute ▸` recordings rather than claiming it affected everyone.
+      ⚠️ **CHANGELOG.md covers the 8 published releases and 1.17.1 only** — 25 tags exist; the rest
+      were never published. Stated in the file so it doesn't read as an oversight.
 
 ⚠️ **What M32 cannot do, and never could:** a check cannot announce the release that shipped it.
 Builds at or before **1.16.0** carry no check, so their holders are never told about 1.17.0 or later —

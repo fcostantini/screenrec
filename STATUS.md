@@ -6,8 +6,28 @@
 
 ## Now
 
-- **✅ M32-T4 SHIPPED (2026-08-05) — the update row goes somewhere. Next: M32-T5 (the release notes),
-  Franco's ask.** The row opened as news and closed as a door: `MenuRow.link` +
+- **✅ M32-T5 SHIPPED (2026-08-05) — the release notes say what changed, and all 8 published releases
+  are rewritten. Next: M34-T1 (the recording-path spike), or Franco's pick.** `CHANGELOG.md` is the
+  source; `release.sh` no longer runs `git log`. **769 tests.**
+  🔴 **The commit list is gone, not collapsed — Franco's call, and my plan was wrong.** I proposed a
+  `<details>` block "for the audit trail"; the audit trail is **git**, which the tag already links, and
+  a list that is only honest when unreadable does not belong on a page meant to be read.
+  🔴 **Dropping it deleted the fallback, so two guards replace it:** a test pinning a **non-empty**
+  `## <VERSION>` section (red when missing *and* when empty — both proven), and a **preflight in
+  `release.sh`** that refuses the release beside the existing `CoreInfo.version` check — **before
+  anything is tagged, pushed or uploaded**, so it cannot half-publish. Measured with `VERSION=9.9.9`.
+  ✅ **All 8 rewritten and verified live: 0 commit-style lines across every published release**
+  (v1.17.0 was 9 bullets, four of them `docs:`). The **Install block was byte-identical across all
+  eight**, so the Gatekeeper *Open Anyway* steps survive untouched.
+  ✅ **CLAUDE.md now asks a commit subject to name the user-visible effect**, not an internal noun
+  (Franco's question). The `Mx-Ty:`/`docs:` prefixes stay — they map a commit to its task, which is a
+  job release notes never had.
+  ⚠️ **The copy came from docs/03's task lists, not from using the app.** Two entries are deliberate
+  anticlimaxes (v1.10.2 "No user-facing changes"; v1.15.1's tap fix qualified to `Mute ▸`), and
+  `CHANGELOG.md` covers the **8 published releases + 1.17.1 only** — 25 tags exist, the rest were never
+  published, stated in the file so it doesn't read as an oversight.
+
+- **✅ M32-T4 SHIPPED (2026-08-05) — the update row goes somewhere.** The row opened as news and closed as a door: `MenuRow.link` +
   `UpdateCheck.releasesPageURL`. Copy unchanged, Franco's call. **768 tests.**
   🚢 **v1.17.1 — PATCH (ADR-013): the row existed and now works.**
   ✅ **The click is proven, not inferred.** Patch-observe-revert with `CoreInfo.version` faked to
