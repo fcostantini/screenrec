@@ -6,6 +6,19 @@
 
 ## Now
 
+- **✅ M32 COMPLETE and G32 PASSED (2026-08-05) — a build can tell it's out of date.** Three tasks:
+  the ruling (`ADR-020`), the check, and a dimmed row with an off switch. **767 tests.** Evidence in
+  the gate table.
+  🚢 **v1.17.0 — MINOR (ADR-013): a new user-facing capability.**
+  🔴 **The milestone changed the project, not just the app.** T2 was blocked because the releases API
+  404s on a private repo — and because **recipients of a handed-over `.app` have no GitHub access at
+  all**, so even a link 404s for them. Franco made the repo **public** (`ADR-021`), which also fired
+  ADR-014's own revisit trigger and settled it: **the notarization friction is accepted, not paid
+  for**, and the README now leads with the block rather than burying it.
+  ⚠️ **What it deliberately does not do:** never downloads, never writes, never blocks — all three
+  measured against a request hanging its full 10 s timeout — and it can be switched off entirely,
+  which is the only honest answer to a daily request that reveals an IP.
+
 - **✅ M32-T3 SHIPPED (2026-08-05) — a build says when it's behind, and you can tell it not to look.
   M32's three tasks are done; G32 is ready to run.** A dimmed row above `Settings…`, reading state the
   launch check left behind — the menu is stamped at open and must never wait on a network (M6-T10).
