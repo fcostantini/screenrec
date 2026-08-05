@@ -189,6 +189,34 @@ content — which is not the same thing as scoping audio, and it cannot reach an
 screen (docs/02 §1a-ii). Audio-only exclusion would need a Core Audio process tap: a new ADR when it
 happens, not an extension of this one.
 
+## ADR-020 ✅ The app may read the release list to say it is out of date (Franco, 2026-08-05)
+The brief's non-goals say **"Streaming, cloud anything"**, which left M32 blocked: does checking for a
+newer version cross that line? **Decided: no, and the check is allowed** — as a background read on
+launch that surfaces a dimmed menu row when a newer release exists, and says nothing otherwise.
+
+**Why this is not the thing the non-goal forbids.** That non-goal is about **recordings** — uploading,
+hosting, streaming what the app captures. ADR-014's whole distribution model is a signed `.app` handed
+to people directly, and it has produced **22 releases**; a recipient on an old build currently has no
+signal of any kind, which is a real defect in the distribution model rather than a missing feature.
+Reading a public list of tags sends nothing about the user and nothing about their recordings.
+
+**Bounds — this ADR authorises exactly one request and nothing more:**
+- **Reads, never writes.** No telemetry, no analytics, no identifier, no crash reporting, no
+  usage counts. Nothing about the machine, the user, or any recording leaves it.
+- **Never downloads or installs.** The app only ever *says* a newer version exists; getting it stays
+  the manual path ADR-014 describes.
+- **Never blocks anything.** Launch, recording, replay and export must be unaffected by a check that
+  is slow, refused, or offline — a failed check is silent, not an error.
+- **Silent when current.** The surface exists only when there is something to say.
+
+⚠️ **The cost, stated rather than buried:** a launch-time request tells `github.com` this machine's IP
+address. That is the whole privacy cost, it is not zero, and for a deliberately private tool it is
+worth a way to turn the check off — a ruling left to M32-T3, not assumed here.
+
+**A reversal is a new ADR.** The line this draws is *reading public metadata about the software
+itself*; anything that sends information about the user, the machine, or a recording is on the other
+side of it and is not authorised by this.
+
 ## ADR-018 ✅ Armed replay keeps the Mac awake, deliberately — and the assertion says so (Franco, 2026-07-27)
 The 2026-07-24 review filed armed replay's sleep assertion as a bug (M16-T1): arm once and the machine
 never idle-sleeps again, while `pmset` blames a recording that isn't happening. Two things settled it.
