@@ -16,17 +16,18 @@
   ✅ **Measured against the real list:** **7 releases**, this build (1.16.0) told **nothing**, and a
   recipient still on **1.7.0 is offered v1.16.0** — the case the milestone exists for. Live leg gated
   behind `SCREENREC_LIVE_UPDATE_CHECK=1`; the default run stays offline. **760 tests.**
-  🔴 **Fired by going public, and NOT settled:** ADR-014 closed notarization "won't do" *on audience
-  size*, and wrote its own trigger — *"if the audience widens beyond a handful of direct recipients,
-  revisit"*. Release zips are now publicly downloadable, so a stranger gets a build macOS blocks until
-  they use **Open Anyway**. **Pay for Developer ID, mark releases source-only, or accept the friction
-  knowingly — Franco's call, recorded in ADR-021.**
+  ✅ **Notarization SETTLED (Franco, 2026-08-05): the friction is accepted, not paid for.** Going
+  public fired ADR-014's own revisit trigger — release zips are downloadable by anyone, and macOS
+  blocks an unnotarized app until **Open Anyway**. Reviewed and kept: $99/yr buys convenience for
+  strangers, not capability. ⚠️ **The obligation that creates is saying so plainly**, so README's
+  install section now **leads with the block** instead of burying it, and its old framing —
+  *"not public distribution"* — is gone. Every release's notes already carried the steps.
   ⚠️ **Pre-publication scan, so nobody re-runs it in a panic:** no credentials/keys/tokens in the tree
   **or the full history**; no window titles or channel names ever reached the docs (M19-T5's
   discipline held in prose too); the one email is Franco's own in docs/00, deliberate. ~61
   `claude.ai/code/artifact/…` links are public but unreadable — dead links, not leaks.
-  ⚠️ **Launch-only is still the weak cadence** — his app ran 18 h+ without a relaunch, so the machine
-  most likely to be behind is the least likely to re-check. One timer away. **T3's call.**
+  ✅ **Cadence ruled and shipped: daily** (Franco, 2026-08-05) — launch-only was wrong for an
+  `LSUIElement` that sits in the menu bar for days.
 
 - **✅ M33 COMPLETE and G33 PASSED (2026-08-05) — the share loop stops refusing work it can do.**
   Three tasks: a queue so a second export waits instead of being dropped, a Settings toggle that

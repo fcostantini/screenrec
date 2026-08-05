@@ -9,6 +9,12 @@ public enum UpdateCheck {
 
     private static let log = Logger(subsystem: "dev.fcostantini.screenrec", category: "update")
 
+    /// How long before a still-running app looks again (Franco, 2026-08-05). Launch-only was the
+    /// first shape and is the wrong one: this app is an `LSUIElement` that sits in the menu bar for
+    /// days — Franco's own instance ran **18 h+ without a relaunch** — so the machine most likely to
+    /// be behind is the one least likely to check.
+    public static let recheckInterval: Duration = .seconds(24 * 60 * 60)
+
     /// The releases ADR-014 hands people a build from — the same list a recipient is sent to.
     /// ⚠️ Readable only because the repo is public (ADR-021); unauthenticated it 404s on a private
     /// one, which is what blocked this task until Franco made the repo public.

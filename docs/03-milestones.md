@@ -2897,9 +2897,9 @@ is rebuilding from source. **MINOR.**
       🔴 **A defect of my own, caught by running it:** the live test used `Issue.record` to print its
       diagnostic, which turns a passing test **red**. Diagnostics are `print`; `Issue.record` is for
       failures.
-      ⚠️ **Launch-only remains the cadence, and it is still the weak part** — Franco's own app ran
-      **18 h+** without a relaunch, so the machine most likely to be behind is the one least likely to
-      re-check. A daily re-check is the honest version and is one timer away. **T3's call.**
+      ✅ **Cadence ruled and shipped: daily** (Franco, 2026-08-05). Launch-only was the wrong shape
+      for an `LSUIElement` that sits in the menu bar for days — his own instance ran **18 h+ without a
+      relaunch**, so the machine most likely to be behind was the one least likely to look.
 - [ ] M32-T3 **The surface.** *(Re-specified 2026-08-05 against ADR-020.)* A **dimmed menu row**,
       present only when a newer release exists — Franco's pick. 🔴 **Ruling owed here: a way to turn
       the check off.** ADR-020 records the privacy cost and deliberately leaves the opt-out to this

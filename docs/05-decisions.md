@@ -236,13 +236,15 @@ ADR-020's existing bounds.
 directly, or cloned and built from source (README's four commands). Nothing about the app, its
 signing, or its TCC behaviour moves because the repo moved.
 
-🔴 **The open question this fires, recorded rather than settled.** ADR-014 closed notarization "won't
-do" *on audience size*, and wrote its own trigger: *"If the audience ever widens beyond a handful of
-direct recipients, revisit."* A public repo means publicly downloadable release zips, so a stranger
-can now get a build that macOS blocks on first launch until they use System Settings → **Open
-Anyway**. That was a fair ask of someone Franco handed a build to; it is a poor first contact for
-someone who found it. **Notarization (Developer ID, $99/yr) is not decided here** — the choice is
-between paying it, marking releases source-only, or accepting the friction knowingly.
+✅ **The question this fired is settled: the friction is accepted, not paid for** (Franco,
+2026-08-05). ADR-014 closed notarization "won't do" *on audience size* and wrote its own trigger —
+*"if the audience ever widens beyond a handful of direct recipients, revisit"* — which a public repo
+fires, since release zips are now downloadable by anyone and macOS blocks an unnotarized app until
+the user goes to System Settings → **Open Anyway**. **Reviewed and kept:** screenrec is a personal
+tool published in the open, not a product with users to onboard, so $99/yr buys convenience for
+strangers rather than capability for anyone. The obligation this creates is **saying so plainly**:
+the README leads its install section with the block rather than burying it, and every release's notes
+carry the steps (`release.sh`). Revisit if it ever acquires an audience it owes a smooth first run.
 
 ⚠️ **Checked before the switch, and worth recording so nobody re-checks in a panic:** the tree and the
 full history carry **no credentials, keys or tokens**; no window titles or channel names ever reached

@@ -148,8 +148,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if state.needsOnboarding { windows.show(.onboarding) }
         screenGrantWatch = Task { [weak self] in await self?.relaunchWhenScreenGrantLands() }
         // ADR-020: reads the release list, says nothing when current or when it fails, and
-        // never blocks — the menu reads whatever answer this leaves behind.
-        updateCheck = Task { [weak state] in await state?.checkForUpdate() }
+        // never blocks — the menu reads whatever answer this leaves behind. Repeats because a
+        // menu-bar app runs for days (`recheckInterval`), so launch-only would go stale on exactly
+        // the machine that needs it.
+        updateCheck = Task { [weak state] in
+            while !Task.isCancelled {
+                await state?.checkForUpdate()
+                try? await Task.sleep(for: UpdateCheck.recheckInterval)
+            }
+        }
 
     }
 

@@ -5,7 +5,7 @@ microphone (separate track)**, tuned HEVC encoding, crash-safe long recordings,
 pause/resume, and ShadowPlay-style **instant replay** via a global hotkey.
 Zero external dependencies — Apple frameworks only, no Xcode required.
 
-**Status:** shipped and in daily use — **M0–M29** (capture, instant replay, per-app/window/region
+**Status:** shipped and in daily use — **M0–M33** (capture, instant replay, per-app/window/region
 capture, microphone recovery, share export and basic editing, per-app audio muting, an AppKit
 menu-bar surface, honest-state and hardening passes, and the share workflow). `VERSION` and the git
 tags carry the current release; `STATUS.md` is the living state.
@@ -72,23 +72,28 @@ Everything is in the menu-bar menu:
   a 3-2-1 count-in, a name prompt when a take stops, an automatic **Stop After** bound, and
   **Launch at login**.
 
-## Sharing this build
+## Installing a release
 
-The build is signed with a **local** identity. screenrec is a personal tool for you and a
-small number of people you hand it to directly — not public distribution (ADR-014) — so it
-deliberately skips Apple notarization. Two ways to share it:
+**⚠️ macOS will refuse to open this app the first time.** That is expected, and it is a deliberate
+choice rather than an oversight — see below.
 
-- **On a Mac that can build**, clone the repo and run the four commands above — self-contained,
-  no caveats.
-- **Otherwise**, copy the assembled `dist/ScreenRec.app` over and clear Gatekeeper **once**: on
-  first launch it's blocked as an unidentified developer, so open **System Settings → Privacy &
-  Security** and click **Open Anyway** (macOS 15 removed the old right-click → Open shortcut). After
-  that it launches normally. Screen-recording and microphone grants then **persist across every
-  future build**, because the stable code-signing identity keys the grant to the app, not to Apple's
-  trust chain.
+Builds are signed with a **local** identity and are **not notarized by Apple** (ADR-014, ADR-021).
+Two ways in:
 
-Frictionless double-click distribution (no "Open Anyway") would need Developer ID signing + Apple
-notarization ($99/yr) — out of scope at this audience size (ADR-014).
+- **Build it yourself** — clone and run the four commands above. No Gatekeeper prompt at all, and
+  nothing to trust but your own machine. This is the recommended path.
+- **Download a release** from [Releases](https://github.com/fcostantini/screenrec/releases), unzip,
+  and move **ScreenRec.app** to `/Applications`. On first launch macOS blocks it as an unidentified
+  developer: open **System Settings → Privacy & Security**, find the ScreenRec message and click
+  **Open Anyway** (macOS 15 removed the old right-click → Open shortcut). After that it launches
+  normally, and screen-recording and microphone grants **persist across every future build**, because
+  the stable code-signing identity keys the grant to the app rather than to Apple's trust chain.
+
+**Why not notarized.** Frictionless double-click installation needs Developer ID signing plus Apple
+notarization, which costs $99/yr. This is a personal tool published in the open, not a product with
+users to onboard — so the friction is **accepted knowingly** (Franco, 2026-08-05; ADR-021) rather
+than paid for. If that ever stops being the right trade, notarization is the only missing piece; it
+is a distribution change, not a capability one.
 
 ## Versioning
 
