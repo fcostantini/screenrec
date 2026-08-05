@@ -6,6 +6,17 @@
 
 ## Now
 
+- **✅ M33 COMPLETE and G33 PASSED (2026-08-05) — the share loop stops refusing work it can do.**
+  Three tasks: a queue so a second export waits instead of being dropped, a Settings toggle that
+  leaves your narration out of shared clips, and the collapse of the arm that withheld a copy it can
+  now queue. **749 tests** (743 → 749). Evidence in the gate table.
+  🚢 **v1.16.0 — MINOR (ADR-013): two new user-facing capabilities.**
+  🔴 **What this milestone was for, in one line:** every one of its three changes removed a place
+  where the app refused to do something it was perfectly capable of, and said so instead.
+  ⚠️ **Two things are unit-tested rather than observed live**, both recorded in the gate row: the
+  `· N waiting` menu row (the export drains faster than a `menudriver` round-trip can read it), and
+  `stopAndShare`'s guard removal (needs a real `RecordingSession`).
+
 - **✅ M33-T3 SHIPPED (2026-08-05) — the shortcut stops withholding a copy it can now queue.**
   Franco's ruling. M24-T2's `stopWithoutCopy` arm existed only because a second export would be
   dropped; T1 removed that reason. **749 tests.**
