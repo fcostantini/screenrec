@@ -109,7 +109,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--print-delivered-notifications") {
             Notifier.printDeliveredAndExit()
         }
+        // After the hook above, so the diagnostic still works while the app is running. A second
+        // copy would otherwise fight the first for the hotkeys and hold a second armed ring.
+        let others = Self.otherRunningInstances()
+        if LaunchPolicy.yieldsToRunningInstance(
+            arguments: CommandLine.arguments, otherInstances: others.count) {
+            others.first?.activate()
+            exit(0)   // nothing has been built yet, so there is nothing to tear down
+        }
         notifier.requestAuthorizationIfNeeded()
+    }
+
+    /// Copies of this app running under the same bundle id, excluding this process — so a build in
+    /// `~/Downloads` and one in `/Applications` count as each other's.
+    private static func otherRunningInstances() -> [NSRunningApplication] {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return [] }
+        return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            .filter { $0 != .current }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

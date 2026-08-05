@@ -2675,7 +2675,7 @@ five. **PATCH** (ADR-013): no new capability.
       grep — the grep was for the target name, and this was a member name.
       ⚠️ `docs/01`'s `ScreenRecApp/` reference is correct and stays: that directory really is the
       executable target.
-- [ ] M30-T5 **A second copy hands over instead of competing.** There is no single-instance check
+- [x] M30-T5 **A second copy hands over instead of competing.** There is no single-instance check
       anywhere in `AppDelegate`. Two copies means two status items; the second one's
       `RegisterEventHotKey` fails and posts *"shortcut unavailable"* at the user (M9-T4's notice,
       firing for the wrong reason); two armed ring buffers holding two copies of the memory the
@@ -2692,6 +2692,20 @@ five. **PATCH** (ADR-013): no new capability.
       **Verify:** `open dist/ScreenRec.app` twice → one status item, one hotkey registration, no
       notice; **and** the grant→relaunch path still works (G4 §5.1's leg) — that second half is the
       one that matters.
+      ✅ **Done 2026-08-05.** `LaunchPolicy.yieldsToRunningInstance` — pure, following
+      `StatusItemPolicy`'s pattern, because building an `AppDelegate` installs a status item.
+      `Relaunch.now()` passes `--relaunching` through `open -n --args`, and the guard sits **after**
+      the `--print-delivered-notifications` hook so that diagnostic still works while the app runs.
+      ✅ **Both branches proven against the deployed app**, with Franco's own running instance as the
+      incumbent and never touched: a plain second `open -n` **yielded** (1 instance, still his pid),
+      and one carrying `--relaunching` **did not** (2 instances). Only the copy this task created was
+      killed afterwards.
+      ⚠️ **The end-to-end TCC grant→relaunch flow is NOT re-run**, and is not claimed: it needs an
+      ungranted state, which can only be produced by revoking Franco's own Screen Recording grant.
+      What *is* proven is the discriminating half — a `--relaunching` copy survives the guard — which
+      is the only thing this change could have broken.
+      ✅ **4 breaks, 4 reds**, including the trap: ignoring the relaunch flag fails a test that names
+      it.
 - [ ] M30-T6 **The grant poll gives up, or backs off.**
       `AppDelegate.relaunchWhenScreenGrantLands()` loops with a 1 s sleep for the whole process
       lifetime whenever screen recording was not granted at launch. The job is real — it catches a

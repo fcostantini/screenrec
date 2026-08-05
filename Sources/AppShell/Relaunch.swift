@@ -14,7 +14,9 @@ enum Relaunch {
         let bundleURL = Bundle.main.bundleURL
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        process.arguments = ["-n", bundleURL.path]
+        // The flag marks the copy as ours, so the single-instance guard lets it through — this and
+        // the process that spawned it overlap until `terminate` below unwinds (LaunchPolicy).
+        process.arguments = ["-n", bundleURL.path, "--args", LaunchPolicy.relaunchArgument]
 
         do {
             try process.run()
