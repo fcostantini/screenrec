@@ -2706,7 +2706,7 @@ five. **PATCH** (ADR-013): no new capability.
       is the only thing this change could have broken.
       ✅ **4 breaks, 4 reds**, including the trap: ignoring the relaunch flag fails a test that names
       it.
-- [ ] M30-T6 **The grant poll gives up, or backs off.**
+- [x] M30-T6 **The grant poll gives up, or backs off.**
       `AppDelegate.relaunchWhenScreenGrantLands()` loops with a 1 s sleep for the whole process
       lifetime whenever screen recording was not granted at launch. The job is real — it catches a
       grant made directly in System Settings, which needs the same relaunch (02 §2) — but it is an
@@ -2717,6 +2717,17 @@ five. **PATCH** (ADR-013): no new capability.
       measured it as immediate, and that is the leg a first-run user actually experiences.
       **Verify:** the transition still relaunches promptly after a grant, and an app left ungranted
       shows the reduced rate.
+      ✅ **Done 2026-08-05.** `LaunchPolicy.grantPollInterval` — **1 s for the first two minutes,
+      5 s after** — pure, so both arms are asserted without waiting on a clock. The ruling went to
+      back-off rather than stop-after-N: giving up entirely would mean a grant made later never
+      relaunches, and that is the flow the loop exists for.
+      ✅ **The leg that matters is the fast one, and it is untouched:** G4 §5.1 measured
+      grant → relaunch as immediate, and the first two minutes still poll every second — which is the
+      whole window a first-run user is actually in.
+      ⚠️ **Not re-run end to end**, same reason as T5: the transition needs an ungranted state, which
+      means revoking Franco's own grant. The schedule is unit-tested both sides of the boundary
+      instead, and the loop's other arm (the relaunch back-off) is unchanged.
+      ✅ **2 breaks, 2 reds** — never backing off, and always slow.
 
 **Gate G30** — a clean-scratch `swift build` emits no warnings; a muted take ended by a *real* stream
 death leaves no live tap, aggregate device or timer behind, proven in-process against a control take;

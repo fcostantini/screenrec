@@ -172,6 +172,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Already granted at launch ⇒ no transition to wait for; also what stops a relaunch loop.
         guard !state.permissions.screenWasGrantedAtLaunch else { return }
 
+        let launchedAt = ContinuousClock.now
         while !Task.isCancelled {
             // Should be unreachable — Start is disabled while blocked — but never terminate on a
             // live writer (ADR-007).
@@ -182,7 +183,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try? await Task.sleep(for: .seconds(5))
                 continue
             }
-            try? await Task.sleep(for: .seconds(1))
+            try? await Task.sleep(
+                for: LaunchPolicy.grantPollInterval(sinceLaunch: ContinuousClock.now - launchedAt))
         }
     }
 }

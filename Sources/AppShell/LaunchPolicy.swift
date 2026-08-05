@@ -17,4 +17,13 @@ enum LaunchPolicy {
         return otherInstances > 0
     }
 
+    /// How long a first-run user is assumed to still be in the granting flow. G4 §5.1 measured the
+    /// grant → relaunch transition as immediate, and that is the leg the interval must not slow.
+    static let attentiveWindow: Duration = .seconds(120)
+
+    /// How long to wait before re-checking for the screen grant. The check is a TCC query, so an app
+    /// left ungranted would otherwise make one every second for as long as it runs.
+    static func grantPollInterval(sinceLaunch elapsed: Duration) -> Duration {
+        elapsed < attentiveWindow ? .seconds(1) : .seconds(5)
+    }
 }
