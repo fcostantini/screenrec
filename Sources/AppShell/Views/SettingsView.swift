@@ -81,6 +81,16 @@ struct SettingsView: View {
 
             Toggle("Launch at login", isOn: $state.launchAtLogin)
 
+            Toggle("Check for new versions", isOn: $state.checksForUpdates)
+
+            Text("Once a day, ScreenRec asks GitHub whether a newer release exists and says so in the menu. It never downloads anything. The request tells GitHub your IP address — turn this off and the app makes no network requests at all.")
+
+                .font(.caption)
+
+                .foregroundStyle(.secondary)
+
+                .fixedSize(horizontal: false, vertical: true)
+
             Toggle("Show recording time in the menu bar", isOn: $state.showsMenuBarTimer)
 
             // M16-T5: the meter's twin opt-out. Shown while recording or armed, so a dead mic is

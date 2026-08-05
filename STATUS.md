@@ -6,6 +6,23 @@
 
 ## Now
 
+- **✅ M32-T3 SHIPPED (2026-08-05) — a build says when it's behind, and you can tell it not to look.
+  M32's three tasks are done; G32 is ready to run.** A dimmed row above `Settings…`, reading state the
+  launch check left behind — the menu is stamped at open and must never wait on a network (M6-T10).
+  **767 tests.**
+  🔴 **ADR-020's deferred ruling is taken: the check has an off switch.** `Settings ▸ Check for new
+  versions`, default on, and its caption names the cost rather than hiding it — *"the request tells
+  GitHub your IP address — turn this off and the app makes no network requests at all."* Off means
+  **no request**, not a discarded answer, and it clears a row already showing.
+  ✅ **Both states seen in the deployed app:** current build → **no row**; then with `CoreInfo.version`
+  temporarily faked to 1.0.0 (patch-observe-revert), the real menu rendered
+  **`1.16.0 is available  (disabled)`** exactly where specified. Scaffolding reverted, real build
+  redeployed and re-checked.
+  ✅ **6 breaks, 6 reds.**
+  ⚠️ **The row is dimmed, which is a real trade:** ADR-020 forbids downloading, so it is news rather
+  than an action — you still go to Releases yourself. Making it *open* that page downloads nothing and
+  is one line; **left as filed rather than widened without asking.**
+
 - **✅ M32-T2 SHIPPED (2026-08-05) — a build can tell it's out of date. Next: M32-T3 (the menu row).**
   🔴 **The repo is now PUBLIC** (Franco, 2026-08-05) — recorded as **`ADR-021`**, which amends
   ADR-014's "never public". Signing and distribution are **unchanged**: still self-signed, still not

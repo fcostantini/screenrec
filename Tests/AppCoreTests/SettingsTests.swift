@@ -185,7 +185,7 @@ import RecorderCore
             "replayArmed", "replaySeconds", "replayHotkey", "showsMenuBarTimer", "showsMenuBarLevel",
             "gifFPS", "gifWidth", "gifMaxSeconds", "mp4Width", "stopAfterMinutes",
             "seenReplayBannerWarning", "countInEnabled", "namesTakeOnStop", "stopHotkeyCopies",
-            "exportsIncludeMicrophone",
+            "exportsIncludeMicrophone", "checksForUpdates",
         ])
     }
 
@@ -755,5 +755,16 @@ import RecorderCore
         settings.exportsIncludeMicrophone = true
         SettingsStore.save(settings, to: defaults)
         #expect(SettingsStore.load(from: defaults).exportsIncludeMicrophone)
+    }
+
+    /// M32-T3. Opt-out like its siblings: absent means on, so an existing install keeps checking.
+    @Test func theUpdateCheckPreferenceIsOptOutAndRoundTrips() {
+        let (defaults, _) = makeDefaults()
+        #expect(SettingsStore.load(from: defaults).checksForUpdates)   // absent ⇒ on
+
+        var settings = Settings.standard
+        settings.checksForUpdates = false
+        SettingsStore.save(settings, to: defaults)
+        #expect(!SettingsStore.load(from: defaults).checksForUpdates)
     }
 }

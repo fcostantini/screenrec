@@ -90,4 +90,12 @@ public enum MenuHeader {
         formatter.dateStyle = .none
         return "Stops at \(formatter.string(from: date))"
     }
+
+    /// The update row (M32-T3). The tag carries a leading `v` and a menu row should not.
+    /// Nil ⇒ nothing to say, which is the common case and shows no row at all.
+    public static func updateAvailable(_ tag: String?) -> String? {
+        guard let tag, !tag.isEmpty else { return nil }
+        let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+        return "\(version) is available"
+    }
 }

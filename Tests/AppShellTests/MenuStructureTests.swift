@@ -191,4 +191,30 @@ import Testing
             "Rename…", "Move to Trash",
         ])
     }
+
+    /// M32-T3: the row exists only when there is news, and it sits with Settings/Quit rather than
+    /// among the actions — it is information, not something to press.
+    @Test func anAvailableUpdateAddsOneDimmedRowAboveSettings() async {
+        let state = MenuSnapshot.state()
+        let before = MenuSnapshot.titles(state)
+        #expect(!before.contains { $0.contains("is available") })
+
+        await state.checkForUpdate { ["v99.0.0"] }
+        let after = MenuSnapshot.titles(state)
+        let index = after.firstIndex(of: "99.0.0 is available")
+        #expect(index != nil, "the update row is missing")
+        if let index {
+            #expect(after[index + 1] == "Settings…")   // immediately above Settings, as specified
+        }
+        #expect(after.count == before.count + 1)       // exactly one row, and nothing else moved
+    }
+
+    /// Dimmed on purpose: the app never downloads (ADR-020), so this is news rather than an action.
+    @Test func theUpdateRowIsNotClickable() async {
+        let state = MenuSnapshot.state()
+        await state.checkForUpdate { ["v99.0.0"] }
+        let row = MenuSnapshot.item(state, titled: "99.0.0 is available")
+        #expect(row != nil)
+        #expect(row?.isEnabled == false)
+    }
 }

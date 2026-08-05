@@ -236,6 +236,9 @@ public struct Settings: Sendable, Equatable {
     /// Whether a share export mixes the microphone in (M33-T2). Default on, so existing installs
     /// export exactly what they did; off leaves a take's narration out of the file it shares.
     public var exportsIncludeMicrophone: Bool
+    /// Whether the app looks for a newer release (M32-T3, ADR-020/021). Default on. Off stops the
+    /// only network request this app makes — see the Settings caption for what it costs.
+    public var checksForUpdates: Bool
     /// Whether the one-time "banners are hidden while armed" alert has been shown (M12-T5). Absent
     /// ⇒ false (not yet seen); once true the alert never fires again — the dimmed menu row is the
     /// ongoing reminder.
@@ -315,6 +318,7 @@ public struct Settings: Sendable, Equatable {
             stopAfterMinutes: 0,
             mp4Width: 1920,
             exportsIncludeMicrophone: true,
+            checksForUpdates: true,
             seenReplayBannerWarning: false)
     }
 }
@@ -382,6 +386,8 @@ public enum SettingsStore {
         public static let mp4Width = "mp4Width"
         /// Absent ⇒ on (M33-T2): the microphone rides along unless it's turned off.
         public static let exportsIncludeMicrophone = "exportsIncludeMicrophone"
+        /// Absent ⇒ on (M32-T3): the update check is opt-out, like the other opt-outs here.
+        public static let checksForUpdates = "checksForUpdates"
         public static let stopAfterMinutes = "stopAfterMinutes"
         /// The last export's path, for the receipt that survives relaunch (M12-T2). Absent ⇒ no
         /// receipt. Not part of `Settings` (it's a transient pointer, not user config) — its own
@@ -512,6 +518,9 @@ public enum SettingsStore {
         // Opt-out like its siblings: only an explicit stored value overrides the default.
         if defaults.object(forKey: Key.exportsIncludeMicrophone) != nil {
             settings.exportsIncludeMicrophone = defaults.bool(forKey: Key.exportsIncludeMicrophone)
+        }
+        if defaults.object(forKey: Key.checksForUpdates) != nil {
+            settings.checksForUpdates = defaults.bool(forKey: Key.checksForUpdates)
         }
         settings.seenReplayBannerWarning = defaults.bool(forKey: Key.seenReplayBannerWarning)
 
@@ -655,6 +664,7 @@ public enum SettingsStore {
         defaults.set(settings.gifMaxSeconds, forKey: Key.gifMaxSeconds)
         defaults.set(settings.mp4Width, forKey: Key.mp4Width)
         defaults.set(settings.exportsIncludeMicrophone, forKey: Key.exportsIncludeMicrophone)
+        defaults.set(settings.checksForUpdates, forKey: Key.checksForUpdates)
         defaults.set(settings.stopAfterMinutes, forKey: Key.stopAfterMinutes)
     }
 }

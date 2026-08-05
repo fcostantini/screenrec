@@ -171,6 +171,13 @@ public final class AppState {
         didSet { if exportsIncludeMicrophone != oldValue { persist() } }
     }
 
+    /// Whether the app looks for a newer release (M32-T3). Persisted, opt-out. Turning it off takes
+    /// effect at the next check rather than cancelling one in flight — a read already on the wire is
+    /// not worth the machinery to abort.
+    public var checksForUpdates: Bool {
+        didSet { if checksForUpdates != oldValue { persist() } }
+    }
+
     /// Stop a recording after this many minutes (M18-T4); 0 ⇒ off. Applies to the *next* start —
     /// changing it mid-recording would move a deadline the menu has already stated.
     public var stopAfterMinutes: Int {
@@ -535,6 +542,7 @@ public final class AppState {
         gifMaxSeconds = settings.gifMaxSeconds
         mp4Width = settings.mp4Width
         exportsIncludeMicrophone = settings.exportsIncludeMicrophone
+        checksForUpdates = settings.checksForUpdates
         stopAfterMinutes = settings.stopAfterMinutes
         hasSeenReplayBannerWarning = settings.seenReplayBannerWarning
         // The export cluster (M14-T1): it seeds its own persisted receipt from `defaults`.
@@ -612,6 +620,7 @@ public final class AppState {
                 gifFPS: gifFPS, gifWidth: gifWidth, gifMaxSeconds: gifMaxSeconds,
                 stopAfterMinutes: stopAfterMinutes, mp4Width: mp4Width,
                 exportsIncludeMicrophone: exportsIncludeMicrophone,
+                checksForUpdates: checksForUpdates,
                 seenReplayBannerWarning: hasSeenReplayBannerWarning),
             to: defaults)
     }
@@ -925,6 +934,11 @@ public final class AppState {
     public func checkForUpdate(
         fetchTags: @Sendable () async -> [String] = UpdateCheck.fetchTags
     ) async {
+        // Off means no request at all, not a request whose answer is discarded (M32-T3).
+        guard checksForUpdates else {
+            if availableUpdate != nil { availableUpdate = nil }
+            return
+        }
         let newest = UpdateCheck.newestRelease(among: await fetchTags(), laterThan: CoreInfo.version)
         if availableUpdate != newest { availableUpdate = newest }
     }

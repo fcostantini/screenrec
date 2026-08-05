@@ -111,4 +111,42 @@ import Testing
         // Printed, not `Issue.record`: a diagnostic must not turn a passing test red.
         print("LIVE: \(tags.count) tags; this build \(CoreInfo.version); a 1.7.0 build sees \(old ?? "nothing")")
     }
+
+    // MARK: - The row, and the off switch (M32-T3)
+
+    @Test func theRowNamesTheVersionWithoutTheTagsV() {
+        #expect(MenuHeader.updateAvailable("v1.17.0") == "1.17.0 is available")
+        #expect(MenuHeader.updateAvailable("1.17.0") == "1.17.0 is available")
+    }
+
+    /// The common case shows no row at all — the surface exists only when there is news.
+    @Test func nothingToSayMeansNoRow() {
+        #expect(MenuHeader.updateAvailable(nil) == nil)
+        #expect(MenuHeader.updateAvailable("") == nil)
+    }
+
+    /// Off must mean **no request**, not a request whose answer is thrown away — the whole point of
+    /// the switch is that the app then makes no network requests at all (ADR-020's privacy cost).
+    @MainActor
+    @Test func turningTheCheckOffMakesNoRequestAtAll() async {
+        let state = AppState(defaults: TestDefaults.make())
+        let asked = Flag()
+        state.checksForUpdates = false
+
+        await state.checkForUpdate { asked.raise(); return ["v99.0.0"] }
+        #expect(!asked.isRaised, "a disabled check must not reach the network")
+        #expect(state.availableUpdate == nil)
+    }
+
+    /// And turning it off clears a row that was already showing, rather than leaving it stranded.
+    @MainActor
+    @Test func turningItOffAlsoClearsARowAlreadyShowing() async {
+        let state = AppState(defaults: TestDefaults.make())
+        await state.checkForUpdate { ["v99.0.0"] }
+        #expect(state.availableUpdate == "v99.0.0")
+
+        state.checksForUpdates = false
+        await state.checkForUpdate { ["v99.0.0"] }
+        #expect(state.availableUpdate == nil)
+    }
 }
