@@ -145,6 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // docs/06: appears on first launch or any missing permission, never once satisfied.
         if state.needsOnboarding { windows.show(.onboarding) }
         screenGrantWatch = Task { [weak self] in await self?.relaunchWhenScreenGrantLands() }
+
     }
 
     /// Finishes work in flight before exit — an in-progress recording (ADR-007) or an export

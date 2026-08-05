@@ -911,6 +911,24 @@ public final class AppState {
     }
     public private(set) var selfTestState: SelfTestState = .idle
 
+    /// A newer release's tag when one exists, else nil (M32, ADR-020). Stored, because the menu is
+    /// stamped at open and must never wait on a network read (M6-T10) — the check runs at launch and
+    /// the row reads the answer it left behind.
+    public private(set) var availableUpdate: String?
+
+    /// Reads the release list and records whether this build is behind. The app calls it once at
+    /// launch. Silent in every failing case: offline, rate-limited, or an unparseable tag all leave
+    /// `availableUpdate` nil, which is the same state as being current.
+    ///
+    /// `fetchTags` is injected so the decision is testable without a network — the live half can
+    /// only ever be smoke-tested.
+    public func checkForUpdate(
+        fetchTags: @Sendable () async -> [String] = UpdateCheck.fetchTags
+    ) async {
+        let newest = UpdateCheck.newestRelease(among: await fetchTags(), laterThan: CoreInfo.version)
+        if availableUpdate != newest { availableUpdate = newest }
+    }
+
     /// The app's version, for the two footers (M16-T6). ADR-014 hands people a signed `.app`
     /// directly, so "am I on the build with the fix?" has to be answerable from inside it.
     public var versionLabel: String { "ScreenRec \(CoreInfo.version)" }

@@ -2849,7 +2849,7 @@ is rebuilding from source. **MINOR.**
       export; silent when current *and* when it fails.
       ⚠️ **The cost is recorded, not buried:** the request tells `github.com` this machine's IP. For a
       deliberately private tool that earns a way to switch the check off — **a ruling left to T3.**
-- [ ] M32-T2 **The check.** *(Re-specified 2026-08-05 against ADR-020.)* **Seams:** `CoreInfo.version` is the single
+- [ ] M32-T2 **The check.** 🔴 **BLOCKED 2026-08-05 — the premise is false, see below.** **Seams:** `CoreInfo.version` is the single
       source and is already pinned against `VERSION` by a test and by `release.sh`; `URLSession` is
       Foundation, so this stays zero-dep (ADR-010). **Rulings:** what a failed or offline check does
       — *nothing at all* is the likely honest answer — and the hard constraint that it can never
@@ -2862,6 +2862,29 @@ is rebuilding from source. **MINOR.**
       exactly the machine that needs it, and a once-a-day re-check may be the honest version; and what
       a non-semver tag does (ignore it, never guess). ⚠️ **The comparison must be pure** and tested
       over injected strings, because the live half can only ever be smoke-tested.
+      🔴 **BLOCKED, and the blocker is not the code.** The comparison is built and tested (10 tests,
+      every ordering case); the **source of truth is not reachable**. `api.github.com/repos/
+      fcostantini/screenrec/releases` returns **HTTP 404 unauthenticated — the repo is private**
+      (measured, `gh repo view` confirms `PRIVATE`). Nothing calls `fetchTags`: a request known to
+      fail on every launch is not worth making.
+      🔴 **And it is worse than a wrong URL — the recipients have no GitHub access at all.** They were
+      handed a `.app`, not an invite, so the releases *page* 404s for them too. Even the manual
+      `Check for Updates…` shape only works for Franco. **The milestone's real question turns out to
+      be: how does someone who was handed a file learn a newer one exists, when nothing about this
+      project is public?**
+      **The options, with their costs — a ruling, not an implementation detail:**
+      **(a) Ship a token.** ❌ Not an option: a read credential inside a distributed binary is a
+      leaked credential, and it grants the whole private repo.
+      **(b) Make the repo public.** Contradicts ADR-014's *"never public"* and exposes the source and
+      every release asset. Real, and Franco's call alone.
+      **(c) Publish a one-line version manifest somewhere public** — a Gist or a static file —
+      pushed by `release.sh` beside the tag. Repo stays private, no token, ~15 lines. The app reads a
+      number, not a repo. ⚠️ It is a second place that can go stale, so `release.sh` must own it or
+      it will drift.
+      **(d) Drop the automatic check.** Accept that distribution is Franco telling people, and close
+      M32. Honest, and cheaper than any of the above.
+      ⚠️ **ADR-020 is not invalidated** — it authorised *a read*, and (c) is squarely inside its
+      bounds. What it could not anticipate is that there was nothing public to read.
 - [ ] M32-T3 **The surface.** *(Re-specified 2026-08-05 against ADR-020.)* A **dimmed menu row**,
       present only when a newer release exists — Franco's pick. 🔴 **Ruling owed here: a way to turn
       the check off.** ADR-020 records the privacy cost and deliberately leaves the opt-out to this

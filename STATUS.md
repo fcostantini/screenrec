@@ -380,6 +380,14 @@
 
 **Open:**
 
+- [ ] 🔴 **M32-T2 is BLOCKED on a ruling, and the premise was false** (2026-08-05). The update check's
+      comparison is built and tested; the **source is unreachable**: the releases API returns **404**
+      because **the repo is private**, and — the part that reshapes the milestone — **recipients have
+      no GitHub access at all**, so the releases page 404s for them too. Even a manual
+      `Check for Updates…` only works for Franco. **Options in docs/03 under M32-T2:** ship a token
+      (❌ never), make the repo public (contradicts ADR-014), publish a one-line version manifest
+      that `release.sh` pushes (repo stays private, ~15 lines), or drop the check and close M32.
+
 - [x] ~~**M32-T1 — is a network read acceptable at all?**~~ **RULED 2026-08-05 → `ADR-020`.** Yes,
       as an automatic background read on launch surfacing a dimmed row only when behind. The non-goal
       is about *recordings*; this sends nothing about the user or the machine. **M32 is unblocked.**
