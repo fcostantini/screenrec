@@ -2729,7 +2729,7 @@ five. **PATCH** (ADR-013): no new capability.
       instead, and the loop's other arm (the relaunch back-off) is unchanged.
       ✅ **2 breaks, 2 reds** — never backing off, and always slow.
 
-**Gate G30** — a clean-scratch `swift build` emits no warnings; a muted take ended by a *real* stream
+**Gate G30** — ✅ **PASSED 2026-08-05** (evidence in STATUS.md's gate table; two items recorded there as not claimed, not waived). The criterion as filed: a clean-scratch `swift build` emits no warnings; a muted take ended by a *real* stream
 death leaves no live tap, aggregate device or timer behind, proven in-process against a control take;
 the filmstrip still fills on a real recording; two launches leave one running app, one status item and
 one set of shortcuts **while the screen-grant relaunch still works**; an ungranted app does not query
