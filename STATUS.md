@@ -6,6 +6,24 @@
 
 ## Now
 
+- **✅ M31-T1 SHIPPED (2026-08-05) — GO, and the root cause is upstream of where M31 assumed it was.
+  Next: M31-T2, re-specified below.** A spike, no production code. Detail in docs/07.
+  🔴 **`SCStreamConfiguration.colorSpaceName` and `.colorMatrix` are both `nil` by default**, and the
+  default `pixelFormat` is **`420v`** — SCK hands us YCbCr already, so the RGB→YCbCr conversion
+  happens **inside SCK under an unstated matrix**, before any code here sees a frame. The file then
+  carries `unknown/unknown/unknown` end to end, which is what I measured on your real recordings.
+  ⚠️ **So T2 grew:** tagging only the writer would assert something about a conversion we never
+  controlled. The stream's colour space has to be set too.
+  ✅ **The tag demonstrably changes what a player shows** — same decoder, only the tag differing:
+  ffmpeg went red `220,5,39` → `237,15,25`, mid-grey `128` → `121`, up to **26/255 ≈ 10%**.
+  ✅ **AVFoundation is unmoved by it** — byte-identical tagged or not, because it already assumes
+  BT.709. **That is why this never looked broken: QuickTime is the only player ever used to check.**
+  🔴 **BT.709 tagging did NOT converge the two decoders**, and moved mid-grey further apart — so T2
+  has to *verify* convergence, not assume the obvious tag is correct.
+  ⚠️ **A limit of my own rig, recorded rather than buried:** cross-decoder absolute numbers are
+  confounded (my sampler colour-manages the AVFoundation path and not the ffmpeg one). The
+  confound-free comparisons are same-decoder, tagged vs untagged.
+
 - **✅ M30 COMPLETE and G30 PASSED (2026-08-05) — the signals nobody was hearing.** Six tasks: a
   leaked Core Audio tap, a data race with a hang behind it, four warning sites closed or explained,
   five stale references, and two launch guards. **739 tests** (728 → 739). Evidence in the gate table.

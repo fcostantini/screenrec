@@ -2750,7 +2750,7 @@ an NLE — and that lands on the `.mp4` share path, which is the one thing ADR-0
 gate. It is not a measured trade-off that was accepted; it is an axis nobody has looked at.
 **PATCH** — a fix, not a capability.
 
-- [ ] M31-T1 **Measure before changing anything.** M21's lesson, in M27-T1's shape: the rest of this
+- [x] M31-T1 **Measure before changing anything.** M21's lesson, in M27-T1's shape: the rest of this
       milestone is only worth doing if the difference is visible. Answer, with numbers in docs/07:
       does a tagged export actually render differently from today's untagged one, and in which
       players (QuickTime, a browser, and whatever `tools/frames.swift` decodes)? What does SCK
@@ -2760,6 +2760,23 @@ gate. It is not a measured trade-off that was accepted; it is an axis nobody has
       — if the untagged file is already read identically everywhere it goes, T2 and T3 close
       "won't do" and this milestone ends here. **Nothing below should be detailed further until it
       lands.**
+      ✅ **Done 2026-08-05 — GO.** The difference is real, and the root cause is upstream of where
+      this milestone assumed it was.
+      🔴 **`SCStreamConfiguration.colorSpaceName` and `.colorMatrix` are both `nil` by default**, and
+      the default `pixelFormat` is **`420v`** — SCK hands us YCbCr already, so the RGB→YCbCr
+      conversion happens **inside SCK under an unstated matrix**, before any code here sees a frame.
+      ⚠️ **This moves T2's scope:** a writer-side tag alone asserts something about a conversion we
+      never controlled, so the stream's `colorSpaceName` has to be set too.
+      ✅ **The tag changes what a player shows — clean A/B, same decoder, only the tag differing:**
+      ffmpeg went red `220,5,39` → `237,15,25`, green `45,199,79` → `22,173,66`, mid-grey `128` →
+      `121` — up to **26/255 ≈ 10%**.
+      ✅ **AVFoundation is unmoved by the tag** (byte-identical either way): it already assumes
+      BT.709, which is why this never looked wrong in QuickTime — the only player ever used to check.
+      🔴 **BT.709 tagging did NOT converge the two decoders** and moved mid-grey further apart, so
+      **T2 must verify convergence rather than assume the obvious tag is right.**
+      ⚠️ **A methodology limit, recorded not buried:** cross-decoder absolute numbers in this spike
+      are confounded (the sampler colour-manages the AVFoundation path and not the ffmpeg one). The
+      confound-free comparisons are same-decoder, tagged vs untagged. Full detail in docs/07.
 - [ ] M31-T2 **A recording states its colour.** *(Shape depends on T1.)* **Seams:**
       `MovieRecorder.videoSettings`; `CaptureEngine.makeStreamConfiguration` for `colorSpaceName`.
       **Rulings:** which tag set — `ITU_R_709_2` across primaries/transfer/matrix is the honest

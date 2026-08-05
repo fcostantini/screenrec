@@ -7,6 +7,30 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-05 (M31-T1): **Nothing in the capture chain ever states a colour space, and the root cause
+  is one line of SCK defaults.** Measured, and it settles which side the fix belongs on.
+  - 🔴 **`SCStreamConfiguration.colorSpaceName` and `.colorMatrix` are BOTH `nil` by default** — not
+    sRGB, not anything. (They bridge to Swift `String` as NULL, which *traps on use*: a spike that
+    simply prints them segfaults. Probe them as `CFString?` and check for nil.)
+  - 🔴 **And the default `pixelFormat` is `420v`** (0x34323076) — SCK already hands us **YCbCr**, so
+    the RGB→YCbCr conversion happens **inside SCK with an unstated matrix**, before any code here
+    sees a frame. `MovieRecorder` then passes it through with no `AVVideoColorPropertiesKey`, so the
+    file carries `unknown/unknown/unknown` end to end.
+  - ⚠️ **So a writer-side tag alone would be asserting something about a conversion we never
+    controlled.** The honest fix sets `colorSpaceName` on the stream *and* tags the writer to match.
+  - ✅ **The tag demonstrably changes what a player shows — clean A/B, same decoder, only the tag
+    differing.** ffmpeg on an otherwise identical file: red `220,5,39` → `237,15,25`, green
+    `45,199,79` → `22,173,66`, mid-grey `128` → `121`. Up to **26/255 ≈ 10%**.
+  - ✅ **AVFoundation is unmoved by the tag** (byte-identical untagged vs BT.709-tagged), so it
+    already assumes BT.709 — which is why this never looked broken in QuickTime, the only player
+    used to check.
+  - ⚠️ **Methodology caveat, stated rather than buried:** absolute AVFoundation-vs-ffmpeg numbers in
+    that spike are *not* comparable — the sampler redraws the AVFoundation path into sRGB (colour
+    managed) while the ffmpeg PNG path is read as-is. The two confound-free comparisons are
+    same-decoder-tagged-vs-untagged, above. A cross-player claim needs a better rig.
+  - 🔴 **Naive BT.709 tagging did NOT converge the two decoders** in this spike, and moved mid-grey
+    further apart. T2 must *verify* convergence rather than assume the tag is self-evidently right.
+
 - 2026-08-05 (M30-T3): **`SCREENREC_HW_ENCODE_TESTS=1 swift test` — the whole suite at once — is not
   a check, and quoting it as one is a mistake this session made twice.** ExporterTests' own comment
   says the layered encode suites oversubscribe VideoToolbox and fault it (VT **-12912**) "about half
