@@ -14,9 +14,8 @@ enum StatusIconImage {
     /// as "not recording".
     private static let pulseFloor: Double = 0.45
 
-    /// The status item's accessible name. `Image(nsImage:)` doesn't adopt an `NSImage`'s
-    /// `accessibilityDescription` and a label-based `MenuBarExtra` has no title, so the view must
-    /// apply this explicitly.
+    /// The status item's accessible name. Its button carries an image and no title, so nothing
+    /// supplies one to VoiceOver unless this is set explicitly.
     static func label(
         for icon: StatusIcon, isReplayArmed: Bool, isExporting: Bool = false
     ) -> String {
@@ -126,9 +125,8 @@ enum StatusIconImage {
 
     /// The input meter (M16-T5), drawn INTO the icon rather than beside it.
     ///
-    /// ⚠️ A `MenuBarExtra` label renders only its **first** `Image` — a second one contributes
-    /// nothing at all (measured: `Text` widens the item, a second `Image` doesn't). So the meter
-    /// composites, exactly as the armed badge does.
+    /// ⚠️ The status item's button carries **one** image, so anything that must appear beside the
+    /// glyph is composited into it rather than added alongside — as the armed badge already is.
     private static func withMeter(_ base: NSImage, bars: Int) -> NSImage {
         let gap: CGFloat = 3, meterWidth: CGFloat = 9
         let size = NSSize(width: base.size.width + gap + meterWidth, height: base.size.height)
@@ -164,13 +162,10 @@ enum StatusIconImage {
     /// Draws the elapsed clock **into** the icon image, instead of letting the label carry a
     /// `Text`.
     ///
-    /// ⚠️ The `.menu` MenuBarExtra hands a label's `Text` to the status item as its AppKit *title*
-    /// and discards SwiftUI layout and styling entirely — `.offset`, `.padding` and even a 6 pt
-    /// `.font` all render identically (measured, docs/07). That title's digits sit 1.5 px at 2×
-    /// above the bar's centre, because digits carry no descenders while the line box reserves room
-    /// for them, and nothing in SwiftUI can move it. Drawing the clock here is the only way to put
-    /// it on the same optical line as the glyph — the same reason the armed badge and the level
-    /// meter composite rather than sit beside it.
+    /// ⚠️ A button *title* sits on the text baseline, which puts its digits 1.5 px at 2× above the
+    /// bar's centre: digits carry no descenders while the line box reserves room for them (measured,
+    /// docs/07). Drawing the clock into the image is what puts it on the same optical line as the
+    /// glyph — the same reason the armed badge and the level meter composite rather than sit beside.
     ///
     /// Centred on the digits' **cap height**, not the line box, which is the whole point.
     static func withClock(_ base: NSImage, text: String) -> NSImage {
@@ -198,9 +193,8 @@ enum StatusIconImage {
         return image
     }
 
-    /// The save confirmation (M9-T3), composited to the right of everything else — which is where
-    /// the original `HStack` put it, and where it never rendered: a `MenuBarExtra` label draws only
-    /// its first `Image` (measured, docs/07). Same fix the armed badge and the meter already had.
+    /// The save confirmation (M9-T3), composited to the right of everything else — the button holds
+    /// a single image, so this rides in it like the armed badge and the meter.
     static func withSavedMark(_ base: NSImage) -> NSImage {
         let gap: CGFloat = 3
         let diameter = min(base.size.height, base.size.width) * 0.62
