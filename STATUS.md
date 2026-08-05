@@ -6,6 +6,25 @@
 
 ## Now
 
+- **📋 FOLLOW-UPS FILED (2026-08-05) — M32-T4 and M34; one parked. Next: Franco's pick.** None came
+  from the audit; all three are things the work itself turned up.
+  **M32-T4 — the update row goes somewhere.** It says `1.17.0 is available` and does nothing. 🔴 **The
+  person M32 was built for is the one who cannot act on it** — handed a `.app`, no reason to know a
+  repo exists. One line (`MenuRow.action` + `NSWorkspace.open`); ADR-020 forbids downloading, not
+  linking. **G32 unaffected** — no criterion mentions the row's clickability.
+  **M34 — what happens while recording is untested.** 🔴 **The largest untested surface left, and
+  where the defects actually come from:** M28 shipped two that only *looking* caught, M29 recorded the
+  recording/paused menus as its own remaining gap, M23-T3 made `finishTake` internal because no test
+  could reach it, and M33-T3's sweep proved a **silent** `return` can be re-added with the suite still
+  green. Everything downstream of `session.isActive` needs a real `RecordingSession`. **T1 is a spike**
+  because the obvious seam — a protocol over `RecordingSession` — is a large surface invented for
+  tests and used by one caller. ⚠️ **T2 touches gate-verified ownership**, and M22 is the precedent for
+  how that goes wrong.
+  **Parked — label the audio tracks at write time.** `--no-microphone` identifies the mic by channel
+  count, which is an inference. 🔴 Its failure mode is **silent and inverted**: a contract change would
+  strip the *system audio* instead. ⚠️ A label helps only new files, so both paths coexist until old
+  ones age out. **Trigger:** the first time export-without-mic is used in anger.
+
 - **✅ M32 COMPLETE and G32 PASSED (2026-08-05) — a build can tell it's out of date.** Three tasks:
   the ruling (`ADR-020`), the check, and a dimmed row with an off switch. **767 tests.** Evidence in
   the gate table.

@@ -2927,6 +2927,19 @@ is rebuilding from source. **MINOR.**
       action — a reader still goes to Releases themselves. Making it *open* that page downloads
       nothing and is one line; **left as filed rather than widened without asking.**
 
+- [ ] M32-T4 **The update row goes somewhere** (added 2026-08-05, after G32 — Franco's call). The
+      row says `1.17.0 is available` and does nothing; a reader has to already know the repo exists.
+      🔴 **The irony is that the person M32 was built for is the one who cannot act on it** — someone
+      handed a `.app`, with no reason to know there is a GitHub repo at all. For Franco it is an
+      annoyance; for a recipient the row is a dead end. **Seams:** `MenuRow.action` instead of
+      `MenuRow.label`, and `NSWorkspace.shared.open` — ADR-020 forbids **downloading**, not linking,
+      and opening the Releases page is the manual path ADR-014 already documents. **Rulings:** whether
+      a browser-opening action belongs in a menu that is otherwise entirely about recording — a taste
+      call, which is why it was left rather than decided. **Verify:** the existing
+      `theUpdateRowIsNotClickable` test inverts, and the row opens the page from the deployed app.
+      ⚠️ **G32 does not need re-running:** none of its criteria mention the row's clickability, and
+      the row's presence and absence are unchanged.
+
 **Gate G32** — ✅ **PASSED 2026-08-05** (evidence in STATUS.md's gate table; the method note about the faked version is recorded there, not waived). As filed: a decision is recorded; a build behind the latest release says so on a surface Franco
 chose, a current build says nothing, and an offline machine behaves exactly like a current one; the
 check never blocks launch, a recording, or an export.
@@ -3050,6 +3063,46 @@ flattened. **MINOR.**
 quitting waits for all of them; an export can be produced without the microphone's content in it,
 proven by level rather than by track count; the default export is unchanged.
 
+## M34 — What happens while recording is untested (from the 2026-08-05 session's own findings)
+
+Every decision the app makes **while idle** is unit-tested. Almost nothing it does **while recording**
+is — because those paths are gated on `session.isActive`, which needs a real `RecordingSession`: a
+`CaptureEngine` and an `AVAssetWriter`. No test can build one, so the whole recording surface is
+verified by deploying the app and driving it.
+
+🔴 **This is not a theory; it is where the defects have actually come from.** M28 shipped two that only
+*looking* caught. M29 closed the idle menu and **recorded the recording and paused menus as its
+remaining gap**. M23-T3 made `finishTake` `internal` specifically because "no test can reach it". And
+M33-T3's sweep proved the point again: re-introducing a **silent** `return` in `stopAndShare` leaves
+the suite green. **PATCH** — no user-facing change; this buys the ability to prove one.
+
+- [ ] M34-T1 **Find the smallest seam, before building one.** M27-T1's shape, and the reason this is
+      a milestone rather than a task: the obvious move — a protocol over `RecordingSession` — means
+      abstracting `router`, `events`, `pause`/`resume`/`stop`/`discard`, `recordedDuration`,
+      `hasStartedSession` and `microphoneLevel`, a large surface invented for tests and used by one
+      caller. **Answer, with the options costed:** can `SessionModel` be made *active* without a
+      capture at all (its `isActive` is `capture != nil` today)? Does `AppState` need to own a
+      protocol, or only `SessionModel`? What does the CLI's own use of `RecordingSession` constrain?
+      ⚠️ **A test-only backdoor is on the table and must be argued explicitly, not slipped in** — it
+      is contained, and it is also exactly the shape that lets a test pass against a state production
+      can never reach. **Verify:** a spike and a written recommendation; nothing below is detailed
+      until it lands.
+- [ ] M34-T2 **The seam.** *(Shape depends on T1.)* ⚠️ It touches `SessionModel` and `AppState`'s
+      session ownership, both gate-verified, and M22 is the precedent for how that goes wrong: two
+      guards inverted silently when `session` stopped being optional, and only the **unmoved** tests
+      noticed. **The bar is M22's:** the deployed menu unchanged, and no existing test edited.
+- [ ] M34-T3 **The recording and paused menus, asserted in-process.** M29-T2 closed the idle menu and
+      named these two as what it could not reach. ⚠️ `apply(.started)` moves the status icon but
+      **not** the session, so a test written against it asserts the *idle* menu and passes — M29
+      measured that, and it is the trap this task exists to avoid.
+- [ ] M34-T4 **The decisions that were unreachable become reachable.** `stopAndShare`'s guard (M33-T3
+      proved it is not catchable today), `finishTake` (M23-T3), and whatever else T1's sweep turns up.
+      **Verify:** the M33-T3 break — re-adding the silent `return` — now turns a named test **red**.
+
+**Gate G34** — the recording and paused menus each fail a test when broken, proven by breaking them
+rather than asserted; the silent guard M33-T3 removed is catchable; `menudriver dump` is unchanged
+across the whole milestone, because none of this is a behaviour change.
+
 ## Dependency graph
 
 ```
@@ -3136,7 +3189,14 @@ three of them were a task each and one was a ruling wearing a milestone's clothe
   their reasons, and **nothing on this roadmap crosses ADR-015's line** — every task above reuses a
   stage the app already runs.
 
-**Parked, with the trigger that would un-park each (updated 2026-07-31).** Four of the six were
+**Filed 2026-08-05 from the session's own findings, not from a review — M32-T4 and M34.** Neither
+came from the audit; both are things the work itself turned up. **M32-T4** is one line and a taste
+call. **M34 is the one that changes what this codebase can prove about itself**: the idle surface is
+fully unit-tested and the recording surface is not, which is where M28's two visual defects and
+M33-T3's uncatchable guard both came from. Its T1 is a spike precisely because the obvious seam — a
+protocol over `RecordingSession` — is a large surface invented for tests and used by one caller.
+
+**Parked, with the trigger that would un-park each (updated 2026-08-05).** Four of the six were
 **encoded as M25–M28 on 2026-07-31 (Franco)** and are no longer parked. What remains:
 
 - **Multi-display region capture** — M11 is main-display only and honest about it: the overlay draws
@@ -3155,6 +3215,19 @@ three of them were a task each and one was a ruling wearing a milestone's clothe
   not wanted for now — kept on this list deliberately, not dropped.** ⚠️ If it is ever taken up, the
   honest framing is that it is not a feature but a **second product identity**, and it wants its own
   review before any milestone: it changes what every other decision was optimising for.
+
+- **Label the audio tracks at write time, so the microphone stops being an inference** (M33-T2,
+  2026-08-05). Nothing in the container records a track's role, so `--no-microphone` identifies the
+  mic by **channel count**: mono is the mic, because system audio is always stereo (02 §1) and every
+  mic is normalised to 48 kHz mono (M8-T1). 🔴 **The failure mode is silent and inverted:** if SCK ever
+  delivers mono system audio, or the mic contract changes, "export without the microphone" would strip
+  the **system audio** instead and hand back a file missing the wrong thing with nothing saying so.
+  Today's code errs toward safety (a stereo mic is kept; an all-mono source keeps everything), which is
+  damage control on a guess rather than a fix. ⚠️ **A label only helps files written after it**, so
+  both paths — label if present, infer if not — would have to coexist until old recordings age out:
+  *more* code, not less. ⚠️ Also unverified: what actually survives a `.mov` round-trip and reads back
+  through `AVAssetTrack`. **Trigger:** the first time export-without-mic is used in anger — hardening
+  a feature nobody exercises is paying complexity for nothing.
 
 - 🔴 **The replay save is only visible if the user has done a settings dance — NEEDS A RULING**
   (audit, 2026-08-05). Armed replay captures the display; macOS suppresses banners while the display
