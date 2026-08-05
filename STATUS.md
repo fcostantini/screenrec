@@ -6,7 +6,27 @@
 
 ## Now
 
-- **✅ M30-T4 SHIPPED (2026-08-05) — the tree builds with ZERO warnings. Next: M30-T5.**
+- **✅ M30-T5 + M30-T6 SHIPPED (2026-08-05) — one instance, and a poll that stops. M30's six tasks
+  are done; G30 is ready to run.** `LaunchPolicy` (pure, the `StatusItemPolicy` pattern — building an
+  `AppDelegate` installs a status item). **739 tests.**
+  ✅ **T5's trap was the whole task, and both branches are proven against the deployed app.**
+  `Relaunch.now()` runs `open -n`, which spawns a second copy **deliberately** and terminates the
+  first only afterwards — so a naive guard would kill the replacement and strand a first-run user at
+  onboarding the instant they granted Screen Recording. The relaunch carries `--relaunching`, and a
+  copy holding it never yields. Measured with **Franco's own running instance as the incumbent,
+  untouched throughout**: a plain `open -n` **yielded** (1 instance, still his pid), one with the flag
+  **did not** (2), and only the copy this task created was killed.
+  ✅ **T6 backs off rather than giving up** — 1 s for the first two minutes, 5 s after. Stopping
+  entirely would mean a grant made later never relaunches, which is the flow the loop exists for; and
+  G4 §5.1's immediate transition survives, because the fast window covers the whole time a first-run
+  user is actually in it.
+  ⚠️ **Neither T5's nor T6's end-to-end TCC leg was re-run, and neither is claimed.** Both need an
+  ungranted state, which can only be produced by revoking Franco's own Screen Recording grant. What is
+  proven is the discriminating half — a `--relaunching` copy survives the guard — which is the only
+  thing these changes could have broken.
+  ✅ **6 breaks, 6 reds** across the two tasks, including the relaunch trap.
+
+- **✅ M30-T4 SHIPPED (2026-08-05) — the tree builds with ZERO warnings.**
   `capture.router` replaces the force-unwrap; the orphaned doc comment is gone; `LoginItem` names
   `AppShell`; `WindowPresenter` names `AppDelegate.init` / `.state` instead of `ScreenRecApp.init`
   and a SwiftUI `@State` M28 deleted; README reads **M0–M29**.
