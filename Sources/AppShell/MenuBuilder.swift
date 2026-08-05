@@ -182,7 +182,9 @@ struct MenuBuilder {
         }
         if let name = state.exports.exportInProgress {
             let fraction = state.exports.exportProgress
-            let row = MenuRow.label(MenuHeader.exporting(name, fraction: fraction))
+            let row = MenuRow.label(
+                MenuHeader.exporting(
+                    name, fraction: fraction, waiting: state.exports.queuedExportCount))
             // Only the path that can report gets a bar; GIF and trim say what they are doing and
             // nothing they cannot know (M28-T4).
             if let fraction { row.view = ExportProgressRowView(fraction: fraction) }
@@ -396,16 +398,11 @@ struct MenuBuilder {
         let derives = DeriveOptions(for: url)
         if derives.hasAny {
             items.append(MenuRow.separator())
-            let busy = state.exports.exportInProgress != nil
             if derives.canExportToMP4 {
-                items.append(fileAction("Export as MP4", url, enabled: !busy) {
-                    state.exportToMP4($0)
-                })
+                items.append(fileAction("Export as MP4", url) { state.exportToMP4($0) })
             }
             if derives.canSaveAsGIF {
-                items.append(fileAction("Save as GIF", url, enabled: !busy) {
-                    state.exportToGIF($0)
-                })
+                items.append(fileAction("Save as GIF", url) { state.exportToGIF($0) })
             }
             if derives.canTrim {
                 items.append(fileAction("Trim…", url) { url in
@@ -487,9 +484,12 @@ struct MenuBuilder {
 
         guard state.exports.exportInProgress != nil else { return NSApplication.shared.terminate(nil) }
 
+        let outstanding = 1 + state.exports.queuedExportCount
         guard Self.confirm(
-            "An export is still running.",
-            "Quitting now throws it away. The recording it came from is untouched.",
+            outstanding == 1 ? "An export is still running." : "\(outstanding) exports are still running.",
+            outstanding == 1
+                ? "Quitting now throws it away. The recording it came from is untouched."
+                : "Quitting now throws them away. The recordings they came from are untouched.",
             first: "Wait for Export", second: "Quit Anyway")
         else {
             // Abandon it first: `terminate` runs `applicationShouldTerminate`, which waits for an

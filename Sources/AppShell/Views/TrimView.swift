@@ -170,7 +170,7 @@ struct TrimView: View {
                 // the range, this to copy it. Return stays on Trim & Save — ADR-015 keeps lossless
                 // the default action.
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(!hasRange || state.exports.exportInProgress != nil)
+                .disabled(!hasRange)
                 Button("Trim & Save") {
                     state.trim(url, from: inSeconds, to: outSeconds,
                                mode: reencodes ? .precise : .lossless, crop: crop)
@@ -180,7 +180,7 @@ struct TrimView: View {
                 // A crop has to decode and re-encode every frame, which is what lossless doesn't do
                 // (M26-T4) — so the pair is refused rather than one of them silently dropped.
                 .disabled(
-                    !hasRange || state.exports.exportInProgress != nil
+                    !hasRange
                         || (crop != nil && !reencodes))
             }
 

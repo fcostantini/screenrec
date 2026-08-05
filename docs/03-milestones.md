@@ -2867,7 +2867,7 @@ audio and mic down to one stereo stream, which is right for messaging and is the
 — so the separate mic track ADR-003 calls **the point of Tier 2** is captured and then always
 flattened. **MINOR.**
 
-- [ ] M33-T1 **A second export waits its turn instead of being refused.** **Seams:**
+- [x] M33-T1 **A second export waits its turn instead of being refused.** **Seams:**
       `ExportModel.performExport` is the one entry point every MP4, GIF and trim already passes
       through; `exportInProgress`, `exportProgress`, `exportTask`, the `ExportRoom` pre-check and the
       receipt all keep their shapes. **Rulings:** what the menu shows for a queued item (the progress
@@ -2878,6 +2878,27 @@ flattened. **MINOR.**
       turn, not at enqueue**, or the second job is judged against space the first has not spent yet.
       **Verify:** three exports requested from one menu open all land, in order, each with its own
       receipt and notice; `applicationShouldTerminate` waits for the whole queue.
+      ✅ **Done 2026-08-05.** A FIFO behind the existing single runner: `exportInProgress` still means
+      *the one running*, so the status icon and `applicationShouldTerminate` are untouched, and a new
+      `queuedExportCount` carries the rest. Every ending routes through one `finish()`, so a failure
+      or a refusal cannot strand the queue behind it. **743 tests.** Plan artifact:
+      `claude.ai/code/artifact/d253d125-bc5b-4834-951f-bdad830de957`.
+      ✅ **The rulings, taken:** one row with a count (`Exporting… 42% · 2 waiting`), not a row per
+      job; `cancelExport()` clears the backlog and the quit copy now names it (`3 exports are still
+      running.`); and the queue does **not** survive relaunch — which ruling 2 is what makes honest.
+      ✅ **The derive rows and the Trim window's export buttons are enabled again** — that is the
+      feature. The disk pre-check moved to each job's **turn**, never at enqueue, or three queued jobs
+      would each be judged against space the ones ahead had not spent.
+      ✅ **5 breaks, 5 reds** — dropping instead of queuing, LIFO, a stranded queue, a cancel that
+      leaves the backlog, and a row that ignores the count.
+      🔴 **The sweep found a flaw in my own tests first, and it cost a run:** a stranded queue made
+      the suite **hang** rather than fail, because the tests waited on the queue with no bound. Both
+      helpers are bounded now (M15-T1's rule) and the same break turns red in 0.4 s. ⚠️ The sweep
+      harness needs a per-break timeout too — a break that hangs kills the sweep, not just the test.
+      ⚠️ **`stopWithoutCopy` is deliberately left alone.** M24-T2 added it because a second export
+      would be *dropped*; with a queue that reason is gone and the arm is now conservative rather than
+      necessary. Collapsing it removes a case, its tests and a notice, all verified in G24 — **it is a
+      one-line follow-up and Franco's call**, not a silent change.
 - [ ] M33-T2 **An export can leave the microphone out.** **Seams:** `Exporter`'s
       `AVAssetReaderAudioMixOutput` already takes the track list, so this is an argument to work that
       happens anyway — which is exactly the test ADR-015 set for what may come through that door;

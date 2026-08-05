@@ -92,4 +92,22 @@ import RecorderCore
         #expect(MenuHeader.exporting("Clip.mov", fraction: 1.4) == "Exporting… 100%")
         #expect(MenuHeader.exporting("Clip.mov", fraction: -0.3) == "Exporting… 0%")
     }
+
+    // MARK: - The export row's backlog (M33-T1)
+
+    /// One row with a count, not a row per job — the menu's length must not track the backlog.
+    @Test func theExportRowNamesHowManyAreWaiting() {
+        #expect(MenuHeader.exporting("Clip.mov", fraction: 0.42, waiting: 2)
+            == "Exporting… 42% · 2 waiting")
+        #expect(MenuHeader.exporting("Clip.mov", fraction: nil, waiting: 3)
+            == "Exporting Clip.mov… · 3 waiting")
+    }
+
+    /// Nothing queued reads exactly as it did before the queue existed, so the common case is
+    /// untouched.
+    @Test func anEmptyQueueLeavesTheRowUnchanged() {
+        #expect(MenuHeader.exporting("Clip.mov", fraction: 0.42, waiting: 0) == "Exporting… 42%")
+        #expect(MenuHeader.exporting("Clip.mov", fraction: nil, waiting: 0) == "Exporting Clip.mov…")
+        #expect(MenuHeader.exporting("Clip.mov", fraction: 0.42) == "Exporting… 42%")
+    }
 }

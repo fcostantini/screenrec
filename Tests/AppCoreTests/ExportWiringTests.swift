@@ -64,20 +64,39 @@ import RecorderCore
         #expect(state.exports.lastExport?.url == firstURL)   // A's pointer isn't erased by B's failure
     }
 
-    @Test func secondExportWhileOneRunsIsIgnored() async {
+    /// Was `secondExportWhileOneRunsIsIgnored` until M33-T1: a second request is now queued, so the
+    /// assertion moves from "one completed" to "both did, in order".
+    /// Bounded drain. `waitForExportToFinish()` is rightly unbounded in production — quitting waits
+    /// as long as the work takes — but a stranded queue must **fail** this suite, not hang it
+    /// (M15-T1). The break sweep hung on exactly this before the bound existed.
+    private func drain(_ state: AppState) async {
+        for _ in 0..<10_000 {
+            guard state.exports.exportInProgress != nil || state.exports.queuedExportCount > 0
+            else { return }
+            await Task.yield()
+        }
+        Issue.record("exports never drained — \(state.exports.queuedExportCount) still queued")
+    }
+
+    @Test func secondExportWhileOneRunsIsQueuedNotIgnored() async {
         let state = makeState()
         var posted: [RecordingNotification] = []
         state.notifier = { posted.append($0) }
-        state.exports.exportFunction = { _, output, _, _, _, _ in output }
+        let ran = Trail()
+        state.exports.exportFunction = { source, output, _, _, _, _ in
+            ran.append(source.lastPathComponent)
+            return output
+        }
 
-        // No suspension point between the two calls, so the first export's task hasn't run yet —
-        // the guard sees `exportInProgress` set and drops the second.
+        // No suspension point between the two calls, so the first export's task hasn't run yet.
         state.exportToMP4(URL(fileURLWithPath: "/tmp/A.mov"))
         state.exportToMP4(URL(fileURLWithPath: "/tmp/B.mov"))
         #expect(state.exports.exportInProgress == "A.mov")
+        #expect(state.exports.queuedExportCount == 1)
 
-        while state.exports.exportInProgress != nil { await Task.yield() }
-        #expect(posted.count == 1)   // exactly one export completed
+        await drain(state)
+        #expect(ran.items == ["A.mov", "B.mov"])
+        #expect(posted.count == 2)
     }
 
     // MARK: - The fit check (M23-T2)
@@ -398,20 +417,23 @@ import RecorderCore
         #expect(state.mp4SizeLabel(forWidth: Settings.mp4CeilingWidth) == "Largest")
     }
 
-    @Test func oneExportAtATimeAcrossFormats() async {
+    /// One at a time still holds across formats — it just no longer means the second is lost. The
+    /// GIF now runs after the MP4, so the receipt ends up on the *last* one to finish.
+    @Test func formatsShareOneQueueAndRunInOrder() async {
         let state = makeState()
         state.notifier = { _ in }
-        state.exports.exportFunction = { _, output, _, _, _, _ in output }
-        state.exports.gifExportFunction = { _, output, _ in output }
+        let ran = Trail()
+        state.exports.exportFunction = { _, output, _, _, _, _ in ran.append("mp4"); return output }
+        state.exports.gifExportFunction = { _, output, _ in ran.append("gif"); return output }
 
-        // An MP4 in flight blocks a GIF (they share one guard); no await between, so the MP4
-        // task hasn't run yet.
         state.exportToMP4(URL(fileURLWithPath: "/tmp/A.mov"))
         state.exportToGIF(URL(fileURLWithPath: "/tmp/A.mov"))
         #expect(state.exports.exportInProgress == "A.mov")
-        while state.exports.exportInProgress != nil { await Task.yield() }
-        // The receipt is the MP4 sibling, not the GIF — the GIF call was dropped.
-        #expect(state.exports.lastExport?.url.pathExtension == "mp4")
+        #expect(state.exports.queuedExportCount == 1)   // the GIF is behind it, not dropped
+
+        await drain(state)
+        #expect(ran.items == ["mp4", "gif"])                  // never both at once, and in order
+        #expect(state.exports.lastExport?.url.pathExtension == "gif")
     }
 
     @Test func gifNotificationCopy() {

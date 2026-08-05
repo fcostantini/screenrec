@@ -17,8 +17,15 @@ import RecorderCore
         ExportModel(defaults: TestDefaults.make())
     }
 
-    private func settle(_ model: ExportModel) async {
-        while model.exportInProgress != nil { await Task.yield() }
+    /// Bounded, per M15-T1: a queue that never drains is a **hang**, and a regression has to fail
+    /// this suite rather than wedge it. The sweep proved the point — removing `finish()` hung the
+    /// run instead of turning it red, until this yield budget was added.
+    private func settle(_ model: ExportModel, file: StaticString = #file, line: UInt = #line) async {
+        for _ in 0..<10_000 {
+            guard model.exportInProgress != nil || model.queuedExportCount > 0 else { return }
+            await Task.yield()
+        }
+        Issue.record("exports never settled — \(model.queuedExportCount) still queued")
     }
 
     // MARK: - One export at a time (M10-T2)
@@ -33,19 +40,63 @@ import RecorderCore
         await settle(model)
     }
 
-    @Test func aSecondExportWhileOneRunsIsDroppedAndPostsNothing() async {
+    /// M33-T1 replaced the old contract here. Until then a second request while one ran was
+    /// **dropped** — this test asserted that. It now has to wait its turn instead, and the strong
+    /// form of that is: both run, in the order asked, and the queue drains to empty.
+    @Test func aSecondExportWhileOneRunsWaitsItsTurnRatherThanBeingDropped() async {
         let model = makeModel()
         var posted: [RecordingNotification] = []
         model.notify = { posted.append($0) }
-        model.exportFunction = { _, output, _, _, _, _ in output }
+        let ran = Trail()
+        model.exportFunction = { source, output, _, _, _, _ in
+            ran.append(source.lastPathComponent)
+            return output
+        }
 
         // No suspension point between the calls, so the first task hasn't run yet.
         model.exportToMP4(Self.source, configuration: ExportConfiguration())
         model.exportToMP4(URL(fileURLWithPath: "/tmp/Other.mov"), configuration: ExportConfiguration())
-        #expect(model.exportInProgress == "Clip.mov")
+        #expect(model.exportInProgress == "Clip.mov")   // the first still runs immediately
+        #expect(model.queuedExportCount == 1)           // and the second is behind it, not gone
 
         await settle(model)
-        #expect(posted.count == 1)          // exactly one export ran
+        #expect(ran.items == ["Clip.mov", "Other.mov"])       // FIFO, not whichever finished first
+        #expect(posted.count == 2)                      // each gets its own notice
+        #expect(model.queuedExportCount == 0)
+        #expect(model.exportInProgress == nil)
+    }
+
+    /// A job that fails must not strand the ones behind it — every ending routes through `finish()`.
+    @Test func aFailureInTheMiddleStillReleasesTheQueue() async {
+        let model = makeModel()
+        let ran = Trail()
+        model.notify = { _ in }
+        model.exportFunction = { source, output, _, _, _, _ in
+            ran.append(source.lastPathComponent)
+            if source.lastPathComponent == "B.mov" { throw ExportError.readerFailed("boom") }
+            return output
+        }
+        for name in ["A.mov", "B.mov", "C.mov"] {
+            model.exportToMP4(URL(fileURLWithPath: "/tmp/\(name)"), configuration: ExportConfiguration())
+        }
+        await settle(model)
+        #expect(ran.items == ["A.mov", "B.mov", "C.mov"])
+        #expect(model.queuedExportCount == 0)
+    }
+
+    /// Quitting means quitting: "Quit Anyway" drops the whole backlog, which is why the menu's
+    /// confirmation states how many (M33-T1).
+    @Test func cancellingClearsTheQueueAndNotJustTheRunner() async {
+        let model = makeModel()
+        model.notify = { _ in }
+        model.exportFunction = { _, output, _, _, _, _ in output }
+        for name in ["A.mov", "B.mov", "C.mov"] {
+            model.exportToMP4(URL(fileURLWithPath: "/tmp/\(name)"), configuration: ExportConfiguration())
+        }
+        #expect(model.queuedExportCount == 2)
+        model.cancelExport()
+        #expect(model.queuedExportCount == 0)
+        #expect(model.exportInProgress == nil)
     }
 
     @Test func inProgressClearsOnFailureSoTheNextExportIsNotWedged() async {

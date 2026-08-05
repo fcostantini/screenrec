@@ -18,8 +18,9 @@ public final class ExportModel {
     /// Posts the export outcome (M10-T2). Wired by AppState from its notifier; nil in tests.
     public var notify: (@MainActor (RecordingNotification) -> Void)?
 
-    /// The source filename of the export in flight (M10-T2, MP4 or GIF), or nil when idle: the menu
-    /// shows an "Exporting…" row and blocks a second export. One at a time, either format.
+    /// The source filename of the export **running now** (M10-T2, MP4 or GIF), or nil when nothing
+    /// is. The menu shows an "Exporting…" row for it; anything requested meanwhile joins
+    /// `pending` rather than being refused (M33-T1). One at a time, either format.
     public private(set) var exportInProgress: String?
 
     /// How far the export in flight has got, 0…1 — or nil for one whose progress cannot be known
@@ -152,14 +153,35 @@ public final class ExportModel {
             failure: RecordingNotifications.trimFailed)
     }
 
-    /// Runs an export off the main path — the menu row and the notification carry the outcome. One
-    /// export at a time; the source is only read, so it never touches a live recording. Only a
-    /// success sets `lastExport`; the "Exporting…" row shadows any prior receipt while this runs,
-    /// so a failed re-export leaves the previous export's pointer intact.
+    /// One queued export: everything `run` needs when its turn comes (M33-T1).
+    private struct PendingExport {
+        let source: URL
+        let output: URL
+        let estimate: (@Sendable () async -> Int64?)?
+        let export: @Sendable (URL, URL, @escaping @Sendable (Double) -> Void) async throws -> URL
+        let success: (URL) -> RecordingNotification
+        let failure: () -> RecordingNotification
+        let reportsProgress: Bool
+        let completion: (@MainActor (URL) -> Void)?
+    }
+
+    /// Jobs waiting behind the one running. Still one at a time — that just no longer means "one at
+    /// a time or nothing". Not persisted: a queued job is an intention with nothing on disk, and the
+    /// `.partial` discipline is not a job store, so quitting says what it drops (`cancelExport`).
+    private var pending: [PendingExport] = []
+
+    /// How many exports are waiting behind the running one, for the menu's single row.
+    public var queuedExportCount: Int { pending.count }
+
+    /// Queues an export and starts it when its turn comes (M33-T1) — the menu row and the
+    /// notification carry the outcome. Still **one at a time**, so the encoders are never
+    /// oversubscribed; the source is only read, so it never touches a live recording. Only a success
+    /// sets `lastExport`; the "Exporting…" row shadows any prior receipt while this runs, so a
+    /// failed re-export leaves the previous export's pointer intact.
     ///
     /// `estimate` predicts the output's size so the volume can be checked before anything is
-    /// written (M23-T2). Nil means this kind of export has no defensible prediction, and runs
-    /// unguarded — see `ExportRoom.fits`.
+    /// written (M23-T2), and it runs at the job's **turn** rather than at enqueue. Nil means this
+    /// kind of export has no defensible prediction, and runs unguarded — see `ExportRoom.fits`.
     private func performExport(
         _ source: URL,
         to output: URL,
@@ -170,41 +192,63 @@ public final class ExportModel {
         reportsProgress: Bool = false,
         completion: (@MainActor (URL) -> Void)? = nil
     ) {
-        guard exportInProgress == nil else { return }
+        pending.append(
+            PendingExport(
+                source: source, output: output, estimate: estimate, export: export,
+                success: success, failure: failure, reportsProgress: reportsProgress,
+                completion: completion))
+        startNextIfIdle()
+    }
+
+    /// Takes the next job when nothing is running. The single-runner invariant lives here, so no
+    /// caller has to hold it.
+    private func startNextIfIdle() {
+        guard exportInProgress == nil, !pending.isEmpty else { return }
+        run(pending.removeFirst())
+    }
+
+    private func run(_ job: PendingExport) {
         exportGeneration += 1
-        exportInProgress = source.lastPathComponent
-        exportProgress = reportsProgress ? 0 : nil
+        exportInProgress = job.source.lastPathComponent
+        exportProgress = job.reportsProgress ? 0 : nil
         let availableBytes = self.availableBytes
         // Built here, after the generation moves, so the sink belongs to this run and no other.
         let report = progressReporter()
-        exportTask = Task { [weak self, export] in
+        exportTask = Task { [weak self, job] in
+            // At this job's turn, never at enqueue: a queue judged up front would weigh every job
+            // against space the ones ahead of it have not spent yet.
+            //
             // Before a byte is written: an export knows its own length, so a job that cannot land
             // is refused rather than failed part-way (the recording path's floor is the other
             // shape, for the other reason).
-            if let shortfall = await Self.shortfall(
-                writing: output, estimate: estimate, availableBytes: availableBytes) {
-                guard let self else { return }
-                exportInProgress = nil
-                exportProgress = nil
+            let shortfall = await Self.shortfall(
+                writing: job.output, estimate: job.estimate, availableBytes: availableBytes)
+            // Unwrapped once, so the `finish()` that releases the queue is reachable from every
+            // ending below rather than only from the ones inside a binding.
+            guard let self else { return }
+            if let shortfall {
                 notify?(RecordingNotifications.exportNoRoom(shortfall))
-                return
+                return finish()
             }
             do {
-                let url = try await export(source, output, report)
-                guard let self else { return }
-                exportInProgress = nil
-                exportProgress = nil
+                let url = try await job.export(job.source, job.output, report)
                 lastExport = LastExport(url: url, date: Date())
-                completion?(url)      // before the notice, so "Copied" is true when it is read
-                notify?(success(url))
+                job.completion?(url)  // before the notice, so "Copied" is true when it is read
+                notify?(job.success(url))
             } catch {
-                guard let self else { return }
-                exportInProgress = nil
-                exportProgress = nil
                 Self.log.error("export failed: \(error.localizedDescription, privacy: .public)")
-                notify?(failure())
+                notify?(job.failure())
             }
+            finish()
         }
+    }
+
+    /// Clears the running state and takes the next job. Every ending routes through here, so one
+    /// that fails or is refused cannot strand the queue behind it.
+    private func finish() {
+        exportInProgress = nil
+        exportProgress = nil
+        startNextIfIdle()
     }
 
     /// The sink handed to the exporter, which reports from a background queue — every update lands
@@ -271,9 +315,14 @@ public final class ExportModel {
     /// process (M23-T2) — the shape `SessionModel.consumeTask` uses for a recording.
     private var exportTask: Task<Void, Never>?
 
-    /// Waits for an in-flight export to settle. Returns at once when none is running.
+    /// Waits for the whole queue to settle, not just the job running now. Returns at once when
+    /// nothing is in flight. Each ending starts its successor on the main actor before its task
+    /// resolves, so by the time one `await` returns `exportTask` is already the next one.
     public func waitForExportToFinish() async {
-        await exportTask?.value
+        while exportInProgress != nil || !pending.isEmpty {
+            guard let task = exportTask else { return }
+            await task.value
+        }
     }
 
     /// Abandons an in-flight export — the user chose to quit through it (M23-T2).
@@ -285,6 +334,10 @@ public final class ExportModel {
     public func cancelExport() {
         exportTask?.cancel()
         exportTask = nil
+        // The queue goes too: quitting means quitting, and the confirmation says how many that is
+        // (M33-T1). Clearing it before the runner stops is what keeps `startNextIfIdle` from
+        // reviving one on the way out.
+        pending.removeAll()
         exportInProgress = nil
         exportProgress = nil
     }

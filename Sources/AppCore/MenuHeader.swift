@@ -24,9 +24,12 @@ public enum MenuHeader {
     /// The export row (M28-T4). The percentage rides in the title, not only in the drawn bar,
     /// because the title is what VoiceOver reads — a bar alone leaves that reader the frozen row
     /// this row exists to fix. Nil progress keeps the filename, since there is nothing else to say.
-    public static func exporting(_ name: String, fraction: Double?) -> String {
-        guard let fraction else { return "Exporting \(name)…" }
-        return "Exporting… \(exportPercent(fraction))%"
+    /// `waiting` is how many more are queued behind this one (M33-T1) — one row with a count, not a
+    /// row per job, so the menu's length doesn't track the backlog.
+    public static func exporting(_ name: String, fraction: Double?, waiting: Int = 0) -> String {
+        let head = fraction.map { "Exporting… \(exportPercent($0))%" } ?? "Exporting \(name)…"
+        guard waiting > 0 else { return head }
+        return "\(head) · \(waiting) waiting"
     }
 
     /// One rounding rule, so the drawn bar and the number it sits beside can never disagree.
