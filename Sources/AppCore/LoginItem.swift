@@ -2,7 +2,7 @@ import Foundation
 
 /// The launch-at-login seam (docs/06). A protocol so `AppState` is testable without touching the
 /// real `SMAppService`, which registers a system login item as a side effect — the concrete
-/// `SMAppService.mainApp` wrapper lives in the app target (`ScreenRecApp`).
+/// `SMAppService.mainApp` wrapper lives in `AppShell`.
 @MainActor
 public protocol LoginItemManaging {
     /// Whether the app is registered to launch at login — true for both `.enabled` and

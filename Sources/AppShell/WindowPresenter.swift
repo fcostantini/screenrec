@@ -15,8 +15,8 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
         case onboarding, settings, trim
     }
 
-    /// Set by `ScreenRecApp.init` before any window can be asked for. Weak — the App's `@State`
-    /// owns it; this is a back-reference, like `AppDelegate.appState`.
+    /// Set by `AppDelegate.init` before any window can be asked for. Weak — `AppDelegate.state`
+    /// owns it; this is a back-reference.
     weak var state: AppState?
 
     private var windows: [Kind: NSWindow] = [:]

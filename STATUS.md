@@ -6,7 +6,20 @@
 
 ## Now
 
-- **✅ M30-T3 SHIPPED (2026-08-05) — the warnings are closed or explained, one each. Next: M30-T4.**
+- **✅ M30-T4 SHIPPED (2026-08-05) — the tree builds with ZERO warnings. Next: M30-T5.**
+  `capture.router` replaces the force-unwrap; the orphaned doc comment is gone; `LoginItem` names
+  `AppShell`; `WindowPresenter` names `AppDelegate.init` / `.state` instead of `ScreenRecApp.init`
+  and a SwiftUI `@State` M28 deleted; README reads **M0–M29**.
+  ✅ **A full clean-scratch `swift build` emits 0 warnings and 0 errors.** M30 opened with **5 sites
+  and 48 warning lines**. **733 tests**, release and signed bundle green, encode suites green one per
+  invocation.
+  ⚠️ **A fifth stale reference the task hadn't catalogued** — `WindowPresenter` also named
+  `AppDelegate.appState`, which is `AppDelegate.state`. The grep that found the others searched for a
+  *target* name; this was a *member* name, and only reading the line caught it.
+  ⚠️ **No `VERSION` bump yet.** M30 is filed PATCH and T1/T2 are real fixes, so one is owed — but it
+  belongs with G30, not mid-milestone (T5/T6 outstanding).
+
+- **✅ M30-T3 SHIPPED (2026-08-05) — the warnings are closed or explained, one each.**
   Three sites, three answers, **no blanket `@preconcurrency import`**. **733 tests.** Plan artifact:
   `claude.ai/code/artifact/822e8092-b2cd-44ab-8bc6-ffe5ea86df66`.
   ✅ **One of them was a real fix, not a suppression.** `ReplayEncoder` was handing a whole

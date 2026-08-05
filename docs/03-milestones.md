@@ -2652,7 +2652,7 @@ five. **PATCH** (ADR-013): no new capability.
       suite failed with 13 issues — and fails **identically on the unmodified tree**. It is the
       documented VT -12912 oversubscription, established by A/B rather than assumed. One suite per
       invocation is the real check, as the pre-push hook does (docs/07).
-- [ ] M30-T4 **The force-unwrap, and the comments M28/M29 left behind.**
+- [x] M30-T4 **The force-unwrap, and the comments M28/M29 left behind.**
       `AppState.replayConfigurationChanged()` binds `if let capture = session.capture` and then reads
       `session.capture!.router` inside the branch — an unused binding (the warning STATUS has tracked
       since M28-T3, recorded then at line 766, now **`AppState.swift:770`**) and a `!` in shipping
@@ -2664,6 +2664,17 @@ five. **PATCH** (ADR-013): no new capability.
       breakdown", seven milestones later. **Seams:** one line each. **Rulings:** none.
       **Verify:** `grep -rn "ScreenRecApp" Sources/ docs/ README.md` returns only the executable
       target's own references; the tree builds warning-free with T3.
+      ✅ **Done 2026-08-05.** `capture.router` replaces the force-unwrap (the binding was already
+      there and unused); the orphaned doc comment is gone; `LoginItem` now names `AppShell`;
+      `WindowPresenter` names `AppDelegate.init` / `AppDelegate.state` instead of `ScreenRecApp.init`
+      and a SwiftUI `@State` M28 deleted; README reads **M0–M29**.
+      ✅ **A full clean-scratch `swift build` emits ZERO warnings** — M30 opened with 5 sites and
+      48 warning lines. **733 tests**, release and signed bundle green.
+      ⚠️ **A fifth stale reference the task hadn't catalogued:** `WindowPresenter` also named
+      `AppDelegate.appState`, which is `AppDelegate.state`. Found by reading the line rather than by
+      grep — the grep was for the target name, and this was a member name.
+      ⚠️ `docs/01`'s `ScreenRecApp/` reference is correct and stays: that directory really is the
+      executable target.
 - [ ] M30-T5 **A second copy hands over instead of competing.** There is no single-instance check
       anywhere in `AppDelegate`. Two copies means two status items; the second one's
       `RegisterEventHotKey` fails and posts *"shortcut unavailable"* at the user (M9-T4's notice,

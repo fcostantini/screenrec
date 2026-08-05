@@ -5,10 +5,10 @@ microphone (separate track)**, tuned HEVC encoding, crash-safe long recordings,
 pause/resume, and ShadowPlay-style **instant replay** via a global hotkey.
 Zero external dependencies — Apple frameworks only, no Xcode required.
 
-**Status:** shipped and in daily use — **M0–M22** (capture, instant replay, per-app/window/region
-capture, microphone recovery, share export and basic editing, honest-state and hardening passes, and
-the share workflow). `VERSION` and the git tags carry the current release; `STATUS.md` is the living
-state.
+**Status:** shipped and in daily use — **M0–M29** (capture, instant replay, per-app/window/region
+capture, microphone recovery, share export and basic editing, per-app audio muting, an AppKit
+menu-bar surface, honest-state and hardening passes, and the share workflow). `VERSION` and the git
+tags carry the current release; `STATUS.md` is the living state.
 
 ## Build & run
 
@@ -116,7 +116,7 @@ This repo is documentation-first and built to be driven by coding agents:
 | `docs/00-product-brief.md` | Vision, goals, non-goals, v1 acceptance criteria |
 | `docs/01-architecture.md` | Module layout, dataflow, concurrency, state machine |
 | `docs/02-technical-reference.md` | All API knowledge + every bug already hit. Read first. |
-| `docs/03-milestones.md` | M0–M22 task breakdown with IDs, estimates, gates |
+| `docs/03-milestones.md` | Milestone task breakdown with IDs, estimates, gates |
 | `docs/04-testing-verification.md` | Concrete pass/fail checks per gate |
 | `docs/05-decisions.md` | ADRs — the "why" behind every non-obvious choice |
 | `docs/06-ui-spec.md` | Menu-bar app UI spec: menu states, notifications, onboarding, settings |

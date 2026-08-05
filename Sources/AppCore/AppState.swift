@@ -772,7 +772,7 @@ public final class AppState {
             // length takes `windowChanged` instead); rebuild on the recording's stream, with
             // the mic pick resolved the same way every replay path resolves it.
             replay.recordingStarted(
-                router: session.capture!.router, configuration: replayCaptureConfiguration(),
+                router: capture.router, configuration: replayCaptureConfiguration(),
                 seconds: Double(replaySeconds), outputDirectory: outputDirectory)
         } else {
             replay.configurationChanged(
@@ -1022,8 +1022,6 @@ public final class AppState {
     public func rowTitle(for url: URL) -> String {
         RecentRecordings.rowTitle(for: url, detail: recentDetails[url])
     }
-
-    /// Drops a stale export receipt at menu open (M12-T3) — forwards to `exports` (M14-T1).
 
     /// Settles everything a quit must not kill: a recording finalizes (ADR-007), then an export
     /// finishes (M23-T2). One definition, so the menu's Quit and `applicationShouldTerminate`
