@@ -207,6 +207,12 @@ Order and grouping (separators between groups):
     nobody has asked for rather than a limit. `NSMenuItem.indentationLevel` is likewise available
     now; M18-T3's nesting made the leading-whitespace indent unnecessary before it arrived.
 11. — separator —
+11b. `<version> is available` (M32-T3/T4, ADR-020) — present **only** when the launch check found a
+    newer release, and never when `Check for new versions` is off. In the tail shared by both menus, so
+    a recording shows it too. **Clickable: it opens the Releases page** (`NSWorkspace`) — the app never
+    downloads, so the row is a route to the manual path ADR-014 documents, not an installer. State is
+    read off what the check left behind; the row is stamped at open and never waits on a network
+    (M6-T10).
 12. `Settings…` (⌘,) · `Quit` (⌘Q). Quit while recording → confirm, then clean
     finalize before exit (never abandon a writer). **Every OTHER quit route while recording**
     (logout, shutdown, software update, `⌘Q` from a window) also finalizes — `applicationShouldTerminate`

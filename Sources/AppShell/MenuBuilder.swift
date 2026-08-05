@@ -16,11 +16,11 @@ struct MenuBuilder {
         var items = state.session.isActive ? recordingItems() : idleItems()
 
         items.append(MenuRow.separator())
-        // Only when there is something to say (M32-T3, ADR-020) — a dimmed line, because the app
-        // never downloads anything and this is news rather than an action. Read off state the launch
-        // check left behind: the menu is stamped at open and must not wait on a network (M6-T10).
+        // Only when there is something to say (M32-T3, ADR-020). Opens the Releases page rather than
+        // downloading anything — the manual path ADR-014 documents. Read off state the launch check
+        // left behind: the menu is stamped at open and must not wait on a network (M6-T10).
         if let update = MenuHeader.updateAvailable(state.availableUpdate) {
-            items.append(MenuRow.label(update))
+            items.append(MenuRow.link(update, url: UpdateCheck.releasesPageURL))
         }
         // docs/06 item 12: present in both menus. Settings are read at the next Start, so changing
         // them mid-recording is harmless. ⌘, is bound on the row because an LSUIElement app has no

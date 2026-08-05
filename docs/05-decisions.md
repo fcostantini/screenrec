@@ -223,6 +223,10 @@ are current forever. The feature works **from 1.17.0 forward only**, and the exi
 told once, by hand, exactly as before. That is not a defect and there is no version of this feature
 that avoids it; it is the reason the first upgrade is always the owner's job.
 
+⚠️ **Amended 2026-08-05 (M32-T4, Franco): the row is clickable, not dimmed** — it opens the Releases
+page. Still no download: the page is the manual path this ADR already points at, and it is reachable
+by a recipient only because of ADR-021.
+
 **A reversal is a new ADR.** The line this draws is *reading public metadata about the software
 itself*; anything that sends information about the user, the machine, or a recording is on the other
 side of it and is not authorised by this.

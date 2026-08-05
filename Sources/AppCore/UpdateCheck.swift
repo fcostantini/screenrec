@@ -21,6 +21,12 @@ public enum UpdateCheck {
     static let releasesURL = URL(
         string: "https://api.github.com/repos/fcostantini/screenrec/releases")!
 
+    /// The same list as a page a person can read — where the update row sends them. Distinct from
+    /// `releasesURL`, which answers JSON; ADR-020 forbids downloading, not linking, and this is the
+    /// manual path ADR-014 documents.
+    public static let releasesPageURL = URL(
+        string: "https://github.com/fcostantini/screenrec/releases")!
+
     /// A tag as orderable integers, or nil when it isn't three of them.
     ///
     /// A leading `v` is optional because the repo's tags carry one and `VERSION` does not. Anything

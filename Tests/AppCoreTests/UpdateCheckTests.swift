@@ -149,4 +149,12 @@ import Testing
         await state.checkForUpdate { ["v99.0.0"] }
         #expect(state.availableUpdate == nil)
     }
+
+    /// The row opens the page a person can read, not the API that answers JSON — one host and two
+    /// path components apart, and getting it wrong shows a recipient raw JSON.
+    @Test func theReleasesPageIsAHumanPage() {
+        #expect(
+            UpdateCheck.releasesPageURL.absoluteString
+                == "https://github.com/fcostantini/screenrec/releases")
+    }
 }

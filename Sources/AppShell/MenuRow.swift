@@ -38,6 +38,14 @@ enum MenuRow {
         return item
     }
 
+    /// A row that opens a URL. The destination rides on `representedObject` so it is assertable —
+    /// a closure alone tells a test nothing about where the row goes.
+    static func link(_ title: String, url: URL) -> NSMenuItem {
+        let item = action(title) { NSWorkspace.shared.open(url) }
+        item.representedObject = url
+        return item
+    }
+
     /// A dimmed, inert row — docs/06's info rows, which state something rather than doing it.
     static func label(_ title: String) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")

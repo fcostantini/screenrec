@@ -204,17 +204,22 @@ import Testing
         let index = after.firstIndex(of: "99.0.0 is available")
         #expect(index != nil, "the update row is missing")
         if let index {
-            #expect(after[index + 1] == "Settings…")   // immediately above Settings, as specified
+            // `dropFirst` rather than `after[index + 1]`: a row that moves to the very end of the
+            // menu must fail this test, not crash the whole suite on an out-of-range index.
+            #expect(after.dropFirst(index + 1).first == "Settings…")
         }
         #expect(after.count == before.count + 1)       // exactly one row, and nothing else moved
     }
 
-    /// Dimmed on purpose: the app never downloads (ADR-020), so this is news rather than an action.
-    @Test func theUpdateRowIsNotClickable() async {
+    /// The row is a door, not a notice — a recipient handed a `.app` has no other route to a newer
+    /// build. ⚠️ **Deliberately not fired here**: that would open a browser, so only the live leg
+    /// proves `NSWorkspace.open`. This proves the row is enabled and carries the right destination.
+    @Test func theUpdateRowOpensTheReleasesPage() async {
         let state = MenuSnapshot.state()
         await state.checkForUpdate { ["v99.0.0"] }
         let row = MenuSnapshot.item(state, titled: "99.0.0 is available")
-        #expect(row != nil)
-        #expect(row?.isEnabled == false)
+        #expect(row?.isEnabled == true)
+        #expect(row is ActionMenuItem)
+        #expect(row?.representedObject as? URL == UpdateCheck.releasesPageURL)
     }
 }
