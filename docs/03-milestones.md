@@ -2900,7 +2900,7 @@ is rebuilding from source. **MINOR.**
       ✅ **Cadence ruled and shipped: daily** (Franco, 2026-08-05). Launch-only was the wrong shape
       for an `LSUIElement` that sits in the menu bar for days — his own instance ran **18 h+ without a
       relaunch**, so the machine most likely to be behind was the one least likely to look.
-- [ ] M32-T3 **The surface.** *(Re-specified 2026-08-05 against ADR-020.)* A **dimmed menu row**,
+- [x] M32-T3 **The surface.** *(Re-specified 2026-08-05 against ADR-020.)* A **dimmed menu row**,
       present only when a newer release exists — Franco's pick. 🔴 **Ruling owed here: a way to turn
       the check off.** ADR-020 records the privacy cost and deliberately leaves the opt-out to this
       task rather than assuming one. Where it says so, and how quietly.
@@ -2908,8 +2908,26 @@ is rebuilding from source. **MINOR.**
       is exactly the async read M28-T2 had to prime at launch rather than let fill in under an open
       menu. **Verify:** `menudriver dump` in both states (current, and a forced out-of-date), with
       the idle menu otherwise byte-identical.
+      ✅ **Done 2026-08-05.** A dimmed row immediately above `Settings…`, in the shared tail so both
+      menus carry it, reading state the launch check left behind — the menu is stamped at open and
+      must never wait on a network (M6-T10), which is why T2 stores the answer rather than fetching
+      on demand. **767 tests.**
+      🔴 **The ruling ADR-020 deferred here is taken: the check can be switched off.** `Settings ▸
+      Check for new versions`, default on, with the cost in its own caption — *"the request tells
+      GitHub your IP address — turn this off and the app makes no network requests at all."*
+      ⚠️ **Off means no request, not a discarded answer**, and it clears a row already showing rather
+      than stranding one; both are tested and both go red when broken.
+      ✅ **Both states observed in the deployed app.** Current build → **no row at all**. Then with
+      `CoreInfo.version` temporarily faked to `1.0.0` and rebuilt — CLAUDE.md's patch-observe-revert —
+      the real menu rendered **`1.16.0 is available  (disabled)`** immediately above `Settings…`.
+      Scaffolding reverted, real build redeployed and confirmed showing no row.
+      ✅ **6 breaks, 6 reds:** ignoring the off switch, leaving a stale row, keeping the tag's `v`,
+      showing a row with no news, moving the row out of the tail, and dropping the persistence.
+      ⚠️ **Dimmed is a real trade:** ADR-020 forbids downloading, so the row is news rather than an
+      action — a reader still goes to Releases themselves. Making it *open* that page downloads
+      nothing and is one line; **left as filed rather than widened without asking.**
 
-**Gate G32** — a decision is recorded; a build behind the latest release says so on a surface Franco
+**Gate G32** — ⏳ **not yet run.** As filed: a decision is recorded; a build behind the latest release says so on a surface Franco
 chose, a current build says nothing, and an offline machine behaves exactly like a current one; the
 check never blocks launch, a recording, or an export.
 
