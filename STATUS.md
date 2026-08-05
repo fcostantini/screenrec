@@ -6,6 +6,21 @@
 
 ## Now
 
+- **✅ M30 COMPLETE and G30 PASSED (2026-08-05) — the signals nobody was hearing.** Six tasks: a
+  leaked Core Audio tap, a data race with a hang behind it, four warning sites closed or explained,
+  five stale references, and two launch guards. **739 tests** (728 → 739). Evidence in the gate table.
+  🚢 **v1.15.1 — PATCH (ADR-013): fixes, no new capability.**
+  ✅ **The headline number: 5 warning sites and 48 warning lines → ZERO.**
+  🔴 **What this milestone was for, in one line:** every defect in it was something the machine was
+  already reporting — a compiler diagnostic, a resource never released, a comment describing a
+  framework that had been deleted — and nothing was reading them.
+  ⚠️ **Two claims deliberately not made:** no unit test can catch the tap leak returning
+  (`--audit-tap` is the standing instrument, and `SystemAudioTapTests` says so), and the end-to-end
+  TCC grant→relaunch flow was not re-run, because producing an ungranted state means revoking
+  Franco's own grant.
+  🔴 **The gate earned its keep:** it caught four `MenuBarExtra` comments M30-T4's own sweep missed —
+  T4 grepped the removed *target* name and never the removed *API*.
+
 - **✅ M30-T5 + M30-T6 SHIPPED (2026-08-05) — one instance, and a poll that stops. M30's six tasks
   are done; G30 is ready to run.** `LaunchPolicy` (pure, the `StatusItemPolicy` pattern — building an
   `AppDelegate` installs a status item). **739 tests.**
