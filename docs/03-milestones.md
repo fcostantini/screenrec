@@ -2937,7 +2937,22 @@ flattened. **MINOR.**
       level measurement is **not done**: the synthetic fixture's audio is constant DC, which AAC does
       not carry usefully, and a peak reader written for it **crashed** (SIGSEGV in
       `CMBlockBufferGetDataPointer`). It needs either a fixed harness or one real take with audible
-      sound on both sources. **G33 cannot pass until this lands.**
+      sound on both sources.
+      ✅ **PAID 2026-08-05 — measured on a real take** (15 s, AirPods so the speakers couldn't bleed
+      into the mic, music in a windowed app, Franco talking throughout). ⚠️ **The control first**, or
+      none of it counts: both source tracks are genuinely audible — system **mean −32.4 / max −12.5
+      dB**, mic **mean −32.0 / max −8.0 dB**.
+      **The four numbers the criterion asks for:** the normal export peaks at **−8.0 dB**, *exactly*
+      the mic's peak — the loudest moment in the file is the voice. With `--no-microphone` the peak
+      falls to **−12.6** against the system track's **−12.5**, and the mean returns to **−32.4**
+      against the system track's **−32.4**. **The voice is gone and the music is not**, which is the
+      half a silenced-everything bug would also have passed.
+      ⚠️ **The null test was tried and does NOT discriminate** — subtracting the source's system
+      track leaves −27.7 dB (with mic) against −29.6 dB (without), because the export is re-encoded,
+      resampled and mixed with its own gain, so it never nulls cleanly against a raw source track.
+      Recorded so nobody rebuilds it expecting an answer.
+      ⚠️ **`screenrec-cli export --to-mp4 --no-microphone` was added for this** — the option existed
+      with no headless surface, which ADR-011 makes a gap rather than a nicety.
 
 **Gate G33** — three exports queued from one menu open all land in order with their own receipts, and
 quitting waits for all of them; an export can be produced without the microphone's content in it,

@@ -6,6 +6,24 @@
 
 ## Now
 
+- **✅ M33 COMPLETE (2026-08-05) — an export queue, and an export that can leave you out of it.**
+  T1: a second export waits its turn instead of being refused. T2: `Include the microphone` in
+  Settings, off leaves your narration out of shared clips. **748 tests.** ⚠️ **G33 not yet run** —
+  the milestone's own gate still needs its pass.
+  ✅ **T2's level check is PAID, not waived** — the one leg I flagged as owed. On a real 15 s take
+  (AirPods, music playing, Franco talking): both source tracks audible first (**the control**), then
+  the normal export peaks at **−8.0 dB = exactly the mic's peak**, and `--no-microphone` drops it to
+  **−12.6** against the system track's **−12.5**, mean back to **−32.4** = the system's exact mean.
+  **The voice is gone; the music is not.**
+  ⚠️ **A null test was tried and does not discriminate** (−27.7 vs −29.6 dB): the export is
+  re-encoded, resampled and mixed with its own gain, so it never nulls against a raw source track.
+  Recorded so it isn't rebuilt.
+  🔴 **Identifying the mic track is an INFERENCE** — nothing in the container records a role. Mono
+  ⇒ mic (system is always stereo, 02 §1; mics are normalised to 48 kHz mono, M8-T1). A stereo mic is
+  **kept** rather than guessed at. **Follow-up worth filing: label the tracks at write time.**
+  ⚠️ **Still open, both Franco's:** M32's ADR ruling (is a network read acceptable?), and whether
+  `stopWithoutCopy` should collapse now that a second export queues rather than being dropped.
+
 - **🔴 M31 CLOSED "won't do" (2026-08-05) — the premise was false, and the fault was mine.
   Next: M32 or M33, Franco's pick.** No code shipped; the T2 implementation was written, measured to
   change nothing, and reverted.

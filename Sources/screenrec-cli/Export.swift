@@ -55,6 +55,7 @@ func runExport(_ args: [String]) async {
     var to: Double?
     var crop: CropRect?
     var detectsCrop = false
+    var includesMicrophone = true
 
     var index = 0
     func value(after flag: String) -> String {
@@ -65,6 +66,8 @@ func runExport(_ args: [String]) async {
     while index < args.count {
         switch args[index] {
         case "--to-mp4": toMP4 = true
+        case "--no-microphone":
+            includesMicrophone = false
         case "--to-gif": toGIF = true
         // Round, don't truncate, and floor at 1: a sub-1.0 value would otherwise become 0 → a
         // broken GIF (fps 0 keeps one frame; width 0 floors to a 2px clip).
@@ -126,7 +129,7 @@ func runExport(_ args: [String]) async {
             }
             try await runMP4(
                 input: input, explicitOutput: explicitOutput, width: width, range: range,
-                crop: crop, detectsCrop: detectsCrop)
+                crop: crop, detectsCrop: detectsCrop, includesMicrophone: includesMicrophone)
         }
     } catch {
         die(exportErrorMessage(error), code: 70)
@@ -135,7 +138,7 @@ func runExport(_ args: [String]) async {
 
 private func runMP4(
     input: URL, explicitOutput: URL?, width: Int?, range: ExportRange?, crop: CropRect?,
-    detectsCrop: Bool = false
+    detectsCrop: Bool = false, includesMicrophone: Bool = true
 ) async throws {
     var crop = crop
     if detectsCrop {
@@ -146,7 +149,8 @@ private func runMP4(
     let output = explicitOutput
         ?? Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: input, range: range))
     let progress = ProgressPrinter()
-    let configuration = width.map { ExportConfiguration(maxWidth: $0) } ?? ExportConfiguration()
+    let configuration = ExportConfiguration(
+        maxWidth: width ?? ExportConfiguration().maxWidth, includesMicrophone: includesMicrophone)
     if let range {
         print("Range     \(Timecode.cutPoint(range.start)) – \(Timecode.cutPoint(range.end))")
     }

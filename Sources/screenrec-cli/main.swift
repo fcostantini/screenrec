@@ -21,6 +21,8 @@ func printUsage() {
                                        holds exactly — no intermediate trim. --crop keeps only that
                                        rectangle of each frame, in source pixels from the top-left,
                                        or `--crop detect` to find the letterbox bars itself;
+                                       --no-microphone leaves the mic's track out of the mix
+                                       (M33-T2);
                                        --width then caps the crop, not the source. Default <out> is
                                        the input's .mp4 sibling, or its " trimmed" one for a range.
                                        The source is read-only.
