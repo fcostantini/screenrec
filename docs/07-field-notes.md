@@ -7,6 +7,20 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-05 (M30-T3): **`SCREENREC_HW_ENCODE_TESTS=1 swift test` — the whole suite at once — is not
+  a check, and quoting it as one is a mistake this session made twice.** ExporterTests' own comment
+  says the layered encode suites oversubscribe VideoToolbox and fault it (VT **-12912**) "about half
+  the time"; measured today it failed **2 of 2**, with **13 issues in 122 s** each time — the
+  encoders fault, then `MovieRecorderTests`, `ReplayEncoderTests`, `VideoFrameReaderTests`,
+  `TrimmerTests` and the AppCore export tests all cascade off 120 s timeouts.
+  - ✅ **Every one of those suites passes in isolation**, in under 2 s each.
+  - 🔴 **Proven pre-existing by A/B, not assumed:** the same command on the unmodified tree fails
+    **identically** — 13 issues, 122 s, -12912 present. A failure that reproduces on both sides of a
+    diff says nothing about the diff, and the only way to know that is to run both.
+  - ⚠️ **The correct form is one suite per invocation**, which `Scripts/hooks/pre-push` and
+    `release.sh` already do. STATUS entries for M30-T1 and M30-T2 quote the combined form as green;
+    it happened to pass those runs, and that was luck rather than evidence.
+
 - 2026-08-05 (M30-T1): **A leaked Core Audio process tap is nearly unobservable — three probes, one
   works.** The tap's aggregate device is created `kAudioAggregateDeviceIsPrivateKey`, so the obvious
   instruments fail, and two of them fail *silently* by reporting exactly what a healthy system

@@ -2613,7 +2613,7 @@ five. **PATCH** (ADR-013): no new capability.
       because it makes the value unreachable outside the lock, and docs/01 already sanctions
       `os_unfair_lock`; the consistent alternative was an ~8-line `NSLock` class like
       `WriterDrain.FirstError`.
-- [ ] M30-T3 **The remaining warnings are closed or explained, one each.** `ReplayEncoder.swift:69`
+- [x] M30-T3 **The remaining warnings are closed or explained, one each.** `ReplayEncoder.swift:69`
       captures a non-Sendable `CMSampleBuffer` in a `@Sendable` closure; `WriterDrain.swift:24–27`
       captures `var done`, a non-Sendable `AVAssetWriterInput` and a non-Sendable `pump`;
       `RecordingFileSentinel.swift:115` uses a deprecated `String(cString:)`. The first two are Swift
@@ -2626,6 +2626,32 @@ five. **PATCH** (ADR-013): no new capability.
       or write the invariant down with a pointer from the code. ⚠️ **A file-wide `@preconcurrency
       import` is the answer to avoid**: it silences the next one too. **Verify:** a clean-scratch
       `swift build` emits **zero** warnings, or only ones whose invariant is stated in docs/07.
+      ✅ **Done 2026-08-05.** Three sites, three different answers — and no blanket
+      `@preconcurrency import`. Plan: `claude.ai/code/artifact/822e8092-b2cd-44ab-8bc6-ffe5ea86df66`.
+      ✅ **`ReplayEncoder` was a real fix, not a suppression.** Bring-up reads only the format
+      description, so the whole `CMSampleBuffer` was crossing to `setupQueue` for nothing — and SCK's
+      IOSurface pool is `queueDepth` (5) deep, so that held one of five surfaces for as long as VT
+      session creation took, on the first frame of every arm (docs/01's own constraint). It now passes
+      `CMFormatDescription`, which **is** `Sendable` in this SDK (type-checked against Swift 6): the
+      warning goes away by removing the thing it warned about.
+      ✅ **`WriterDrain` states its invariant instead.** `requestMediaDataWhenReady` re-invokes only
+      on its serial `queue`, so `done`/`input`/`pump` are single-threaded in fact.
+      `nonisolated(unsafe)` on all three plus one comment naming the confinement — the idiom
+      `FilmstripThumbnails` already uses. ⚠️ A lock-guarded latch was considered and rejected: it adds
+      a lock where a queue already serialises **and** would still leave two annotations for the two
+      non-Sendable parameters.
+      ✅ **`RecordingFileSentinel`** moves its `F_GETPATH` buffer to `[UInt8]` so
+      `String(decoding:as:)` takes it directly. `WriterDrain.swift:1:1`'s `@preconcurrency` note
+      disappeared with the invariant, as expected.
+      ✅ **The bar is met: one clean-scratch build emits 4 warning lines at 1 site** —
+      `AppState.swift:770`, which is **T4's**. M30 opened with five sites.
+      ✅ **Behaviour unchanged on the one risky path:** a headless `replay-arm` filled the ring
+      (10 keyframes, 25 MB) and saved in **0.06 s** → `hvc1 4112×2570 + AAC, 8.26 s`. All six affected
+      suites pass in isolation.
+      🔴 **A false alarm worth recording:** `SCREENREC_HW_ENCODE_TESTS=1 swift test` over the whole
+      suite failed with 13 issues — and fails **identically on the unmodified tree**. It is the
+      documented VT -12912 oversubscription, established by A/B rather than assumed. One suite per
+      invocation is the real check, as the pre-push hook does (docs/07).
 - [ ] M30-T4 **The force-unwrap, and the comments M28/M29 left behind.**
       `AppState.replayConfigurationChanged()` binds `if let capture = session.capture` and then reads
       `session.capture!.router` inside the branch — an unused binding (the warning STATUS has tracked

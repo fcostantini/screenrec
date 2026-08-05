@@ -19,7 +19,13 @@ enum WriterDrain {
         pump: @escaping () -> Bool
     ) {
         group.enter()
-        var done = false
+        // Confined to `queue`: `requestMediaDataWhenReady` re-invokes its block only there, so all
+        // three are single-threaded in fact — a guarantee the compiler cannot see across the
+        // AVFoundation boundary. Stated here rather than hidden behind a file-wide
+        // `@preconcurrency import`, which would silence the next one too.
+        nonisolated(unsafe) let input = input
+        nonisolated(unsafe) let pump = pump
+        nonisolated(unsafe) var done = false
         input.requestMediaDataWhenReady(on: queue) {
             guard !done else { return }
             while input.isReadyForMoreMediaData {

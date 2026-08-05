@@ -110,9 +110,11 @@ public final class RecordingFileSentinel: @unchecked Sendable {
             return
         }
         guard data.contains(.rename) else { return }
-        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        // `[UInt8]`, not `[CChar]`: identical layout for `F_GETPATH`, and it decodes without the
+        // deprecated `String(cString:)`. The kernel null-terminates; `prefix` drops the padding.
+        var buffer = [UInt8](repeating: 0, count: Int(PATH_MAX))
         guard fcntl(Int32(descriptor), F_GETPATH, &buffer) == 0 else { return }
-        let currentPath = String(cString: buffer)
+        let currentPath = String(decoding: buffer.prefix { $0 != 0 }, as: UTF8.self)
         guard currentPath != reservedPath else { return }   // echo of our own rename-back
         if rename(currentPath, reservedPath) == 0 {
             onIncident(.movedAndRestored(from: currentPath))

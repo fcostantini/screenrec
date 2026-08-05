@@ -66,7 +66,14 @@ public final class ReplayEncoder: SampleConsumer, @unchecked Sendable {
             if !isPreparingSession {
                 isPreparingSession = true
                 lock.unlock()
-                setupQueue.async { [weak self] in self?.prepareSession(for: buffer) }
+                // The format, not the buffer: bring-up reads nothing else, and SCK's IOSurface pool
+                // is `queueDepth` deep (docs/01), so carrying a frame onto another queue would hold
+                // one of five surfaces for as long as the VT session takes to build.
+                if let format = CMSampleBufferGetFormatDescription(buffer) {
+                    setupQueue.async { [weak self] in self?.prepareSession(for: format) }
+                } else {
+                    fail("The first frame carried no format description.")
+                }
             } else {
                 lock.unlock()
             }
@@ -86,9 +93,9 @@ public final class ReplayEncoder: SampleConsumer, @unchecked Sendable {
         }
     }
 
-    private func prepareSession(for buffer: CMSampleBuffer) {
+    private func prepareSession(for format: CMFormatDescription) {
         do {
-            let session = try Self.makeSession(for: buffer, frameRateCap: frameRateCap)
+            let session = try Self.makeSession(for: format, frameRateCap: frameRateCap)
             lock.lock()
             // `invalidate()` may have run while the session was building.
             guard !invalidated else {
@@ -217,10 +224,9 @@ public final class ReplayEncoder: SampleConsumer, @unchecked Sendable {
     /// One HEVC session sized from the first frame's format description (same move as
     /// `MovieRecorder`). Properties per 02 §9; bitrate matches recording's Balanced math so the
     /// two encoders can't drift apart.
-    private static func makeSession(for buffer: CMSampleBuffer, frameRateCap: Int) throws -> VTCompressionSession {
-        guard let format = CMSampleBufferGetFormatDescription(buffer) else {
-            throw EncoderError(message: "The first frame carried no format description.")
-        }
+    private static func makeSession(
+        for format: CMFormatDescription, frameRateCap: Int
+    ) throws -> VTCompressionSession {
         let dimensions = CMVideoFormatDescriptionGetDimensions(format)
 
         var session: VTCompressionSession?

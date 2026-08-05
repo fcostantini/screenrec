@@ -6,7 +6,29 @@
 
 ## Now
 
-- **✅ M30-T2 SHIPPED (2026-08-05) — the filmstrip's counter cannot lose a decrement. Next: M30-T3.**
+- **✅ M30-T3 SHIPPED (2026-08-05) — the warnings are closed or explained, one each. Next: M30-T4.**
+  Three sites, three answers, **no blanket `@preconcurrency import`**. **733 tests.** Plan artifact:
+  `claude.ai/code/artifact/822e8092-b2cd-44ab-8bc6-ffe5ea86df66`.
+  ✅ **One of them was a real fix, not a suppression.** `ReplayEncoder` was handing a whole
+  `CMSampleBuffer` to `setupQueue` when bring-up reads only the format description — and SCK's
+  IOSurface pool is `queueDepth` **(5)** deep, so that held one of five surfaces for the length of VT
+  session creation, on the first frame of every arm. It passes `CMFormatDescription` now (measured
+  **Sendable** in this SDK), so the warning goes by removing what it warned about.
+  ✅ **`WriterDrain` keeps its invariant written down instead** — the block only ever runs on its
+  serial queue — and `RecordingFileSentinel` drops the deprecated `String(cString:)`.
+  ✅ **The bar is met: 1 warning site left, `AppState.swift:770`, which is T4's.** M30 opened with
+  five.
+  ✅ **Behaviour unchanged where it could have moved:** headless `replay-arm` → ring filled (10 kf,
+  25 MB), save in **0.06 s** → `hvc1 4112×2570 + AAC, 8.26 s`.
+  🔴 **Correction to the M30-T1 and M30-T2 entries below.** Both quote
+  `SCREENREC_HW_ENCODE_TESTS=1 swift test` — the **whole suite at once** — as a green check. That
+  form is the documented VT-oversubscription trap: it failed **2 of 2** today with 13 issues in 122 s,
+  and **fails identically on an unmodified tree** (established by A/B, not assumed). Those runs
+  passing was luck, not evidence. **The real check is one suite per invocation**, which
+  `Scripts/hooks/pre-push` and `release.sh` already do — and all six affected suites pass that way.
+  docs/07 has the detail.
+
+- **✅ M30-T2 SHIPPED (2026-08-05) — the filmstrip's counter cannot lose a decrement.**
   `OSAllocatedUnfairLock<Int>` makes decrement-and-test one operation. **733 tests** (+1). Plan
   artifact: `claude.ai/code/artifact/9d40deee-65c0-47a4-bb1e-215e6aede97b`.
   🔴 **The task I filed was wrong about the blast radius:** `FilmstripThumbnails.stream` has **three**
