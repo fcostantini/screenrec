@@ -7,6 +7,32 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-05 (M32-T4): **Two ways a break sweep lies, both found in one sweep. Extends the M30-T1
+  entry below — that one is about restoring files and grepping `✘`; these are about the two remaining
+  ways a break reads "not caught" when it was.**
+  - 🔴 **An out-of-range index in a test kills the entire `swift test` run, not one test.**
+    `MenuStructureTests` asserted the row's slot as `after[index + 1] == "Settings…"`. The break that
+    moves the row to the very end of the menu made that index out of range, and swift-testing died
+    with `Swift/ContiguousArrayBuffer.swift:690: Fatal error: Index out of range` **partway through an
+    unrelated suite** — no failure attributed to the test, no summary line, 700+ other results lost.
+    **Assert positionally with `array.dropFirst(n).first`, never `array[n + 1]`, whenever the thing
+    under test could move an element to the end.** A crash is strictly worse than a red: it hides
+    every other result in the run.
+  - 🔴 **A sweep that classifies on the summary line alone reports a build failure as "the break is
+    not caught".** My harness read `Test run with N tests (passed|failed)`; a break whose patch didn't
+    compile produces **neither**, so the empty match fell through to "GREEN — not caught" and looked
+    exactly like a missing test. **Require a successful `swift build` before believing any sweep
+    verdict**, and treat an empty summary as "inconclusive", never as green.
+  - ⚠️ **The cause of that non-compiling patch is worth its own warning:** a `perl -0pi` regex
+    anchored on `return items` matched the *first* of several functions in the file. **Multi-line
+    regex patches against a file with repeated idioms are unreliable** — for a break that moves code
+    between functions, edit by hand and read the result.
+  - ✅ **`NSMenuItem.representedObject` is how you make a row's destination assertable.** A row built
+    from a closure (`MenuRow.action(title) { NSWorkspace.shared.open(url) }`) is a black box: no test
+    can tell where it goes without firing it, and firing it opens a browser. Storing the URL on
+    `representedObject` as well turned "the row opens the wrong page" from an uncatchable break into a
+    red one.
+
 - 2026-08-05 (M31, CLOSED "won't do"): **Recordings and exports were correctly colour-tagged all
   along. The audit finding that started this milestone was a bug in my own probe.** Retracted in full;
   what survives is the trap that caused it and three facts about SCK.

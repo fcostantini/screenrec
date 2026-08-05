@@ -2927,7 +2927,7 @@ is rebuilding from source. **MINOR.**
       action — a reader still goes to Releases themselves. Making it *open* that page downloads
       nothing and is one line; **left as filed rather than widened without asking.**
 
-- [ ] M32-T4 **The update row goes somewhere** (added 2026-08-05, after G32 — Franco's call). The
+- [x] M32-T4 **The update row goes somewhere** (added 2026-08-05, after G32 — Franco's call). The
       row says `1.17.0 is available` and does nothing; a reader has to already know the repo exists.
       🔴 **The irony is that the person M32 was built for is the one who cannot act on it** — someone
       handed a `.app`, with no reason to know there is a GitHub repo at all. For Franco it is an
@@ -2939,6 +2939,45 @@ is rebuilding from source. **MINOR.**
       `theUpdateRowIsNotClickable` test inverts, and the row opens the page from the deployed app.
       ⚠️ **G32 does not need re-running:** none of its criteria mention the row's clickability, and
       the row's presence and absence are unchanged.
+      ✅ **Done 2026-08-05 — the row opens the Releases page.** Copy unchanged (Franco's call): the
+      highlight is how every other actionable row in that menu announces itself. **768 tests.**
+      🚢 **v1.17.1 — PATCH (ADR-013): the row existed and now works.**
+      ✅ **Proven live, click and all** (patch-observe-revert, `CoreInfo.version` faked to 1.0.0): the
+      dump read **`1.17.0 is available` with no `(disabled)` suffix** — M32-T3's read
+      `1.16.0 is available  (disabled)` — and `menudriver click` landed Firefox on
+      **`github.com/fcostantini/screenrec/releases`**, screenshotted. Both controls hold: the real
+      1.17.1 build (ahead of every release) shows **no row** before and after.
+      ✅ **4 breaks, 4 reds**, but only after the seam changed. **`MenuRow.link` carries the URL on
+      `representedObject`** — the plan's inline `NSWorkspace` closure made "the row opens the wrong
+      page" **uncatchable**, since no test can see inside a closure and firing it opens a browser.
+      🔴 **Two doc gaps the task didn't anticipate, both closed:** ADR-020 specified a **dimmed** row,
+      so shipping a clickable one without amending it would contradict a ✅ ADR; and **docs/06 never
+      recorded this row at all** (M32-T3 shipped a menu row with no spec line) — now item 11b.
+      🔴 **An existing test was crash-prone and the sweep found it:** the slot assertion indexed
+      `after[index + 1]`, so a row moved to the end of the menu **killed the whole run** with
+      `Fatal error: Index out of range` instead of failing one test. Now `dropFirst(index + 1).first`.
+      ⚠️ **The destination is now the weak link, not the row** — see M32-T5.
+
+- [ ] M32-T5 **The release notes are unreadable to the person the row now sends there** (added
+      2026-08-05 — Franco, on landing on the page T4 opens). `Scripts/release.sh:86` generates notes
+      with `git log --pretty='- %s'`, so the page inherits every convention that exists for the audit
+      trail and none that exist for a reader: **`docs:` commits** (`docs: G32 passed`), **task IDs**
+      (`M32-T3:`), **`release: v1.17.0` in its own changelog**, and subjects written for an agent
+      ("the row, and the switch that turns the check off" assumes you know what "the row" is).
+      🔴 **This is T4's dead end moved one hop:** the row now reliably delivers a recipient to a page
+      that tells them nothing about whether they want the update.
+      ✅ **The user-facing sentence already gets written every milestone** — every STATUS.md entry
+      opens with "what this milestone was for, in one line". It is drafted; it is just in the wrong
+      file. **Seams:** `release_notes()` already leads with the Gatekeeper steps, which are the most
+      useful thing on the page and stay. **Shape:** a `CHANGELOG.md` section per version that
+      `release.sh` reads under a `## What's new` heading, commit list collapsed into `<details>`
+      beneath so the audit trail survives; **falls back to today's raw log when a version has no
+      section**, so it can never block a release.
+      ✅ **The 7 existing releases can be fixed in place** — `gh release edit <tag> --notes-file`
+      rewrites published notes without re-tagging or touching assets. ⚠️ That is 7 hand-written
+      summaries; **rulings owed:** all seven or only the recent few, and whether the older ones keep
+      their raw log. **Verify:** the notes of the newest release read as product changes with no task
+      IDs and no `docs:` lines, and a release with no CHANGELOG section still publishes.
 
 ⚠️ **What M32 cannot do, and never could:** a check cannot announce the release that shipped it.
 Builds at or before **1.16.0** carry no check, so their holders are never told about 1.17.0 or later —

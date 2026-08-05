@@ -6,6 +6,36 @@
 
 ## Now
 
+- **✅ M32-T4 SHIPPED (2026-08-05) — the update row goes somewhere. Next: M32-T5 (the release notes),
+  Franco's ask.** The row opened as news and closed as a door: `MenuRow.link` +
+  `UpdateCheck.releasesPageURL`. Copy unchanged, Franco's call. **768 tests.**
+  🚢 **v1.17.1 — PATCH (ADR-013): the row existed and now works.**
+  ✅ **The click is proven, not inferred.** Patch-observe-revert with `CoreInfo.version` faked to
+  1.0.0: the dump read **`1.17.0 is available` with no `(disabled)`** (M32-T3's read
+  `1.16.0 is available  (disabled)`), and `menudriver click` put Firefox on
+  **`github.com/fcostantini/screenrec/releases`**. Both controls hold — the real 1.17.1 build shows
+  **no row** before and after, scaffolding reverted.
+  ✅ **4 breaks, 4 reds — but only because the seam changed mid-task.** The plan's inline
+  `NSWorkspace` closure made "the row opens the **wrong** page" uncatchable; `MenuRow.link` carries the
+  URL on **`representedObject`**, so a wrong destination is now a red test. A closure is a black box
+  and firing it opens a browser.
+  🔴 **Two doc gaps closed that the task hadn't catalogued:** ADR-020 specified a **dimmed** row (so
+  shipping a clickable one silently would contradict a ✅ ADR — amended), and **docs/06 never recorded
+  this row at all** — M32-T3 shipped a menu row with no spec line, now item 11b.
+  🔴 **The sweep found a crash-prone existing test:** the slot assertion indexed `after[index + 1]`, so
+  a row moved to the end of the menu **killed the entire run** with `Fatal error: Index out of range`
+  — 700+ results lost, nothing attributed. Now `dropFirst(index + 1).first`. Both this and a
+  build-failure-read-as-green are in docs/07.
+  ⚠️ **Franco's finding, and it is the real remaining gap: the destination is worse than the row was.**
+  The Releases page is raw `git log` — `docs:` commits, task IDs, agent-facing subjects. **Filed as
+  M32-T5**, including that `gh release edit` can fix the 7 already-published releases in place.
+  ⚠️ **Asked and answered, not built: could the app do the download/install itself?** The fetch is
+  ~30 lines and `Relaunch.now()` (M30-T5) is already the right seam — but **an unnotarized download
+  gets quarantined**, so the recipient still hits *Open Anyway* and the feature buys nothing; the only
+  way out is the app stripping Gatekeeper's flag off its own replacement. Gated on notarization
+  ($99/yr, declined 2026-08-05), an ADR-020 reversal, and a path no test can reach without destroying
+  the binary under test. **Not filed as a milestone** — say so if it should be.
+
 - **📋 FOLLOW-UPS FILED (2026-08-05) — M32-T4 and M34; one parked. Next: Franco's pick.** None came
   from the audit; all three are things the work itself turned up.
   **M32-T4 — the update row goes somewhere.** It says `1.17.0 is available` and does nothing. 🔴 **The
