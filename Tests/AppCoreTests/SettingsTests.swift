@@ -185,6 +185,7 @@ import RecorderCore
             "replayArmed", "replaySeconds", "replayHotkey", "showsMenuBarTimer", "showsMenuBarLevel",
             "gifFPS", "gifWidth", "gifMaxSeconds", "mp4Width", "stopAfterMinutes",
             "seenReplayBannerWarning", "countInEnabled", "namesTakeOnStop", "stopHotkeyCopies",
+            "exportsIncludeMicrophone",
         ])
     }
 
@@ -738,5 +739,21 @@ import RecorderCore
         let defaults = TestDefaults.make("settings-window")
         defaults.set([SettingsStore.Key.windowID: 37], forKey: SettingsStore.Key.captureWindow)
         #expect(SettingsStore.load(from: defaults).captureWindow == nil)
+    }
+
+    /// M33-T2. Opt-out like its siblings: absent means on, so an existing install exports exactly
+    /// what it did before the preference existed.
+    @Test func theMicrophoneExportPreferenceIsOptOutAndRoundTrips() {
+        let (defaults, _) = makeDefaults()
+        #expect(SettingsStore.load(from: defaults).exportsIncludeMicrophone)   // absent ⇒ on
+
+        var settings = Settings.standard
+        settings.exportsIncludeMicrophone = false
+        SettingsStore.save(settings, to: defaults)
+        #expect(!SettingsStore.load(from: defaults).exportsIncludeMicrophone)
+
+        settings.exportsIncludeMicrophone = true
+        SettingsStore.save(settings, to: defaults)
+        #expect(SettingsStore.load(from: defaults).exportsIncludeMicrophone)
     }
 }

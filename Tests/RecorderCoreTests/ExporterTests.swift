@@ -377,4 +377,38 @@ import Testing
         }
         return atoms
     }
+
+    // MARK: - Leaving the microphone out (M33-T2)
+
+    /// The mono track is the microphone: system audio is always stereo (02 §1) and every mic track
+    /// is normalised to 48 kHz mono (M8-T1). An inference, and these say which way it errs.
+    @Test func theMonoTrackIsTheOneLeftOut() {
+        #expect(ExportConfiguration.mixedTrackIndices(
+            channelCounts: [2, 1], includesMicrophone: false) == [0])
+        #expect(ExportConfiguration.mixedTrackIndices(
+            channelCounts: [1, 2], includesMicrophone: false) == [1])   // order is not the rule
+    }
+
+    /// The default must not change what today's exports produce.
+    @Test func keepingTheMicrophoneKeepsEveryTrack() {
+        #expect(ExportConfiguration.mixedTrackIndices(
+            channelCounts: [2, 1], includesMicrophone: true) == [0, 1])
+        #expect(ExportConfiguration().includesMicrophone)
+    }
+
+    /// "Without the microphone" must never mean "without any sound": a take with no system audio
+    /// has only a mono track, and dropping it would export silence.
+    @Test func aSourceWithOnlyAMicrophoneKeepsItRatherThanExportingSilence() {
+        #expect(ExportConfiguration.mixedTrackIndices(
+            channelCounts: [1], includesMicrophone: false) == [0])
+        #expect(ExportConfiguration.mixedTrackIndices(
+            channelCounts: [], includesMicrophone: false) == [])
+    }
+
+    /// A stereo mic (possible pre-M8-T1) is kept — erring toward including audio rather than
+    /// silently removing the wrong track.
+    @Test func anUnrecognisableMicrophoneIsKeptRatherThanGuessedAt() {
+        #expect(ExportConfiguration.mixedTrackIndices(
+            channelCounts: [2, 2], includesMicrophone: false) == [0, 1])
+    }
 }

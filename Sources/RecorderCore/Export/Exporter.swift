@@ -58,6 +58,9 @@ public struct ExportConfiguration: Sendable {
     public var referenceVideoBitRate: Int
     public var audioBitRate: Int
     public var keyFrameIntervalSeconds: Double
+    /// Whether the microphone's track is mixed into the export (M33-T2). Default `true`, so every
+    /// existing export is unchanged; off leaves a take's narration out of the file it shares.
+    public var includesMicrophone: Bool
 
     /// The size `referenceVideoBitRate` is quoted at.
     static let referenceSize = (width: 1920, height: 1200)
@@ -68,13 +71,32 @@ public struct ExportConfiguration: Sendable {
         maxHeight: Int = 2304,
         referenceVideoBitRate: Int = 6_000_000,
         audioBitRate: Int = 160_000,
-        keyFrameIntervalSeconds: Double = 2
+        keyFrameIntervalSeconds: Double = 2,
+        includesMicrophone: Bool = true
     ) {
         self.maxWidth = maxWidth
         self.maxHeight = maxHeight
         self.referenceVideoBitRate = referenceVideoBitRate
         self.audioBitRate = audioBitRate
         self.keyFrameIntervalSeconds = keyFrameIntervalSeconds
+        self.includesMicrophone = includesMicrophone
+    }
+
+    /// Which of a source's audio tracks a share export should mix, given each one's channel count.
+    ///
+    /// ⚠️ **An inference, not a label.** Nothing in the container records a track's role — both are
+    /// plain AAC. What separates them is width: system audio is always **stereo** (02 §1) and every
+    /// microphone track is normalised to 48 kHz **mono** (M8-T1). So the mono track is the mic.
+    /// A stereo mic captured before M8-T1 would be kept rather than dropped, which errs toward
+    /// including audio over silently removing the wrong thing.
+    ///
+    /// Dropping every track would leave a silent file, so a source whose tracks are *all* mono keeps
+    /// them: "without the microphone" cannot mean "without any sound".
+    public static func mixedTrackIndices(channelCounts: [Int], includesMicrophone: Bool) -> [Int] {
+        let all = Array(channelCounts.indices)
+        guard !includesMicrophone else { return all }
+        let kept = all.filter { channelCounts[$0] != 1 }
+        return kept.isEmpty ? all : kept
     }
 
     /// The rate for a `width × height` output: the reference scaled by pixel count, but never
@@ -232,7 +254,22 @@ public enum Exporter {
         guard let videoTrack = tracks.first(where: { $0.mediaType == .video }) else {
             throw ExportError.noVideoTrack
         }
-        let audioTracks = tracks.filter { $0.mediaType == .audio }
+        var audioTracks = tracks.filter { $0.mediaType == .audio }
+        // Channel counts decide which of them the mix keeps — see `mixedTrackIndices`.
+        if !configuration.includesMicrophone, audioTracks.count > 1 {
+            var channels: [Int] = []
+            for track in audioTracks {
+                let formats = (try? await track.load(.formatDescriptions)) ?? []
+                let asbd = formats.first.flatMap {
+                    CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee
+                }
+                channels.append(Int(asbd?.mChannelsPerFrame ?? 0))
+            }
+            let keep = Set(
+                ExportConfiguration.mixedTrackIndices(
+                    channelCounts: channels, includesMicrophone: false))
+            audioTracks = audioTracks.enumerated().filter { keep.contains($0.offset) }.map(\.element)
+        }
         let (naturalSize, videoRange) = try await videoTrack.load(.naturalSize, .timeRange)
         let sourceWidth = Int(naturalSize.width.rounded())
         let sourceHeight = Int(naturalSize.height.rounded())

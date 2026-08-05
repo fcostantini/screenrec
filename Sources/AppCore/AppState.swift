@@ -166,6 +166,11 @@ public final class AppState {
         didSet { if mp4Width != oldValue { persist() } }
     }
 
+    /// Whether a share export mixes the microphone in (M33-T2). A pure export pref, persisted.
+    public var exportsIncludeMicrophone: Bool {
+        didSet { if exportsIncludeMicrophone != oldValue { persist() } }
+    }
+
     /// Stop a recording after this many minutes (M18-T4); 0 ⇒ off. Applies to the *next* start —
     /// changing it mid-recording would move a deadline the menu has already stated.
     public var stopAfterMinutes: Int {
@@ -529,6 +534,7 @@ public final class AppState {
         gifWidth = settings.gifWidth
         gifMaxSeconds = settings.gifMaxSeconds
         mp4Width = settings.mp4Width
+        exportsIncludeMicrophone = settings.exportsIncludeMicrophone
         stopAfterMinutes = settings.stopAfterMinutes
         hasSeenReplayBannerWarning = settings.seenReplayBannerWarning
         // The export cluster (M14-T1): it seeds its own persisted receipt from `defaults`.
@@ -605,6 +611,7 @@ public final class AppState {
                 showsMenuBarTimer: showsMenuBarTimer, showsMenuBarLevel: showsMenuBarLevel,
                 gifFPS: gifFPS, gifWidth: gifWidth, gifMaxSeconds: gifMaxSeconds,
                 stopAfterMinutes: stopAfterMinutes, mp4Width: mp4Width,
+                exportsIncludeMicrophone: exportsIncludeMicrophone,
                 seenReplayBannerWarning: hasSeenReplayBannerWarning),
             to: defaults)
     }
@@ -704,7 +711,7 @@ public final class AppState {
     /// the height ceiling is a decoder limit, not a taste (`ExportConfiguration.maxHeight`). Public
     /// so a surface can state the size an export will really produce (M21-T1).
     public var exportConfiguration: ExportConfiguration {
-        ExportConfiguration(maxWidth: mp4Width)
+        ExportConfiguration(maxWidth: mp4Width, includesMicrophone: exportsIncludeMicrophone)
     }
 
     /// The `Stop & Copy MP4` row's title (M21-T2), estimate included. Stamped at menu open like

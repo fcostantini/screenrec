@@ -256,6 +256,13 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+
+                Toggle("Include the microphone", isOn: $state.exportsIncludeMicrophone)
+                Text("Off leaves your narration out of shared clips — the recording still keeps "
+                    + "the microphone on its own track, so nothing is lost.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Section("GIF") {

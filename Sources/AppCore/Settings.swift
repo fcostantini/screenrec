@@ -233,6 +233,9 @@ public struct Settings: Sendable, Equatable {
     /// "as large as the source allows" (see `ExportConfiguration.maxHeight`). The CLI takes its
     /// own flag.
     public var mp4Width: Int
+    /// Whether a share export mixes the microphone in (M33-T2). Default on, so existing installs
+    /// export exactly what they did; off leaves a take's narration out of the file it shares.
+    public var exportsIncludeMicrophone: Bool
     /// Whether the one-time "banners are hidden while armed" alert has been shown (M12-T5). Absent
     /// ⇒ false (not yet seen); once true the alert never fires again — the dimmed menu row is the
     /// ongoing reminder.
@@ -311,6 +314,7 @@ public struct Settings: Sendable, Equatable {
             gifMaxSeconds: 30,
             stopAfterMinutes: 0,
             mp4Width: 1920,
+            exportsIncludeMicrophone: true,
             seenReplayBannerWarning: false)
     }
 }
@@ -376,6 +380,8 @@ public enum SettingsStore {
         public static let gifWidth = "gifWidth"
         public static let gifMaxSeconds = "gifMaxSeconds"
         public static let mp4Width = "mp4Width"
+        /// Absent ⇒ on (M33-T2): the microphone rides along unless it's turned off.
+        public static let exportsIncludeMicrophone = "exportsIncludeMicrophone"
         public static let stopAfterMinutes = "stopAfterMinutes"
         /// The last export's path, for the receipt that survives relaunch (M12-T2). Absent ⇒ no
         /// receipt. Not part of `Settings` (it's a transient pointer, not user config) — its own
@@ -502,6 +508,10 @@ public enum SettingsStore {
         }
         if defaults.object(forKey: Key.capturesSystemAudio) != nil {
             settings.capturesSystemAudio = defaults.bool(forKey: Key.capturesSystemAudio)
+        }
+        // Opt-out like its siblings: only an explicit stored value overrides the default.
+        if defaults.object(forKey: Key.exportsIncludeMicrophone) != nil {
+            settings.exportsIncludeMicrophone = defaults.bool(forKey: Key.exportsIncludeMicrophone)
         }
         settings.seenReplayBannerWarning = defaults.bool(forKey: Key.seenReplayBannerWarning)
 
@@ -644,6 +654,7 @@ public enum SettingsStore {
         defaults.set(settings.gifWidth, forKey: Key.gifWidth)
         defaults.set(settings.gifMaxSeconds, forKey: Key.gifMaxSeconds)
         defaults.set(settings.mp4Width, forKey: Key.mp4Width)
+        defaults.set(settings.exportsIncludeMicrophone, forKey: Key.exportsIncludeMicrophone)
         defaults.set(settings.stopAfterMinutes, forKey: Key.stopAfterMinutes)
     }
 }

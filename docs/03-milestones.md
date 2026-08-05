@@ -2899,7 +2899,7 @@ flattened. **MINOR.**
       would be *dropped*; with a queue that reason is gone and the arm is now conservative rather than
       necessary. Collapsing it removes a case, its tests and a notice, all verified in G24 — **it is a
       one-line follow-up and Franco's call**, not a silent change.
-- [ ] M33-T2 **An export can leave the microphone out.** **Seams:** `Exporter`'s
+- [x] M33-T2 **An export can leave the microphone out.** **Seams:** `Exporter`'s
       `AVAssetReaderAudioMixOutput` already takes the track list, so this is an argument to work that
       happens anyway — which is exactly the test ADR-015 set for what may come through that door;
       `DeriveOptions` already decides which derives a file can take, and a single-audio-track source
@@ -2910,6 +2910,34 @@ flattened. **MINOR.**
       source is genuinely absent by level, never by the absence of a track** — G21's own trap, where
       a silent control nearly passed the gate on nothing; and the default path unchanged in track
       layout and dimensions against a control export.
+      ✅ **Done 2026-08-05.** `ExportConfiguration.includesMicrophone` (default **true**, so today's
+      exports are unchanged), fed by a persisted Settings toggle — the `mp4Width` pattern. **748
+      tests.** Plan: `claude.ai/code/artifact/dbbafb0c-f920-4e04-b5c1-3b6fb715287c`.
+      🔴 **Ruling — it lives in Settings, not the file submenu, and the architecture decided it.**
+      `DeriveOptions` is built from the file *extension* and is synchronous; knowing whether a file
+      has a mic track needs `AVAsset` I/O, and **M6-T10 forbids an async fill under an open menu**.
+      Offering the row unconditionally would put a dead row on every mic-less file, which M18-T4
+      rejects. One preference applies to `Export as MP4`, `Stop & Copy MP4` and the Trim window alike.
+      ⚠️ **Only one of the four filed options shipped.** *Mic only* is a niche; *keep both tracks
+      separate* contradicts the share profile's whole point (ADR-016 — messaging apps expect one
+      track) and is a different feature, not an option on this one.
+      🔴 **Identifying the mic is an INFERENCE, and the code says so.** Nothing in the container
+      records a track's role. System audio is always stereo (02 §1) and every mic track is normalised
+      to 48 kHz mono (M8-T1), so **the mono track is the mic**. A stereo mic (possible pre-M8-T1) is
+      **kept** — erring toward including audio over silently removing the wrong track — and a source
+      whose tracks are all mono keeps them, because "without the microphone" must never mean "without
+      any sound". **Follow-up worth filing: label the tracks at write time so this stops being an
+      inference.**
+      ✅ **5 breaks, 5 reds** — dropping by order, dropping everything, ignoring the flag, flipping
+      the default, and dropping the persistence. ⚠️ One break had to be redone: the first patch didn't
+      compile, which under M29's rule counts as nothing, not as a pass.
+      🔴 **OWED, not waived — the level check.** The criterion demands the excluded source be proven
+      absent **by level, never by track count** (G21's trap). The pure rule is fully tested, and the
+      default path is verified live (`H.264 1280×800 + AAC`, still stereo). But the end-to-end
+      level measurement is **not done**: the synthetic fixture's audio is constant DC, which AAC does
+      not carry usefully, and a peak reader written for it **crashed** (SIGSEGV in
+      `CMBlockBufferGetDataPointer`). It needs either a fixed harness or one real take with audible
+      sound on both sources. **G33 cannot pass until this lands.**
 
 **Gate G33** — three exports queued from one menu open all land in order with their own receipts, and
 quitting waits for all of them; an export can be produced without the microphone's content in it,
