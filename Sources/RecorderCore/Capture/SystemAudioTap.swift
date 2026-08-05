@@ -18,6 +18,11 @@ final class SystemAudioTap: @unchecked Sendable {
         case startFailed(OSStatus)
     }
 
+    /// The name carried by both the tap and its private aggregate device.
+    /// `screenrec-cli --audit-tap` matches on it to report a tap that outlived its session, so a
+    /// rename has to change both modules — a test pins it.
+    static let aggregateDeviceName = "screenrec system audio"
+
     private let router: SampleRouter
     /// A tap's rate follows the output device, so it is normalised to one format before the router
     /// sees it (M27-T5). Touched only from the IOProc — `convert` holds converter state and is not
@@ -42,6 +47,15 @@ final class SystemAudioTap: @unchecked Sendable {
         self.onSilent = onSilent
     }
 
+    /// Whether the tap owns live Core Audio objects. False before `start()` and after `stop()`.
+    var isRunning: Bool { lock.withLock { device != AudioObjectID(kAudioObjectUnknown) } }
+
+    /// The backstop for an engine released without terminating: an actor's `deinit` cannot call an
+    /// isolated method, so `CaptureEngine` can never reach its own teardown from there.
+    deinit {
+        stop()
+    }
+
     /// Starts tapping everything except `silencedBundleIDs`.
     ///
     /// ⚠️ A bundle ID the audio system doesn't know **cannot be silenced** — it has no process
@@ -58,7 +72,7 @@ final class SystemAudioTap: @unchecked Sendable {
         guard let outputUID = Self.defaultOutputDeviceUID() else { throw TapError.noDefaultOutputDevice }
 
         let description = CATapDescription(stereoGlobalTapButExcludeProcesses: excluded)
-        description.name = "screenrec system audio"
+        description.name = Self.aggregateDeviceName
         description.uuid = UUID()
         description.isPrivate = true  // not offered to other apps as an input device
         description.muteBehavior = .unmuted  // the user still hears what is being recorded
@@ -77,7 +91,7 @@ final class SystemAudioTap: @unchecked Sendable {
         // Private, so it never appears in Sound settings; drift-compensated against the output it
         // shadows.
         let aggregate: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "screenrec system audio",
+            kAudioAggregateDeviceNameKey: Self.aggregateDeviceName,
             kAudioAggregateDeviceUIDKey: UUID().uuidString,
             kAudioAggregateDeviceMainSubDeviceKey: outputUID,
             kAudioAggregateDeviceIsPrivateKey: true,

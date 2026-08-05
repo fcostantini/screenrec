@@ -86,6 +86,10 @@ func printUsage() {
       --no-system-audio  Record without capturing what the Mac is playing
       --output <dir>     Output directory when no [path] is given (default: ~/Movies)
       --script <steps>   Unattended pause timeline, e.g. rec10,pause5,rec10 (seconds each)
+      --audit-tap        After the session, report whether the system-audio tap's private
+                         aggregate device survived it (M30-T1). Only meaningful with
+                         --mute-app; the check must run in-process, since a private
+                         aggregate is invisible to every other one.
       --test-disk-floor <GB>  Trip the disk guard on demand: stop cleanly when free space
                          is below <GB> (real floor is 2 GB — pass a huge value to test)
       --dry-run          Print the config that would be used, without capturing
@@ -393,6 +397,7 @@ struct RecordOptions {
     var dryRun = false
     var script: [ScriptStep]?
     var diskFloorBytes: Int64?
+    var auditTap = false
 }
 
 /// Parses `rec10,pause5,rec10` into steps.
@@ -454,6 +459,8 @@ func parseRecordOptions(_ args: [String]) -> RecordOptions {
         case "--script":
             guard let value = iterator.next() else { die("--script needs a value like rec10,pause5,rec10") }
             options.script = parseScript(value)
+        case "--audit-tap":
+            options.auditTap = true
         case "--test-disk-floor":
             // Test hook (04 §4.4): a floor above the volume's free space trips the disk guard.
             // Bounded at 1 PB so GB→bytes can't overflow Int64.
@@ -764,6 +771,7 @@ func performRecording(_ options: RecordOptions) async {
     }
     ticker.cancel()
     controls.forEach { $0.cancel() }
+    if options.auditTap { TapAudit.report() }
     exit(exitCode)
 }
 

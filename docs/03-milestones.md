@@ -2540,7 +2540,7 @@ threads, three Swift 6 data-race diagnostics downgraded to warnings because thei
 AVFoundation boundary — and a record in STATUS saying there is *one* warning when a clean build emits
 five. **PATCH** (ADR-013): no new capability.
 
-- [ ] M30-T1 **A terminated engine leaves no tap behind.** `CaptureEngine.stop()` tears the
+- [x] M30-T1 **A terminated engine leaves no tap behind.** `CaptureEngine.stop()` tears the
       system-audio tap down; `terminate()` does not, and `SystemAudioTap` has no `deinit`. Every path
       that ends a session without a user Stop — display unplug, display sleep, lid close, any
       `SCStream.didStopWithError` — leaves a live process tap, a private aggregate device, a running
@@ -2556,6 +2556,29 @@ five. **PATCH** (ADR-013): no new capability.
       stream with a real death (`pmset displaysleepnow`, G3 §4.3's headless lever), and then asserts
       the tap is down; plus a unit test over whatever seam that assertion needs, and a control take
       stopped normally that reports the same.
+      ✅ **Done 2026-08-05.** The teardown moved **into `cancelWatchdogs()`** rather than being copied
+      into `terminate()` — one site both paths already call, so a resource named there is released on
+      every path — plus `SystemAudioTap.deinit`, which covers an engine released without terminating
+      (an actor's `deinit` cannot call an isolated method). **732 tests** (+4, the 304-line file's
+      first). Plan artifact: `claude.ai/code/artifact/162a0804-cadf-4585-9c4b-eac2e3cffb2f`.
+      ✅ **Reproduced, then absent — same command, both binaries.** A window-close stream death
+      (`finished (windowClosed)`) with `--mute-app` set: **pre-fix `✗ 1 tap device(s) still alive`,
+      post-fix `✓ none survived`**. ⚠️ **The control is the load-bearing half:** a normally-stopped
+      muted take reports none on *both* binaries, so the check is not simply always clean. A
+      whole-screen regression take is unaffected — `hvc1 4112×2570` + AAC, 2 tracks.
+      🔴 **Franco's lever, not the filed one:** he chose the window-close route over
+      `pmset displaysleepnow`, which would have blanked the screen four times. It also exercises
+      `.windowClosed` rather than `.displayDisconnected`. The spec's suggestion was the worse option.
+      🔴 **The instrument nearly wasn't built.** The first probe reported a private aggregate as *not*
+      enumerable in-process — a **false negative from a racy HAL cache**, and a weaker fallback
+      assertion was nearly adopted on that single run (docs/07). It is reliable with a 0.5 s settle
+      (5/5 vs 3/5). Two other probes are genuinely unusable: a destroyed object still answers property
+      reads, and `kAudioHardwarePropertyTapList` still lists a destroyed tap.
+      ⚠️ **The break sweep is honest about its own limit — 2 of 3 go red.** `isRunning` and the pinned
+      device name each fail a named test; **re-introducing the defect itself stays green**, because no
+      unit test can reach it (the engine builds its tap internally and needs a live `SCStream`).
+      `--audit-tap` ships as the standing instrument for that claim, and `SystemAudioTapTests`' doc
+      comment states the gap rather than implying coverage it doesn't have.
 - [ ] M30-T2 **The filmstrip's counter cannot lose a decrement.** `FilmstripThumbnails` decrements a
       captured `var outstanding` inside `generateCGImagesAsynchronously`'s handler and finishes the
       `AsyncStream` at zero. `AVAssetImageGenerator` promises no serialisation of that handler, so a

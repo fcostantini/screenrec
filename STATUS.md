@@ -6,6 +6,28 @@
 
 ## Now
 
+- **✅ M30-T1 SHIPPED (2026-08-05) — a terminated engine leaves no tap behind. Next: M30-T2.**
+  The teardown moved **into `cancelWatchdogs()`** — the one site both `stop()` and `terminate()`
+  already call — rather than being copied into `terminate()`, plus `SystemAudioTap.deinit` for an
+  engine released without terminating. **732 tests** (+4). Plan artifact:
+  `claude.ai/code/artifact/162a0804-cadf-4585-9c4b-eac2e3cffb2f`.
+  ✅ **Reproduced, then absent, same command on both binaries:** a window-close stream death
+  (`finished (windowClosed)`) with `--mute-app` → **pre-fix `✗ 1 tap device(s) still alive`, post-fix
+  `✓ none survived`**. ⚠️ **The control carries the claim:** a normally-stopped muted take reports
+  none on *both* binaries, so the check isn't simply always clean.
+  🔴 **The instrument nearly wasn't built.** The first probe said a private aggregate isn't
+  enumerable in-process; that was a **false negative from a racy HAL cache** (3/5 without a settle
+  delay, 5/5 with 0.5 s), and a weaker fallback was nearly adopted on that one run. Two other probes
+  are genuinely unusable — see docs/07.
+  ⚠️ **2 of 3 breaks go red, and the third is the point:** re-introducing the defect itself stays
+  **green**, because no unit test can reach it. `screenrec-cli --audit-tap` ships as the standing
+  instrument, and the test file says so rather than implying coverage it lacks.
+  🔴 **My own error, cost real work:** the first break-sweep harness used `git checkout --` to
+  restore, which reverted to **HEAD** and destroyed uncommitted edits — and detected "red" by
+  grepping `✘`, which swift-testing also prints for **skipped** tests, so its first result was a
+  false positive. Both fixed (scratchpad backups; classify on the `Test run with N tests failed`
+  summary line). Worth knowing before writing the next sweep.
+
 - **📋 AUDIT FILED (2026-08-05) — M30–M33 are the roadmap. Next: M30-T1.** A full read of the tree
   (code health + product), filed as four milestones in `docs/03`. Artifact:
   `claude.ai/code/artifact/5faea78f-6d9f-42f7-936e-8e1d6ad00c17`. **No code changed** — this is a

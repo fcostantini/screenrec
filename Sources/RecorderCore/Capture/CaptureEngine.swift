@@ -212,8 +212,6 @@ public actor CaptureEngine {
         case .starting:
             requestedStopReason = reason
         case .running:
-            systemAudioTap?.stop()
-            systemAudioTap = nil
             // Disarm before teardown: `stopCapture` halts delivery and can take seconds
             // (Bluetooth), so watchdogs still polling across it would false-fire on a
             // perfectly complete recording.
@@ -286,7 +284,12 @@ public actor CaptureEngine {
         }
     }
 
+    /// Releases everything a termination must release. Both `stop()` and `terminate()` call it, so a
+    /// resource named here is released on every path — including a stream death, which reaches
+    /// `terminate()` without passing through `stop()`. Safe to run twice.
     private func cancelWatchdogs() {
+        systemAudioTap?.stop()
+        systemAudioTap = nil
         microphoneWatchdogTask?.cancel()
         microphoneWatchdogTask = nil
         stallWatchdogTask?.cancel()

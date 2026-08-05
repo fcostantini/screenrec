@@ -7,6 +7,31 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-05 (M30-T1): **A leaked Core Audio process tap is nearly unobservable — three probes, one
+  works.** The tap's aggregate device is created `kAudioAggregateDeviceIsPrivateKey`, so the obvious
+  instruments fail, and two of them fail *silently* by reporting exactly what a healthy system
+  reports.
+  - ✅ **What works: enumerate `kAudioHardwarePropertyDevices` from inside the owning process** and
+    match the device by name. Reports 1 while the tap lives and 0 after it is destroyed.
+  - 🔴 **But only after a settle delay, and this is the trap.** A query fired straight after the
+    create/destroy misses the change: without a wait it read **3 of 5 runs** correctly, with a 0.5 s
+    wait **5 of 5**. The HAL client caches the device list. ⚠️ **The first measurement of this whole
+    question was a false negative** — it concluded a private aggregate is not enumerable in-process
+    at all, and a fallback to a weaker assertion was nearly built on one run of a racy probe.
+  - 🔴 **A destroyed `AudioObjectID` still answers property reads.** `AudioObjectGetPropertyDataSize`
+    on a destroyed *aggregate device* returns `noErr` indefinitely, so "is this object still alive"
+    is not a question the HAL will answer. (A destroyed *tap* sometimes returns
+    `kAudioHardwareBadObjectError` — inconsistent between runs, so unusable either way.)
+  - 🔴 **`kAudioHardwarePropertyTapList` still lists a destroyed tap.** Measured immediately and after
+    a 0.5 s settle; the id stays in the list.
+  - ⚠️ **Nothing outside the process can see any of this**, so a leak in the long-lived `.app` cannot
+    be detected by an external script — which is why `screenrec-cli --audit-tap` runs the check before
+    the CLI exits rather than a separate tool doing it afterwards.
+  - ⚠️ **Out of scope, noticed while here:** `stringProperty`-shaped CFString/`AudioObjectPropertyAddress`
+    boilerplate is now hand-rolled in **four** places — `AudioInputDevice`, `AudioProcesses`,
+    `SystemAudioTap` and (cross-module, so unavoidably) `screenrec-cli/TapAudit`. The first three
+    could share one internal helper; `AudioInputs.globalAddress` is already most of it.
+
 - 2026-08-04 (M29): **Three things about making an untested target testable, all learned the hard
   way in one session.**
   - 🔴 **A break that doesn't compile reads as "nothing went red".** The break-it-and-watch-it-fail
