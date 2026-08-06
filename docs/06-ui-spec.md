@@ -52,6 +52,16 @@ Order and grouping (separators between groups):
    When armed, a dimmed cost row follows it (M16-T2): `4:30 buffer · ≈800 MB · Mac stays awake`
    — the Settings caption's short form, **stamped at open, never ticking** (M6-T10). Without
    screen geometry it degrades to `Mac stays awake while armed`.
+   ⚠️ **AMENDED 2026-08-06 (M36-T2): while the ring holds less than the window, the leading phrase
+   states the holding instead** — `0:12 of 4:30 held · ≈800 MB · Mac stays awake` — and returns to
+   naming the window once full (within a second counts as full). 🔴 **Why:** a ring restarts empty
+   after any stream death (a display sleep, a source or quality change), so the configured size can be
+   true of the setting and wrong about the contents by the whole window, and `Save Replay Now` then
+   hands over a fraction with no warning — measured 2026-08-06. The figure is the **larger** of the
+   video and audio rings' spans, matching the muxer's own anchoring (a static screen's video ring goes
+   stale while audio keeps flowing). ⚠️ The `≈bytes` stays the **configured** footprint: the real
+   figure needs an O(n) walk of the ring, and the memory the user signed up for is the honest thing to
+   state.
 4. — separator —
 5. `Source ▸` submenu (M7-T2; was `Display ▸`): what gets captured. **Entire Screen** (one row
    per `NSScreen` when several — "Entire Screen (<name>)"), a divider, then the **running apps**

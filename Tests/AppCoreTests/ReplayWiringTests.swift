@@ -18,6 +18,11 @@ import RecorderCore
         var microphoneLevelSource: MicrophoneLevelSource? { nil }
         var onPipelineFailure: (@MainActor (String) -> Void)?
 
+        /// Settable so the armed row's "how much is held" copy is testable without a ring (M36-T2).
+        /// Nil is the honest default: a spy holds nothing.
+        var held: Double?
+        func heldSeconds() -> Double? { held }
+
         enum Call: Equatable {
             case arm, disarm, recordingStarted, recordingEnded, configurationChanged,
                  windowChanged, setOutputDirectory

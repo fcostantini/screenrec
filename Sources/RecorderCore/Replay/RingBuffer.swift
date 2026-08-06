@@ -129,6 +129,16 @@ final class RingBuffer<Element>: @unchecked Sendable {
         return entries.last?.pts
     }
 
+    /// How much the ring is holding, without copying it or walking it: `stats()` is O(n) over every
+    /// entry (~7,200 at 2 min / 60 fps) and the menu that reads this must not wait (M6-T10).
+    /// NaN-guarded for the same reason `span(of:)` is — docs/02 §10.
+    func heldSeconds() -> Double {
+        lock.lock(); defer { lock.unlock() }
+        guard let first = entries.first, let last = entries.last else { return 0 }
+        let seconds = CMTimeSubtract(last.pts, first.pts).seconds
+        return seconds.isFinite ? max(0, seconds) : 0
+    }
+
     private func clipLocked(endingAt anchor: CMTime, seconds: CMTime) -> [RingEntry<Element>] {
         guard let start = Self.clipStartIndex(in: entries, endingAt: anchor, seconds: seconds) else {
             return []

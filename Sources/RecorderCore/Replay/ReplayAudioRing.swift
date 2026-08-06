@@ -88,6 +88,9 @@ public final class ReplayAudioRing: SampleConsumer, @unchecked Sendable {
         ring.setCapacity(ReplayWindow.capacity(seconds))
     }
 
+    /// How many seconds of audio the ring is holding right now — O(1), unlike `stats()`.
+    public func heldSeconds() -> Double { ring.heldSeconds() }
+
     public func stats() -> Stats {
         lock.lock()
         let asbd = latchedASBD

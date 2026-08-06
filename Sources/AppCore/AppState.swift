@@ -1027,8 +1027,24 @@ public final class AppState {
         guard let bytes = replayBufferBytes(seconds: replaySeconds) else {
             return "Mac stays awake while armed"
         }
-        return "\(Self.shortBufferPhrase(replaySeconds)) buffer · "
+        return "\(Self.bufferHolding(replaySeconds, held: replay.heldSeconds())) · "
             + "≈\(ApproximateBytes.formatted(bytes)) · Mac stays awake"
+    }
+
+    /// The row's leading phrase: what the buffer *holds* while it is short of the window, and the
+    /// window itself once it is full (M36-T2).
+    ///
+    /// 🔴 A ring restarts empty after any stream death — a display sleep, a source change — so
+    /// "2 min buffer" can be true of the setting and wrong about the contents by two minutes, and
+    /// `Save Replay Now` then hands over a fraction with no warning. ⚠️ The `≈bytes` beside this
+    /// stays the *configured* footprint: the real figure needs an O(n) walk of the ring, and the
+    /// memory the user signed up for is the honest thing to state.
+    static func bufferHolding(_ seconds: Int, held: Double?) -> String {
+        let window = shortBufferPhrase(seconds)
+        // Within a second of full reads as full: the ring's newest-minus-oldest never quite equals
+        // the window, and "1:59 of 2 min held" forever would be worse than saying nothing.
+        guard let held, held.isFinite, held < Double(seconds) - 1 else { return "\(window) buffer" }
+        return "\(Timecode.length(max(0, held))) of \(window) held"
     }
 
     /// `45-second` / `1-minute` / `1:45` — whole minutes read better than `1:00`, and the slider's

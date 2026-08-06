@@ -115,6 +115,10 @@ public final class ReplayEncoder: SampleConsumer, @unchecked Sendable {
         ring.setCapacity(ReplayWindow.capacity(seconds))
     }
 
+    /// How many seconds of video the ring is holding right now — O(1), unlike `stats()`, because
+    /// the armed menu row reads it at every open (M6-T10).
+    public func heldSeconds() -> Double { ring.heldSeconds() }
+
     public func stats() -> Stats {
         let entries = ring.snapshot()
         var keyframes = 0

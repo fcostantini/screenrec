@@ -17,6 +17,10 @@ public protocol ReplayControlling: AnyObject {
 
     func arm(configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL)
     func disarm()
+    /// Seconds actually buffered right now, or nil when nothing is armed. ⚠️ **The max across the
+    /// rings**, matching the muxer's own anchoring: frame-on-change leaves a static screen's video
+    /// ring stale while audio keeps flowing, and that buffer would still save a full window.
+    func heldSeconds() -> Double?
     /// A recording started: share its stream (docs/01's key property). Arms a disarmed
     /// controller — this is also the mid-recording toggle's entry, and callers gate on the
     /// user's armed intent. The replay buffer restarts — a new stream is a new pts epoch;
@@ -106,6 +110,21 @@ public final class ReplayController: ReplayControlling {
         isArmed = true
         consecutivePipelineFailures = 0
         startOwnStream(configuration: configuration, seconds: seconds, outputDirectory: outputDirectory)
+    }
+
+    public func heldSeconds() -> Double? {
+        guard let encoder else { return nil }
+        return Self.heldSeconds(video: encoder.heldSeconds(), audio: systemRing?.heldSeconds())
+    }
+
+    /// The larger of the two rings' spans (M36-T2). Pure, because a spy-based test cannot reach the
+    /// live one and this policy is the part worth pinning.
+    ///
+    /// 🔴 Not the video ring alone: frame-on-change leaves a static screen's video ring stale while
+    /// audio keeps flowing, and the muxer already anchors on the newest pts **across all rings** for
+    /// exactly that reason — such a buffer really would save a full window.
+    static func heldSeconds(video: Double, audio: Double?) -> Double {
+        max(video, audio ?? 0)
     }
 
     public func disarm() {

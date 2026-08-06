@@ -242,6 +242,63 @@ import RecorderCore
         #expect(state.replayBufferMenuLabel == "1 min buffer · ≈180 MB · Mac stays awake")
     }
 
+    // MARK: - What the buffer actually holds (M36-T2)
+
+    /// 🔴 The row used to state the *configured* window unconditionally. A ring restarts empty after
+    /// any stream death — a display sleep, a source change — so it could promise two minutes while
+    /// holding four seconds, and `Save Replay Now` then handed over a fraction with no warning.
+    @Test func theRowSaysWhatIsHeldWhileTheBufferIsStillShort() {
+        #expect(AppState.bufferHolding(120, held: 12) == "0:12 of 2 min held")
+        #expect(AppState.bufferHolding(120, held: 63.31) == "1:03 of 2 min held")
+        #expect(AppState.bufferHolding(60, held: 0) == "0:00 of 1 min held")
+    }
+
+    /// Full reads as full, and the wording returns to exactly what it always was — silence when there
+    /// is nothing to say. ⚠️ Within a second counts as full: newest-minus-oldest never quite equals
+    /// the window, and "1:59 of 2 min held" forever would be worse than saying nothing.
+    @Test func aFullBufferGoesBackToNamingTheWindow() {
+        #expect(AppState.bufferHolding(120, held: 120) == "2 min buffer")
+        #expect(AppState.bufferHolding(120, held: 119.4) == "2 min buffer")
+        #expect(AppState.bufferHolding(120, held: 200) == "2 min buffer")     // can't exceed it
+    }
+
+    /// Nothing armed ⇒ nothing measured. The row doesn't exist then, but the phrase must not invent
+    /// a figure if it is ever asked.
+    @Test func nothingHeldAndNothingArmedBothNameTheWindow() {
+        #expect(AppState.bufferHolding(120, held: nil) == "2 min buffer")
+        // docs/02 §10: CMTime → seconds can be NaN, and a NaN must never reach the row.
+        #expect(AppState.bufferHolding(120, held: .nan) == "2 min buffer")
+        // ⚠️ NaN alone does not exercise the `isFinite` guard — every NaN comparison is false, so it
+        // falls through to the window phrase anyway. Negative infinity is what the guard is for.
+        #expect(AppState.bufferHolding(120, held: -.infinity) == "2 min buffer")
+        #expect(AppState.bufferHolding(120, held: .infinity) == "2 min buffer")
+    }
+
+    /// 🔴 The break sweep found this untested: a spy overrides `heldSeconds()` wholesale, so the real
+    /// controller's max-of-rings policy had no coverage at all. Pinned as a pure function instead.
+    @Test func theHoldingIsTheLargerRingNotTheVideoOne() {
+        // A static screen: video stale, audio flowing — the buffer would still save a full window.
+        #expect(ReplayController.heldSeconds(video: 3, audio: 118) == 118)
+        // A silent take: audio ring absent, video is all there is.
+        #expect(ReplayController.heldSeconds(video: 42, audio: nil) == 42)
+        #expect(ReplayController.heldSeconds(video: 0, audio: nil) == 0)
+    }
+
+    /// The whole row, through the injected controller rather than the pure helper — so the wiring
+    /// from ring to menu is covered, not just the phrasing.
+    @MainActor
+    @Test func theArmedRowCarriesTheHoldingThroughTheController() {
+        let spy = ReplayWiringTests.ReplaySpy()
+        spy.held = 9
+        let state = AppState(defaults: TestDefaults.make(), replayController: spy)
+        state.refreshSources(displays: [retinaDisplay()])
+        state.replaySeconds = 60
+        state.frameRateCap = 60
+        state.microphonePreference = .automatic
+
+        #expect(state.replayBufferMenuLabel == "0:09 of 1 min held · ≈180 MB · Mac stays awake")
+    }
+
     @Test func aMicrophoneThatWontBeCapturedIsntBilledFor() {
         let state = makeState()
         state.refreshSources(displays: [retinaDisplay()])

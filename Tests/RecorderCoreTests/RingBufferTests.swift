@@ -111,4 +111,33 @@ import Testing
         // No content assertion — the point is a clean run under the thread sanitizer, no crash.
         #expect(ring.snapshot().isEmpty == false)
     }
+
+    // MARK: - What it is holding (M36-T2)
+
+    /// O(1) and equal to newest − oldest. The armed menu row reads this at every open, so it must
+    /// never walk the ring.
+    @Test func heldSecondsIsTheSpanFromOldestToNewest() {
+        let ring = RingBuffer<Int>(capacity: Self.t(60))
+        #expect(ring.heldSeconds() == 0)                       // empty holds nothing
+        ring.append(1, pts: Self.t(10), isKeyframe: true)
+        #expect(ring.heldSeconds() == 0)                       // one entry spans nothing
+        ring.append(2, pts: Self.t(22.5), isKeyframe: false)
+        #expect(ring.heldSeconds() == 12.5)
+    }
+
+    /// An invalid pts is **evicted**, so no NaN span can form — measured, and not what I assumed.
+    ///
+    /// `CMTimeSubtract(5s, .invalid).seconds` really is NaN (docs/02 §10), but `evictLocked`'s own
+    /// `CMTimeCompare` drops the invalid entry before any span is taken. ⚠️ **So `heldSeconds()`'s
+    /// `isFinite` guard is unreachable through `append` and no test can turn its removal red** — it
+    /// stays as defence mirroring `span(of:)`'s documented guard, and this note is the honest record
+    /// rather than a claim of coverage.
+    @Test func anInvalidTimestampIsEvictedSoNoNaNSpanCanForm() {
+        let ring = RingBuffer<Int>(capacity: Self.t(60))
+        ring.append(1, pts: .invalid, isKeyframe: true)
+        ring.append(2, pts: Self.t(5), isKeyframe: false)
+        #expect(ring.snapshot().count == 1)                    // the invalid one is gone
+        #expect(ring.snapshot().first?.pts == Self.t(5))
+        #expect(ring.heldSeconds() == 0)
+    }
 }
