@@ -3213,6 +3213,57 @@ recording and paused menus each fail a test when broken, proven by breaking them
 the silent guard M33-T3 removed is catchable; `menudriver dump` is unchanged across the whole
 milestone, because none of this is a behaviour change.
 
+## M35 — The replay save is visible without a settings dance (Franco's ruling, 2026-08-06)
+
+Instant Replay's only reliable success signal is a **2 s icon flash**, because armed replay captures
+the display and macOS suppresses banners while it does. The `.timeSensitive` break-through needs an
+entitlement a self-signed build cannot carry (measured 2026-07-16). Every piece of today's behaviour is
+honest; the net effect is that the flagship feature confirms itself only to someone who completed a
+manual step they were told about once, ever — and **Franco's own machine had that step done, which is
+why the gap was invisible from where he sits**.
+
+🔴 **The ruling (Franco, 2026-08-06): (b) is the floor and (a) is the improvement on top**, because the
+measurement killed the fallback that would have made them equivalent — see docs/07. **MINOR.**
+
+- [ ] M35-T1 **The copy stops hedging** — no ruling needed, and independent of T2/T3. Today's rows say
+      banners *"may"* be hidden because the app could not tell; it can (`com.apple.ncprefs` →
+      `dnd_prefs` → **`dndMirrored`**, and the user's toggle is `!dndMirrored`). Say **will** or
+      **won't**. **Seams:** the read is Foundation-only, so it belongs in `AppCore` beside
+      `SettingsStore` rather than in `NotificationSettings` (AppShell), which owns only the AppKit
+      deep-link. M12-T5's one-time alert and the armed-menu caveat row are the two surfaces.
+      🔴 **The hard constraint, and the reason this is T1:** a **failed or unavailable read must
+      degrade to today's hedged copy**, never to a claim. A private undocumented key can vanish in any
+      macOS release, and a caveat row that confidently says the wrong thing is worse than one that
+      hedges. Three states, not two: allowed / suppressed / **unknown**.
+      ⚠️ **Ruling owed, one line:** whether reading another app's private preference domain wants an
+      **ADR**. ADR-020 is the precedent for recording a read the app makes; this one leaves the machine
+      not at all, which is the argument it does not.
+      **Verify:** unit tests over the pure mapping for all three states; then the row read in the
+      deployed app with the toggle **on** and **off** — ⚠️ **needs one flip from Franco** (10 s), the
+      same leg the measurement used.
+- [ ] M35-T2 **The flash becomes something a person notices** — the floor, and the one that works for
+      a user who never touches the setting. M28-T4's precedent: it promoted the export row from a
+      frozen label into something that visibly advances. ⚠️ **Shape is a taste call** — a plan artifact
+      with options comes before any code, and the options must be *shown*, not described.
+      ⚠️ **Don't eyeball an animation; measure it** (M4-T1's field note): frame-sample the status item
+      and count distinct bitmaps rather than trusting an impression.
+      ⚠️ **Constraint from M9-T3:** the elapsed clock is *drawn into the icon image*, so anything that
+      animates the item has to compose with that rather than fight it.
+      **Verify:** with notifications suppressed (`dndMirrored = true`), a replay save is unmistakable
+      **with no banner at all** — Franco watches one, and the animation is measured headlessly.
+- [ ] M35-T3 **Onboarding walks them through it, and verifies it took** — the improvement, and the M16
+      "honest state" thesis applied to the one place it was waived. Uses T1's read, so it can show a
+      real checkmark instead of a hopeful deep link. `NotificationSettings.open()` already deep-links
+      to the right pane (M12-T5); what is missing is the confirmation afterwards.
+      ⚠️ **Only reachable in both states with a flip or a fresh account**, so its verify inherits
+      T1's human leg rather than adding a new kind.
+      **Verify:** the onboarding row reads unconfirmed → Franco flips the toggle → it confirms without
+      a relaunch; and with the read unavailable it shows neither state rather than a false negative.
+
+**Gate G35** — with the toggle **off** and no banner possible, a replay save is unmistakable to someone
+watching the menu bar; every surface states the **actual** state rather than "may"; and a read that
+fails degrades to the hedge rather than to a claim, proven by breaking the read rather than asserted.
+
 ## Dependency graph
 
 ```
@@ -3366,7 +3417,8 @@ protocol over `RecordingSession` — is a large surface invented for tests and u
   so an app can never learn whether a human *saw* anything. A "did you see it?" self-test is
   impossible. **That makes (b) the floor rather than an alternative** — the only signal that survives
   both a missing key and a user who will not do the dance — with (a) the improvement on top.
-  **Trigger:** Franco picks a direction. The measurement is no longer owed.
+  ✅ **RULED and ENCODED as M35 (Franco, 2026-08-06) — no longer parked.** (b) is the floor, (a) the
+  improvement on top, and the honest-copy fix lands regardless as **M35-T1**.
 
 - **Localisation, in-app diagnostics, and a settings-schema version** — three limits that bind only
   if the audience grows (audit, 2026-08-05). Roughly **330 English string literals** sit inline across

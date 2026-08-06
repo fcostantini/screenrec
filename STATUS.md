@@ -6,6 +6,18 @@
 
 ## Now
 
+- **📋 M35 FILED (2026-08-06) — the replay save becomes visible without a settings dance. Next:
+  M35-T1.** Franco's ruling on the audit's one parked finding, taken after the measurement rather than
+  before it. Three tasks: the copy stops hedging (needs no ruling), the flash is promoted (**the
+  floor** — it is the only signal for someone who never touches the setting), and onboarding verifies
+  the toggle took (**the improvement**, buildable only because `dndMirrored` turned out readable).
+  🔴 **T1's hard constraint is three states, not two:** allowed / suppressed / **unknown**. A private
+  undocumented key can vanish in any macOS release, and a caveat row that confidently says the wrong
+  thing is worse than one that hedges — so a failed read must degrade to today's copy.
+  ⚠️ **What M35 needs from Franco: one 10-second toggle flip per verify leg** (T1 and T3 share it), and
+  **a taste call on T2's shape**, which gets a plan artifact with the options shown rather than
+  described. No fresh account required.
+
 - **✅ M34 COMPLETE and G34 PASSED (2026-08-06) — what happens while recording is tested now.** Four
   tasks, one of them closed as unnecessary: a spike that disproved the milestone's premise, the two
   menus asserted, and the silent guard made catchable. **777 tests** (769 → 777), and **not one
@@ -538,9 +550,10 @@
 **Open:**
 
 
-- [ ] **The replay-save confirmation — pick a direction** (audit, 2026-08-05; parked in docs/03 with
-      🔴 *needs a ruling*). (a) onboarding walks the user through the banner-suppression toggle and
-      verifies it took, or (b) the 2 s flash becomes something a person notices.
+- [x] **The replay-save confirmation — RULED and encoded as M35** (Franco, 2026-08-06): (b) the flash
+      is the **floor**, (a) onboarding-verify is the **improvement on top**, and the honest-copy fix
+      (M35-T1) lands regardless. What remains from you is **one toggle flip** per verify leg, not a
+      decision.
       ✅ **The measurement is PAID (2026-08-06) — nothing is owed to you now but the choice.** The
       setting has **no public API** (13 `UNNotificationSettings` properties, none about mirroring) but
       **is readable**: `com.apple.ncprefs` → `dnd_prefs` → **`dndMirrored`**, and the toggle you see is
