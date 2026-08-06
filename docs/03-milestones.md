@@ -3193,13 +3193,25 @@ the suite green. **PATCH** — no user-facing change; this buys the ability to p
       ⚠️ **The sweep's own guard earned its place immediately:** one patch replaced a row with an
       invalid statement, and the build check reported **INCONCLUSIVE** rather than the false "not
       caught" the M32-T4 sweep would have printed.
-- [ ] M34-T4 **The decisions that were unreachable become reachable.** `stopAndShare`'s guard (M33-T3
+- [x] M34-T4 **The decisions that were unreachable become reachable.** `stopAndShare`'s guard (M33-T3
       proved it is not catchable today), `finishTake` (M23-T3), and whatever else T1's sweep turns up.
       **Verify:** the M33-T3 break — re-adding the silent `return` — now turns a named test **red**.
+      ✅ **Done 2026-08-06 — the break turns `stopAndShareQueuesBehindARunningExportRatherThanDropping
+      It` red** (`queuedExportCount → 0` vs `1`). **777 tests**, no production file changed.
+      ✅ **Two tests, because the guard that stays matters as much as the one that went:** a share
+      requested while an export runs must **queue**, and a share with **no session** must export
+      nothing. Reachable because `stopAndWaitForFinalize` short-circuits on a never-started session's
+      nil `consumeTask`, so the tail runs with no capture (measured in T1 at 25 µs).
+      ⚠️ **`finishTake` needed nothing** — the task listed it as unreachable, but M23-T3 made it
+      `internal` precisely so tests could reach it and **six call sites already do**
+      (`MenuTruthTests`, `FileManagementTests`). Filed on a premise that was already false, like the
+      milestone itself.
 
-**Gate G34** — the recording and paused menus each fail a test when broken, proven by breaking them
-rather than asserted; the silent guard M33-T3 removed is catchable; `menudriver dump` is unchanged
-across the whole milestone, because none of this is a behaviour change.
+**Gate G34** — ✅ **PASSED 2026-08-06** (evidence in STATUS.md's gate table; the dump criterion is met
+by an empty production diff rather than a live dump, and the reason is recorded there). As filed: the
+recording and paused menus each fail a test when broken, proven by breaking them rather than asserted;
+the silent guard M33-T3 removed is catchable; `menudriver dump` is unchanged across the whole
+milestone, because none of this is a behaviour change.
 
 ## Dependency graph
 
