@@ -7,6 +7,20 @@ one file in the repo whose audience is not us.
 Only versions published as releases appear here; several were tagged during development and never
 published. The commit history is in the repository, where it belongs.
 
+## 1.19.0
+
+**The menu tells you how much replay you actually have.** While the buffer is still filling — which
+happens every time it restarts, including after your screen has slept — the armed row now reads
+`0:12 of 2 min held` instead of promising the whole window. *Save Replay Now* can no longer hand you
+four seconds while the menu claims two minutes.
+
+**A long window title no longer stretches the menu.** Picking a window whose title ran to 170
+characters used to widen every row in the menu; titles are shortened to fit now.
+
+**And the last place the app still guessed about hidden notification banners now checks.** Settings'
+Instant Replay pane says whether banners will really appear, and keeps itself current if you change the
+setting while it is open.
+
 ## 1.18.0
 
 **You can tell when a replay has been saved.** The menu bar now says **Saved** for three seconds

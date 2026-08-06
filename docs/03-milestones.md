@@ -3430,7 +3430,7 @@ would need an ADR-020 amendment, since it is a second request). **Do not re-file
       rather than the one I intended). It stays as defence mirroring `span(of:)`'s documented guard.
       ⚠️ **The `≈360 MB` is untouched and still the *configured* footprint** — honest for the memory the
       user signed up for, and the real figure needs the O(n) walk this task exists to avoid.
-- [ ] M36-T3 **Window titles are truncated before they reach the menu.** `Source ▸ Window ▸` lists live
+- [x] M36-T3 **Window titles are truncated before they reach the menu.** `Source ▸ Window ▸` lists live
       titles verbatim; measured on Franco's machine at **~140 characters including a full session
       UUID**, and every row in the menu is as wide as the widest one. Any long browser tab or document
       name does the same.
@@ -3443,10 +3443,28 @@ would need an ADR-020 amendment, since it is a second request). **Do not re-file
       label is ambiguous, and the app-name prefix survives.
       **Verify:** the truncation is pure and unit-tested at the boundary; `menudriver dump` shows the
       long row bounded and the menu's widest row shrinking; docs/06 records the cap.
+      ✅ **Done 2026-08-06 — capped at 56 (Franco).** **807 tests** (802 → 807). Plan artifact:
+      `claude.ai/code/artifact/2bfec2e6-7948-4db7-9335-1f30317e7241`.
+      🔴 **The audit undersold it: the header is the worse half.** `SourcesModel` builds the top-level
+      `Source:` label from the same helper, so **picking** that window put 171 characters on a
+      *top-level* row and every other row stretched to match. One pure function fixes both callers.
+      ✅ **Measured after, in characters not bytes** (⚠️ `awk` counts bytes and `— ⠐ …` are 3 each,
+      which briefly read as 64): **zero window rows over the cap**, the 171-character row now exactly
+      **56**, and it breaks on a word boundary rather than mid-word.
+      ✅ **4 breaks, 4 red** — truncation removed, the ellipsis added on top of the budget instead of
+      spent from it, a middle ellipsis keeping the session id, and a dangling space before the ellipsis.
+      🔴 **The sweep caught a test that never exercised its own case:** with an `"ab "` pattern the cut
+      lands on a letter, so the space-dropping never ran. The title is built **from the cap** now, so
+      the cut lands on a space by construction.
+      ⚠️ **The menu's widest row is now a recents row at 63 characters** — the date-repetition finding
+      Franco reviewed and chose not to file. Window rows are bounded; that one is a known deferral.
 
-**Gate G36** — each of the three surfaces states a fact rather than a configuration, proven by breaking
-each and watching a named test go red; the menu's widest row is bounded by the cap; and a planted
-hard-coded suppression claim fails a test rather than shipping.
+**Gate G36** — ✅ **PASSED 2026-08-06** (evidence in STATUS.md's gate table). As filed: each of the
+three surfaces states a fact rather than a configuration, proven by breaking each and watching a named
+test go red; the menu's widest row is bounded by the cap; and a planted hard-coded suppression claim
+fails a test rather than shipping. 🚢 **MINOR, decided here as the milestone said it would be:** T2 put
+a figure in the menu that was never there, which is a capability rather than a fix — the same call M35
+took. **v1.19.0.**
 
 ## Dependency graph
 
