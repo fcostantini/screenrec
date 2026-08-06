@@ -45,6 +45,15 @@ import Testing
         #expect(!StatusItemPolicy.redrawsOnClockTick(isPulsing: false, hasClock: false))
     }
 
+    // MARK: - The save confirmation (M35-T2)
+
+    /// A word only while confirming. Empty the rest of the time is the load-bearing half: the menu
+    /// bar is shared, and a permanent word would push every other item along for good.
+    @Test func theItemCarriesAWordOnlyWhileConfirmingASave() {
+        #expect(StatusItemPolicy.title(isConfirmingSave: true) == "Saved")
+        #expect(StatusItemPolicy.title(isConfirmingSave: false).isEmpty)
+    }
+
     // MARK: - Row geometry
 
     @MainActor

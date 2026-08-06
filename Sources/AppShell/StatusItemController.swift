@@ -40,6 +40,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.delegate = self
         statusItem.menu = menu
         statusItem.button?.setAccessibilityRole(.menuButton)
+        // The glyph keeps the leading edge when the save confirmation adds a word beside it.
+        statusItem.button?.imagePosition = .imageLeading
         // A frame that lands while the menu is open fills its own row in; only the view redraws,
         // so the menu is not rebuilt under the cursor (M6-T10, docs/07).
         thumbnails.onThumbnail = { [weak self] url in self?.showThumbnail(for: url) }
@@ -167,6 +169,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let button = statusItem.button
         button?.image = StatusIconImage.decorated(
             base, clock: clockText, showsSavedMark: state.replaySavedFlash)
+        // A word, not only a mark (M35-T2): banners are suppressed exactly when replay is armed, so
+        // this is the whole receipt a save gets.
+        button?.title = StatusItemPolicy.title(isConfirmingSave: state.replaySavedFlash)
         button?.setAccessibilityLabel(accessibilityLabel)
     }
 

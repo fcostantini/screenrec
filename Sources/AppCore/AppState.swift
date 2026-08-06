@@ -433,7 +433,8 @@ public final class AppState {
     /// Since M23-T3 a finished *recording* raises it too, when its banner can't render.
     public private(set) var replaySavedFlash = false
     private var flashTask: Task<Void, Never>?
-    private static let flashDuration: Duration = .seconds(2)
+    /// Long enough to catch on the way back from looking away — 2 s was missable (M35-T2, Franco).
+    private static let flashDuration: Duration = .seconds(3)
 
     /// Whether a take that just ended needs the menu-bar flash to say so. Pure, so the policy is
     /// asserted rather than inferred from a live capture.

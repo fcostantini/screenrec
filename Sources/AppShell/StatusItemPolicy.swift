@@ -20,4 +20,10 @@ enum StatusItemPolicy {
     static func redrawsOnClockTick(isPulsing: Bool, hasClock: Bool) -> Bool {
         !isPulsing && hasClock
     }
+
+    /// The word beside the glyph while a save is being confirmed (M35-T2), and **empty** the rest of
+    /// the time: a permanent word in the menu bar is a tax, and the width change is what gets noticed.
+    static func title(isConfirmingSave: Bool) -> String {
+        isConfirmingSave ? "Saved" : ""
+    }
 }
