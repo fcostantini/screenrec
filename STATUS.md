@@ -6,6 +6,22 @@
 
 ## Now
 
+- **✅ M35-T2 SHIPPED (2026-08-06) — a saved replay says so, in words. Next: M35-T3, then G35.**
+  Option A at 3 s, Franco's pick from four shown as sketches beside a real capture of the old flash.
+  The item carries **`✓ Saved`** for 3 s, then nothing. **786 tests.** Plan artifact:
+  `claude.ai/code/artifact/925e67a3-7388-41b3-a88d-40812cf9be45`.
+  ✅ **Both sides measured, which is the point of capturing the "before" first:** the old tick changed
+  **4 %** of the item's area — that was the entire receipt for a replay — and the word changes **~32 %**.
+  Present within **0.4 s**, still there at **2.8 s**, gone by **3.2 s**, item back to the armed baseline
+  (max delta **2**). Frames at 2.5 Hz on the deployed app.
+  🔴 **Two corrections to my own plan.** (1) **The VoiceOver justification was wrong:**
+  `accessibilityLabel` already appended `", saved"`, so no screen reader was ever left out — A's win is
+  **visual only**, and the M28-T4 parallel I argued from does not hold. (2) **The sketch showed a blue
+  pill; the build uses the menu bar's native text style**, which reads like `RAM 65%` beside it rather
+  than fighting the template tinting. Judged better; overrule me if the look is wrong.
+  ⚠️ **The item widens for 3 s and neighbours shift** — accepted knowingly (and the old tick already
+  did it). Nothing animates, so `reduceMotion` is untouched.
+
 - **✅ M35-T1 SHIPPED (2026-08-06) — the armed-replay caveat says what is true, or says nothing.
   Next: M35-T2 (the promoted flash) — a taste call, so it gets a plan artifact with options shown.**
   `ADR-022` records the ruling. **785 tests** (777 → 785).

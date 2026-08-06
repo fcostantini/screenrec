@@ -3257,7 +3257,7 @@ measurement killed the fallback that would have made them equivalent — see doc
       whoever ran them — green here only because Franco's toggle is on. Both now stub the state. Same
       class as M29-T2's live-TCC assertion.
       ⚠️ **`VERSION` unchanged** — M30's precedent: the bump belongs with G35, not mid-milestone.
-- [ ] M35-T2 **The flash becomes something a person notices** — the floor, and the one that works for
+- [x] M35-T2 **The flash becomes something a person notices** — the floor, and the one that works for
       a user who never touches the setting. M28-T4's precedent: it promoted the export row from a
       frozen label into something that visibly advances. ⚠️ **Shape is a taste call** — a plan artifact
       with options comes before any code, and the options must be *shown*, not described.
@@ -3267,6 +3267,21 @@ measurement killed the fallback that would have made them equivalent — see doc
       animates the item has to compose with that rather than fight it.
       **Verify:** with notifications suppressed (`dndMirrored = true`), a replay save is unmistakable
       **with no banner at all** — Franco watches one, and the animation is measured headlessly.
+      ✅ **Done 2026-08-06 — option A at 3 s (Franco's pick from four, shown as sketches beside a real
+      capture).** The item carries **`✓ Saved`** for 3 s, then nothing. **786 tests.** Plan artifact:
+      `claude.ai/code/artifact/925e67a3-7388-41b3-a88d-40812cf9be45`.
+      ✅ **Measured on both sides, which is why the "before" was captured first (M4-T1's rule):** the
+      old tick changed **4 %** of the item's area; the word changes **~32 %**. Present within **0.4 s**,
+      still there at **2.8 s**, gone by **3.2 s**, and the item returns to the armed baseline
+      (max channel delta **2**). Frames sampled at 2.5 Hz through real saves on the deployed app.
+      🔴 **Two corrections to the plan that recommended it.** (1) **The VoiceOver argument was wrong** —
+      `StatusItemController.accessibilityLabel` already appends `", saved"`, so a screen reader was
+      never left out. A's benefit is **visual only**, and the M28-T4 parallel I leaned on does not
+      apply. (2) **The sketch showed a blue pill; the build uses the menu bar's own text style**, which
+      reads as a system item (beside `RAM 65%`) instead of fighting the template tinting. Judged
+      better, and the screenshot is in STATUS so it can be overruled.
+      ⚠️ **The item widens for 3 s, so neighbours shift** — accepted knowingly, and the tick alone
+      already did it. `reduceMotion` is untouched: nothing here animates.
 - [ ] M35-T3 **Onboarding walks them through it, and verifies it took** — the improvement, and the M16
       "honest state" thesis applied to the one place it was waived. Uses T1's read, so it can show a
       real checkmark instead of a hopeful deep link. `NotificationSettings.open()` already deep-links
