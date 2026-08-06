@@ -6,6 +6,25 @@
 
 ## Now
 
+- **✅ M35-T1 SHIPPED (2026-08-06) — the armed-replay caveat says what is true, or says nothing.
+  Next: M35-T2 (the promoted flash) — a taste call, so it gets a plan artifact with options shown.**
+  `ADR-022` records the ruling. **785 tests** (777 → 785).
+  ✅ **Three states, all three seen where it matters.** Deployed app, one pass: banners allowed → the
+  caveat row is **gone entirely**; suppressed → **`Notification banners are hidden while armed`**;
+  `unknown` is unit-covered by injecting a failed read, since no machine produces it on demand.
+  🔴 **The skip had to move into AppCore, and that is the only behaviour change in the task.**
+  `isReplayArmed` spends the once-ever flag *before* AppShell sees it, so deciding in the alert would
+  burn a user's single warning on nothing — and leave them unwarned if they later turned the setting
+  off. A test covers exactly that sequence.
+  ✅ **T3's blocker is cleared, which is why T1 went first:** the **running** app saw the toggle change
+  **without a relaunch** — `CFPreferences` served no stale value. T3's design holds. ⚠️ One
+  observation, not a guarantee.
+  ✅ **4 breaks, 4 reds.** 🔴 **And two existing tests carried a defect this surfaced:**
+  `ReplayWiringTests`' first-arm tests read the **live** system setting, so they asserted something
+  about whoever ran them — passing here only because Franco's toggle is on. Both stub it now; same
+  class as M29-T2's live-TCC assertion.
+  ⚠️ **`VERSION` unchanged** — M30's precedent: the bump belongs with G35.
+
 - **📋 M35 FILED (2026-08-06) — the replay save becomes visible without a settings dance. Next:
   M35-T1.** Franco's ruling on the audit's one parked finding, taken after the measurement rather than
   before it. Three tasks: the copy stops hedging (needs no ruling), the flash is promoted (**the

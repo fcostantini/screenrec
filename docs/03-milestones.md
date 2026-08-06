@@ -3225,7 +3225,7 @@ why the gap was invisible from where he sits**.
 🔴 **The ruling (Franco, 2026-08-06): (b) is the floor and (a) is the improvement on top**, because the
 measurement killed the fallback that would have made them equivalent — see docs/07. **MINOR.**
 
-- [ ] M35-T1 **The copy stops hedging** — no ruling needed, and independent of T2/T3. Today's rows say
+- [x] M35-T1 **The copy stops hedging** — no ruling needed, and independent of T2/T3. Today's rows say
       banners *"may"* be hidden because the app could not tell; it can (`com.apple.ncprefs` →
       `dnd_prefs` → **`dndMirrored`**, and the user's toggle is `!dndMirrored`). Say **will** or
       **won't**. **Seams:** the read is Foundation-only, so it belongs in `AppCore` beside
@@ -3241,6 +3241,22 @@ measurement killed the fallback that would have made them equivalent — see doc
       **Verify:** unit tests over the pure mapping for all three states; then the row read in the
       deployed app with the toggle **on** and **off** — ⚠️ **needs one flip from Franco** (10 s), the
       same leg the measurement used.
+      ✅ **Done 2026-08-06 — `ADR-022` records the ruling and its bounds.** **785 tests** (777 → 785).
+      ✅ **All three states seen in the deployed app, in one pass:** toggle **on** → the caveat row is
+      **gone entirely** (buffer row straight to `Save Replay Now`); toggle **off** → **`Notification
+      banners are hidden while armed`**; and `unknown` is unit-covered by injecting a read that fails,
+      since no machine produces it on demand. Toggle restored to on, replay disarmed.
+      ✅ **T3's blocker is measured and cleared, which was the point of doing this first:** the
+      **running** app saw the toggle change **without a relaunch** — `CFPreferences` did not serve a
+      stale cached value. M35-T3's "it confirms without a relaunch" is viable as specified. ⚠️ One
+      observation, not a guarantee: T3 should still not assume instantaneity.
+      ✅ **4 breaks, 4 reds:** polarity inverted, a failed read turned into a claim, the caveat shown
+      when banners work, and the once-ever flag spent on an arm with nothing to warn about.
+      🔴 **Two existing tests had to be edited, and the reason is a defect they carried:**
+      `ReplayWiringTests`' first-arm tests read the **live** setting, so they asserted something about
+      whoever ran them — green here only because Franco's toggle is on. Both now stub the state. Same
+      class as M29-T2's live-TCC assertion.
+      ⚠️ **`VERSION` unchanged** — M30's precedent: the bump belongs with G35, not mid-milestone.
 - [ ] M35-T2 **The flash becomes something a person notices** — the floor, and the one that works for
       a user who never touches the setting. M28-T4's precedent: it promoted the export row from a
       frozen label into something that visibly advances. ⚠️ **Shape is a taste call** — a plan artifact
