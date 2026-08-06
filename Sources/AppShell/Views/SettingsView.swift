@@ -33,6 +33,12 @@ struct SettingsView: View {
 
     @State private var page: Page = .general
 
+    /// Re-read while the window is up, not once at open: the sharing toggle is changed in System
+    /// Settings — often via this pane's own link — with no callback to observe (`OnboardingView`'s
+    /// poll exists for the same reason). Without this the caption is right when you arrive and wrong
+    /// the moment you act on it.
+    @State private var banners: BannerVisibility = .unknown
+
     var body: some View {
         VStack(spacing: 0) {
             // A segmented control, not `TabView`: at this width SwiftUI collapses toolbar tabs into
@@ -56,6 +62,13 @@ struct SettingsView: View {
         .fixedSize()
         .onAppear { syncReplayControls() }
         .onChange(of: state.replaySeconds) { syncReplayControls() }
+        .task {
+            while !Task.isCancelled {
+                let fresh = state.bannerVisibility()
+                if fresh != banners { banners = fresh }   // only on change; a set re-renders the pane
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
     }
 
     /// Where files go and what the menu bar shows — plus the build, which M16-T6 put here so
@@ -236,11 +249,9 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            // Banner suppression (docs/06 §Notifications): while armed, the screen is captured,
-            // so macOS hides banners — ours and other apps'. Name the fix, not the API.
-            Text("While replay is armed, macOS hides notification banners — ScreenRec's and other "
-                + "apps'. To keep seeing them, turn on \"Allow notifications when mirroring or "
-                + "sharing the display\" in System Settings › Notifications.")
+            // Banner suppression (docs/06 §Notifications): while armed the screen is captured, so
+            // macOS may hide banners — ours and other apps'. Name the fix, not the API.
+            Text(ArmedBannerCaption.text(for: banners))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

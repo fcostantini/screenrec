@@ -385,7 +385,7 @@ privacy trade to make knowingly. Decision deferred (Franco, 2026-07-16): documen
 later — candidates are onboarding copy, a product-brief honesty note, or nothing until users
 hit it.
 
-✅ **RESOLVED — M12-T5 surfaces it (2026-07-23), three touches:** (1) a **one-time alert on the
+✅ **RESOLVED — M12-T5 surfaces it (2026-07-23), three touches** ⚠️ **— FOUR, corrected 2026-08-06 (M36-T1): the Instant Replay settings pane carries the caption too, and it was missed by M35 precisely because this line said three. The fourth is listed at (4) below; a test now fails if a fifth appears in a file that never reads the setting.** (1) a **one-time alert on the
 first arm ever** ("Notifications may be hidden while replay is armed"; OK + **Open Notification
 Settings…** routing to the M9-T2 fix), gated on a persisted `seenReplayBannerWarning` flag so it fires
 exactly once; (2) a **standing dimmed menu row** under the Arm toggle while armed — `Notification
