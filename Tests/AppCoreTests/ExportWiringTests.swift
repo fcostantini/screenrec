@@ -343,6 +343,62 @@ import RecorderCore
         #expect(recordedOutput.value?.lastPathComponent == "Clip.mp4")
     }
 
+    /// M33-T3 removed a **silent** `exportInProgress == nil` guard from `stopAndShare`, and its own
+    /// sweep proved re-adding it left the suite green — the path needs an active session, which is
+    /// what M34-T1 made reachable. This is the test that break now turns red.
+    ///
+    /// The session is a real `RecordingSession` that is never started: `stopAndWaitForFinalize`
+    /// short-circuits on its nil `consumeTask`, so the tail runs without any capture.
+    @Test func stopAndShareQueuesBehindARunningExportRatherThanDroppingIt() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("stopandshare-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let take = directory.appendingPathComponent("Take.mov")
+        try Data().write(to: take)
+
+        let state = makeState()
+        state.notifier = { _ in }
+        state.exports.copyToPasteboard = { _ in }
+        let release = Box<Bool>()
+        state.exports.exportFunction = { _, output, _, _, _, _ in
+            while release.value != true { await Task.yield() }
+            return output
+        }
+
+        // An export already running — the state the removed guard would have refused.
+        state.exportToMP4(directory.appendingPathComponent("Earlier.mov"))
+        #expect(state.exports.exportInProgress != nil)
+
+        // A finished take to share, and a session still in flight: both are needed to reach the tail.
+        state.finishTake((url: take, duration: 5))
+        let capture = try RecordingSession(
+            configuration: CaptureConfiguration(),
+            outputURL: directory.appendingPathComponent("Live.mov"))
+        state.session.attach(
+            capture, outputURL: directory.appendingPathComponent("Live.mov"),
+            microphoneName: nil, appName: nil, region: nil)
+
+        await state.stopAndShare()
+        #expect(state.exports.queuedExportCount == 1, "the share was dropped instead of queued")
+
+        release.value = true
+        while state.exports.exportInProgress != nil { await Task.yield() }
+    }
+
+    /// The guard that must stay: nothing to stop means nothing to share, and no export at all.
+    @Test func stopAndShareWithNoSessionExportsNothing() async throws {
+        let state = makeState()
+        state.notifier = { _ in }
+        state.exports.exportFunction = { _, output, _, _, _, _ in output }
+        state.finishTake((url: URL(fileURLWithPath: "/tmp/Take.mov"), duration: 5))
+
+        await state.stopAndShare()
+
+        #expect(state.exports.exportInProgress == nil)
+        #expect(state.exports.queuedExportCount == 0)
+    }
+
     @Test func stopAndCopyLeavesTheExportOnThePasteboardAndPostsOneNotice() async {
         // M21-T2: one action, one notice — not an export receipt plus a copy.
         let state = makeState()
