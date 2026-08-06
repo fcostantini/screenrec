@@ -83,6 +83,13 @@ Order and grouping (separators between groups):
    the mic reads None, one dimmed row follows: **`This recording will have no audio`** — a silent
    recording is legitimate, but it must not be a surprise discovered afterwards. Zero extra rows in
    every other configuration.
+   ⚠️ **AMENDED 2026-08-06 (M36-T3): a window label is capped at 56 characters** (`WindowSelection
+   .labelCap`), cutting the **title** only — never the app name, which is what you pick by and is never
+   user-generated — with a **trailing** ellipsis spent from the budget rather than added to it. 🔴 A
+   171-character title measured live stretched **every** row in the menu, because the top-level
+   `Source:` header is built from the same helper. Trailing not middle: the front carries the app and
+   document, the tail is where session ids and window sizes live. ⚠️ Accepted: two long titles from one
+   app can render alike — the pick has been by *identity* since M19-T5, so only the label is ambiguous.
    **Window (M17-T2):** below the app rows, a single **`Window ▸`** row whose submenu lists the
    on-screen windows as `<App> — <Title>`, app-then-title sorted, ScreenRec's own excluded. It nests
    deliberately: a dozen-plus windows is normal (12 measured on the dev machine), and Source is the

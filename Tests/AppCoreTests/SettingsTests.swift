@@ -767,4 +767,67 @@ import RecorderCore
         SettingsStore.save(settings, to: defaults)
         #expect(!SettingsStore.load(from: defaults).checksForUpdates)
     }
+
+    // MARK: - Window labels are bounded (M36-T3)
+
+    /// 🔴 Measured live: a 171-character title stretched **every** row in the menu, because
+    /// `SourcesModel` builds the top-level `Source:` header from this same helper.
+    @Test func aLongTitleIsCutSoOneWindowCannotSetTheMenusWidth() {
+        let label = WindowSelection.label(
+            appName: "Terminal",
+            title: "screenrec-app — Continue current work from documentation — caffeinate "
+                + "◂ claude --resume a0670892-99ca-4280-b617-90d8b323fba9 — 292×85")
+        #expect(label.count == WindowSelection.labelCap)
+        #expect(label.hasPrefix("Terminal — screenrec-app"))
+        #expect(label.hasSuffix("…"))
+        // The tail — session id, window size — is exactly what a middle ellipsis would have kept.
+        #expect(!label.contains("a0670892"))
+        #expect(!label.contains("292×85"))
+    }
+
+    /// The ellipsis is spent from the budget, not added on top of it — or the cap would be a lie by
+    /// one character and the widest row would still be a window.
+    @Test func aLabelAtTheCapIsLeftAloneAndOneOverIsCutToTheCap() {
+        let app = "Firefox"
+        let prefix = "\(app) — ".count
+        let exact = String(repeating: "a", count: WindowSelection.labelCap - prefix)
+        #expect(WindowSelection.label(appName: app, title: exact).count == WindowSelection.labelCap)
+        #expect(!WindowSelection.label(appName: app, title: exact).contains("…"))
+
+        let oneOver = exact + "b"
+        let cut = WindowSelection.label(appName: app, title: oneOver)
+        #expect(cut.count == WindowSelection.labelCap)
+        #expect(cut.hasSuffix("…"))
+    }
+
+    /// A cut that lands on a space must not leave one dangling before the ellipsis.
+    ///
+    /// ⚠️ The title is built *from the cap* so the cut lands exactly on a space — a pattern like
+    /// `"ab "` happens to break on a letter, and the earlier version of this test passed without
+    /// exercising the space-dropping at all (the break sweep caught it).
+    @Test func aCutAtAWordBoundaryDoesNotLeaveAFloatingEllipsis() {
+        let app = "Slack"
+        let room = WindowSelection.labelCap - "\(app) — ".count - 1
+        let title = String(repeating: "x", count: room - 1) + " tail beyond the cap"
+        let label = WindowSelection.label(appName: app, title: title)
+        #expect(!label.contains(" …"))
+        #expect(label.hasSuffix("x…"))
+        #expect(label.count < WindowSelection.labelCap)   // shorter, because the space was dropped
+    }
+
+    /// Short titles and empty ones are untouched — the common case must not grow an ellipsis.
+    @Test func ordinaryTitlesAreUnchanged() {
+        #expect(WindowSelection.label(appName: "Firefox", title: "Release Notes")
+            == "Firefox — Release Notes")
+        #expect(WindowSelection.label(appName: "Finder", title: "") == "Finder — ")
+    }
+
+    /// ⚠️ An app name past the cap is left intact rather than mangled: it is not user-generated, and
+    /// macOS app names are short. Stated so the behaviour is a decision, not an accident.
+    @Test func anAppNameLongerThanTheCapSurvivesWhole() {
+        let absurd = String(repeating: "A", count: 80)
+        let label = WindowSelection.label(appName: absurd, title: "anything")
+        #expect(label.hasPrefix(absurd))
+        #expect(label.contains("anything"))
+    }
 }

@@ -154,10 +154,25 @@ public struct WindowSelection: Hashable, Sendable {
         return match
     }
 
+    /// How wide a window label may get. The menu's widest ordinary row is ~45 characters, so this
+    /// sits just above it: a window stops being the thing that sets the menu's width.
+    static let labelCap = 56
+
     /// `Firefox — Release Notes`, the menu's label for a window row. Always built from a *live*
     /// window, so a retitled one relabels itself.
+    ///
+    /// ⚠️ Capped (M36-T3): a 171-character title measured live stretched **every** row, because
+    /// `SourcesModel` builds the top-level `Source:` header from this too. Only the title is cut —
+    /// the app name is what you pick by, and it is never user-generated. Trailing, not middle: the
+    /// front carries the app and document, the tail is where session ids and window sizes live.
     public static func label(appName: String, title: String) -> String {
-        "\(appName) — \(title)"
+        let prefix = "\(appName) — "
+        guard prefix.count + title.count > labelCap else { return prefix + title }
+        // The ellipsis is spent from the budget, not added on top of it.
+        let room = labelCap - prefix.count - 1
+        guard room > 0 else { return prefix + title }   // an app name past the cap stays intact
+        let cut = title.prefix(room).reversed().drop { $0 == " " }.reversed()
+        return prefix + String(cut) + "…"
     }
 
     /// `Firefox (closed)` — a pick whose window is gone. The app is all we can honestly say, since
