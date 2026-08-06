@@ -78,8 +78,13 @@ case "dump":
 
 case "press":
     guard let title = value else { fail("press needs a button title", 64) }
-    guard let button = firstElement(role: kAXButtonRole as String, title: title, in: windows) else {
-        fail("no button titled \"\(title)\"", 3)
+    // Radio buttons too: a SwiftUI segmented picker's tabs are `AXRadioButton`, and pressing one is
+    // the only way to reach Settings' other panes headlessly.
+    let pressable = [kAXButtonRole, kAXRadioButtonRole, kAXCheckBoxRole].map { $0 as String }
+    guard let button = pressable.lazy
+        .compactMap({ firstElement(role: $0, title: title, in: windows) }).first
+    else {
+        fail("nothing pressable titled \"\(title)\"", 3)
     }
     let result = AXUIElementPerformAction(button, kAXPressAction as CFString)
     guard result == .success else { fail("press failed: \(result.rawValue)", 4) }

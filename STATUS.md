@@ -6,9 +6,29 @@
 
 ## Now
 
-- **▶️ STATE OF PLAY (2026-08-06): no filed work. Every milestone through M35 is complete and gated.**
-  New work comes from a review or from Franco (CLAUDE.md's working contract) — the 2026-08-05 audit's
-  roadmap (M30–M33) and everything filed from the sessions since (M34, M35) are shipped.
+- **📋 UI/UX AUDIT FILED as M36 (2026-08-06) — three tasks. Next: M36-T1.** Artifact:
+  `claude.ai/code/artifact/bfb2f778-4be2-4e2a-b982-95f32d50ef3e`. Every surface driven on the deployed
+  v1.18.0: both menus, all four Settings panes, onboarding, Trim. **No code changed** — a `docs:` commit.
+  🔴 **The two leading findings are the same failure twice: a surface stating a *configuration* as if it
+  were a *fact*.** A Settings caption asserts that macOS hides banners **without asking** — false
+  whenever the sharing toggle is on, i.e. on Franco's own machine — and the armed row asserts
+  `2 min buffer` **without asking what is held**, which after a display-sleep death is near zero.
+  🔴 **T1 is a miss in M35, and mine.** docs/06 records M12-T5 as "three touches"; M35 fixed those three
+  and G35's "every surface" criterion was assessed against that enumeration rather than a `grep`. There
+  is a fourth. **T1 therefore also adds a guard against enumeration drift**, not just the fix.
+  ⚠️ **Filed PATCH, MINOR decided at the gate** (M30's precedent): T2 may land as a new figure in the
+  menu, which is arguably a capability.
+  ⚠️ **Three findings reviewed and NOT filed** (Franco): the recents date repetition, the Trim window's
+  closing prose, and whether the update row could say what changed (needs an ADR-020 amendment). They
+  live in the artifact; don't re-file without a ruling.
+  ⚠️ **One thing deliberately not claimed:** the Trim window's two action buttons *read* as both being
+  default-styled, but the code says only `Trim & Save` is — recorded as an impression, not a finding.
+  ✅ **Two tooling improvements fell out of driving the app:** `alertdriver.swift` now matches
+  `AXDescription` (SwiftUI buttons often carry no `AXTitle`) and presses radio buttons and checkboxes —
+  which is what made Settings' other panes reachable headlessly at all.
+
+- **▶️ STATE OF PLAY (2026-08-06): every milestone through M35 is complete and gated; M36 is filed.**
+  The 2026-08-05 audit's roadmap (M30–M33) and everything filed since (M34, M35) are shipped.
   🚢 **v1.18.0 is CUT and PUBLISHED** (2026-08-06) — full gate, tagged, signed zip live at
   `github.com/fcostantini/screenrec/releases/tag/v1.18.0`. Its notes come from `CHANGELOG.md`, and the
   M32-T5 preflight has now gated two consecutive releases.

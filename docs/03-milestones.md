@@ -3336,6 +3336,73 @@ save is unmistakable to someone watching the menu bar; every surface states the 
 than "may"; and a read that fails degrades to the hedge rather than to a claim, proven by breaking the
 read rather than asserted.
 
+## M36 — The surfaces state facts, not configurations (from the 2026-08-06 UI/UX audit)
+
+Audit artifact: `claude.ai/code/artifact/bfb2f778-4be2-4e2a-b982-95f32d50ef3e`. Six findings; **Franco
+took three** (2026-08-06). 🔴 **The two that lead are the same failure in two places: a surface stating
+a *configuration* as though it were a *fact*.** One caption asserts what macOS will do without asking,
+and the armed row asserts a buffer size without asking what is held. That is the specific kind of wrong
+this project has otherwise organised itself against — the disk guard, `≈46 MB per minute`, the caption
+that admits a request reveals your IP — which is why they rank above the merely untidy. **Filed PATCH**;
+⚠️ if T2 lands as a new figure in the menu that is arguably a capability, so **MINOR is decided at the
+gate**, not now (M30's precedent for deferring the bump).
+
+⚠️ **Reviewed and NOT filed (Franco, 2026-08-06)** — they stay in the audit artifact rather than
+becoming work: recents repeating the date a day header already gave (M28-T5 deferred it once already),
+the Trim window's two closing paragraphs, and whether the update row could say *what* changed (that one
+would need an ADR-020 amendment, since it is a second request). **Do not re-file without a ruling.**
+
+- [ ] M36-T1 **The fourth suppression surface stops asserting.** `SettingsView.swift:241`, the Instant
+      Replay pane: *"While replay is armed, macOS hides notification banners — ScreenRec's and other
+      apps'."* — unconditional, and **false whenever the sharing toggle is on**, which is Franco's own
+      state. **Seams:** `BannerVisibility` (ADR-022) is built and tested; this is the fourth consumer of
+      the same three-state pattern. **Rulings:** when banners *work*, does the caption state the good
+      news or disappear? ⚠️ The menu row vanishes (ADR-020's "silent when there is nothing to say"), but
+      a Settings pane is a **reference** surface where "this is fine" earns its place — different jobs,
+      so decide rather than copy. The `Open Notification Settings…` link stays either way: it is the
+      route back *out*.
+      🔴 **Why this was missed, and the guard that follows from it:** docs/06 records M12-T5 as "three
+      touches", M35 audited those three, and G35's "every surface" criterion was assessed against that
+      enumeration instead of a `grep`. **So T1 also adds a test that fails when any source file
+      hard-codes a suppression claim outside the sanctioned sites** — the same shape as the
+      `CoreInfo`↔`VERSION` and `CHANGELOG`↔`VERSION` pins, guarding against enumeration drift rather
+      than against a logic error.
+      **Verify:** the three states unit-tested; the pane read in the deployed app with the toggle **on**
+      and **off** (⚠️ one flip from Franco); and the new guard turns red when a claim is planted.
+- [ ] M36-T2 **The armed row reports what is actually held.** `replayBufferMenuLabel` computes
+      `2 min buffer · ≈360 MB` from `replaySeconds` — the **configured** size, never the fill. 🔴 **And
+      the ring can be nearly empty without saying so:** measured 2026-08-06, a display-sleep stream death
+      restarts it from zero (63 s held 64 s after waking, the full 120 s only at 165 s), so for two
+      minutes after returning to the Mac the menu claims two minutes and `Save Replay Now` hands over a
+      fraction. Franco's own menu holds a `0:04` replay.
+      **Seams:** ⚠️ **no `bufferedSeconds` exists anywhere** — `ReplayMuxer` only reports
+      `.nothingBuffered` as a *save* error. The rings know their span; it has to be surfaced through
+      `ReplayMuxer` → `ReplayController` → `AppState`. **Rulings:** show the fill **only when it is short
+      of the configured size** (ADR-020's silence rule again), or always? Recommend the former.
+      ⚠️ **Two traps already known:** the menu is stamped at open and must not tick (M6-T10), so the row
+      reports the value *at open*; and `@Observable` publishes on every set, so assign only on real
+      change or an open menu rebuilds under the cursor (`refreshProgress`'s precedent).
+      **Verify:** the label unit-tested for full / partial / empty; live — arm, save at once, and the row
+      must have said something small; then the M16-T1 scenario (display sleep, wake) and watch the figure
+      climb. **Precedent:** M28-T4 turned a frozen export row into a live one for exactly this reason.
+- [ ] M36-T3 **Window titles are truncated before they reach the menu.** `Source ▸ Window ▸` lists live
+      titles verbatim; measured on Franco's machine at **~140 characters including a full session
+      UUID**, and every row in the menu is as wide as the widest one. Any long browser tab or document
+      name does the same.
+      **Rulings:** the cap (~48 characters) and the ellipsis position — ⚠️ **trailing, not middle**: the
+      useful part is the front (`Terminal — screenrec-app — …`), and a middle ellipsis would keep the
+      UUID tail. ⚠️ **Second-order and worth naming:** the menu is a surface people screenshot, and
+      titles carry document, channel and customer names; M19-T5 already ruled a title is not *identity*,
+      so this is only about how much gets **shown**.
+      ⚠️ **Accepted cost:** two long titles can then render alike. The pick is by identity, so only the
+      label is ambiguous, and the app-name prefix survives.
+      **Verify:** the truncation is pure and unit-tested at the boundary; `menudriver dump` shows the
+      long row bounded and the menu's widest row shrinking; docs/06 records the cap.
+
+**Gate G36** — each of the three surfaces states a fact rather than a configuration, proven by breaking
+each and watching a named test go red; the menu's widest row is bounded by the cap; and a planted
+hard-coded suppression claim fails a test rather than shipping.
+
 ## Dependency graph
 
 ```
