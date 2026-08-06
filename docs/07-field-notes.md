@@ -7,6 +7,30 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-06 (the display-sleep question, MEASURED AND CLOSED — UNMEASURED since 2026-07-24):
+  **Armed replay does NOT wake a slept display, and the ring recovers completely on wake. The strobe
+  this note feared cannot happen.** Run with Franco genuinely away from the keyboard for 90 s.
+  - ✅ **No self-wake:** `pmset displaysleepnow` at **13:37:37** → `Display is turned off`, and **no**
+    `Display is turned on` for the next 90 s. The earlier same-second off→on was the operator's own
+    trackpad, and the control proved it (see the abandoned-attempt note below).
+  - ✅ **Why the composed fear was wrong:** 02 §7's "SCK wakes a slept display" applies to the
+    **unlocked** case. This Mac **locks when the display sleeps**, which is §7's third row — *locked AND
+    slept ⇒ **zero displays*** — so the retry cannot start a capture and therefore cannot wake anything.
+    **34 capture-start attempts** in the 90 s window, every one failing, display staying dark.
+  - ✅ **The stream dies immediately and quietly:** SCK logged
+    `Stopping stream due to stream frameStatus=5` at **13:37:37.296**, the same second as the blank, and
+    the app surfaced **zero errors** of its own. ⚠️ ~1,700 SCK log lines in 90 s while achieving
+    nothing — verbose, but not ours.
+  - ✅ **The ring refills unaided, and the arithmetic is the proof:** display on at **13:40:19**; a save
+    at **13:41:23** (+64 s) held **63.31 s**; a save at **13:43:04** (+165 s) held **120.50 s** — the
+    full 2-minute cap, rolling. Video plus both audio tracks in each.
+  - 🔴 **Pre-sleep content is DISCARDED — the ring restarts empty.** The +64 s save contained 63.31 s,
+    i.e. only what was captured since the wake, nothing from before the death. So "the last two
+    minutes" after you return spans **your return**, never your absence. Expected (nothing was captured
+    while away) but worth stating: someone will assume the buffer bridges the gap.
+  - ⚠️ **None of this can happen on Franco's own machine unprompted:** `displaysleep 0`. It is a
+    recipient's scenario, whose display sleeps after ~10 minutes by default.
+
 - 2026-08-06 (G4 §5.4, owed since 2026-07-15): **An `NSOpenPanel` IS drivable headlessly, and the
   read-only directory you test it with must be `chmod 555` — not `000`.**
   - ✅ **The recipe**, after `menudriver click "Settings…"`:

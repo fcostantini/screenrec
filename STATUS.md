@@ -9,11 +9,12 @@
 - **▶️ STATE OF PLAY (2026-08-06): no filed work. Every milestone through M35 is complete and gated.**
   New work comes from a review or from Franco (CLAUDE.md's working contract) — the 2026-08-05 audit's
   roadmap (M30–M33) and everything filed from the sessions since (M34, M35) are shipped.
-  🚢 **`VERSION` is `1.18.0` and NOT released** — M35 earned the MINOR bump; `Scripts/release.sh` will
-  cut it, and its changelog preflight passes because 1.18.0's notes are written.
-  ⚠️ **One thing only Franco can do, and it is not blocking anything:** arm Instant Replay next time he
-  is actually leaving the desk, come back, unlock, and hit `Save Replay Now`. A full buffer closes the
-  display-sleep note; nothing means a real bug found the way it would bite. See "Needs Franco".
+  🚢 **v1.18.0 is CUT and PUBLISHED** (2026-08-06) — full gate, tagged, signed zip live at
+  `github.com/fcostantini/screenrec/releases/tag/v1.18.0`. Its notes come from `CHANGELOG.md`, and the
+  M32-T5 preflight has now gated two consecutive releases.
+  ✅ **The display-sleep question is measured and closed** (docs/07): armed replay does **not** wake a
+  slept display, and the ring refills unaided to its full cap. Nothing is owed to Franco but the two
+  standing items below, neither blocking.
   ⚠️ **A last audit was 2026-08-05 and the tree has moved a lot since** — public repo, a network read,
   release tooling that depends on `CHANGELOG.md`, `AppShellTests` covering both menu states, and
   `ADR-022`'s private-preference read. A fresh review is the natural next generator of work.
@@ -113,19 +114,18 @@
       even enter it. **The panel is drivable headlessly now** (docs/07 has the recipe); nothing here
       needs you.
 
-- [ ] **Display-sleep lever** (declined 2026-07-27; **attempted and abandoned 2026-08-06** — docs/07).
-      ⚠️ **`pmset displaysleepnow` measures nothing while you are at the keyboard:** the display relit
-      in the same second, armed *and* disarmed, because your own trackpad tickles
-      `UserIsActive`. The control caught it; the armed run alone looked like a confirmed defect.
-      ⚠️ **It also locks the session** (a password on wake) — warn first.
-      🔴 **Reframed, and this is the useful part:** your Mac locks on display sleep, so armed replay
-      lands in 02 §7's **"locked AND slept" → zero displays → capture fails** state, not the "SCK wakes
-      the display" one. So the strobe was probably the wrong hypothesis and **the question is whether
-      the ring dies silently while you are away and fails to refill on unlock** — a *Save Replay Now*
-      that yields nothing after you walk back.
-      **What it needs from you: a genuine absence** — arm it, walk away for a few minutes, come back,
-      unlock, and save. That is the real scenario, and no tooling substitutes for it. Best done
-      opportunistically next time you are leaving the desk anyway.
+- [x] **Display-sleep lever — MEASURED AND CLOSED 2026-08-06** (declined 2026-07-27, attempted and
+      abandoned earlier the same day, then run properly with Franco away from the keyboard for 90 s).
+      ✅ **Both questions answered.** The retry loop does **not** wake a slept display — 34 failed
+      capture-start attempts, display dark throughout — because this Mac locks when the display sleeps,
+      which is 02 §7's *locked AND slept ⇒ zero displays* row, so SCK cannot start a capture at all.
+      And the ring **refills unaided**: +64 s after the wake it held **63.31 s**, +165 s it held the full
+      **120.50 s** cap.
+      🔴 **The one thing worth knowing: pre-sleep content is discarded** — the ring restarts empty, so
+      "the last two minutes" after you return spans your return, never your absence.
+      ⚠️ Unreachable on this machine unprompted (`displaysleep 0`); it is a recipient's scenario.
+      Detail in docs/07.
+
 - [ ] **Monitor unplug mid-recording** — N/A on this hardware (built-in display only). Worth one run
       if an external display ever exists: it could report a code other than -3815, which would need a
       new `endReason` mapping (02 §7).
