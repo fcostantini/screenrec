@@ -7,6 +7,16 @@ one file in the repo whose audience is not us.
 Only versions published as releases appear here; several were tagged during development and never
 published. The commit history is in the repository, where it belongs.
 
+## 1.18.0
+
+**You can tell when a replay has been saved.** The menu bar now says **Saved** for three seconds
+instead of showing a small tick. That matters more than it sounds: macOS hides notification banners
+while Instant Replay is armed, so this is often the only confirmation you get.
+
+**And ScreenRec stops guessing about those hidden banners.** It can now tell whether you've allowed
+notifications while sharing the display, so the menu and the setup window say what will actually
+happen rather than what might. Turn the setting on and the setup window confirms it, with no restart.
+
 ## 1.17.1
 
 **The update notice now takes you somewhere.** When a newer version exists, clicking the row in the

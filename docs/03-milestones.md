@@ -3312,9 +3312,11 @@ measurement killed the fallback that would have made them equivalent — see doc
       ⚠️ **The first-arm alert's new copy was never seen live** — it fires once ever and
       `hasSeenReplayBannerWarning` is already true on this machine. Covered by unit tests only.
 
-**Gate G35** — with the toggle **off** and no banner possible, a replay save is unmistakable to someone
-watching the menu bar; every surface states the **actual** state rather than "may"; and a read that
-fails degrades to the hedge rather than to a claim, proven by breaking the read rather than asserted.
+**Gate G35** — ✅ **PASSED 2026-08-06** (evidence in STATUS.md's gate table; two claims deliberately
+narrowed there rather than waived). As filed: with the toggle **off** and no banner possible, a replay
+save is unmistakable to someone watching the menu bar; every surface states the **actual** state rather
+than "may"; and a read that fails degrades to the hedge rather than to a claim, proven by breaking the
+read rather than asserted.
 
 ## Dependency graph
 
