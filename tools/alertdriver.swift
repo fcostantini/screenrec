@@ -34,11 +34,15 @@ func fail(_ message: String, _ code: Int32) -> Never {
     exit(code)
 }
 
+/// Matches `kAXTitleAttribute` **or** `kAXDescriptionAttribute`: a SwiftUI button often carries its
+/// label only as the description, and matching titles alone can't find it (measured on Settings'
+/// `Choose…`).
 func firstElement(role: String, title: String? = nil, in windows: [AXUIElement]) -> AXUIElement? {
     for window in windows {
         for (element, _) in descendants(window) where string(element, kAXRoleAttribute as String) == role {
             guard let title else { return element }
             if string(element, kAXTitleAttribute as String) == title { return element }
+            if string(element, kAXDescriptionAttribute as String) == title { return element }
         }
     }
     return nil

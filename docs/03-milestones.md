@@ -364,7 +364,7 @@ UI layout, states, notification copy, and onboarding flow are specified in
       UX check — but it is no longer load-bearing for this question.
       **Verify:** unit tests render view model for every permission-state combination;
       fresh-account walkthrough per 04-testing §5.1 **(human)**.
-- [ ] M4-T4 Settings window (SwiftUI Form, UserDefaults): output dir (with preflight on
+- [x] M4-T4 Settings window (SwiftUI Form, UserDefaults): output dir (with preflight on
       choose — 02 §2), preset, fps.
       ⚠️ **DESCOPED 2026-07-15 (Franco)**: replay duration + hotkey recorder move to **M5**, and
       launch-at-login to **M6** — see docs/06's Settings amendment. The principle: don't ship
@@ -381,6 +381,24 @@ UI layout, states, notification copy, and onboarding flow are specified in
       exactly the documented names. ⚠️ **G4 §5.4 (choose Desktop → friendly error at selection)
       is NOT yet run** — it needs the NSOpenPanel driven, and `menudriver` can't; the preflight
       behind it is M0-T4's and unit-tested. Owed to G4.
+      ✅ **RUN AT LAST 2026-08-06, and the box ticks.** Chose a folder the app cannot write to → the
+      panel closed, **`outputDirectory` stayed `~/Movies`** (`defaults read`), and Settings rendered the
+      documented error in red: *"Can't write to the output folder: … If this is Desktop, Documents, or
+      Downloads, grant Files and Folders access…"*. The happy path is now observed too: a valid folder
+      **is** adopted and persisted. All three had only ever been unit-tested at the `preflight` level.
+      🔴 **§5.4's literal wording cannot be tested on this machine: Desktop is WRITABLE for the
+      deployed app.** Choosing it was *accepted* and `outputDirectory` became `~/Desktop` (restored
+      immediately — CLAUDE.md forbids recordings there). The app has accumulated the Files & Folders
+      grant over months of testing, so the TCC failure a recipient would hit cannot be reproduced here
+      without revoking it. **The deterministic substitute is a `chmod 555` directory** — readable, so
+      the panel can navigate in; unwritable, so the writer probe fails. That is the same branch by the
+      same route.
+      🔴 **`chmod 000` does NOT work and the reason is worth knowing:** NSOpenPanel refuses to select a
+      directory it cannot read, so macOS blocks before the app's preflight ever runs — a different
+      failure mode entirely. One digit apart, and only one of them tests the code.
+      ✅ **The July blocker is gone:** the panel *is* drivable headlessly. `tools/alertdriver.swift`
+      gained a 4-line `AXDescription` fallback (Settings' `Choose…` has no `AXTitle`), and the
+      navigation recipe is in docs/07.
       **Verify:** change each setting, quit, relaunch → `defaults read
       dev.fcostantini.screenrec.app` shows the documented keys with persisted values
       and UI reflects them; choosing unreadable dir → immediate friendly error (§5.4).

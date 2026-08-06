@@ -7,6 +7,33 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-06 (G4 §5.4, owed since 2026-07-15): **An `NSOpenPanel` IS drivable headlessly, and the
+  read-only directory you test it with must be `chmod 555` — not `000`.**
+  - ✅ **The recipe**, after `menudriver click "Settings…"`:
+    `alertdriver press "Choose…"` (**background it** — `runModal()` blocks), then **one** `osascript`
+    doing `set frontmost to true` → `⌘⇧G` → `⌘A` → `keystroke <path>` → Return, then
+    `alertdriver press "Choose"`. The panel appears as `window 0: Open [AXDialog]` of the app itself.
+  - 🔴 **`frontmost` and the keystroke must be in the SAME osascript.** Every command runs from
+    Terminal, which is the frontmost app, and `activate` / `set frontmost to true` issued as a separate
+    call does not stick — a later `keystroke` then types into *your own shell*. Combined in one script
+    it lands in the panel.
+  - 🔴 **`⌘A` before typing, or the path CONCATENATES** onto whatever the go-to field already holds
+    (measured: `…/screenrec-unwritable-test/Users/fcostantini/Desktop`, which silently navigates
+    nowhere).
+  - ⚠️ **`System Events`' `entire contents of window 1` returns ZERO elements** for this app's SwiftUI
+    windows, while `tools/axdump.swift` walks the same tree fine. Use the project's own AX drivers, not
+    AppleScript element queries.
+  - ⚠️ **`tools/alertdriver.swift` now matches `AXDescription` as well as `AXTitle`** — a SwiftUI button
+    often carries its label only in the description, and Settings' `Choose…` has no title at all.
+  - 🔴 **`chmod 000` tests nothing:** NSOpenPanel refuses to select a directory it cannot read, so
+    macOS blocks *before* the app's `preflight` runs. **`chmod 555` is the instrument** — readable so
+    the panel can enter it, unwritable so the `AVAssetWriter` probe fails, which is precisely the
+    "readable but refuses writes" shape the branch exists for.
+  - 🔴 **Desktop is WRITABLE for the deployed app**, so §5.4's literal wording is untestable here: it
+    was accepted and became the output folder. Months of testing earned it the Files & Folders grant. A
+    recipient's fresh install has no such grant, so **their** failure path is still only reachable via
+    the 555 substitute or by revoking the grant.
+
 - 2026-08-06 (display-sleep lever, ATTEMPTED AND ABANDONED): **`pmset displaysleepnow` is not a
   usable lever while a human is at the keyboard, and the question it was meant to answer needs the
   *absence* of a user — which no harness can supply. Nothing was learned about the app; everything
