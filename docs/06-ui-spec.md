@@ -358,9 +358,15 @@ notifications fire after capture ends. Remedies, in order:
 - **Now:** the user enables *System Settings → Notifications → Allow notifications when
   mirroring or sharing the display* — **measured working 2026-07-16 (Franco): with the toggle
   on, the replay-saved banner renders while armed, and so do third-party banners (Slack) —
-  the remedy is system-wide.** The suppression side (toggle OFF + armed ⇒ Slack silenced?)
-  remains inferred; the A/B needs a toggle-off run. Candidate onboarding copy for the
-  Notifications row (deferred by Franco, same day).
+  the remedy is system-wide.** ✅ **The toggle-OFF arm of that A/B is now run for our own banner
+  (2026-08-06, M35-T1's measurement): armed + toggle off → the `Replay saved` banner is absent at 1 s,
+  3 s and 6 s, while the notification still lands in the delivered list.** Third-party banners
+  (Slack silenced?) remain inferred. Candidate onboarding copy for the Notifications row is M35-T3.
+- **Since M35-T1 (ADR-022), the app reads the setting instead of guessing**, so both surfaces state
+  what is true: the armed caveat row reads *"Notification banners **are** hidden while armed"* when
+  suppressed, **disappears entirely** when banners will render, and keeps *"**may** be hidden"* only
+  when the read fails. The first-arm alert follows the same three states and **does not fire at all**
+  when banners work — leaving its once-ever flag unspent for an arm that actually warrants it.
 - **M6-T4:** `interruptionLevel = .timeSensitive` is already set on every notification, but the
   required entitlement (`Scripts/entitlements.plist`, parked) needs a provisioning profile —
   AMFI refuses to launch a self-signed app carrying it (POSIX 153), and without the entitlement

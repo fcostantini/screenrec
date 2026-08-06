@@ -337,7 +337,10 @@ import RecorderCore
     @Test func theFirstArmEverFiresTheWarningOnceAndPersistsSeen() {
         let (state, _, defaults) = makeState()
         var fired = 0
-        state.onReplayBannerWarning = { fired += 1 }
+        // Stubbed, never read live (M35-T1): the real setting is the machine's, so without this the
+        // test asserts something about whoever runs it.
+        state.bannerVisibility = { .hidden }
+        state.onReplayBannerWarning = { _ in fired += 1 }
         #expect(!state.hasSeenReplayBannerWarning)
 
         state.isReplayArmed = true
@@ -356,7 +359,10 @@ import RecorderCore
         defaults.set(true, forKey: SettingsStore.Key.seenReplayBannerWarning)
         let state = AppState(defaults: defaults, replayController: ReplaySpy())
         var fired = 0
-        state.onReplayBannerWarning = { fired += 1 }
+        // `.hidden` on purpose: with the real read this could pass because banners happen to work on
+        // this machine, rather than because the flag was already seen.
+        state.bannerVisibility = { .hidden }
+        state.onReplayBannerWarning = { _ in fired += 1 }
 
         #expect(state.hasSeenReplayBannerWarning)     // seeded from defaults
         state.isReplayArmed = true

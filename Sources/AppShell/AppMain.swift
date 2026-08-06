@@ -76,7 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         // First-arm banner-suppression alert (M12-T5): AppKit lives here, fired once ever.
-        state.onReplayBannerWarning = { NotificationSettings.showArmedBannerWarning() }
+        state.onReplayBannerWarning = { NotificationSettings.showArmedBannerWarning($0) }
         // Stop & Copy MP4 (M21-T2): the pasteboard is AppKit, so the app performs the copy the
         // export path asks for — the same write the per-file `Copy` row does.
         state.exports.copyToPasteboard = { ShareActions.copy($0) }

@@ -166,9 +166,14 @@ struct MenuBuilder {
         guard state.isReplayArmed else { return items }
         // What arming costs (M16-T2): the ring's memory, and ADR-018's deliberate wakefulness.
         items.append(MenuRow.label(state.replayBufferMenuLabel))
-        // docs/06 §Notifications (M12-T5): macOS hides banners while the screen is captured, unless
-        // the user allowed them when sharing — not readable via API, so "may".
-        items.append(MenuRow.label("Notification banners may be hidden while armed"))
+        // docs/06 §Notifications: macOS hides banners while the screen is captured, unless the user
+        // allowed them when sharing. M35-T1 reads that setting, so this states the fact when it can
+        // and stays silent when there is nothing to warn about; "may" survives only for a failed read.
+        switch state.bannerVisibility() {
+        case .hidden: items.append(MenuRow.label("Notification banners are hidden while armed"))
+        case .unknown: items.append(MenuRow.label("Notification banners may be hidden while armed"))
+        case .shown: break
+        }
         items.append(MenuRow.action("Save Replay Now", hotkey: state.replayHotkey) {
             state.saveReplay()
         })

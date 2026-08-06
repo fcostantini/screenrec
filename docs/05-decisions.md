@@ -231,6 +231,35 @@ by a recipient only because of ADR-021.
 itself*; anything that sends information about the user, the machine, or a recording is on the other
 side of it and is not authorised by this.
 
+## ADR-022 ✅ The app may read a private macOS preference to tell the truth about banners (2026-08-06)
+Armed replay captures the display, so macOS hides **every** app's notification banners unless the user
+turned on *"Allow notifications when mirroring or sharing the display"*. Two surfaces had to hedge —
+*"banners **may** be hidden"* — because M12-T5 recorded that the setting has no public API. **That is
+correct and it was the wrong place to stop:** the setting is readable at
+`com.apple.ncprefs` → `dnd_prefs` → **`dndMirrored`**, and the toggle the user sees is `!dndMirrored`
+(polarity measured by flipping it, not inferred — docs/07). **Decided: the app may read it.**
+
+**Why this is not the same kind of decision as ADR-020.** That one authorised a *network* read, which
+sends an IP address to a third party. This read never leaves the machine, sends nothing, and concerns
+the system's own configuration. There is no privacy cost to weigh — only a maintenance one.
+
+**Bounds:**
+- **Read only, never write.** The app never changes the setting; it deep-links to the pane and lets the
+  user decide (M12-T5's existing behaviour).
+- **Three states, always.** `shown` / `hidden` / **`unknown`** — a failed read is a first-class answer.
+- 🔴 **An unreadable setting degrades to the hedge, never to a claim.** The key is undocumented and can
+  be renamed in any macOS release. A caveat row that confidently says the wrong thing is worse than one
+  that hedges, so `unknown` reproduces exactly the copy the app used when it could read nothing at all.
+  This is the whole reason the decision is acceptable.
+- **Silent when there is nothing to say.** Banners working is not news: the caveat row disappears and
+  the first-arm alert does not fire — and, so the one-time warning is not spent on nothing, the "seen"
+  flag stays unset until an arm actually warrants a warning.
+
+⚠️ **The cost, stated rather than buried:** this is a private domain and an undocumented key. If Apple
+removes it the app gets quieter and vaguer, not wrong — which is the failure mode that makes it worth
+taking. **A reversal is a new ADR**; so is reading any *other* private domain, which this does not
+authorise.
+
 ## ADR-021 ✅ The repository is public; distribution and signing are unchanged (Franco, 2026-08-05)
 ADR-014 said screenrec is **"never public"**, and M32 ran straight into the consequence: the update
 check it needed could not read a private repo's releases, and — the part that reshaped the milestone

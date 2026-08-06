@@ -220,11 +220,15 @@ public final class AppState {
             guard isReplayArmed != oldValue else { return }
             // First arm ever (M12-T5): flag it seen now so persist() below stores it, but fire the
             // alert only AFTER arming — a modal here would defer capture until it was dismissed.
-            let isFirstArm = isReplayArmed && !hasSeenReplayBannerWarning
+            // The visibility test leaves the flag unspent when there is nothing to warn about, so
+            // turning the setting off later still earns the one alert (ADR-022).
+            let banners = bannerVisibility()
+            let isFirstArm =
+                isReplayArmed && !hasSeenReplayBannerWarning && banners.warrantsWarning
             if isFirstArm { hasSeenReplayBannerWarning = true }
             persist()
             syncReplayArming()
-            if isFirstArm { onReplayBannerWarning?() }
+            if isFirstArm { onReplayBannerWarning?(banners) }
         }
     }
 
@@ -233,8 +237,13 @@ public final class AppState {
     public private(set) var hasSeenReplayBannerWarning: Bool = false
 
     /// Shows the first-arm alert (M12-T5): the AppKit `NSAlert` is injected (banned in AppCore), nil
-    /// in tests. Fired once ever, after which the dimmed menu row is the standing reminder.
-    public var onReplayBannerWarning: (@MainActor () -> Void)?
+    /// in tests. Fired once ever, after which the dimmed menu row is the standing reminder. Carries the
+    /// state it was fired for, so the alert's copy and this decision never disagree.
+    public var onReplayBannerWarning: (@MainActor (BannerVisibility) -> Void)?
+
+    /// Whether banners will render while capturing (M35-T1). Injected so tests drive all three states;
+    /// the default reads the system setting.
+    public var bannerVisibility: @MainActor () -> BannerVisibility = { .current() }
 
     /// The rolling window, `Settings.replaySecondsRange` (5 s – 15 min, M9-T8). Changing it resizes
     /// the rings in place — the buffer survives: grow fills over time, shrink evicts the excess now.

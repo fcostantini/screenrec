@@ -48,6 +48,7 @@ import Testing
 
     @Test func armingAddsItsCostItsCaveatAndTheSaveRowAndNothingElse() {
         let state = MenuSnapshot.state()
+        state.bannerVisibility = { .unknown }        // the caveat's original case
         let before = MenuSnapshot.titles(state)
 
         state.isReplayArmed = true
@@ -64,6 +65,27 @@ import Testing
         // The cost and the caveat state something; only the save row does something.
         #expect(MenuSnapshot.item(state, titled: state.replayBufferMenuLabel)?.isEnabled == false)
         #expect(MenuSnapshot.item(state, titled: "Save Replay Now")?.isEnabled == true)
+    }
+
+    /// M35-T1: the caveat states the fact when the app can read it, and **says nothing** when there is
+    /// nothing to warn about — ADR-020's "silent when current", applied to a second surface.
+    @Test func theArmedCaveatMatchesWhatTheAppCanActuallyTell() {
+        func armedRows(_ banners: BannerVisibility) -> [String] {
+            let state = MenuSnapshot.state()
+            state.bannerVisibility = { banners }
+            state.isReplayArmed = true
+            let titles = MenuSnapshot.titles(state)
+            // To the block's own separator, not a fixed count — a fixed prefix cannot see a row leave.
+            return Array(
+                titles.drop { $0 != "Arm Instant Replay" }.dropFirst().prefix { $0 != "---" })
+        }
+
+        #expect(armedRows(.hidden)[1] == "Notification banners are hidden while armed")
+        #expect(armedRows(.unknown)[1] == "Notification banners may be hidden while armed")
+        // Nothing to say: the row is gone entirely, and Save Replay Now moves up into its place.
+        #expect(armedRows(.shown).count == 2)
+        #expect(armedRows(.shown)[1] == "Save Replay Now")
+        #expect(!armedRows(.shown).contains { $0.contains("Notification banners") })
     }
 
     // MARK: - What is left out of a take
