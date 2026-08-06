@@ -6,6 +6,22 @@
 
 ## Now
 
+- **✅ M35-T3 SHIPPED (2026-08-06) — onboarding says whether banners will really appear. M35's three
+  tasks are done; G35 needs Franco.** Option A: the tick stays, the sentence changes. **791 tests.**
+  Plan artifact: `claude.ai/code/artifact/35f8f986-425c-4663-bfb2-0faee7d5c8f2`.
+  ✅ **Observed live in both states, window never touched.** Allowed → *"…including while replay is
+  armed"*; Franco flipped it off → the row rewrote itself to *"Banners are hidden while replay is
+  armed. Turn on …"*. Toggle restored to on.
+  ✅ **No new machinery** — `pollUntilSatisfied()` already re-reads every second *"because they're
+  granted elsewhere, with no callback"*. ✅ **4 breaks, 4 reds.**
+  🔴 **Franco expected the checkmark to move, not the text** — the exact objection the plan recorded
+  against option A, confirmed on first use. Left as A on his call; **B or C is a two-line change.**
+  🔴 **The live "it took" moment is unobservable on one screen:** going to System Settings is what
+  buries the window, so a user sees the confirmation *next time they open it*. A property of the flow,
+  not of the row — and the reason "walks them through it" promised more than any build could.
+  ⚠️ **The first-arm alert's new copy was never seen live** (fires once ever;
+  `hasSeenReplayBannerWarning` is already true here). Unit-tested only.
+
 - **✅ M35-T2 SHIPPED (2026-08-06) — a saved replay says so, in words. Next: M35-T3, then G35.**
   Option A at 3 s, Franco's pick from four shown as sketches beside a real capture of the old flash.
   The item carries **`✓ Saved`** for 3 s, then nothing. **786 tests.** Plan artifact:

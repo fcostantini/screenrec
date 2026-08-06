@@ -3282,7 +3282,7 @@ measurement killed the fallback that would have made them equivalent — see doc
       better, and the screenshot is in STATUS so it can be overruled.
       ⚠️ **The item widens for 3 s, so neighbours shift** — accepted knowingly, and the tick alone
       already did it. `reduceMotion` is untouched: nothing here animates.
-- [ ] M35-T3 **Onboarding walks them through it, and verifies it took** — the improvement, and the M16
+- [x] M35-T3 **Onboarding walks them through it, and verifies it took** — the improvement, and the M16
       "honest state" thesis applied to the one place it was waived. Uses T1's read, so it can show a
       real checkmark instead of a hopeful deep link. `NotificationSettings.open()` already deep-links
       to the right pane (M12-T5); what is missing is the confirmation afterwards.
@@ -3290,6 +3290,27 @@ measurement killed the fallback that would have made them equivalent — see doc
       T1's human leg rather than adding a new kind.
       **Verify:** the onboarding row reads unconfirmed → Franco flips the toggle → it confirms without
       a relaunch; and with the read unavailable it shows neither state rather than a false negative.
+      ✅ **Done 2026-08-06 — option A (Franco's pick from three): the tick stays, the sentence changes.**
+      **791 tests** (786 → 791). Plan artifact:
+      `claude.ai/code/artifact/35f8f986-425c-4663-bfb2-0faee7d5c8f2`.
+      ✅ **Observed live, both states, with the window never touched:** banners allowed → *"ScreenRec
+      will tell you when a recording is saved — **including while replay is armed**"*; Franco flipped
+      the toggle off → the row rewrote itself to *"**Banners are hidden while replay is armed.** Turn on
+      "Allow notifications when mirroring or sharing the display" to see them."* Toggle restored.
+      ✅ **No new machinery:** `OnboardingView.pollUntilSatisfied()` already re-reads every second
+      *"because they're granted elsewhere, with no callback"* — exactly this case.
+      ✅ **4 breaks, 4 reds**, including the row ignoring the banner state entirely (7 issues) and a
+      failed read turned into a claim.
+      🔴 **Franco expected the checkmark to move, not the text** (his words, on first use). That is
+      precisely the objection recorded against option A in the plan, now confirmed by the only real
+      data point there is. Left as A on his call — **switching to B or C is a two-line change**, and
+      this is the note that saves rediscovering it.
+      🔴 **The live "it took" moment is unobservable on one screen:** going to System Settings is what
+      buries the window, so in practice a user sees the confirmation *next time they open it*. Not a
+      defect in the row — a property of the flow, and the reason "walks them through it" oversold what
+      any implementation could deliver here.
+      ⚠️ **The first-arm alert's new copy was never seen live** — it fires once ever and
+      `hasSeenReplayBannerWarning` is already true on this machine. Covered by unit tests only.
 
 **Gate G35** — with the toggle **off** and no banner possible, a replay save is unmistakable to someone
 watching the menu bar; every surface states the **actual** state rather than "may"; and a read that
