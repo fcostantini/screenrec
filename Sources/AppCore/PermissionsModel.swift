@@ -55,13 +55,14 @@ public final class PermissionsModel {
 
     /// Re-reads the permission states. Assigns only on a real change: `@Observable` publishes on
     /// every set, not every change, so an unconditional write would redraw the window once a second.
-    public func refreshOnboarding(microphoneRequired: Bool) {
+    public func refreshOnboarding(microphoneRequired: Bool, banners: BannerVisibility) {
         let fresh = OnboardingModel.rows(
             screen: Permissions.screenRecordingState(),
             hasAskedForScreen: hasAskedForScreenRecording,
             microphone: Permissions.microphoneState(),
             microphoneRequired: microphoneRequired,
-            notifications: notificationState)
+            notifications: notificationState,
+            banners: banners)
         if fresh != onboardingRows { onboardingRows = fresh }
     }
 
@@ -69,20 +70,22 @@ public final class PermissionsModel {
     /// grant landed — it essentially never does on the spot: macOS makes the user cross to System
     /// Settings and restart the app (02 §2). The window polls for it instead.
     @discardableResult
-    public func requestScreenRecording(microphoneRequired: Bool) -> Bool {
+    public func requestScreenRecording(microphoneRequired: Bool, banners: BannerVisibility) -> Bool {
         hasAskedForScreenRecording = true
         let granted = Permissions.requestScreenRecording()
-        refreshOnboarding(microphoneRequired: microphoneRequired)   // switch the row to System Settings
+        refreshOnboarding(microphoneRequired: microphoneRequired, banners: banners)   // row → System Settings
         return granted
     }
 
-    public func requestMicrophoneAccess(microphoneRequired: Bool) async {
+    public func requestMicrophoneAccess(microphoneRequired: Bool, banners: BannerVisibility) async {
         _ = await Permissions.requestMicrophoneAccess()
-        refreshOnboarding(microphoneRequired: microphoneRequired)
+        refreshOnboarding(microphoneRequired: microphoneRequired, banners: banners)
     }
 
-    public func setNotificationState(_ state: PermissionState, microphoneRequired: Bool) {
+    public func setNotificationState(
+        _ state: PermissionState, microphoneRequired: Bool, banners: BannerVisibility
+    ) {
         notificationState = state
-        refreshOnboarding(microphoneRequired: microphoneRequired)
+        refreshOnboarding(microphoneRequired: microphoneRequired, banners: banners)
     }
 }

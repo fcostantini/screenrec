@@ -16,12 +16,13 @@ import RecorderCore
         hasAskedForScreen: Bool = false,
         microphone: PermissionState = .granted,
         microphoneRequired: Bool = false,
-        notifications: PermissionState = .granted
+        notifications: PermissionState = .granted,
+        banners: BannerVisibility = .unknown
     ) -> [OnboardingRow] {
         OnboardingModel.rows(
             screen: screen, hasAskedForScreen: hasAskedForScreen,
             microphone: microphone, microphoneRequired: microphoneRequired,
-            notifications: notifications)
+            notifications: notifications, banners: banners)
     }
 
     private func row(_ kind: PermissionKind, _ all: [OnboardingRow]) -> OnboardingRow {
@@ -44,9 +45,11 @@ import RecorderCore
         for notifications in Self.states {
             for asked in [true, false] {
                 for required in [true, false] {
+                  for banners in [BannerVisibility.shown, .hidden, .unknown] {
                     let all = rows(
                         screen: screen, hasAskedForScreen: asked, microphone: microphone,
-                        microphoneRequired: required, notifications: notifications)
+                        microphoneRequired: required, notifications: notifications,
+                        banners: banners)
                     #expect(all.count == 3)
                     // A satisfied row must never still be asking for something, and an
                     // unsatisfied one must always offer a way forward — the dead `Grant…`
@@ -67,6 +70,7 @@ import RecorderCore
                         #expect(!r.title.isEmpty)
                         #expect(!r.detail.isEmpty)
                     }
+                  }
                 }
             }
         }
@@ -207,5 +211,52 @@ import RecorderCore
                 }
             }
         }
+    }
+
+    // MARK: - Banner suppression (M35-T3)
+
+    /// The row keeps its tick when banners are suppressed — notifications *are* granted, and saying
+    /// otherwise would be false about a permission. The sentence carries the truth instead.
+    @Test func aSuppressedSetupKeepsTheTickAndSaysWhatIsWrong() {
+        let suppressed = row(.notifications, rows(notifications: .granted, banners: .hidden))
+        #expect(suppressed.isSatisfied)                       // the grant is real
+        #expect(suppressed.detail.hasPrefix("Banners are hidden while replay is armed."))
+        #expect(suppressed.detail.contains("mirroring or sharing the display"))   // names the fix
+        #expect(!suppressed.detail.contains("may"))           // the hedge is gone
+    }
+
+    @Test func aWorkingSetupSaysSoWithoutHedging() {
+        let working = row(.notifications, rows(notifications: .granted, banners: .shown))
+        #expect(working.isSatisfied)
+        #expect(working.detail.contains("including while replay is armed"))
+        #expect(!working.detail.contains("may"))
+    }
+
+    /// A read that failed keeps exactly the copy the app used when it could read nothing at all
+    /// (ADR-022): `unknown` degrades to the hedge, never to a claim.
+    @Test func anUnreadableSettingKeepsTheHedge() {
+        let unknown = row(.notifications, rows(notifications: .granted, banners: .unknown))
+        #expect(unknown.detail.contains("may hide banners"))
+    }
+
+    /// 🔴 The whole point of the task: nothing about the *permission* changes, only the system
+    /// setting — and the row is different. That is what the window's one-second poll turns into a
+    /// confirmation while the user watches.
+    @Test func theRowChangesWhenOnlyTheSystemSettingDoes() {
+        let before = row(.notifications, rows(notifications: .granted, banners: .hidden))
+        let after = row(.notifications, rows(notifications: .granted, banners: .shown))
+        #expect(before != after)
+        #expect(before.isSatisfied == after.isSatisfied)      // the grant never moved
+        #expect(before.detail != after.detail)
+    }
+
+    /// Nothing is delivered at all, so what happens to banners while armed is moot — and the copy
+    /// must not start lecturing a user who declined.
+    @Test func aDeclinedRowSaysTheSameThingInEveryBannerState() {
+        let details = [BannerVisibility.shown, .hidden, .unknown].map {
+            row(.notifications, rows(notifications: .denied, banners: $0)).detail
+        }
+        #expect(Set(details).count == 1)
+        #expect(details[0].hasPrefix("Skipped."))
     }
 }

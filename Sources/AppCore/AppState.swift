@@ -480,20 +480,24 @@ public final class AppState {
     // which only AppState knows (it reads the mic pick). Deleting them would copy that rule to
     // every call site. What went was the pure pass-throughs — read those off `permissions`.
     public func refreshOnboarding() {
-        permissions.refreshOnboarding(microphoneRequired: microphoneRequired)
+        permissions.refreshOnboarding(
+            microphoneRequired: microphoneRequired, banners: bannerVisibility())
     }
 
     @discardableResult
     public func requestScreenRecording() -> Bool {
-        permissions.requestScreenRecording(microphoneRequired: microphoneRequired)
+        permissions.requestScreenRecording(
+            microphoneRequired: microphoneRequired, banners: bannerVisibility())
     }
 
     public func requestMicrophoneAccess() async {
-        await permissions.requestMicrophoneAccess(microphoneRequired: microphoneRequired)
+        await permissions.requestMicrophoneAccess(
+            microphoneRequired: microphoneRequired, banners: bannerVisibility())
     }
 
     public func setNotificationState(_ state: PermissionState) {
-        permissions.setNotificationState(state, microphoneRequired: microphoneRequired)
+        permissions.setNotificationState(
+            state, microphoneRequired: microphoneRequired, banners: bannerVisibility())
     }
 
     // MARK: - Session

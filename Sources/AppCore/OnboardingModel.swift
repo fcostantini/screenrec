@@ -82,11 +82,12 @@ public enum OnboardingModel {
         hasAskedForScreen: Bool,
         microphone: PermissionState,
         microphoneRequired: Bool,
-        notifications: PermissionState
+        notifications: PermissionState,
+        banners: BannerVisibility
     ) -> [OnboardingRow] {
         [screenRow(screen, hasAsked: hasAskedForScreen),
          microphoneRow(microphone, required: microphoneRequired),
-         notificationsRow(notifications)]
+         notificationsRow(notifications, banners: banners)]
     }
 
     /// Screen recording — always required.
@@ -152,25 +153,51 @@ public enum OnboardingModel {
 
     /// Notifications — optional, never blocks anything (docs/06). They only carry the
     /// "saved / ended because…" message.
-    private static func notificationsRow(_ state: PermissionState) -> OnboardingRow {
-        let satisfied = state == .granted
-        let detail: String
+    /// ⚠️ The mark stays a tick when banners are suppressed (M35-T3): notifications *are* granted, and
+    /// the sharing toggle is macOS's rather than a permission given to us.
+    private static func notificationsRow(
+        _ state: PermissionState, banners: BannerVisibility
+    ) -> OnboardingRow {
         let action: OnboardingRow.Action
         switch state {
-        case .granted:
-            detail = "ScreenRec will tell you when a recording is saved. "
-                + "While replay is armed, macOS may hide banners from other apps."
-            action = .review(.notifications)
-        case .notDetermined:
-            detail = "Optional — tells you when a recording is saved, and why it ended. "
-                + "While armed, macOS may hide banners from other apps."
-            action = .request
-        case .denied:
-            detail = "Skipped. ScreenRec works fine without notifications."
-            action = .openSettings(.notifications)
+        case .granted: action = .review(.notifications)
+        case .notDetermined: action = .request
+        case .denied: action = .openSettings(.notifications)
         }
         return OnboardingRow(
-            id: .notifications, title: "Notifications", detail: detail,
-            isSatisfied: satisfied, action: action, blocksRecording: false)
+            id: .notifications, title: "Notifications",
+            detail: notificationsDetail(state, banners: banners),
+            isSatisfied: state == .granted, action: action, blocksRecording: false)
+    }
+
+    /// What the row says. The *action* depends only on the permission; only the **copy** depends on
+    /// whether banners will actually render, which is why the two are decided apart.
+    private static func notificationsDetail(
+        _ state: PermissionState, banners: BannerVisibility
+    ) -> String {
+        // Nothing is delivered at all, so what happens to banners while armed is moot — and a user
+        // who declined must not be lectured about a setting that would change nothing for them.
+        guard state != .denied else { return "Skipped. ScreenRec works fine without notifications." }
+        let granted = state == .granted
+        switch banners {
+        case .hidden where granted:
+            return "Banners are hidden while replay is armed. Turn on “Allow notifications when "
+                + "mirroring or sharing the display” to see them."
+        case .shown where granted:
+            return "ScreenRec will tell you when a recording is saved — including while replay is "
+                + "armed."
+        case .hidden:
+            return "Optional — tells you when a recording is saved, and why it ended. "
+                + "While armed, macOS hides banners from other apps."
+        case .shown:
+            return "Optional — tells you when a recording is saved, and why it ended."
+        // ADR-022: a read that failed keeps the hedge the app used when it could read nothing at all.
+        case .unknown where granted:
+            return "ScreenRec will tell you when a recording is saved. "
+                + "While replay is armed, macOS may hide banners from other apps."
+        case .unknown:
+            return "Optional — tells you when a recording is saved, and why it ended. "
+                + "While armed, macOS may hide banners from other apps."
+        }
     }
 }

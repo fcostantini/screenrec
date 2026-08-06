@@ -18,7 +18,7 @@ import RecorderCore
 
     @Test func setNotificationStateUpdatesTheHeldValueAndRefreshes() {
         let model = PermissionsModel()
-        model.setNotificationState(.granted, microphoneRequired: false)
+        model.setNotificationState(.granted, microphoneRequired: false, banners: .unknown)
         #expect(model.notificationState == .granted)
         #expect(model.onboardingRows.count == 3)       // screen · microphone · notifications
     }

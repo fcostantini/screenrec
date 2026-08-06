@@ -390,8 +390,15 @@ first arm ever** ("Notifications may be hidden while replay is armed"; OK + **Op
 Settings…** routing to the M9-T2 fix), gated on a persisted `seenReplayBannerWarning` flag so it fires
 exactly once; (2) a **standing dimmed menu row** under the Arm toggle while armed — `Notification
 banners may be hidden while armed` — cleared on disarm; (3) a **line in onboarding's Notifications
-copy** (granted + not-yet-asked states) so the caveat is seen at setup. **All three say "may"
-deliberately** (Franco, 2026-07-23): the global "Allow notifications when mirroring or sharing the
+copy** (granted + not-yet-asked states) so the caveat is seen at setup. ✅ **SUPERSEDED 2026-08-06 by
+M35 (ADR-022): none of the three says "may" any more, because the toggle turned out to be readable
+after all** — not via any public API, which was correct, but via `com.apple.ncprefs` → `dnd_prefs` →
+`dndMirrored`. Each surface now states the fact when it can, and keeps "may" **only** when the read
+fails. The onboarding row additionally **confirms the fix took**: the window's one-second poll means
+flipping the toggle in System Settings changes the row while the user watches, and its tick stays —
+notifications *are* granted, and the sharing toggle is macOS's, not a permission given to us.
+**The original reasoning, for the record:** all three said "may"
+deliberately (Franco, 2026-07-23): the global "Allow notifications when mirroring or sharing the
 display" toggle that actually governs suppression **isn't readable via any public API** (`UNNotification­Settings`
 exposes per-app auth/alert/preview, not this global switch), so an unconditional "are hidden" would lie
 to anyone who's enabled it — the copy names that exact toggle and stays true either way. The M9-T2
