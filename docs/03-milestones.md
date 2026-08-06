@@ -3352,7 +3352,7 @@ becoming work: recents repeating the date a day header already gave (M28-T5 defe
 the Trim window's two closing paragraphs, and whether the update row could say *what* changed (that one
 would need an ADR-020 amendment, since it is a second request). **Do not re-file without a ruling.**
 
-- [ ] M36-T1 **The fourth suppression surface stops asserting.** `SettingsView.swift:241`, the Instant
+- [x] M36-T1 **The fourth suppression surface stops asserting.** `SettingsView.swift:241`, the Instant
       Replay pane: *"While replay is armed, macOS hides notification banners — ScreenRec's and other
       apps'."* — unconditional, and **false whenever the sharing toggle is on**, which is Franco's own
       state. **Seams:** `BannerVisibility` (ADR-022) is built and tested; this is the fourth consumer of
@@ -3369,6 +3369,27 @@ would need an ADR-020 amendment, since it is a second request). **Do not re-file
       than against a logic error.
       **Verify:** the three states unit-tested; the pane read in the deployed app with the toggle **on**
       and **off** (⚠️ one flip from Franco); and the new guard turns red when a claim is planted.
+      ✅ **Done 2026-08-06.** `ArmedBannerCaption` (AppShell, extracted so the copy is assertable without
+      rendering SwiftUI) + the guard. **795 tests** (791 → 795). Plan artifact:
+      `claude.ai/code/artifact/c1cbe532-4f76-4757-8efa-7306b5567bce`.
+      ✅ **Ruling taken (Franco): the pane states the good news rather than vanishing.** The menu row
+      disappears when there is nothing to warn about; a Settings pane is a **reference** surface where
+      "this is fine" is an answer, so it says *"Notification banners keep working while replay is armed,
+      because you've allowed them when sharing the display."*
+      🔴 **The first build was correct-at-open and stale afterwards, and the live check caught it.**
+      Reading `state.bannerVisibility()` inline gives SwiftUI nothing to re-render on, so flipping the
+      toggle left the old sentence up — the exact failure the task exists to fix, and reachable through
+      *this pane's own link*. Fixed with a 1 s poll while the window is up, which is
+      `OnboardingView.pollUntilSatisfied`'s reason verbatim ("granted elsewhere, with no callback"),
+      assigning only on change so an open pane doesn't re-render every second.
+      ✅ **Proven live across a flip, window never touched:** *"keep working"* → *"macOS hides
+      notification banners…"* → back. Toggle restored to on.
+      ✅ **The guard caught its own false positive first:** it flagged `MenuBuilder.swift`, which is
+      compliant — it calls `state.bannerVisibility()` and never names the type. Matching is
+      case-insensitive on `bannervisibility` now. ⚠️ **Its limit is written into the test:** it knows
+      today's phrasings and guards against **drift**, not against someone inventing new words.
+      ✅ **docs/06's "three touches" now says FOUR, named** — the root cause was the enumeration, not the
+      caption.
 - [ ] M36-T2 **The armed row reports what is actually held.** `replayBufferMenuLabel` computes
       `2 min buffer · ≈360 MB` from `replaySeconds` — the **configured** size, never the fill. 🔴 **And
       the ring can be nearly empty without saying so:** measured 2026-08-06, a display-sleep stream death
