@@ -565,11 +565,19 @@
       the fallback **cannot exist**. ⚠️ **Cheap and independent of the ruling:** the copy can stop
       saying banners *"may"* be hidden and say whether they **will** be (~15 lines).
 
-- [ ] **Display-sleep lever** (declined 2026-07-27 — "headless legs only"): two questions need
-      `pmset displaysleepnow` while armed, which blanks the screen mid-session. Does
-      `ReplayController`'s 5 s retry loop wake the display back up (02 §7 says SCK wakes a slept
-      display to capture it — never measured together), and does the ring refill unaided after a real
-      sleep/wake? UNMEASURED in docs/07 under M16-T1.
+- [ ] **Display-sleep lever** (declined 2026-07-27; **attempted and abandoned 2026-08-06** — docs/07).
+      ⚠️ **`pmset displaysleepnow` measures nothing while you are at the keyboard:** the display relit
+      in the same second, armed *and* disarmed, because your own trackpad tickles
+      `UserIsActive`. The control caught it; the armed run alone looked like a confirmed defect.
+      ⚠️ **It also locks the session** (a password on wake) — warn first.
+      🔴 **Reframed, and this is the useful part:** your Mac locks on display sleep, so armed replay
+      lands in 02 §7's **"locked AND slept" → zero displays → capture fails** state, not the "SCK wakes
+      the display" one. So the strobe was probably the wrong hypothesis and **the question is whether
+      the ring dies silently while you are away and fails to refill on unlock** — a *Save Replay Now*
+      that yields nothing after you walk back.
+      **What it needs from you: a genuine absence** — arm it, walk away for a few minutes, come back,
+      unlock, and save. That is the real scenario, and no tooling substitutes for it. Best done
+      opportunistically next time you are leaving the desk anyway.
 - [ ] **Monitor unplug mid-recording** — N/A on this hardware (built-in display only). Worth one run
       if an external display ever exists: it could report a code other than -3815, which would need a
       new `endReason` mapping (02 §7).

@@ -7,6 +7,36 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-06 (display-sleep lever, ATTEMPTED AND ABANDONED): **`pmset displaysleepnow` is not a
+  usable lever while a human is at the keyboard, and the question it was meant to answer needs the
+  *absence* of a user — which no harness can supply. Nothing was learned about the app; everything
+  below is method.**
+  - 🔴 **The measurement, and why it says nothing:** with replay armed, `pmset displaysleepnow` gave
+    `Display is turned off` and `Display is turned on` **in the same second** — which looked exactly
+    like the predicted "SCK wakes the display to capture it" strobe. **The control refuted it:** the
+    identical run with replay **disarmed** produced the same same-second off→on. The cause is visible in
+    `pmset -g assertions` — `pid 164(WindowServer) UserIsActive named:
+    "com.apple.iohideventsystem.queue.tickle … Apple Internal Keyboard / Trackpad"` — i.e. **the
+    operator's own trackpad**. Any HID tickle relights the display instantly.
+  - 🔴 **The July decline ("headless legs only") was more right than its own note.** This is not a
+    missing instrument: the scenario *is* "walked away", so the experiment requires ~60 s during which
+    nobody touches the machine, per condition. Design it as two hands-off windows or not at all.
+  - ⚠️ **Blanking the display LOCKS the session on this machine** (password required on wake). Warn
+    before doing it — it costs the operator a login, and it also changes what is being measured.
+  - 🔴 **And it reframes the question.** With lock-on-display-sleep, armed replay lands in 02 §7's
+    **"locked AND display slept" → zero displays → capture fails** state, *not* the "unlocked, slept →
+    SCK wakes it" state. So the strobe is probably the wrong hypothesis, and the real risk is the
+    **ring dying silently while away and never refilling on unlock** — a save that yields nothing after
+    someone walks back. That is the half worth measuring.
+  - ⚠️ **The app logged nothing during the blank**, but the display was off for under a second, so that
+    is not evidence either way.
+  - 🔴 **Two shell traps that each cost a wrong answer, both worth knowing:**
+    **(1) `log` is shadowed by a function in this environment** — `log show …` returns
+    `too many arguments` or silently nothing. **Always `/usr/bin/log`.** Two queries "found no app
+    logs" before this surfaced. **(2) `timeout` does not exist on macOS** (no coreutils): a
+    `timeout 90 swift test …` guard becomes `command not found`, and an `&& echo` chain around it
+    then reports success. Use the harness's own timeout instead.
+
 - 2026-08-06 (the replay-save ruling — the measurement the audit said was owed): **"Allow
   notifications when mirroring or sharing the display" has no public API, but it IS readable, and the
   app can read it. M12-T5's "no public API" is right and was the wrong conclusion to stop at.**
