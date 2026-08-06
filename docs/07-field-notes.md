@@ -7,6 +7,38 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-06 (the replay-save ruling — the measurement the audit said was owed): **"Allow
+  notifications when mirroring or sharing the display" has no public API, but it IS readable, and the
+  app can read it. M12-T5's "no public API" is right and was the wrong conclusion to stop at.**
+  - ✅ **No public API, measured against the SDK rather than remembered.**
+    `UNNotificationSettings` on the macOS 15 SDK has 13 properties — `authorizationStatus`,
+    `sound/badge/alert`, `notificationCenter`, `lockScreen`, `carPlay` (unavailable on macOS),
+    `alertStyle`, `showPreviews`, `criticalAlert`, `providesAppNotificationSettings`, `announcement`
+    (unavailable on macOS), `timeSensitive`, `scheduledDelivery`, `directMessages`. **None concerns
+    mirroring or screen sharing.**
+  - ✅ **Where it actually lives:** `com.apple.ncprefs` → key **`dnd_prefs`** → a **nested binary
+    plist** → **`dndMirrored`** (siblings: `dndDisplaySleep`, `dndDisplayLock`,
+    `facetimeCanBreakDND`). Read from plain Swift with
+    `UserDefaults(suiteName: "com.apple.ncprefs").data(forKey: "dnd_prefs")` then
+    `PropertyListSerialization` — 202 bytes, no sandbox obstacle (the app isn't sandboxed).
+  - ✅ **Polarity measured by an A/B flip, not inferred from the name:** toggle **ON** ⟺
+    `dndMirrored == false`; toggle **OFF** ⟺ `true`. So the setting the user sees is `!dndMirrored`.
+    Siblings did not move, which is what confirms it is *this* key and not a coincidence.
+  - ✅ **Behaviour paired with both states, replay armed (so the display is being captured):** ON →
+    the `Replay saved` banner **appears**; OFF → **no banner** at 1 s, 3 s *and* 6 s after the save.
+  - 🔴 **The notification is delivered in BOTH states** (`--print-delivered-notifications` shows it
+    either way). **Delivery is not visibility**, so an app can never learn from
+    `UNUserNotificationCenter` whether a human saw anything — a "did you see it?" self-test is
+    impossible, and the readable pref is the only route to knowing. ⚠️ It also means a user with the
+    toggle off silently accumulates undisplayed receipts (43 delivered on this machine).
+  - ⚠️ **The cost of using it:** a private domain and an undocumented key, renameable in any macOS
+    release. Acceptable only because the failure mode degrades to today's behaviour — read fails ⇒
+    "cannot confirm" ⇒ the existing hedged copy. A verifier that silently inverts would be worse than
+    none.
+  - ⚠️ **Method note:** `--print-delivered-notifications` works while the app is running —
+    `AppMain.swift` runs the hook (line ~111) **before** M30-T5's single-instance guard (~116), with a
+    comment saying that is deliberate.
+
 - 2026-08-06 (M34-T1/T3): **A `RecordingSession` can be built in a unit test. Everything that needs
   ScreenCaptureKit, a display or a TCC grant lives in `start()`, not in `init`.**
   - ✅ **The recipe:** `try RecordingSession(configuration: CaptureConfiguration(microphone: .none,

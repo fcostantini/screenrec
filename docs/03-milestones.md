@@ -3349,11 +3349,24 @@ protocol over `RecordingSession` — is a large surface invented for tests and u
   2 s icon change** unless a person completed a manual step they were told about once, ever.
   **Two directions, not exclusive:** (a) onboarding walks them through the toggle and then *verifies
   it took* — the M16 thesis; (b) the flash is promoted into something a person notices, the way
-  M28-T4 promoted the export row. ⚠️ **Both turn on one unmeasured fact:** M12-T5 recorded that the
-  suppression setting has no public API — which is why the shipped copy says banners *"may"* be
-  hidden. If that still holds, (a) can prompt but **cannot** verify, and its honest form is a deep
-  link plus a "did that work?" self-test, not a checkmark. **Trigger:** Franco picks a direction —
-  and the measurement above is owed first, since it may rule one out.
+  M28-T4 promoted the export row.
+  ✅ **THE OWED MEASUREMENT IS PAID (2026-08-06) — and it turns (a) from impossible into buildable.**
+  M12-T5's "no public API" is confirmed against the macOS 15 SDK (13 `UNNotificationSettings`
+  properties, none about mirroring) — **but the setting is readable anyway**:
+  `com.apple.ncprefs` → `dnd_prefs` → a nested plist → **`dndMirrored`**, which app code reads through
+  `UserDefaults(suiteName:)`. **Polarity measured by flipping it, not inferred:** the toggle the user
+  sees is `!dndMirrored`, and with it off there is **no banner** while armed (1 s / 3 s / 6 s), with it
+  on the `Replay saved` banner **appears**. Full detail in docs/07.
+  🔴 **What this changes for the ruling:** (a) can show a real checkmark rather than a hopeful deep
+  link, and — separately and for ~15 lines — the shipped copy can stop saying banners *"may"* be
+  hidden and say whether they **will** be, which is the M16 thesis applied to the one place it was
+  waived. ⚠️ **Its cost, priced:** a private undocumented key, renameable in any macOS release;
+  acceptable only because a failed read degrades to today's hedged copy rather than lying.
+  🔴 **And the fallback I expected does not exist:** the notification is **delivered in both states**,
+  so an app can never learn whether a human *saw* anything. A "did you see it?" self-test is
+  impossible. **That makes (b) the floor rather than an alternative** — the only signal that survives
+  both a missing key and a user who will not do the dance — with (a) the improvement on top.
+  **Trigger:** Franco picks a direction. The measurement is no longer owed.
 
 - **Localisation, in-app diagnostics, and a settings-schema version** — three limits that bind only
   if the audience grows (audit, 2026-08-05). Roughly **330 English string literals** sit inline across

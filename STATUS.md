@@ -540,9 +540,17 @@
 
 - [ ] **The replay-save confirmation — pick a direction** (audit, 2026-08-05; parked in docs/03 with
       🔴 *needs a ruling*). (a) onboarding walks the user through the banner-suppression toggle and
-      verifies it took, or (b) the 2 s flash becomes something a person notices. ⚠️ An agent owes you
-      one measurement first — whether that setting is readable at all (M12-T5 says no public API),
-      since it may rule out (a)'s verifying half. Not filed as a milestone until you rule.
+      verifies it took, or (b) the 2 s flash becomes something a person notices.
+      ✅ **The measurement is PAID (2026-08-06) — nothing is owed to you now but the choice.** The
+      setting has **no public API** (13 `UNNotificationSettings` properties, none about mirroring) but
+      **is readable**: `com.apple.ncprefs` → `dnd_prefs` → **`dndMirrored`**, and the toggle you see is
+      `!dndMirrored` — measured by flipping it on your machine, banner present with it on and **absent
+      at 1 s / 3 s / 6 s** with it off. **(a) is buildable with a real checkmark**, at the cost of a
+      private undocumented key that degrades to today's hedged copy if it ever disappears.
+      🔴 **(b) is the floor, not an alternative:** the notification is **delivered in both states**, so
+      no app can ever learn whether a human saw it — the "did you see it?" self-test I expected to be
+      the fallback **cannot exist**. ⚠️ **Cheap and independent of the ruling:** the copy can stop
+      saying banners *"may"* be hidden and say whether they **will** be (~15 lines).
 
 - [ ] **Display-sleep lever** (declined 2026-07-27 — "headless legs only"): two questions need
       `pmset displaysleepnow` while armed, which blanks the screen mid-session. Does
