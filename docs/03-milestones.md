@@ -3390,7 +3390,7 @@ would need an ADR-020 amendment, since it is a second request). **Do not re-file
       today's phrasings and guards against **drift**, not against someone inventing new words.
       ✅ **docs/06's "three touches" now says FOUR, named** — the root cause was the enumeration, not the
       caption.
-- [ ] M36-T2 **The armed row reports what is actually held.** `replayBufferMenuLabel` computes
+- [x] M36-T2 **The armed row reports what is actually held.** `replayBufferMenuLabel` computes
       `2 min buffer · ≈360 MB` from `replaySeconds` — the **configured** size, never the fill. 🔴 **And
       the ring can be nearly empty without saying so:** measured 2026-08-06, a display-sleep stream death
       restarts it from zero (63 s held 64 s after waking, the full 120 s only at 165 s), so for two
@@ -3406,6 +3406,30 @@ would need an ADR-020 amendment, since it is a second request). **Do not re-file
       **Verify:** the label unit-tested for full / partial / empty; live — arm, save at once, and the row
       must have said something small; then the M16-T1 scenario (display sleep, wake) and watch the figure
       climb. **Precedent:** M28-T4 turned a frozen export row into a live one for exactly this reason.
+      ✅ **Done 2026-08-06 — `0:12 of 2 min held` while short, today's wording once full.** **802 tests**
+      (795 → 802). Plan artifact: `claude.ai/code/artifact/b324243e-ed2b-43ae-9cbf-3a3ee99e6865`.
+      🔴 **Correction to this task's own filing:** it said no such value exists.
+      **`ReplayEncoder.Stats.spanSeconds` already did** — and `--replay-arm` already printed it. But
+      `stats()` is **O(n)** (it snapshots the ring and walks every entry summing bytes, ~7,200 at
+      2 min/60 fps), so the task became a **cheap O(1) `heldSeconds()`** on `RingBuffer`, not a call to
+      `stats()`. The menu must not wait (M6-T10).
+      ✅ **Observed live climbing and then stopping:** `0:03 → 0:26 → 0:35 → 0:44 of 2 min held`, then
+      after the ring filled, back to **`2 min buffer · ≈360 MB · Mac stays awake`** — byte-identical to
+      the old wording, which is the point.
+      ✅ **The figure is the larger of the video and audio rings**, matching the muxer's anchoring:
+      frame-on-change leaves a static screen's video ring stale while audio flows, and such a buffer
+      really would save a full window.
+      ✅ **5 breaks, 4 red — and the sweep found three holes in my own tests before they were.** A spy
+      overrides `heldSeconds()` wholesale, so the real max-of-rings policy had **no coverage**: extracted
+      as a pure `ReplayController.heldSeconds(video:audio:)` and pinned. NaN alone could not exercise the
+      `isFinite` guard (every NaN comparison is false, so it already fell through), so ±infinity cases
+      were added.
+      🔴 **The fifth break stays GREEN deliberately, and the test file says why:** `RingBuffer`'s NaN
+      guard is unreachable through `append` — `evictLocked`'s own `CMTimeCompare` **drops an
+      invalid-pts entry** before any span is taken (measured; my first test passed for that reason
+      rather than the one I intended). It stays as defence mirroring `span(of:)`'s documented guard.
+      ⚠️ **The `≈360 MB` is untouched and still the *configured* footprint** — honest for the memory the
+      user signed up for, and the real figure needs the O(n) walk this task exists to avoid.
 - [ ] M36-T3 **Window titles are truncated before they reach the menu.** `Source ▸ Window ▸` lists live
       titles verbatim; measured on Franco's machine at **~140 characters including a full session
       UUID**, and every row in the menu is as wide as the widest one. Any long browser tab or document
