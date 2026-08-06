@@ -3142,7 +3142,7 @@ remaining gap**. M23-T3 made `finishTake` `internal` specifically because "no te
 M33-T3's sweep proved the point again: re-introducing a **silent** `return` in `stopAndShare` leaves
 the suite green. **PATCH** — no user-facing change; this buys the ability to prove one.
 
-- [ ] M34-T1 **Find the smallest seam, before building one.** M27-T1's shape, and the reason this is
+- [x] M34-T1 **Find the smallest seam, before building one.** M27-T1's shape, and the reason this is
       a milestone rather than a task: the obvious move — a protocol over `RecordingSession` — means
       abstracting `router`, `events`, `pause`/`resume`/`stop`/`discard`, `recordedDuration`,
       `hasStartedSession` and `microphoneLevel`, a large surface invented for tests and used by one
@@ -3153,14 +3153,46 @@ the suite green. **PATCH** — no user-facing change; this buys the ability to p
       is contained, and it is also exactly the shape that lets a test pass against a state production
       can never reach. **Verify:** a spike and a written recommendation; nothing below is detailed
       until it lands.
-- [ ] M34-T2 **The seam.** *(Shape depends on T1.)* ⚠️ It touches `SessionModel` and `AppState`'s
-      session ownership, both gate-verified, and M22 is the precedent for how that goes wrong: two
-      guards inverted silently when `session` stopped being optional, and only the **unmoved** tests
-      noticed. **The bar is M22's:** the deployed menu unchanged, and no existing test edited.
-- [ ] M34-T3 **The recording and paused menus, asserted in-process.** M29-T2 closed the idle menu and
+      ✅ **Done 2026-08-06 — and the milestone's premise is false.** Artifact:
+      `claude.ai/code/artifact/a79d6ebc-cec4-4008-b407-f00fe24cbffd`. **A test can build a
+      `RecordingSession`:** everything touching SCK or the disk lives in `start()`, which a test never
+      calls. `CaptureEngine.init` builds a router, a stream and (only for a `.device` mic) watchdogs —
+      no `SCStream`; `MovieRecorder.init` builds an `AVAssetWriter`, which creates no file until
+      `startWriting()`; `DiskSpaceMonitor` documents itself as timer-free.
+      🔴 **A test in this repo had already been doing it since M22-T2** — `SessionModelTests`
+      constructs one and attaches it. The milestone was filed on an impossibility that a
+      counter-example in the tree disproves. **Grep for the counter-example before filing one.**
+      ✅ **Measured, not argued:** 771 tests green with the spike, both menus rendered in 95 ms, **0**
+      stray `.partial` files, no TCC prompt. `AppState.stop()` returns in **74 µs** and
+      `stopAndWaitForFinalize()` in **25 µs** (it short-circuits on a nil `consumeTask`), so the hang
+      that would have made T4 unreachable does not exist.
+      🔴 **Both alternatives rejected, with the protocol rejected for the task's own M22 reason.** A
+      protocol over `RecordingSession` is **10 members**, and it cannot be narrowed to the two
+      `SessionModel` reads: `AppState` reaches the rest *through* `session.capture` at 11 sites, so
+      narrowing would force a second reference to the same object — the gate-verified ownership M22
+      established. A test-only backdoor is unnecessary, and a never-started session is a state
+      production reaches on every take (between `attach` and the first frame).
+      ⚠️ **The limit:** `recordedDuration` is NaN and `hasStartedSession` false, so the header row
+      reads `00:00:00 — Zero KB · HEVC` and always will. Structure is assertable; measurement is not.
+- [x] ~~M34-T2 **The seam.**~~ — **CLOSED "not needed" 2026-08-06 (T1's spike).** There is no seam to
+      build: `attach` and `apply` are already `internal`, and `apply`'s own doc already says "only
+      tests hand-feed events". The task existed to invent a seam, with M22's ownership precedent as
+      its warning; nothing about ownership changes, so the warning has nothing to apply to.
+- [x] M34-T3 **The recording and paused menus, asserted in-process.** M29-T2 closed the idle menu and
       named these two as what it could not reach. ⚠️ `apply(.started)` moves the status icon but
       **not** the session, so a test written against it asserts the *idle* menu and passes — M29
       measured that, and it is the trap this task exists to avoid.
+      ✅ **Done 2026-08-06 — 6 tests, `MenuSnapshot.recording`, and no production file changed.**
+      **775 tests** (769 → 775). The full recording order, the paused swap, the source pickers being
+      *gone* rather than disabled, the scoped-take rows (app and region), the active-mic row, and —
+      new — **the update row proven to ride the recording menu**, which is the half of M32-T3's
+      "shared tail" claim that had never been verified.
+      ✅ **6 breaks, 6 reds**, one per test: the pause branch inverted, a source picker left visible,
+      the scoped row dropped, the mic row dropped, the update row made idle-only, and Discard hoisted
+      next to the Stop rows.
+      ⚠️ **The sweep's own guard earned its place immediately:** one patch replaced a row with an
+      invalid statement, and the build check reported **INCONCLUSIVE** rather than the false "not
+      caught" the M32-T4 sweep would have printed.
 - [ ] M34-T4 **The decisions that were unreachable become reachable.** `stopAndShare`'s guard (M33-T3
       proved it is not catchable today), `finishTake` (M23-T3), and whatever else T1's sweep turns up.
       **Verify:** the M33-T3 break — re-adding the silent `return` — now turns a named test **red**.

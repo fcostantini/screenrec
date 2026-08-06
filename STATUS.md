@@ -6,6 +6,29 @@
 
 ## Now
 
+- **✅ M34-T1 + M34-T3 SHIPPED, M34-T2 CLOSED (2026-08-06) — the recording and paused menus are
+  tests now. Next: M34-T4, then G34.** **775 tests** (769 → 775), **no production file changed**.
+  Spike artifact: `claude.ai/code/artifact/a79d6ebc-cec4-4008-b407-f00fe24cbffd`.
+  🔴 **M34's premise was false, and a test in this repo had already disproved it.** The milestone says
+  no test can build a `RecordingSession`; `SessionModelTests` has been building one since **M22-T2**.
+  Everything needing SCK or the disk lives in `start()` — `CaptureEngine.init` makes no `SCStream`,
+  `AVAssetWriter` makes no file until `startWriting()` (0 stray `.partial` files), `DiskSpaceMonitor`
+  is timer-free. **An impossibility claim is worth one grep before it becomes a milestone.**
+  🔴 **T2 is closed, not done: there is no seam to build.** `attach` and `apply` are already
+  `internal`. The 10-member protocol was rejected for T2's *own* M22 reason — it cannot be narrowed to
+  the two members `SessionModel` reads, because `AppState` reaches the rest through `session.capture`
+  at 11 sites, so narrowing forces a second owner of one object. The backdoor was rejected as
+  unnecessary.
+  ✅ **6 tests, 6 breaks, 6 reds** — including **the update row proven to ride the recording menu**,
+  the half of M32-T3's "shared tail" claim that had never been checked.
+  ✅ **The sweep guard I added yesterday paid for itself on its first outing:** a patch that didn't
+  compile was reported **INCONCLUSIVE** instead of the false "not caught" the M32-T4 harness printed.
+  ⚠️ **The limit, written into the test file rather than left implied:** a never-started session has
+  `recordedDuration` NaN, so the header row reads `00:00:00 — Zero KB · HEVC` and always will.
+  Structure is assertable; the clock and byte count are not.
+  ⚠️ **T4 is reachable but has a dependency:** `stopAndShare`'s tail calls `exportAndCopy`, a **real**
+  export, so it must go through the injection seam M33's queue tests already use.
+
 - **✅ M32-T5 SHIPPED (2026-08-05) — the release notes say what changed, and all 8 published releases
   are rewritten. Next: M34-T1 (the recording-path spike), or Franco's pick.** `CHANGELOG.md` is the
   source; `release.sh` no longer runs `git log`. **769 tests.**

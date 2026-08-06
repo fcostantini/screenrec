@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import RecorderCore
 
 @testable import AppCore
 @testable import AppShell
@@ -43,6 +44,25 @@ enum MenuSnapshot {
         return nil
     }
 
+    /// Puts `state` into a recording, for the menus that need one (M34-T1).
+    ///
+    /// The session is a **real `RecordingSession` that is never started**: construction touches
+    /// neither ScreenCaptureKit nor the disk, because everything that does lives in `start()`.
+    /// The returned `Take` owns only the scratch directory; the session itself is retained by
+    /// `SessionModel`, so a test that doesn't need the URL can discard it.
+    @discardableResult
+    static func recording(
+        _ state: AppState, appName: String? = nil, microphoneName: String? = nil,
+        region: CGSize? = nil
+    ) throws -> Take {
+        let take = try Take()
+        state.session.attach(
+            take.session, outputURL: take.outputURL,
+            microphoneName: microphoneName, appName: appName, region: region)
+        state.session.apply(.started)
+        return take
+    }
+
     /// A directory of empty files with chosen modification dates, for the recents rows.
     static func directory(_ files: [(name: String, daysAgo: Double)]) throws -> URL {
         let directory = FileManager.default.temporaryDirectory
@@ -57,6 +77,30 @@ enum MenuSnapshot {
         }
         return directory
     }
+}
+
+/// A recording in flight and the scratch directory it writes into.
+///
+/// ⚠️ The clock and the byte count stay at zero: both come from a writer that never ran, so a test
+/// can assert that the header row *exists* and what it says at zero — never that it says `00:03:12`.
+final class Take {
+    let session: RecordingSession
+    let outputURL: URL
+    private let directory: URL
+
+    init() throws {
+        directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("take-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        outputURL = directory.appendingPathComponent("take.mov")
+        // `.none` and no system audio keep construction quietest: a `.device` mic builds the
+        // rescue and two watchdogs (`CaptureEngine.init`).
+        session = try RecordingSession(
+            configuration: CaptureConfiguration(microphone: .none, capturesSystemAudio: false),
+            outputURL: outputURL)
+    }
+
+    deinit { try? FileManager.default.removeItem(at: directory) }
 }
 
 /// Throwaway `UserDefaults` suites, swept at exit.

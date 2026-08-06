@@ -7,6 +7,25 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-06 (M34-T1/T3): **A `RecordingSession` can be built in a unit test. Everything that needs
+  ScreenCaptureKit, a display or a TCC grant lives in `start()`, not in `init`.**
+  - ✅ **The recipe:** `try RecordingSession(configuration: CaptureConfiguration(microphone: .none,
+    capturesSystemAudio: false), outputURL: <temp>/take.mov)`, then `SessionModel.attach(…)` — which
+    is what `isActive` gates on — then `apply(.started)`. Both the recording and paused menus render
+    in-process, 95 ms, no TCC prompt.
+  - ✅ **Why init is inert:** `CaptureEngine.init` makes a `SampleRouter`, an `AsyncStream` and (only
+    for a `.device` mic) the rescue + two watchdogs — **no `SCStream`**. `MovieRecorder.init` makes an
+    `AVAssetWriter`, and **AVFoundation creates no file until `startWriting()`** (measured: zero
+    `.partial` files after a full run). `DiskSpaceMonitor` is timer-free by design.
+  - ✅ **No hang, measured:** `AppState.stop()` returns in **74 µs** and `stopAndWaitForFinalize()` in
+    **25 µs** — the latter short-circuits on a nil `consumeTask`, which a never-started session has.
+    The event loop that would block lives in `start()`, so there is nothing to await.
+  - ⚠️ **What it cannot do:** `recordedDuration` is NaN and `hasStartedSession` false, so the header
+    row is `00:00:00 — Zero KB · HEVC` forever. Structure is assertable, measurement isn't.
+  - 🔴 **The lesson is about the filing, not the API.** M34 was filed on "no test can build one" —
+    while `SessionModelTests` had been building one since **M22-T2**. An impossibility claim is worth
+    one grep before it becomes a milestone; this one would have collapsed to a single task.
+
 - 2026-08-05 (M32-T4): **Two ways a break sweep lies, both found in one sweep. Extends the M30-T1
   entry below — that one is about restoring files and grepping `✘`; these are about the two remaining
   ways a break reads "not caught" when it was.**

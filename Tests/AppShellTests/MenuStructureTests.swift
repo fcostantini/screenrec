@@ -9,10 +9,12 @@ import Testing
 /// The menu's structure, pinned in-process (M29-T2) — the checks M28 could only make by deploying
 /// the app and driving it over Accessibility.
 ///
-/// ⚠️ The **recording** and **paused** menus are absent on purpose: they are gated on
-/// `session.isActive`, which needs a real `RecordingSession` (a `CaptureEngine` and an
-/// `AVAssetWriter`). `apply(.started)` moves the status icon but not the session, so a test written
-/// against it would assert the *idle* menu and pass. Those two layouts stay with the live dump.
+/// The **recording** and **paused** menus are here too since M34: `MenuSnapshot.recording` attaches
+/// a real `RecordingSession` that is never started, which is what `session.isActive` gates on.
+/// ⚠️ `apply(.started)` alone moves the status icon but **not** the session — a test written against
+/// it asserts the *idle* menu and passes, which is the trap these tests exist to avoid.
+/// ⚠️ Structure only: the elapsed clock and byte count come from a writer that never ran, so they
+/// are asserted at zero and nowhere else.
 @MainActor
 @Suite struct MenuStructureTests {
 
@@ -221,5 +223,84 @@ import Testing
         #expect(row?.isEnabled == true)
         #expect(row is ActionMenuItem)
         #expect(row?.representedObject as? URL == UpdateCheck.releasesPageURL)
+    }
+
+    // MARK: - The recording and paused menus (M34)
+
+    @Test func theRecordingMenuIsTheDocumentedOrder() throws {
+        let state = MenuSnapshot.state()
+        try MenuSnapshot.recording(state)
+
+        #expect(MenuSnapshot.titles(state) == [
+            "00:00:00 — Zero KB · HEVC",
+            "---",
+            "Pause", "Stop & Save", "Stop & Copy MP4", "---",
+            "Arm Instant Replay", "Sources locked while recording", "---",
+            "Discard Recording…", "---",
+            "Settings…", "Quit",
+        ])
+    }
+
+    /// docs/06: the pickers are hidden while recording, not disabled — a source cannot change
+    /// mid-take, and offering one that silently wouldn't apply is worse than not offering it.
+    @Test func theSourcePickersAreGoneWhileRecording() throws {
+        let state = MenuSnapshot.state()
+        try MenuSnapshot.recording(state)
+
+        let titles = MenuSnapshot.titles(state)
+        #expect(!titles.contains { $0.hasPrefix("Source:") })
+        #expect(!titles.contains { $0.hasPrefix("Quality:") })
+        #expect(!titles.contains { $0.hasPrefix("Stop After:") })
+        #expect(!titles.contains("Capture System Audio"))
+        #expect(!titles.contains("Start Recording"))
+    }
+
+    @Test func pausingSwapsPauseForResumeAndNothingElse() throws {
+        let state = MenuSnapshot.state()
+        try MenuSnapshot.recording(state)
+        let recording = MenuSnapshot.titles(state)
+
+        state.session.apply(.paused)
+        let paused = MenuSnapshot.titles(state)
+
+        #expect(state.session.isPaused)
+        #expect(paused.contains("Resume"))
+        #expect(!paused.contains("Pause"))
+        // One row changes, in place — a pause must not reshuffle the menu under the cursor.
+        #expect(paused.count == recording.count)
+        #expect(zip(recording, paused).filter { $0 != $1 }.count == 1)
+    }
+
+    /// docs/06 recording item 5 (M7-T2 / M11-T2): a scoped take names what it is recording, or the
+    /// menu can't distinguish a window recording from a whole-screen one.
+    @Test func aScopedRecordingNamesItsSubject() throws {
+        let state = MenuSnapshot.state()
+        try MenuSnapshot.recording(state, appName: "Safari")
+        #expect(MenuSnapshot.titles(state).contains("Recording Safari only"))
+
+        let regionState = MenuSnapshot.state()
+        try MenuSnapshot.recording(regionState, region: CGSize(width: 1920, height: 1080))
+        #expect(MenuSnapshot.titles(regionState).contains { $0.hasPrefix("Recording region ") })
+    }
+
+    /// The mic bound for the take, not the one picked (02 §4) — a vanished device falls back, and
+    /// the row has to name what is actually in the file.
+    @Test func theActiveMicrophoneGetsItsOwnRow() throws {
+        let state = MenuSnapshot.state()
+        try MenuSnapshot.recording(state, microphoneName: "Studio Mic")
+        #expect(MenuSnapshot.titles(state).contains("Studio Mic · separate track"))
+    }
+
+    /// M32-T3 put the update row in the tail *shared* by both menus and could only verify the idle
+    /// one; this is the other half of that claim.
+    @Test func theUpdateRowRidesTheRecordingMenuToo() async throws {
+        let state = MenuSnapshot.state()
+        try MenuSnapshot.recording(state)
+        await state.checkForUpdate { ["v99.0.0"] }
+
+        let titles = MenuSnapshot.titles(state)
+        let index = titles.firstIndex(of: "99.0.0 is available")
+        #expect(index != nil, "the update row is missing from the recording menu")
+        if let index { #expect(titles.dropFirst(index + 1).first == "Settings…") }
     }
 }
