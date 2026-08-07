@@ -1,4 +1,4 @@
-# screenrec — Tier 2
+# screenrec
 
 A native macOS (15+) menu-bar screen recorder: **screen video + system audio +
 microphone (separate track)**, tuned HEVC encoding, crash-safe long recordings,
@@ -10,11 +10,6 @@ a recording starts and the elapsed clock ticks in the menu bar beside a red dot,
 with a "Recording saved" confirmation.](docs/assets/demo.gif)
 
 <sub>Recorded with ScreenRec's own region capture and encoded by its GIF exporter — v1.19.0.</sub>
-
-**Status:** shipped and in daily use — **M0–M33** (capture, instant replay, per-app/window/region
-capture, microphone recovery, share export and basic editing, per-app audio muting, an AppKit
-menu-bar surface, honest-state and hardening passes, and the share workflow). `VERSION` and the git
-tags carry the current release; `STATUS.md` is the living state.
 
 ## Build & run
 
@@ -81,7 +76,7 @@ Everything is in the menu-bar menu:
 ## Installing a release
 
 **⚠️ macOS will refuse to open this app the first time.** That is expected, and it is a deliberate
-choice rather than an oversight — see below.
+choice rather than an oversight.
 
 Builds are signed with a **local** identity and are **not notarized by Apple** (ADR-014, ADR-021).
 Two ways in:
@@ -94,27 +89,6 @@ Two ways in:
   **Open Anyway** (macOS 15 removed the old right-click → Open shortcut). After that it launches
   normally, and screen-recording and microphone grants **persist across every future build**, because
   the stable code-signing identity keys the grant to the app rather than to Apple's trust chain.
-
-**Why not notarized.** Frictionless double-click installation needs Developer ID signing plus Apple
-notarization, which costs $99/yr. This is a personal tool published in the open, not a product with
-users to onboard — so the friction is **accepted knowingly** (Franco, 2026-08-05; ADR-021) rather
-than paid for. If that ever stops being the right trade, notarization is the only missing piece; it
-is a distribution change, not a capability one.
-
-## Versioning
-
-The single source of truth is the `VERSION` file (`bundle.sh` stamps it into both
-`CFBundleShortVersionString` and `CFBundleVersion`, and refuses to build without it). Releases
-follow **semantic versioning**, read for an end-user app (so "breaking" means user-facing, not API —
-ADR-013):
-
-- **MAJOR** (`2.0.0`) — a breaking user-facing change: a settings/recording-format migration,
-  dropping macOS 15 support, a fundamental UX overhaul.
-- **MINOR** (`1.1.0`) — a new backward-compatible feature (e.g. per-app capture, mic recovery).
-- **PATCH** (`1.0.1`) — bug/dogfooding fixes; no new user-facing feature.
-
-Bump `VERSION` in the same commit as the change that warrants it, and tag the release (`git tag
-v1.0.0`). `1.0.0` is v1 (feature-complete M0–M6).
 
 ## Repository map
 
@@ -135,10 +109,6 @@ This repo is documentation-first and built to be driven by coding agents:
 | `docs/history/` | Closed session logs, rotated out of STATUS.md. Not maintained |
 | `tools/probe.swift` | Inspect any recording's tracks/codecs/duration |
 | `tools/menudriver.swift` | Drive/inspect the menu-bar menu via Accessibility (testing) |
-
-Predecessor: `~/code/screenrec-poc` — the working Tier-1 proof of concept
-(ScreenCaptureKit + SCRecordingOutput) that validated capture feasibility and whose
-field bugs are baked into `docs/02`.
 
 ## Contributing / development loop
 
@@ -164,5 +134,4 @@ git config core.hooksPath Scripts/hooks   # points git at Scripts/hooks/pre-push
 ```
 
 Signing (`bundle.sh`) is left out of the hook (it belongs to the release path); bypass in a
-genuine emergency with `git push --no-verify`. On a private repo a local hook is the right call —
-a GitHub Actions macOS runner would just burn paid minutes; add one only if the repo goes public.
+genuine emergency with `git push --no-verify`.
