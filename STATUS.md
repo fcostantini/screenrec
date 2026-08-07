@@ -6,6 +6,24 @@
 
 ## Now
 
+- **📎 README demo GIF added (2026-08-07) — a `docs:` commit, no VERSION bump (ADR-013).**
+  17.6 s, 720×684, 20 fps, 1.6 MB at `docs/assets/demo.gif`, shot against the deployed v1.19.0: menu
+  opens → Instant Replay armed (cost row and all) → Start → the clock ticking in the bar → Stop & Save
+  → `✓ Saved` **and** the banner. Plan artifact:
+  `claude.ai/code/artifact/4724df6a-6eba-4626-8f26-10cde3bc5060`.
+  🔴 **Found a real defect in `Save as GIF`, not fixed:** it stamps a uniform `1/fps` delay on
+  every frame, but SCK only emits frames where the screen changed, so any recording of a mostly-still
+  screen comes out **time-compressed** — this clip would have played **2.2× fast** (112 frames × 0.08 s
+  = 8.96 s for a 19.70 s take). Worked around with an `ffmpeg -vf fps=20` constant-rate pass before the
+  export. **Filed in 07 with a fix direction** (per-frame delays from presentation timestamps).
+  ⚠️ **A stop while replay was armed DID raise its notification banner** — against docs/06's claim that
+  macOS suppresses banners *whenever* replay is armed, since an armed stream holds the display
+  captured. Both confirmations fired here, measured on macOS 15.6.1. **The claim appears in the M35-T2
+  status-item row and in M5-T5's reasoning; it should be re-checked before anything else leans on it.**
+  ⚠️ **Two planned beats were cut after measuring:** `Recordings ▸` is **503 pt wide, 23 rows** and
+  lists real filenames; `Source ▸` reaches to x=1650, far enough left to pull other apps' menu-bar
+  icons into frame. The clip stays in the root menu.
+
 - **✅ M36 COMPLETE and G36 PASSED (2026-08-06) — the surfaces state facts, not configurations.**
   Three tasks from the UI/UX audit: the fourth banner caption, the armed row's real holding, and a cap
   on window titles. **807 tests** (791 → 807), **13 breaks applied, 12 red**. Evidence in the gate table.

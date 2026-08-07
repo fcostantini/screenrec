@@ -5,6 +5,12 @@ microphone (separate track)**, tuned HEVC encoding, crash-safe long recordings,
 pause/resume, and ShadowPlay-style **instant replay** via a global hotkey.
 Zero external dependencies — Apple frameworks only, no Xcode required.
 
+![The ScreenRec menu opening in the macOS menu bar: Instant Replay is armed and shows its buffer cost,
+a recording starts and the elapsed clock ticks in the menu bar beside a red dot, and Stop & Save ends
+with a "Recording saved" confirmation.](docs/assets/demo.gif)
+
+<sub>Recorded with ScreenRec's own region capture and encoded by its GIF exporter — v1.19.0.</sub>
+
 **Status:** shipped and in daily use — **M0–M33** (capture, instant replay, per-app/window/region
 capture, microphone recovery, share export and basic editing, per-app audio muting, an AppKit
 menu-bar surface, honest-state and hardening passes, and the share workflow). `VERSION` and the git
