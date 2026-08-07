@@ -7,6 +7,27 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-07 (the README demo GIF): **`Save as GIF` time-compresses any real screen recording. It
+  stamps a uniform `1/fps` delay on every frame, but a capture only *has* frames where the screen
+  changed.**
+  - 🔴 **Measured:** a 19.70 s take of the menu-bar corner, exported at `--fps 12`, produced
+    **112 frames × 0.08 s = 8.96 s** of GIF — **2.2× fast**. `VideoFrameReader` can only hand on the
+    frames the source contains, and SCK delivers none at all while the screen is still (a menu sitting
+    open emits nothing for seconds). `GifExporter` then spends a full `1/fps` on each frame it does
+    get, so every still stretch collapses to a fraction of its real duration.
+  - ⚠️ **The stiller the recording, the worse it is** — and a UI walkthrough, a document, a code
+    review are exactly what people turn into GIFs. This source averaged 22 fps but held its 387 frames
+    in bursts across 17.55 s, with long empty gaps between them.
+  - ⚠️ **GIF delays are stored in centiseconds**, so only rates dividing 100 are honest: `--fps 12`
+    becomes 8 cs = **12.5 fps** (4 % fast), 15 becomes 7 cs = 14.3 fps. **20 and 25 are exact.**
+  - ✅ **Workaround used for the README clip:** an `ffmpeg -vf fps=20` pass to a constant-rate
+    intermediate *before* `export --to-gif`, which duplicates frames across the still stretches → 351
+    frames, 17.55 s of delay, matching the source exactly.
+  - **Fix direction (not attempted):** carry each frame's presentation timestamp through
+    `VideoFrameReader` and stamp per-frame delays from the deltas, rounded to centiseconds with a
+    sane floor, instead of a uniform `1/fps`. Zero-dep — the timestamps are already on the sample
+    buffers, and ImageIO takes a per-frame delay.
+
 - 2026-08-06 (the display-sleep question, MEASURED AND CLOSED — UNMEASURED since 2026-07-24):
   **Armed replay does NOT wake a slept display, and the ring recovers completely on wake. The strobe
   this note feared cannot happen.** Run with Franco genuinely away from the keyboard for 90 s.
