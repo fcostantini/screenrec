@@ -6,6 +6,30 @@
 
 ## Now
 
+- **📋 M37 FILED from Franco's own use (2026-08-18) — three tasks, nothing implemented. Next: M37-T1.**
+  Plan artifact: `claude.ai/code/artifact/d4c0110d-199a-4d3e-a26c-0e55768677ce`. A `docs:` commit — no
+  code changed, no VERSION bump yet (**MINOR at the gate**, ADR-013: T1 is a capability, not a fix).
+  🔴 **All three reports are the same window being less than a window.** Minimizing Trim is a
+  **one-way door**: `LSUIElement` removes the Dock tile, the ⌘-Tab entry and the menu bar — every route
+  back — and `WindowPresenter` hands out a minimize button anyway, with **no `deminiaturize` anywhere in
+  the source**, so even re-picking the menu row can't recover it. Settings and Onboarding carry the same
+  button.
+  ✅ **Ruled by Franco before filing:** all three windows flip the activation policy (not Trim alone),
+  and the Edit menu's ⌘V fix is folded into T1.
+  ✅ **Measured on the deployed v1.19.0, same click at one fixed pixel:** crop **off** → play/pause
+  0→1, clock 00:00→00:02; crop **on** → timeline **20.421912393162 s, unchanged to twelve digits**.
+  The overlay eats the transport and keeps drawing it dimmed underneath.
+  ⚠️ **What narrows T3:** crop mode is *not* fully dead — the filmstrip still seeks (measured) and the
+  arrow keys still step, because both are the app's own, not `AVPlayerView`'s.
+  ✅ **T2 is plumbing, not geometry:** `CropGeometry` already derives the video rect from the view size
+  it is handed and holds the crop in **source pixels**, so resizing cannot drift a crop. The ceiling is
+  `TrimView.previewSize = 480 × 300`, not the style mask. Franco's clip was **1920 × 790** → the video
+  filled **480 × 197** of a 300-pt box.
+  🔴 **The trap T1 drags in:** `AppMain.swift:64` filters the Source picker to `.regular` processes,
+  so flipping our own policy would **list ScreenRec in its own picker**. Exclude the bundle ID.
+  ⚠️ **Needs Franco:** the T3 spacebar call (recommend button-only — space fights the focus ring), and
+  T1's live legs (⌘-Tab, Window menu restore, Dock tile appearing/going, ⌘V in the Rename field).
+
 - **📎 README demo GIF added (2026-08-07) — a `docs:` commit, no VERSION bump (ADR-013).**
   17.6 s, 720×684, 20 fps, 1.6 MB at `docs/assets/demo.gif`, shot against the deployed v1.19.0: menu
   opens → Instant Replay armed (cost row and all) → Start → the clock ticking in the bar → Stop & Save

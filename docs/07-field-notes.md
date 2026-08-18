@@ -7,6 +7,28 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-18 (M37 filing, driving the Trim window headlessly): **three things about probing
+  `AVPlayerView` and about synthetic clicks, all of which cost a retry before they were understood.**
+  - 🔴 **A synthetic click on a window that is not frontmost is consumed by activation.** The
+    first `CGEvent` mouse-down activates the app and never reaches the control; only the second one
+    does. Every probe must `NSRunningApplication.activate` immediately before the click, or a
+    working control reads as dead. This is the same class of artefact `menudriver` documents for
+    activation, and it silently produces **false negatives** rather than errors.
+  - 🔴 **`AVPlayerView`'s inline transport auto-hides, and its AX text values go stale while
+    hidden** — the elapsed-time `AXStaticText` kept reporting `01:41` after a seek to 20 s. The
+    **`AXSlider` labelled `timeline` stays live** whether the transport is drawn or not, and is the
+    only trustworthy read of playback position. Probe that, never the text.
+  - ⚠️ **The crop overlay eats the transport's clicks while `AVPlayerView` keeps drawing it.** Measured
+    at one fixed pixel: crop off → play/pause `0→1`, clock `00:00→00:02`; crop on → timeline
+    `20.421912393162` before and after, identical to twelve digits. The app's own controls are
+    unaffected — the filmstrip still seeks and the arrow keys still step, because neither goes through
+    the player. That asymmetry is what makes M37-T3 a small fix rather than a redesign.
+  - ✅ **A window's live frame is one line, and worth knowing:** `osascript -e 'tell application
+    "System Events" to tell process "ScreenRec" to get {position, size} of window 1'` feeds
+    `screencapture -R` directly. The Trim window is **500 × 653 pt**, growing to **500 × 685** when
+    Crop is ticked (the `Find bars` row appears) — content-driven sizing, which is exactly what T2
+    has to stop doing.
+
 - 2026-08-07 (the README demo GIF): **`Save as GIF` time-compresses any real screen recording. It
   stamps a uniform `1/fps` delay on every frame, but a capture only *has* frames where the screen
   changed.**
