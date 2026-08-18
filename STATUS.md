@@ -6,6 +6,20 @@
 
 ## Now
 
+- **✅ M37-T1 DONE (2026-08-18) — a window open now means a Dock icon, ⌘-Tab and a menu bar.**
+  **818 tests** (807 → 818). Verified headlessly on the deployed build: 0 windows → `accessory`,
+  `menu bar: none`; Settings open → `regular`, `Apple · ScreenRec · Edit · Window`, `✓ScreenRec
+  Settings` listed by AppKit; Trim minimized → **`◆Trim`**, and the row restores it; ⌘V pastes into
+  `Rename…`; last window closed → `accessory`, no bar. **Next: M37-T2.**
+  🔴 **The bar is removed, not just undrawn — a live run proved it matters.** A menu answers
+  its key equivalents whether or not macOS draws it, so ⌘H went live; hiding the app with the region
+  overlay open then refused **every later `Select Region…`** silently. Fixed in `present()`, and
+  re-measured.
+  🔴 **My "ScreenRec would list itself" trap was wrong** — `SourcesModel.refreshApps` has
+  self-excluded since M7. Corrected in the artifact, the milestone and ADR-023; the code written for
+  it was deleted.
+  ⚠️ **Not committed until this line says so** — see the commit below.
+
 - **📋 M37 FILED from Franco's own use (2026-08-18) — three tasks, nothing implemented. Next: M37-T1.**
   Plan artifact: `claude.ai/code/artifact/d4c0110d-199a-4d3e-a26c-0e55768677ce`. A `docs:` commit — no
   code changed, no VERSION bump yet (**MINOR at the gate**, ADR-013: T1 is a capability, not a fix).
@@ -25,8 +39,12 @@
   it is handed and holds the crop in **source pixels**, so resizing cannot drift a crop. The ceiling is
   `TrimView.previewSize = 480 × 300`, not the style mask. Franco's clip was **1920 × 790** → the video
   filled **480 × 197** of a 300-pt box.
-  🔴 **The trap T1 drags in:** `AppMain.swift:64` filters the Source picker to `.regular` processes,
-  so flipping our own policy would **list ScreenRec in its own picker**. Exclude the bundle ID.
+  🔴 **The trap T1 named was already handled, and the real one was worse.** `SourcesModel
+  .refreshApps` self-excludes before `recordableAppsFilter` runs, so the Source picker was never at
+  risk — that claim is wrong in the plan artifact, the milestone and ADR-023, and is corrected in all
+  three. What *is* real: **a menu bar answers its key equivalents whether or not macOS draws it**, so
+  a bar installed at launch made ⌘H over the region-selection overlay hide that window without closing
+  it, wedging `Select Region…` permanently. The bar is installed and removed with the Dock icon.
   ⚠️ **Needs Franco:** the T3 spacebar call (recommend button-only — space fights the focus ring), and
   T1's live legs (⌘-Tab, Window menu restore, Dock tile appearing/going, ⌘V in the Rename field).
 

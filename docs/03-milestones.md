@@ -3471,6 +3471,9 @@ took. **v1.19.0.**
 Three defects reported in one sitting, all in the same corner of the app: **a window you cannot get
 back to, a window you cannot resize, and a control that is drawn but does nothing.** Plan artifact:
 `claude.ai/code/artifact/d4c0110d-199a-4d3e-a26c-0e55768677ce`. **Filed MINOR (ADR-013)** — T1 is a capability the app has never had, not a fix.
+⚠️ **The bump lands at G37, not per task:** `CHANGELOG.md` is pinned to `VERSION` and is release prose,
+so writing 1.20.0 notes for one task of three would mean rewriting them twice. Nothing is tagged before
+the gate, so the pin cannot ship stale.
 
 🔴 **The first one in a line:** `LSUIElement` removes the Dock tile, the ⌘-Tab entry and the menu bar —
 the three routes back to a window — and `WindowPresenter` hands out a minimize button anyway. There is
@@ -3481,7 +3484,7 @@ and the same button sits on Settings and Onboarding.
 ✅ **Rulings taken before filing (Franco, 2026-08-18):** all three windows flip the policy, not Trim
 alone; and the Edit menu's ⌘V fix is folded into T1 rather than deferred.
 
-- [ ] M37-T1 **A window open means a Dock icon, a ⌘-Tab entry and a menu bar.** `NSApp
+- [x] M37-T1 **A window open means a Dock icon, a ⌘-Tab entry and a menu bar.** `NSApp
       .setActivationPolicy(.regular)` while any window is open, `.accessory` when the last one closes;
       `LSUIElement` in Info.plist stays true, since it only sets the *launch* state.
       **Seams:** `WindowPresenter` already owns exactly this lifecycle — it builds windows into
@@ -3493,19 +3496,39 @@ alone; and the Edit menu's ⌘V fix is folded into T1 rather than deferred.
       as broken. App (About / Settings… / Quit), Edit, and Window. **`NSApp.windowsMenu` is the point of
       the exercise:** set it and AppKit lists the open windows itself, minimized ones marked with a
       diamond, which is the route back Franco asked for.
-      🔴 **The trap this drags in:** `AppMain.swift:64` filters the Source picker's app list to processes
-      whose activation policy is `.regular`. Flip our own and **ScreenRec lists itself as a recordable
-      app** whenever a window is open. Exclude our bundle ID explicitly.
+      🔴 **Correction to this task's own filing — the trap it named was already handled.**
+      `SourcesModel.refreshApps` filters our own bundle ID *before* `recordableAppsFilter` ever runs,
+      and that closure's doc comment says so ("beyond self-exclusion"). Nothing was needed; the
+      exclusion written for it was deleted as dead code. 🔴 **The real trap was elsewhere and worse:**
+      a bar answers its key equivalents whether or not macOS draws it, so installing one at launch made
+      **⌘H over the region-selection overlay** hide that window without closing it — wedging
+      `Select Region…` for the life of the process, since `present()` guards on `window == nil`. The
+      bar is therefore installed and **removed** with the Dock icon, not left in place.
       ⚠️ `MenuBuilder.swift:26` binds ⌘, on the status-item row *"because an LSUIElement app has no app
       menu"*. That stops being unconditionally true; the shortcut must not exist twice, and the comment
       is now wrong.
       ⚠️ **Accepted cost of the "all three" ruling:** first launch shows a Dock icon while Onboarding is
       up. docs/06's flat *"`LSUIElement = true` (no Dock icon, no main window)"* becomes conditional —
       **a docs/06 amendment and an ADR**, since it changes a stated architectural property.
-      **Verify:** `WindowPolicy` unit-tested for open/closed counts. Live (human): open Settings, switch
-      away with ⌘-Tab and back; confirm Window ▸ lists Trim; minimize it and restore it from that menu;
-      close the last window and watch the Dock tile go; ⌘V into the `Rename…` field; and the Source
-      picker must not list ScreenRec.
+      **Verify:** `WindowPolicy` unit-tested for open/closed counts. Live: open Settings, switch away
+      with ⌘-Tab and back; confirm Window ▸ lists Trim; minimize it and restore it from that menu;
+      close the last window and watch the Dock tile go; ⌘V into the `Rename…` field.
+      ✅ **Done 2026-08-18. 818 tests** (807 → 818). Driven headlessly on the deployed build, no human
+      leg needed after all — an AX probe reads `NSRunningApplication.activationPolicy`, the app's
+      `AXMenuBar` and the Window menu's rows.
+      ✅ **Measured, in order:** 0 windows → `accessory`, `menu bar: none`; Settings open → `regular`,
+      `Apple · ScreenRec · Edit · Window`, and `✓ScreenRec Settings` listed by AppKit itself; Trim
+      minimized → **`◆Trim`** in that menu, and clicking the row restored it; the status menu's
+      `Trim…` row restored it too (the `deminiaturize` line); ⌘A then ⌘V put `pasted-from-clipboard`
+      into the `Rename…` field; last window closed → back to `accessory` with `menu bar: none`.
+      🔴 **The bar had to be removed rather than left installed, and a live run proved why.** A menu
+      answers its key equivalents whether or not macOS draws it, so ⌘H became live — and hiding the app
+      with the region overlay open left `RegionSelectionController.window` set with nothing on screen,
+      after which **every later `Select Region…` was refused silently** (measured: the app stayed
+      hidden). Removing the bar covers only the no-window case, so `present()` now drops an overlay
+      that is no longer visible. Re-measured after the fix: the app unhides and presents a fresh one.
+      🔴 **`⌘W` looked broken and wasn't:** `performClose:` targets the *key* window, and after the
+      overlay resigned there was none. With a window raised it closes correctly.
 - [ ] M37-T2 **The Trim window resizes, and the preview grows with it.** Three things stack and only
       the third is the real ceiling: the style mask has no `.resizable` (`WindowPresenter.swift:67`),
       `sizingOptions = [.preferredContentSize]` (`:63`) would snap the window back to its content, and

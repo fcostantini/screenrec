@@ -7,6 +7,29 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-18 (M37-T1, an `NSApp.mainMenu` for an app that had none): **four things about menu bars,
+  activation policy, and how to drive them headlessly.**
+  - 🔴 **A menu bar answers its key equivalents whether or not macOS draws it.** An
+    `.accessory` app does not own the menu bar, so installing one at launch looks free — it is not.
+    ⌘H became live, and hiding the app while the region-selection overlay was up left
+    `RegionSelectionController.window` set with nothing on screen; **every later `Select Region…` was
+    then refused silently for the life of the process** (`present()` guards on `window == nil`).
+    Measured on the deployed build: the app stayed hidden and no overlay appeared. Install and
+    **remove** the bar with the activation policy, and make any "one at a time" overlay drop a window
+    that is no longer visible.
+  - ⚠️ **macOS injects its own rows into whatever menu you assign to `NSApp.windowsMenu`.** Ours has
+    four; the app shows **seventeen** — Minimize All, Zoom All, Fill, Center, Move & Resize, Full
+    Screen Tile, Remove Window from Set, Close All, Arrange in Front arrive uninvited. The open
+    windows are appended below a separator, the key one marked `✓` and a **minimized one marked `◆`**.
+    That marker is the whole feature: it is how a minimized window is found again.
+  - 🔴 **A synthetic ⌘-keystroke through System Events does not reliably reach a main-menu key
+    equivalent, but an AX press of the item does.** ⌘H via `keystroke "h" using command down` never
+    fired; clicking the same item through `AXPress` hid the app every time. A "the shortcut does
+    nothing" result from the keystroke path is worthless on its own — press the item.
+  - ⚠️ **`performClose:` and friends target the *key* window, and no-op silently when there isn't
+    one.** ⌘W read as broken for several minutes after an overlay had resigned key and nothing took
+    over. `AXRaise` a window first, then the shortcut works.
+
 - 2026-08-18 (M37 filing, driving the Trim window headlessly): **three things about probing
   `AVPlayerView` and about synthetic clicks, all of which cost a retry before they were understood.**
   - 🔴 **A synthetic click on a window that is not frontmost is consumed by activation.** The

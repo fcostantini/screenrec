@@ -9,8 +9,15 @@ the UI adds no behavior of its own.
 
 An AppKit `NSStatusItem` with an `NSMenu`, rebuilt on each open (M28-T2; it was a SwiftUI
 `MenuBarExtra(.menu)` through v1.14.0, and the bridge's limits are what the notes below record).
-`LSUIElement = true` (no Dock icon, no main window). Windows that exist — Settings (⌘,), Onboarding
-(first launch / missing permissions only) and Trim — are `NSWindow`s hosting SwiftUI views (M28-T1).
+`LSUIElement = true`, so the app **launches** with no Dock icon and no main window. Windows that
+exist — Settings (⌘,), Onboarding (first launch / missing permissions only) and Trim — are `NSWindow`s
+hosting SwiftUI views (M28-T1).
+
+**While any window is open the app is `.regular`** (M37-T1, ADR-023): a Dock icon, a ⌘-Tab entry and a
+menu bar of App / Edit / Window, all three gone again when the last window closes. Without them a
+minimized window had no route back. AppKit fills the Window menu itself, marking minimized windows, so
+that menu **is** the route back. ⚠️ First launch therefore shows a Dock icon while Onboarding is up.
+The status item keeps its own ⌘, and ⌘Q, since the app menu is absent whenever no window is open.
 
 ## Status item (the menu-bar icon)
 

@@ -17,6 +17,10 @@ final class RegionSelectionController {
         seededWith seed: RegionSelection? = nil,
         completion: @escaping (CGDirectDisplayID?, CGRect) -> Void
     ) {
+        // 🔴 Hiding the app (⌘H, live since ADR-023) orders the overlay out without closing it, so
+        // `window` stays set with nothing on screen — and every later pick would then be refused
+        // silently, for the life of the process. Measured on the deployed build, M37-T1.
+        if let window, !window.isVisible { dismiss() }
         guard window == nil, let screen = Self.mainScreen() else { return }
         let displayID = Self.displayID(of: screen)
         let view = RegionSelectionView(frame: NSRect(origin: .zero, size: screen.frame.size))

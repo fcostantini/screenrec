@@ -19,6 +19,14 @@ final class ActionMenuItem: NSMenuItem {
     @objc private func fire() { run() }
 }
 
+extension ActionMenuItem: NSMenuItemValidation {
+    /// Automatic enabling asks whether the target responds, and an item that is its own target
+    /// always does — so without this, ⌘Q in the app menu stays live inside a confirmation alert and
+    /// re-enters `QuitFlow` from within its modal session. The status menu disables automatic
+    /// enabling, so this never runs there.
+    func validateMenuItem(_ item: NSMenuItem) -> Bool { NSApplication.shared.modalWindow == nil }
+}
+
 /// Row constructors shared by both menus.
 ///
 /// Every menu built here sets `autoenablesItems = false`: AppKit's automatic enabling keys off

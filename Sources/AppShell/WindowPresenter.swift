@@ -21,12 +21,18 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
 
     private var windows: [Kind: NSWindow] = [:]
 
-    /// Opens the window, or brings an open one forward. An `LSUIElement` app's windows open behind
-    /// the frontmost app unless it activates, so presenting always does both.
+    /// Opens the window, or brings an open one forward. The app's windows open behind the frontmost
+    /// app unless it activates, so presenting always does both — and the policy is set first, so the
+    /// Dock tile and menu bar are already there when the window arrives.
+    ///
+    /// `deminiaturize` because `makeKeyAndOrderFront` is a no-op on a miniaturized window: without it
+    /// this row would appear to do nothing when its window is sitting in the Dock.
     func show(_ kind: Kind) {
         guard let state else { return }
         let window = windows[kind] ?? make(kind, state: state)
         windows[kind] = window
+        applyActivationPolicy()
+        window.deminiaturize(nil)
         window.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
@@ -38,6 +44,21 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         guard let closing = notification.object as? NSWindow else { return }
         windows = windows.filter { $0.value !== closing }
+        // Deferred by a turn: dropping to `.accessory` while the closing window is still on screen
+        // leaves the Dock tile and the bar behind. Recomputed when it runs, so opening another
+        // window in the meantime is still correct.
+        Task { [weak self] in self?.applyActivationPolicy() }
+    }
+
+    /// The Dock tile, the ⌘-Tab entry and the menu bar arrive with the first window and leave with
+    /// the last (ADR-023) — the bar included, because a bar with nothing drawn still answers its
+    /// key equivalents.
+    private func applyActivationPolicy() {
+        let policy = WindowPolicy.activationPolicy(openWindows: windows.count)
+        _ = NSApplication.shared.setActivationPolicy(policy)
+        guard policy == .regular else { return MainMenu.remove() }
+        guard let state else { return }
+        MainMenu.install(state: state, windows: self)
     }
 
     private func make(_ kind: Kind, state: AppState) -> NSWindow {

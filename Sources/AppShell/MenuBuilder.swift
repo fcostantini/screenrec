@@ -23,12 +23,12 @@ struct MenuBuilder {
             items.append(MenuRow.link(update, url: UpdateCheck.releasesPageURL))
         }
         // docs/06 item 12: present in both menus. Settings are read at the next Start, so changing
-        // them mid-recording is harmless. ⌘, is bound on the row because an LSUIElement app has no
-        // app menu to route it through.
+        // them mid-recording is harmless. ⌘, is bound on the row as well as in the app menu, because
+        // the app menu exists only while a window is open (ADR-023).
         let settings = MenuRow.action("Settings…") { windows.show(.settings) }
         settings.keyEquivalent = ","
         items.append(settings)
-        let quit = MenuRow.action("Quit") { self.quit() }
+        let quit = MenuRow.action("Quit") { QuitFlow.run(state) }
         quit.keyEquivalent = "q"
         items.append(quit)
         return items
@@ -446,70 +446,15 @@ struct MenuBuilder {
 
     // MARK: - Confirmations
 
-    /// Runs a modal confirmation, reporting whether the **first** button was chosen. Every caller
-    /// puts the safe choice first, so it is the one Return picks.
-    ///
-    /// The app is `LSUIElement`, so it must activate itself or the alert renders inactive and its
-    /// buttons can't be reached (docs/07).
-    private static func confirm(
-        _ message: String, _ informative: String,
-        first: String, second: String, secondIsDestructive: Bool = false
-    ) -> Bool {
-        let alert = NSAlert()
-        alert.messageText = message
-        alert.informativeText = informative
-        alert.addButton(withTitle: first)
-        alert.addButton(withTitle: second).hasDestructiveAction = secondIsDestructive
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        return alert.runModal() == .alertFirstButtonReturn
-    }
-
     /// docs/06 recording item 9: discarding confirms first — the safe choice is the default, so a
     /// reflexive Return can't destroy a take — then drops the file and returns to Ready.
     private func discardRecording() {
         guard state.session.isActive else { return }
-        guard !Self.confirm(
+        guard !ConfirmAlert.ask(
             "Discard this recording?", "This take will be deleted and can't be recovered.",
             first: "Keep Recording", second: "Discard", secondIsDestructive: true)
         else { return }
         Task { await state.discard() }
-    }
-
-    /// docs/06 item 12: quitting mid-recording confirms, then finalizes before exit (ADR-007).
-    /// An export in flight confirms too (M23-T2) — quitting through it loses work silently.
-    private func quit() {
-        if state.session.isActive {
-            guard Self.confirm(
-                "Stop recording and quit?", "Your recording will be saved first.",
-                first: "Stop & Quit", second: "Keep Recording")
-            else { return }
-            Task {
-                await state.finishWorkInFlight()
-                NSApplication.shared.terminate(nil)
-            }
-            return
-        }
-
-        guard state.exports.exportInProgress != nil else { return NSApplication.shared.terminate(nil) }
-
-        let outstanding = 1 + state.exports.queuedExportCount
-        guard Self.confirm(
-            outstanding == 1 ? "An export is still running." : "\(outstanding) exports are still running.",
-            outstanding == 1
-                ? "Quitting now throws it away. The recording it came from is untouched."
-                : "Quitting now throws them away. The recordings they came from are untouched.",
-            first: "Wait for Export", second: "Quit Anyway")
-        else {
-            // Abandon it first: `terminate` runs `applicationShouldTerminate`, which waits for an
-            // export in flight — so without this, "Quit Anyway" would wait like the other button.
-            state.exports.cancelExport()
-            return NSApplication.shared.terminate(nil)
-        }
-
-        Task {
-            await state.exports.waitForExportToFinish()
-            NSApplication.shared.terminate(nil)
-        }
     }
 }
 

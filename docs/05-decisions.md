@@ -260,6 +260,32 @@ removes it the app gets quieter and vaguer, not wrong — which is the failure m
 taking. **A reversal is a new ADR**; so is reading any *other* private domain, which this does not
 authorise.
 
+## ADR-023 ✅ The app is in the Dock and ⌘-Tab while a window is open (Franco, 2026-08-18)
+`LSUIElement = true` has been stated as a flat property since M4: **no Dock icon, no main window.**
+It is now conditional. The app launches `.accessory` as before, switches to `.regular` while any of
+its three windows is open, and switches back when the last one closes.
+
+**What forced it.** An accessory app has no Dock tile, no ⌘-Tab entry and no Window menu — the three
+routes back to a minimized window. `WindowPresenter` offered a minimize button anyway, and nothing in
+the app called `deminiaturize`, so **minimizing Trim put it somewhere the app itself could not reach**.
+Franco hit this in ordinary use and had to minimize every other app to find the window. The alternative
+considered and rejected was removing the minimize button: cheaper, and it answers "don't lose the
+window" without answering "let me switch apps mid-trim and come back", which is the actual request.
+
+**Bounds:**
+- **The window count is the only input.** One rule, one place (`WindowPolicy`), no per-window
+  exceptions — including Onboarding, so ⚠️ **first launch now shows a Dock icon** while it is up.
+- **A `.regular` app owes a menu bar.** With `mainMenu` nil the bar holds only the Apple menu, so the
+  app builds App / Edit / Window itself. Edit is not decoration: the standard editing commands reach a
+  text field through menu items, so ⌘V could not paste into `Rename…` before this.
+- **Two menus, one behaviour.** ⌘Q in the app menu goes through the same `QuitFlow` as the status
+  item's `Quit` row — quitting mid-recording or mid-export must still ask (docs/06 item 12, ADR-007).
+- 🔴 **The bar is removed when the last window closes, not merely undrawn.** A menu answers its key
+  equivalents whether or not macOS draws it, and ⌘H over the region-selection overlay hides that
+  window without closing it — which strands the pick for the life of the process.
+- **The status item is unchanged**, and keeps its own ⌘, and ⌘Q: the app menu exists only while a
+  window is open, so the status menu cannot rely on it.
+
 ## ADR-021 ✅ The repository is public; distribution and signing are unchanged (Franco, 2026-08-05)
 ADR-014 said screenrec is **"never public"**, and M32 ran straight into the consequence: the update
 check it needed could not read a private repo's releases, and — the part that reshaped the milestone
