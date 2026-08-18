@@ -7,6 +7,22 @@ one file in the repo whose audience is not us.
 Only versions published as releases appear here; several were tagged during development and never
 published. The commit history is in the repository, where it belongs.
 
+## 1.20.0
+
+**The windows behave like windows.** While a ScreenRec window is open the app now appears in the Dock
+and in ⌘-Tab, with a Window menu that lists what's open. Minimizing the Trim window used to put it
+somewhere you couldn't get it back from — no Dock icon, no ⌘-Tab entry, nothing to click. It's in
+**Window ▸** now, and ⌘C and ⌘V work in the rename box for the first time.
+
+**The Trim window resizes, and the picture grows with it.** Drag it larger and the preview follows.
+That matters most when you're drawing a crop on a wide recording, where the preview used to spend a
+third of itself on black bars. The size you choose is remembered.
+
+**Play and pause work while you're cropping.** They didn't: the crop overlay covered the player's
+controls and swallowed every click, while still drawing them, so the button was there and did nothing.
+The Trim window now has its own **Play / Pause** and a clock, and the player's own controls step aside
+while a crop is being drawn rather than sitting there dead.
+
 ## 1.19.0
 
 **The menu tells you how much replay you actually have.** While the buffer is still filling — which

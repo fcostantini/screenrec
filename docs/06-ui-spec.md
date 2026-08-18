@@ -629,6 +629,13 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   docs/07). A click seeks proportionally to where you clicked, not to the thumbnail; a white marker
   tracks the playhead. Caption: *"Click to seek · ←/→ a frame · ⇧←/⇧→ a second"*. Navigation, not
   editing — no zoom, no waveform, no multi-track; the window stays spare.
+- **A `Play` / `Pause` button and a `0:11 / 2:00` readout** on the row under the filmstrip (M37-T3),
+  present in both modes. While a crop is being drawn `AVPlayerView` draws **no** controls of its own:
+  they sit under the overlay, which takes every click in the picture, and a visible control that
+  ignores a click is worse than one that isn't there. That makes this row the only transport then —
+  hence the readout, which replaces the time the player would otherwise show. **No spacebar**: it
+  collides with AppKit's "space activates the focused button", so the shortcut would work only when
+  focus happened to be nowhere.
 - **←/→ step one real frame**, ⇧ makes it a second. The frame comes from the sample table
   (`FrameStep`), not `AVPlayerItem.step(byCount:)`, which assumes a cadence frame-on-change capture
   doesn't have. The keys are claimed by a local `NSEvent` monitor scoped to this window, because a

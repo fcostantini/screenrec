@@ -6,6 +6,27 @@
 
 ## Now
 
+- **✅ M37 COMPLETE and G37 PASSED (2026-08-18) — the windows behave like windows. 🚢 v1.20.0.**
+  **821 tests** (807 → 821). Three tasks from Franco's own use of the app, all verified **headlessly**
+  on the deployed build — the "needs Franco" legs turned out not to, since an AX probe reads
+  `activationPolicy`, the app's `AXMenuBar` and the Window menu's rows. **MINOR as filed (ADR-013):**
+  T1 is a capability the app never had. **Not released — not tagged, not pushed.**
+  ✅ **T1:** `accessory` → `regular` → `accessory` with `menu bar: none` either side; a minimized Trim
+  shows as **`◆Trim`** in Window ▸ and the row restores it; ⌘V pastes into `Rename…`.
+  ✅ **T2:** at 1100 × 800 the picture goes **480 × 300 → ~905 × 535**; the size persists; shrinking
+  clamps at **500 × 653**, the size it used to be fixed at.
+  ✅ **T3:** crop ON, the window's `Play` moved the clock **0:00 → 0:02** where the same press moved
+  the timeline by *nothing* before; `Pause` held at 0:11; no transport is drawn while cropping.
+  🔴 **Two defects this milestone nearly shipped, both caught by looking rather than by tests.**
+  A bar installed at launch made ⌘H live, and hiding the app with the region overlay open then refused
+  **every later `Select Region…`** silently — found by the review, then reproduced and fixed. And T2's
+  first build resized the window while `TrimView` still pinned its column to `.frame(width: 500)`, so
+  the content sat stranded in a 500 pt strip — Franco caught that in one screenshot.
+  🔴 **One claim of mine was simply wrong:** "ScreenRec would list itself in its own Source
+  picker". `SourcesModel.refreshApps` has self-excluded since M7. Corrected in the plan artifact, the
+  milestone and ADR-023; the code written for it was deleted.
+  ⚠️ **Needs Franco:** whether to tag and release v1.20.0.
+
 - **✅ M37-T2 DONE (2026-08-18) — the Trim window resizes and the preview grows with it.**
   **819 tests** (818 → 819). Measured on the deployed build: at 1100 × 800 the picture goes
   **480 × 300 → ~905 × 535**, the crop dim lands on the picture rather than the box, close/reopen

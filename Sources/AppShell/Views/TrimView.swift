@@ -8,16 +8,18 @@ import SwiftUI
 /// instantiating its metadata in a Command-Line-Tools (no-Xcode) SPM build.
 private struct PlayerView: NSViewRepresentable {
     let player: AVPlayer
+    let controlsStyle: AVPlayerViewControlsStyle
 
     func makeNSView(context: Context) -> AVPlayerView {
         let view = AVPlayerView()
-        view.controlsStyle = .inline
+        view.controlsStyle = controlsStyle
         view.player = player
         return view
     }
 
     func updateNSView(_ view: AVPlayerView, context: Context) {
         if view.player !== player { view.player = player }
+        if view.controlsStyle != controlsStyle { view.controlsStyle = controlsStyle }
     }
 }
 
@@ -59,8 +61,11 @@ struct TrimView: View {
     @State private var stripTask: Task<Void, Never>?
     @State private var playhead = 0.0
     /// Crop drawing is a mode: an always-on overlay would swallow `AVPlayerView`'s inline transport
-    /// controls, which sit under it (M26-T2).
+    /// controls, which sit under it (M26-T2). While it is on they are not drawn (M37-T3).
     @State private var cropping = false
+    /// Drives the transport button's word. Read off the player rather than set on tap, so it also
+    /// follows a pause the window didn't ask for — the clip reaching its end, or Play Range.
+    @State private var isPlaying = false
     /// The crop, in source pixels — the shape the exporter takes, so nothing about the preview's
     /// geometry can drift into it. Nil until one is drawn.
     @State private var crop: CropRect?
@@ -139,7 +144,8 @@ struct TrimView: View {
             if let player {
                 // The overlay goes on the *fitted* picture, not on the box holding it, or the dim
                 // would spill into the empty space beside a clip the window's shape doesn't match.
-                PlayerView(player: player)
+                PlayerView(player: player,
+                           controlsStyle: TrimPlayerControls.style(cropping: cropping))
                     .aspectRatio(previewAspect, contentMode: .fit)
                     .overlay { if cropping { cropOverlay } }
                     .cornerRadius(6)
@@ -148,9 +154,20 @@ struct TrimView: View {
             }
 
             filmstrip
-            Text("Click to seek · ←/→ a frame · ⇧←/⇧→ a second")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            // The window's own transport, present in both modes: while cropping the player draws
+            // none of its own, and this row is then the only way to play, pause or read the time.
+            HStack(spacing: 10) {
+                Button(isPlaying ? "Pause" : "Play") { togglePlayback() }
+                    .disabled(durationSeconds <= 0)
+                Text("Click to seek · ←/→ a frame · ⇧←/⇧→ a second")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("\(Timecode.cutPoint(playhead)) / \(Timecode.cutPoint(durationSeconds))")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
 
             HStack {
                 Button("Set In") { setIn() }
@@ -403,6 +420,15 @@ struct TrimView: View {
         refreshLeadIn()
     }
 
+    /// Play/pause from the window rather than from the player, which draws no controls while a crop
+    /// is being drawn. A clip sitting at its end restarts, since play would otherwise do nothing.
+    private func togglePlayback() {
+        guard let player, durationSeconds > 0 else { return }
+        guard player.timeControlStatus != .playing else { return player.pause() }
+        if currentTime() >= durationSeconds - 0.05 { seek(toSeconds: 0) }
+        player.play()
+    }
+
     /// Plays only `[in, out]`: seeks to the in-point and pauses again on the way past the out-point.
     /// The seek is zero-tolerance — the preview must start where the trim will, not at a keyframe
     /// up to seconds earlier.
@@ -461,6 +487,7 @@ struct TrimView: View {
         player?.pause()
         player = nil
         loadedURL = nil
+        isPlaying = false
     }
 
     /// Claims the arrow keys for the Trim window.
@@ -498,9 +525,14 @@ struct TrimView: View {
         stopPlayheadObserver()
         observers.playhead = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.2, preferredTimescale: 600), queue: .main
-        ) { time in
+        ) { [weak player] time in
             // Installed with `queue: .main`, so this is provably on the main actor.
-            MainActor.assumeIsolated { playhead = time.seconds.isFinite ? time.seconds : 0 }
+            MainActor.assumeIsolated {
+                playhead = time.seconds.isFinite ? time.seconds : 0
+                // Periodic observers also fire when playback starts or stops, so the button's word
+                // cannot go stale — no second observer is needed for it.
+                isPlaying = player?.timeControlStatus == .playing
+            }
         }
     }
 

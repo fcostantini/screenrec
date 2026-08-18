@@ -3558,7 +3558,7 @@ alone; and the Edit menu's ⌘V fix is folded into T1 rather than deferred.
       Franco caught it in one screenshot. Both the column and the preview follow the window now.
       ⚠️ **Order matters on the crop overlay:** `.overlay` has to come *before* the flexible `.frame`,
       or the dim covers the box rather than the fitted picture (docs/07).
-- [ ] M37-T3 **Playback is reachable while cropping.** The overlay covers the whole player
+- [x] M37-T3 **Playback is reachable while cropping.** The overlay covers the whole player
       (`TrimView.swift:130`) with `.contentShape(Rectangle())` and a `DragGesture`, and `AVPlayerView`'s
       inline transport sits underneath it — **drawn, dimmed, and dead.** The mode was the M26-T2 fix for
       "an always-on overlay would swallow the transport" (`:61`); the bill is that inside the mode you
@@ -3577,11 +3577,27 @@ alone; and the Edit menu's ⌘V fix is folded into T1 rather than deferred.
       **Verify:** the AX probe above re-run both ways (the timeline must advance with crop **on**); the
       controls-style decision extracted as a pure helper and unit-tested, matching how this codebase
       keeps decisions assertable without rendering SwiftUI.
+      ✅ **Done 2026-08-18. 821 tests** (819 → 821). `TrimPlayerControls.style(cropping:)` carries the
+      decision; the button's word is read off `timeControlStatus` in the **existing** periodic observer,
+      which fires when playback starts or stops as well as during it — no second observer was needed.
+      ✅ **Re-measured on the deployed build, crop ON:** pressing the window's `Play` moved the clock
+      **0:00 → 0:02**, and `Pause` held it at **0:11** across two seconds. The same press moved the
+      timeline by *nothing* before. Screenshotted with the pointer over the picture: **no transport is
+      drawn** while cropping, and unticking brings the player's own inline controls straight back.
+      ✅ **Ruling taken (Franco): button only, no spacebar** — it collides with AppKit's "space
+      activates the focused button", so the shortcut would work only when focus happened to be nowhere.
+      ⚠️ **The readout is not decoration:** `.none` removes the player's own clock, so the row carries
+      `0:11 / 2:00` to replace it. It reads a fifth of a second behind `AVPlayerView`'s own display,
+      which rounds where `Timecode.cutPoint` floors — deliberate, since it must agree with In/Out.
 
-**Gate G37** — the three windows are reachable: a Dock icon and ⌘-Tab entry appear with the first
-window and go with the last, and Window ▸ restores a minimized Trim. The Trim window resizes and a crop
-drawn at two sizes exports the same rect. With crop on, the transport either works or is not drawn.
-Driven on the deployed build, with the human legs named above in "Needs Franco".
+**Gate G37** — ✅ **PASSED 2026-08-18** (evidence in STATUS.md's gate table and in each task above).
+As filed: a Dock icon and ⌘-Tab entry appear with the first window and go with the last (measured
+`accessory`→`regular`→`accessory`, with `menu bar: none` either side); Window ▸ lists a minimized Trim
+as **`◆Trim`** and the row restores it; the Trim window resizes, the picture grows with it, and the
+same fraction of the picture is the same `CropRect` at four different window sizes; and with crop on
+the transport both **works** (0:00 → 0:02) and is **not drawn**. Driven headlessly on the deployed
+build — no human leg was needed. 🚢 **MINOR as filed (ADR-013): v1.20.0**, since T1 is a capability
+the app never had. **Not yet released.**
 
 ## Dependency graph
 
