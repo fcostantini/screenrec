@@ -70,6 +70,8 @@ struct TrimView: View {
     @State private var barsMessage: String?
     @State private var findingBars = false
 
+    /// The preview's floor, and the window's with it — the size this window shipped at before it
+    /// could be resized.
     private static let previewSize = CGSize(width: 480, height: 300)
     /// One row of thumbnails across the player's width. 16 measured at 785 ms on a recording,
     /// against 1.8 s for 24 — which is also past the size a screen recording reads at (docs/07).
@@ -80,6 +82,16 @@ struct TrimView: View {
 
     /// A range worth acting on; below this, Trim & Save and Play Range are meaningless.
     private var hasRange: Bool { outSeconds - inSeconds >= 0.1 }
+
+    /// What the preview is shaped like: the clip's own ratio once its geometry has loaded, so a
+    /// wide take spends the window on picture rather than on letterbox. The box's own until then,
+    /// so nothing jumps as a clip loads.
+    private var previewAspect: CGFloat {
+        guard let sourceSize, sourceSize.height > 0 else {
+            return Self.previewSize.width / Self.previewSize.height
+        }
+        return sourceSize.width / sourceSize.height
+    }
 
     /// What `Export & Copy` will produce (M21-T1). The size is what will really be encoded — the
     /// crop when there is one (M26-T2), else the whole frame — fitted through the width in Settings;
@@ -125,10 +137,14 @@ struct TrimView: View {
                 .truncationMode(.middle)
 
             if let player {
+                // The overlay goes on the *fitted* picture, not on the box holding it, or the dim
+                // would spill into the empty space beside a clip the window's shape doesn't match.
                 PlayerView(player: player)
-                    .frame(width: Self.previewSize.width, height: Self.previewSize.height)
+                    .aspectRatio(previewAspect, contentMode: .fit)
                     .overlay { if cropping { cropOverlay } }
                     .cornerRadius(6)
+                    .frame(minWidth: Self.previewSize.width, maxWidth: .infinity,
+                           minHeight: Self.previewSize.height, maxHeight: .infinity)
             }
 
             filmstrip
@@ -228,7 +244,9 @@ struct TrimView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding()
-        .frame(width: 500)
+        // The window resizes now (M37-T2), so the column follows it rather than sitting at a fixed
+        // 500 pt with the extra width stranded either side of it.
+        .frame(minWidth: 500, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     /// The crop band over the preview (M26-T2): drag to draw, drag again to redraw. The dim is

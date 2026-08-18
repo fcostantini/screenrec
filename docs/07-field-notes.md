@@ -7,6 +7,22 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-08-18 (M37-T2, making one window resizable): **two SwiftUI/AppKit facts about growing a
+  hosted view with its window.**
+  - 🔴 **A modifier ordering that decides where an overlay lands.** `.aspectRatio(_, .fit)`
+    then `.overlay` then a flexible `.frame` puts the overlay on the **fitted picture**; move
+    `.overlay` after the `.frame` and it covers the whole box instead, so a crop dim spills into the
+    empty space beside a clip whose shape the window doesn't match. Same three modifiers, different
+    result.
+  - ⚠️ **`NSHostingController.sizingOptions` is the difference between a window that can resize and
+    one that snaps back.** `[.preferredContentSize]` drives the window from the content — right for a
+    fixed panel, and it re-fits Settings when its tab changes. `[.minSize]` makes the content a floor
+    and lets the user's size win. Adding `.resizable` to the style mask alone does nothing while the
+    first option is set.
+  - ✅ **`setFrameAutosaveName` restores size as well as position, across a window that is rebuilt per
+    open.** Measured: dragged to 1100 × 800, closed, reopened at 1100 × 800 in the same place, with no
+    other storage involved.
+
 - 2026-08-18 (M37-T1, an `NSApp.mainMenu` for an app that had none): **four things about menu bars,
   activation policy, and how to drive them headlessly.**
   - 🔴 **A menu bar answers its key equivalents whether or not macOS draws it.** An

@@ -70,22 +70,27 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
             window("ScreenRec Settings", autosave: "settings",
                    hosting: SettingsView(state: state))
         case .trim:
-            window(trimWindowTitle, autosave: "trim",
+            // The only one worth resizing: a crop is drawn on its preview, and a wide clip leaves
+            // that preview mostly letterbox at the fitted size (M37-T2).
+            window(trimWindowTitle, autosave: "trim", resizable: true,
                    hosting: TrimView(state: state) { [weak self] in self?.close(.trim) })
         }
     }
 
-    /// Sizes to its content and cannot be resized; `preferredContentSize` is what lets Settings
-    /// re-fit when its tab changes. The autosave name keeps a moved window where it was put —
-    /// these are rebuilt per open, so nothing else would remember.
+    /// Sizes to its content unless `resizable`, where the content only sets a floor and the user's
+    /// size wins; `preferredContentSize` is what lets Settings re-fit when its tab changes. The
+    /// autosave name keeps a moved — and now a resized — window where it was put, since these are
+    /// rebuilt per open and nothing else would remember.
     private func window(
-        _ title: String, autosave: String, hosting content: some View
+        _ title: String, autosave: String, resizable: Bool = false, hosting content: some View
     ) -> NSWindow {
         let controller = NSHostingController(rootView: content)
-        controller.sizingOptions = [.preferredContentSize]
+        controller.sizingOptions = resizable ? [.minSize] : [.preferredContentSize]
         let window = NSWindow(contentViewController: controller)
         window.title = title
-        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.styleMask = resizable
+            ? [.titled, .closable, .miniaturizable, .resizable]
+            : [.titled, .closable, .miniaturizable]
         // The dictionary above owns these; AppKit's release-on-close would free one under ARC.
         window.isReleasedWhenClosed = false
         window.delegate = self

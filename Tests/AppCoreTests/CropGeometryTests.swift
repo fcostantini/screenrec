@@ -41,6 +41,31 @@ import Testing
         #expect(abs((crop?.height ?? 0) - 1284) <= 2)
     }
 
+    /// M37-T2's real question. The window resizes now, so the same gesture lands on a different
+    /// number of points depending on how big it has been dragged — and must still mean the same
+    /// pixels. The crop is held in source pixels precisely so this holds.
+    @Test func theSameFractionOfTheVideoIsTheSameCropAtAnyWindowSize() {
+        let sizes = [view, CGSize(width: 960, height: 600), CGSize(width: 1440, height: 900),
+                     CGSize(width: 700, height: 900)]
+        let crops = sizes.map { size -> CropRect? in
+            let video = CropGeometry.videoRect(sourceSize: source, in: size)
+            // The same middle half of the picture, wherever the picture happens to sit.
+            let drag = CGRect(
+                x: video.minX + video.width / 4, y: video.minY + video.height / 4,
+                width: video.width / 2, height: video.height / 2)
+            return CropGeometry.crop(fromViewRect: drag, sourceSize: source, viewSize: size)
+        }
+        let first = try? #require(crops.first ?? nil)
+        for crop in crops.dropFirst() {
+            let crop = try? #require(crop)
+            // Within a pixel: a bigger preview rounds a fractional source pixel differently.
+            #expect(abs((crop?.x ?? 0) - (first?.x ?? 0)) <= 1)
+            #expect(abs((crop?.y ?? 0) - (first?.y ?? 0)) <= 1)
+            #expect(abs((crop?.width ?? 0) - (first?.width ?? 0)) <= 2)
+            #expect(abs((crop?.height ?? 0) - (first?.height ?? 0)) <= 2)
+        }
+    }
+
     @Test func aDragIsTheSameRectangleDrawnInAnyDirection() {
         let downRight = CropGeometry.crop(
             fromViewRect: CGRect(x: 100, y: 60, width: 200, height: 120),

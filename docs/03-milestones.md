@@ -3529,7 +3529,7 @@ alone; and the Edit menu's ⌘V fix is folded into T1 rather than deferred.
       that is no longer visible. Re-measured after the fix: the app unhides and presents a fresh one.
       🔴 **`⌘W` looked broken and wasn't:** `performClose:` targets the *key* window, and after the
       overlay resigned there was none. With a window raised it closes correctly.
-- [ ] M37-T2 **The Trim window resizes, and the preview grows with it.** Three things stack and only
+- [x] M37-T2 **The Trim window resizes, and the preview grows with it.** Three things stack and only
       the third is the real ceiling: the style mask has no `.resizable` (`WindowPresenter.swift:67`),
       `sizingOptions = [.preferredContentSize]` (`:63`) would snap the window back to its content, and
       `TrimView.previewSize = 480 × 300` (`:71`) is applied as a fixed `.frame`, so the preview cannot
@@ -3546,6 +3546,18 @@ alone; and the Edit menu's ⌘V fix is folded into T1 rather than deferred.
       **Verify:** the real test is not that it resizes but that the crop still means the same thing —
       draw a crop at two different window sizes and assert the exported rect matches what was drawn.
       Reopen and confirm the size stuck.
+      ✅ **Done 2026-08-18. 819 tests** (818 → 819): the same fraction of the picture is the same
+      `CropRect` at 480 × 300, 960 × 600, 1440 × 900 and a portrait 700 × 900, within a pixel.
+      ✅ **Measured on the deployed build:** dragged to 1100 × 800 the picture goes **480 × 300 →
+      ~905 × 535**; the crop dim lands on the picture and not the space beside it; close and reopen
+      returns **1100 × 800** at the same position; and shrinking clamps at **500 × 653**, exactly the
+      size the window was fixed at, so nothing got worse.
+      🔴 **The style mask was never the ceiling — `TrimView` pinned its whole column to
+      `.frame(width: 500)`.** The first build made the window resizable and left that in, so the extra
+      width stranded either side of a 500 pt column and the preview grew only downward into dead space.
+      Franco caught it in one screenshot. Both the column and the preview follow the window now.
+      ⚠️ **Order matters on the crop overlay:** `.overlay` has to come *before* the flexible `.frame`,
+      or the dim covers the box rather than the fitted picture (docs/07).
 - [ ] M37-T3 **Playback is reachable while cropping.** The overlay covers the whole player
       (`TrimView.swift:130`) with `.contentShape(Rectangle())` and a `DragGesture`, and `AVPlayerView`'s
       inline transport sits underneath it — **drawn, dimmed, and dead.** The mode was the M26-T2 fix for

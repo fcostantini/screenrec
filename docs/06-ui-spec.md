@@ -617,7 +617,10 @@ live and writes through `register()`/`unregister()`. No key.
 ## Trim window (M10-T4 — the first editing surface, ADR-015)
 
 Opened from a recent recording's `Trim…` submenu row; a plain `Window` (id `trim`) reading
-`AppState.trimTarget`, like Settings (an LSUIElement app can't spawn document windows). Spare by
+`AppState.trimTarget`, like Settings (an LSUIElement app can't spawn document windows). **The one
+resizable window** (M37-T2): a crop is drawn on its preview, so the preview follows the window and the
+picture takes the clip's own aspect rather than sitting letterboxed in a fixed box. Floor 500 × 653 —
+the size it was fixed at before — and the frame autosave remembers what it was dragged to. Spare by
 design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
 - An **`AVPlayerView`** preview (AppKit via `NSViewRepresentable` — SwiftUI's generic `VideoPlayer`
   fatal-errors in the Command-Line-Tools SPM build; field note).

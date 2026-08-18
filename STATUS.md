@@ -6,6 +6,18 @@
 
 ## Now
 
+- **✅ M37-T2 DONE (2026-08-18) — the Trim window resizes and the preview grows with it.**
+  **819 tests** (818 → 819). Measured on the deployed build: at 1100 × 800 the picture goes
+  **480 × 300 → ~905 × 535**, the crop dim lands on the picture rather than the box, close/reopen
+  restores 1100 × 800, and shrinking clamps at **500 × 653** — the size the window used to be fixed
+  at. **Next: M37-T3** (playback reachable while cropping).
+  🔴 **The style mask was never the ceiling.** `TrimView` pinned its column to
+  `.frame(width: 500)`, so the first build resized the *window* and left the content stranded in a
+  500 pt strip with dead space either side. Franco caught it in one screenshot; both the column and
+  the preview follow the window now.
+  ⚠️ **`.overlay` must precede the flexible `.frame`** or the crop dim covers the box instead of the
+  picture — in 07.
+
 - **✅ M37-T1 DONE (2026-08-18) — a window open now means a Dock icon, ⌘-Tab and a menu bar.**
   **818 tests** (807 → 818). Verified headlessly on the deployed build: 0 windows → `accessory`,
   `menu bar: none`; Settings open → `regular`, `Apple · ScreenRec · Edit · Window`, `✓ScreenRec
