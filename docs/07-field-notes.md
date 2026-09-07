@@ -7,6 +7,20 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-09-07 (M38 gate run, misreading a locked screen as a wedged app): **with the screen locked,
+  an app's AX window list is a lie and `screencapture -R` fails.** Measured, in this order:
+  `NSRunningApplication.activate` returns and `isActive` stays **false**; `AXWindows` succeeds but
+  contains a single element whose role is **`AXApplication`** (titled with the app name, frame
+  `0,0,0,0`) where the real window should be, and `AXFocusedWindow` is the same element;
+  `screencapture -x -R …` fails with *"could not create image from display with rect"*.
+  ⚠️ **Two things keep working and make it look like an app fault:** `tools/menudriver.swift` still
+  opens, reads and clicks the status menu, and `CGWindowListCopyWindowInfo` still reports the window's
+  real title and frame — so "the window exists, the app can't be activated, AX can't see it" reads as
+  a wedged app. It isn't.
+  ✅ **The one-line check before believing any of it:**
+  `CGSessionCopyCurrentDictionary()["CGSSessionScreenIsLocked"]` — 1 means every UI leg has to wait for
+  a human, and no amount of relaunching will fix it.
+
 - 2026-09-07 (M38-T1, driving the Trim window headlessly): **its controls answer to
   `AXDescription`, not `AXTitle`.** Every button in that window — `Play`, `Set In`, `Export & Copy` —
   reports an empty `AXTitle` and carries its label in `AXDescription`, so a probe matching on title

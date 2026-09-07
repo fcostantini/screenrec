@@ -6,6 +6,24 @@
 
 ## Now
 
+- **⏸ G38 IS THE ONLY THING LEFT, AND IT NEEDS THE SCREEN (2026-09-07).** M38 is code-complete —
+  T1, T2, T3 committed with their evidence, plus three review fixes on top (`888f869` and the
+  Play Range one below). **841 tests.** **No VERSION bump yet:** the milestone says the bump lands at
+  G38, and G38 hasn't run.
+  ⚠️ **The last review fix's live leg is unrun.** A manual seek now disarms Play Range's out-point stop
+  — before M38-T1 the unconditional pause hid the fact that the boundary observer only fires when the
+  out-point is *traversed*, so a filmstrip click past it played to the end with a stale token still
+  installed. Builds and unit-tests clean; the behaviour itself is **not measured** and must be, on the
+  deployed build, before G38 is called.
+  🔴 **The screen locked mid-verify** (`CGSSessionScreenIsLocked: 1`), which is why: with the screen
+  locked the app cannot be activated, `AXWindows` hands back the **application** element instead of the
+  window, and `screencapture -R` fails outright — while `CGWindowListCopyWindowInfo` still reports the
+  window's real frame. Worth knowing before someone reads that state as a wedged app, which is what I
+  did for several minutes. In docs/07.
+  ⚠️ **A `Trim` window is open on the desktop** from that run, and **Instant Replay is disarmed** — it
+  re-armed itself after the first deploy of the day and hasn't since.
+  ⚠️ **Still owed:** the v1.20.0 tag decision, now covering v1.21.0 too.
+
 - **✅ M38-T3 DONE (2026-09-07) — the sound is reachable from the menu and from the Trim window.**
   **840 tests** (838 → 840). Driven on the deployed build: the recents submenu's `Export Audio` wrote
   **5.6 MB / 300.77 s / one AAC track**, and the Trim window's button — under the action row, with its

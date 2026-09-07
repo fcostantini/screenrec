@@ -424,9 +424,11 @@ struct TrimView: View {
 
     /// Moving the playhead doesn't change whether the clip is running (M38-T1) — `TrimSeek` holds
     /// that rule and its end-of-clip exception. A seek preserves the rate on its own, so only the
-    /// case that must *not* keep playing needs the pause.
+    /// case that must *not* keep playing needs the pause. It also ends any Play Range in flight:
+    /// with playback no longer stopping here, its out-point would otherwise still be armed.
     private func seek(toSeconds seconds: Double) {
         guard let player, durationSeconds > 0 else { return }
+        disarmRangeStop()
         let target = min(max(seconds, 0), durationSeconds)
         let keepsPlaying = TrimSeek.keepsPlaying(
             wasPlaying: player.timeControlStatus != .paused, landingAt: target,
@@ -477,13 +479,21 @@ struct TrimView: View {
         ) { _ in player.play() }
     }
 
-    /// Ends a range playback in flight. An out-point at the very end of the clip may never be
-    /// traversed, so the observer can outlive the playback that installed it.
-    private func stopRangePlayback() {
+    /// Drops the boundary observer that pauses at the out-point. An out-point at the very end of a
+    /// clip may never be traversed, so it can outlive the playback that installed it — and a manual
+    /// seek is the user taking over, after which a stop at the out-point would land somewhere they
+    /// didn't ask for. Playback itself is untouched.
+    private func disarmRangeStop() {
         guard let token = observers.range else { return }
         player?.removeTimeObserver(token)
-        player?.pause()
         observers.range = nil
+    }
+
+    /// Ends a range playback in flight.
+    private func stopRangePlayback() {
+        guard observers.range != nil else { return }
+        disarmRangeStop()
+        player?.pause()
     }
 
     /// Asks the asset where a lossless trim from the in-point would really start keeping frames.
