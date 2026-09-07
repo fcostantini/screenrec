@@ -3623,7 +3623,7 @@ MP4 export already uses, and MP3 is not pursued. Also ruled: "keep playing" cove
 click as well as the arrows** — they are the same `seek`, and two ways of moving that behave
 differently would be worse than the bug.
 
-- [ ] M38-T1 **Moving the playhead doesn't stop the preview.** Read `timeControlStatus` at the press,
+- [x] M38-T1 **Moving the playhead doesn't stop the preview.** Read `timeControlStatus` at the press,
       seek, and resume if it was playing. The rule has one exception worth stating: a seek that lands
       **at the end** of the clip does not resume, because playing from there plays nothing and would
       leave the button saying `Pause` over a stopped clip — the 0.05 s threshold `togglePlayback`
@@ -3641,6 +3641,19 @@ differently would be worse than the bug.
       stays put; paused → stays paused). Live on the deployed build, the M37-T3 method: play, press →
       five times, and read the `0:11 / 2:00` clock through AX before and after — it must still be
       advancing, where today it stops dead.
+      ✅ **Done 2026-09-07. 826 tests** (821 → 826). One AX probe, run against both binaries — same
+      button, same five keys, same clip (a 5:01 replay).
+      ✅ **Before (deployed v1.20.0):** `Play` moved the clock **0:00 → 0:02**, then five `→` froze it
+      at **0:02**, still 0:02 two seconds later, with the button back to `Play`.
+      ✅ **After:** the same five presses read 0:02 and **2.2 s later 0:04**, button still `Pause`.
+      Filmstrip: playing at 0:01, a click at 75 % of the strip → **3:47 → 3:49**, still `Pause`.
+      Paused, five presses start nothing — 0:00, `Play`, unchanged 2.2 s later.
+      🔴 **The fix is one `pause()` fewer, not a resume.** A seek preserves the rate on its own, so
+      `seek(toSeconds:)` pauses only when the rule says not to keep playing and `step(byFrames:)`
+      dropped its own pause — no completion handler, so a superseded seek can't restart a clip the
+      next press already stopped.
+      ⚠️ **The end-of-clip exception is unit-tested, not live-measured:** it is a 50 ms window at the
+      end of a 5-minute clip, and one filmstrip pixel is 0.18 s — the surface can't address it.
 - [ ] M38-T2 **The sound can be exported on its own** (RecorderCore + CLI).
       `AudioExporter.exportAudio(from:to:configuration:range:)`: `AVAssetReaderAudioMixOutput` over
       the audio tracks → 48 kHz stereo PCM → one AAC input on an `AVAssetWriter(fileType: .m4a)`.

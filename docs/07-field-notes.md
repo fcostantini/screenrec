@@ -7,6 +7,17 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-09-07 (M38-T1, driving the Trim window headlessly): **its controls answer to
+  `AXDescription`, not `AXTitle`.** Every button in that window — `Play`, `Set In`, `Export & Copy` —
+  reports an empty `AXTitle` and carries its label in `AXDescription`, so a probe matching on title
+  finds nothing and reports a window with no controls. `tools/axdump.swift` prints both; match on
+  description.
+  ⚠️ **Two more things that surface makes noisy.** `AVPlayerView` publishes the *video's* Live Text as
+  a wall of `AXTextArea` nodes — the frame's on-screen writing, OCR'd, ahead of the real controls —
+  so filter them out before reading anything. And the player's own `elapsed time` element read
+  `00:00` throughout a playback the window's readout tracked correctly, its controls being undrawn
+  with the pointer away: read the window's `0:00 / 5:00`, which is the app's own state.
+
 - 2026-09-07 (M38 filing, answering "can we export MP3?"): **macOS decodes MP3 everywhere and
   encodes it nowhere.** `AudioFormatGetProperty(kAudioFormatProperty_Encoders, …)` returns **0
   encoders** for `kAudioFormatMPEGLayer3`, against **1 each** for AAC, ALAC, FLAC and Opus, and

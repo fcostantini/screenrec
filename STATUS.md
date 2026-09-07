@@ -6,6 +6,23 @@
 
 ## Now
 
+- **✅ M38-T1 DONE (2026-09-07) — the preview keeps playing while you move around in it.**
+  **826 tests** (821 → 826). One AX probe run against both binaries, same button and same five keys on
+  a 5:01 replay: **before**, `Play` took the clock 0:00 → 0:02 and five `→` froze it at 0:02 with the
+  button back to `Play`; **after**, the same presses read 0:02 and **0:04** two seconds later, button
+  still `Pause`. A filmstrip click while playing goes **3:47 → 3:49** instead of stopping, and five
+  presses while paused start nothing. **Next: M38-T2.**
+  🔴 **The fix is one `pause()` fewer, not a resume.** A seek preserves the rate on its own, so
+  `seek(toSeconds:)` pauses only when `TrimSeek` says not to keep playing, and `step(byFrames:)`
+  dropped its own pause — no completion handler, so a superseded seek can't restart a clip the next
+  press already stopped.
+  ⚠️ **The end-of-clip exception is unit-tested only** — 50 ms at the end of a 5-minute clip, where one
+  filmstrip pixel is 0.18 s.
+  ⚠️ **Driving that window needs `AXDescription`, not `AXTitle`**, and `AVPlayerView` publishes the
+  video's Live Text as `AXTextArea` noise — both in docs/07.
+  ⚠️ **The deploy discarded the armed replay buffer that was running** (Franco's call, taken before
+  the rebuild); the relaunched build re-armed itself from settings.
+
 - **📋 M38 FILED from Franco's own use (2026-09-07) — three tasks, nothing implemented. Next: M38-T1.**
   Plan artifact: `claude.ai/code/artifact/e2670924-062b-49d5-b8ef-34c3b33099f5`. A `docs:` commit — no code
   changed, no VERSION bump yet (**MINOR at the gate**, ADR-013: an audio derive is a capability the app

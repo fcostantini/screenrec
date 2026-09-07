@@ -381,8 +381,7 @@ struct TrimView: View {
     /// assumes a fixed cadence our frame-on-change capture doesn't have (measured: it moved 0.25 s
     /// and landed off every source frame, `FrameStep`).
     private func step(byFrames count: Int) {
-        guard let player, let asset = player.currentItem?.asset, let url = loadedURL else { return }
-        player.pause()
+        guard let asset = player?.currentItem?.asset, let url = loadedURL else { return }
         let from = currentTime()
         Task {
             guard let next = await FrameStep.time(in: asset, from: from, by: count),
@@ -402,11 +401,18 @@ struct TrimView: View {
         seek(toSeconds: durationSeconds * min(max(fraction, 0), 1))
     }
 
+    /// Moving the playhead doesn't change whether the clip is running (M38-T1) — `TrimSeek` holds
+    /// that rule and its end-of-clip exception. A seek preserves the rate on its own, so only the
+    /// case that must *not* keep playing needs the pause.
     private func seek(toSeconds seconds: Double) {
         guard let player, durationSeconds > 0 else { return }
-        player.pause()
+        let target = min(max(seconds, 0), durationSeconds)
+        let keepsPlaying = TrimSeek.keepsPlaying(
+            wasPlaying: player.timeControlStatus != .paused, landingAt: target,
+            duration: durationSeconds)
+        if !keepsPlaying { player.pause() }
         player.seek(
-            to: CMTime(seconds: min(max(seconds, 0), durationSeconds), preferredTimescale: 600),
+            to: CMTime(seconds: target, preferredTimescale: 600),
             toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
@@ -425,7 +431,7 @@ struct TrimView: View {
     private func togglePlayback() {
         guard let player, durationSeconds > 0 else { return }
         guard player.timeControlStatus != .playing else { return player.pause() }
-        if currentTime() >= durationSeconds - 0.05 { seek(toSeconds: 0) }
+        if TrimSeek.isAtEnd(currentTime(), duration: durationSeconds) { seek(toSeconds: 0) }
         player.play()
     }
 
