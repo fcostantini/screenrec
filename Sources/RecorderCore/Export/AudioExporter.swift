@@ -69,19 +69,23 @@ public enum AudioExporter {
             from: tracks.filter { $0.mediaType == .audio }, configuration: configuration)
         guard !audioTracks.isEmpty else { throw AudioExportError.noAudioTrack }
 
-        // The span the sound occupies, which is not the asset's: a `.mov`'s duration follows its
-        // longest track — normally the video — so a take whose audio stops early would otherwise
-        // report a length the file doesn't hold, and one whose audio starts late would open with
-        // that much silence.
-        var earliest: CMTime?
-        var latest: CMTime?
-        for track in audioTracks {
-            guard let span = try? await track.load(.timeRange) else { continue }
-            earliest = earliest.map { CMTimeMinimum($0, span.start) } ?? span.start
-            latest = latest.map { CMTimeMaximum($0, span.end) } ?? span.end
+        // Rebased from the picture's start, where the MP4 export rebases (`Exporter`): the same
+        // range exported both ways has to line up, so the sound is never moved earlier than the
+        // frames it came from. A source with no picture keeps its own timeline.
+        var mediaStart = CMTime.zero
+        if let video = tracks.first(where: { $0.mediaType == .video }),
+            let start = try? await video.load(.timeRange).start {
+            mediaStart = start
         }
-        let mediaStart = earliest ?? .zero
-        let mediaEnd = latest ?? assetDuration
+        // The end, though, is the sound's and not the asset's: a `.mov`'s duration follows its
+        // longest track — normally the video — so a take whose audio stops early would otherwise be
+        // quoted a length the file doesn't hold.
+        var soundEnd: CMTime?
+        for track in audioTracks {
+            guard let end = try? await track.load(.timeRange).end else { continue }
+            soundEnd = soundEnd.map { CMTimeMaximum($0, end) } ?? end
+        }
+        let mediaEnd = soundEnd ?? assetDuration
         let clipStart = range.map {
             CMTimeMaximum(CMTime(seconds: $0.start, preferredTimescale: 600), mediaStart)
         } ?? mediaStart

@@ -3697,6 +3697,13 @@ differently would be worse than the bug.
       ⚠️ **The CLI prints the rate the file carries** — `AAC 156 kbps` on a 160 kbps request — not the
       configured one: the encoder snaps the request to a rate it supports and AAC spends less on quiet
       content.
+      🔴 **The review found the two exports disagreeing about the same range.** This rebased the
+      `.m4a` from the earliest *sound*, `Exporter` rebases the `.mp4` from the *picture* — so on a take
+      whose mic warms up late, `Export Audio` over 0:00–0:05 wrote 3.5 s while `Export & Copy` over the
+      same range wrote 5 s, and the file was shorter than the window quoted. Both rebase from the
+      picture now (a source with no picture keeps its own clock); only the **end** is still the
+      sound's, which is what keeps a take whose audio stops early from being quoted the video's
+      length. Re-measured: the whole take **300.77 s**, `--from 2 --to 5` **3.00 s**.
       🔴 **The review found two things my own pass didn't, both fixed before the commit.** The
       reported duration was the **asset's** length rather than the sound's — a `.mov`'s duration
       follows its longest track, normally the video — so a take whose audio stops early would have

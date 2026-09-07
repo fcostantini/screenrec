@@ -36,6 +36,10 @@
   needs the VT encoder and stays gated behind `SCREENREC_HW_ENCODE_TESTS=1` (run once, passing).
   ⚠️ **Franco's replays hold one stereo track, no mic** — so the real-file leg proves the
   keep-the-sound branch of M33-T2's rule, and the drop-the-mic branch is unit-tested on a fixture.
+  🔴 **A later review found the two exports disagreeing about the same range** — this rebased from the
+  earliest *sound* where `Exporter` rebases from the *picture*, so a late-starting mic made
+  `Export Audio` and `Export & Copy` of one range write different lengths. Both rebase from the picture
+  now; only the end is still the sound's. Re-measured: whole take **300.77 s**, a 2–5 s range **3.00 s**.
   🔴 **`/code-review medium` found two things my own pass didn't**, both fixed before the commit: the
   result reported the **asset's** length (video-driven) rather than the sound's — 300.79 against the
   file's 300.77, and the CLI divided bytes by it — and a test aimed its second export at the first

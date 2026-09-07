@@ -113,6 +113,20 @@ import Testing
         #expect(abs(try await AVURLAsset(url: result.url).load(.duration).seconds - 1) < 0.2)
     }
 
+    @Test func aRangeIsTheRangeAskedForEvenWhenTheSoundStartsLate() async throws {
+        // Both exports rebase from the source's own clock, so the range you ask for is the range you
+        // get. Trimming the silence off the front instead would slide the sound earlier than the
+        // picture it came from, and hand back a file shorter than the window quoted.
+        let source = try Self.makeAudioClip(systemSeconds: 1.5, micSeconds: 1.5, startingAt: 0.5)
+        defer { try? FileManager.default.removeItem(at: source) }
+        let range = ExportRange(start: 0, end: 1.5)
+        let output = AudioExporter.m4aSibling(of: source, range: range)
+        defer { try? FileManager.default.removeItem(at: output) }
+
+        let result = try await AudioExporter.exportAudio(from: source, to: output, range: range)
+        #expect(abs(result.duration - 1.5) < 0.05)
+    }
+
     @Test(.enabled(if: ProcessInfo.processInfo.environment["SCREENREC_HW_ENCODE_TESTS"] == "1"))
     func aRecordingWithNoSoundIsRefusedRatherThanWrittenSilent() async throws {
         // System audio is optional (ADR-019) and the mic is opt-in, so this is a real recording,
@@ -133,7 +147,9 @@ import Testing
     /// A recording without its picture: two AAC tracks in a `.mov`, stereo "system audio" and mono
     /// "microphone" (ADR-004), each as long as asked. Unequal lengths are what makes the
     /// microphone rule observable.
-    private static func makeAudioClip(systemSeconds: Double, micSeconds: Double) throws -> URL {
+    private static func makeAudioClip(
+        systemSeconds: Double, micSeconds: Double, startingAt offset: Double = 0
+    ) throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("audio-src-\(UUID().uuidString).mov")
         try? FileManager.default.removeItem(at: url)
@@ -157,8 +173,8 @@ import Testing
         for (input, channels, seconds) in [(system, UInt32(2), systemSeconds),
                                            (microphone, UInt32(1), micSeconds)] {
             let format = makeAudioFormat(sampleRate: 48_000, channels: channels)
-            var frames = 0
-            while Double(frames) / 48_000 < seconds {
+            var frames = Int(offset * 48_000)
+            while Double(frames) / 48_000 - offset < seconds {
                 while !input.isReadyForMoreMediaData { usleep(2_000) }
                 precondition(
                     input.append(
