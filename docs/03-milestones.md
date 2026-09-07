@@ -3762,7 +3762,15 @@ differently would be worse than the bug.
       covers any file that can be opened and has nothing to show. Not unit-tested: the cache is
       private and `image(for:)` reads nil either way, so the only observable is work not done.
 
-**Gate G38** — Franco's two reports, answered on the deployed build. With the preview playing, five
+**Gate G38** — ✅ **PASSED 2026-09-07** (evidence in STATUS.md's gate table and in each task above).
+Every leg driven on the deployed build: playback survived five `→` presses (**0:23 → 0:25**) and a
+filmstrip click (**3:47 → 3:49**) while a paused clip stayed paused; a seek mid-range took over from
+Play Range, sailing past a **0:17** out-point to **0:21**; the menu row wrote **300.77 s** and the Trim
+window's button wrote **27.82 s** for a 0:27 range and dismissed; and a take recorded with
+`--no-mic --no-system-audio` answered **"That recording has no sound"** in a real banner, with no file
+written. 🚢 **MINOR as filed (ADR-013): v1.21.0.**
+
+As filed — Franco's two reports, answered on the deployed build. With the preview playing, five
 ←/→ presses and a filmstrip click leave it **still playing** (the clock read through AX before and
 after), and a press in the last 0.05 s stops rather than pretending. Both surfaces produce a playable
 `.m4a`: the menu row's matches the whole take's duration, the Trim window's matches the trimmed range,
