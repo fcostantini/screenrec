@@ -7,7 +7,19 @@ one file in the repo whose audience is not us.
 Only versions published as releases appear here; several were tagged during development and never
 published. The commit history is in the repository, where it belongs.
 
-## 1.20.0
+## 1.21.0
+
+**Export just the audio.** A recording's sound can now leave on its own as an `.m4a` — the whole take
+from the menu (`Export Audio`, beside `Export as MP4` and `Save as GIF`), or only the part you have
+trimmed, from the Trim window. No video is read or encoded, so a five-minute, 1.2 GB take becomes a
+5.6 MB file in under two seconds. It follows the same microphone setting as the MP4 export, and a take
+recorded with no sound at all tells you so instead of handing back an empty file. It is AAC rather than
+MP3 because macOS decodes MP3 everywhere and encodes it nowhere, and ScreenRec ships no third-party
+code.
+
+**The preview keeps playing while you move around in it.** ←/→, ⇧←/⇧→ and clicks on the filmstrip used
+to stop playback dead; they leave it running now, and leave a paused clip paused. A click during
+`Play Range` takes over rather than stopping later at an out-point you have already moved away from.
 
 **The windows behave like windows.** While a ScreenRec window is open the app now appears in the Dock
 and in ⌘-Tab, with a Window menu that lists what's open. Minimizing the Trim window used to put it
