@@ -14,6 +14,20 @@ enum AudioEncodingSettings {
         ]
     }
 
+    /// The PCM a mix output hands that encoder: 16-bit interleaved, the shape both export paths
+    /// read their audio in (M38-T2).
+    static func mixedPCM(sampleRate: Double, channels: Int) -> [String: Any] {
+        [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: sampleRate,
+            AVNumberOfChannelsKey: channels,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+        ]
+    }
+
     /// Snaps `target` to a rate in `AVAudioConverter.applicableEncodeBitRates` for this format:
     /// the AAC encoder accepts only a discrete set that shrinks with the format (24 kHz mono
     /// tops out at 64 kbps), and an out-of-set value fails the writer with -12651. Picks the

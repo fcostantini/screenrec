@@ -25,11 +25,18 @@ private func exportErrorMessage(_ error: Error) -> String {
         GifExportError.unreadable(let message),
         GifExportError.writeFailed(let message):
         return "Couldn't export: \(message)"
+    case AudioExportError.unreadable(let message),
+        AudioExportError.readerFailed(let message),
+        AudioExportError.writerFailed(let message):
+        return "Couldn't export: \(message)"
     case ExportError.noVideoTrack, GifExportError.noVideoTrack:
         return "Couldn't export: that file has no video track."
-    case ExportError.outputCollidesWithInput, GifExportError.outputCollidesWithInput:
+    case AudioExportError.noAudioTrack:
+        return "Couldn't export: that recording has no sound."
+    case ExportError.outputCollidesWithInput, GifExportError.outputCollidesWithInput,
+        AudioExportError.outputCollidesWithInput:
         return "The output path matches the input — choose a different name."
-    case ExportError.emptyRange:
+    case ExportError.emptyRange, AudioExportError.emptyRange:
         return "Couldn't export: the time range is empty."
     case ExportError.cropOutOfBounds(let message):
         return "Couldn't export: \(message)"
@@ -40,13 +47,15 @@ private func exportErrorMessage(_ error: Error) -> String {
     }
 }
 
-/// `export (--to-mp4 | --to-gif) <in> [<out>]` — derive a shareable file from a recording (ADR-016,
-/// M10-T3). `--to-mp4` also takes `--from`/`--to`, writing only that range (M21-T1), and `--crop`,
-/// keeping only that rectangle of each frame (M26-T1). Default output is the input's `.mp4`/`.gif`
-/// sibling, collision-resolved; the source is only read.
+/// `export (--to-mp4 | --to-gif | --to-audio) <in> [<out>]` — derive a shareable file from a
+/// recording (ADR-016, M10-T3, M38-T2). `--to-mp4` and `--to-audio` also take `--from`/`--to`,
+/// writing only that range (M21-T1); `--crop` keeps only that rectangle of each frame (M26-T1).
+/// Default output is the input's `.mp4`/`.gif`/`.m4a` sibling, collision-resolved; the source is
+/// only read.
 func runExport(_ args: [String]) async {
     var toMP4 = false
     var toGIF = false
+    var toAudio = false
     var positionals: [String] = []
     var gifFPS: Int?
     var width: Int?
@@ -69,6 +78,7 @@ func runExport(_ args: [String]) async {
         case "--no-microphone":
             includesMicrophone = false
         case "--to-gif": toGIF = true
+        case "--to-audio": toAudio = true
         // Round, don't truncate, and floor at 1: a sub-1.0 value would otherwise become 0 → a
         // broken GIF (fps 0 keeps one frame; width 0 floors to a 2px clip).
         case "--fps":
@@ -95,13 +105,18 @@ func runExport(_ args: [String]) async {
         }
         index += 1
     }
-    guard toMP4 != toGIF else { die("export needs exactly one of --to-mp4 or --to-gif") }
-    guard !toMP4 || (gifFPS == nil && gifSeconds == nil) else {
+    guard [toMP4, toGIF, toAudio].filter({ $0 }).count == 1 else {
+        die("export needs exactly one of --to-mp4, --to-gif or --to-audio")
+    }
+    guard toGIF || (gifFPS == nil && gifSeconds == nil) else {
         die("--fps/--seconds only apply to --to-gif")
     }
-    guard !toGIF || (from == nil && to == nil && crop == nil && !detectsCrop) else {
-        die("--from/--to/--crop only apply to --to-mp4")
+    guard !toGIF || (from == nil && to == nil) else {
+        die("--from/--to only apply to --to-mp4 or --to-audio")
     }
+    guard toMP4 || (crop == nil && !detectsCrop) else { die("--crop only applies to --to-mp4") }
+    // Audio has no picture to size.
+    guard !toAudio || width == nil else { die("--width doesn't apply to --to-audio") }
     guard (from == nil) == (to == nil) else { die("a range needs both --from and --to") }
     if let from, let to { guard to > from else { die("--to must be after --from") } }
     guard let inputPath = positionals.first else { die("export needs an input path") }
@@ -117,16 +132,20 @@ func runExport(_ args: [String]) async {
 
     print("Reading   \(input.lastPathComponent)")
     do {
+        let range: ExportRange? = if let from, let to {
+            ExportRange(start: from, end: to)
+        } else {
+            nil
+        }
         if toGIF {
             try await runGIF(
                 input: input, explicitOutput: explicitOutput,
                 fps: gifFPS, width: width, seconds: gifSeconds)
+        } else if toAudio {
+            try await runAudio(
+                input: input, explicitOutput: explicitOutput, range: range,
+                includesMicrophone: includesMicrophone)
         } else {
-            let range: ExportRange? = if let from, let to {
-                ExportRange(start: from, end: to)
-            } else {
-                nil
-            }
             try await runMP4(
                 input: input, explicitOutput: explicitOutput, width: width, range: range,
                 crop: crop, detectsCrop: detectsCrop, includesMicrophone: includesMicrophone)
@@ -185,4 +204,27 @@ private func runGIF(
             format: "Wrote     %@  (GIF %d×%d, %d frames, %.1f MB)%@",
             result.url.lastPathComponent, result.width, result.height,
             result.frameCount, Double(result.byteCount) / 1_000_000, window))
+}
+
+/// `--to-audio`: the take's sound on its own, as an `.m4a` (M38-T2). No `--width` — there is no
+/// picture — and no progress line: the pass is short enough that one would only ever print 100%.
+private func runAudio(
+    input: URL, explicitOutput: URL?, range: ExportRange?, includesMicrophone: Bool
+) async throws {
+    let output = explicitOutput
+        ?? Exporter.availableURL(basedOn: AudioExporter.m4aSibling(of: input, range: range))
+    if let range {
+        print("Range     \(Timecode.cutPoint(range.start)) – \(Timecode.cutPoint(range.end))")
+    }
+    let result = try await AudioExporter.exportAudio(
+        from: input, to: output,
+        configuration: ExportConfiguration(includesMicrophone: includesMicrophone), range: range)
+    // The rate the file carries, not the one that was asked for: the encoder snaps the request to
+    // a rate it supports, and AAC spends fewer bits on quiet content.
+    let kbps = result.duration > 0 ? Double(result.byteCount) * 8 / result.duration / 1000 : 0
+    print(
+        String(
+            format: "Wrote     %@  (AAC %.0f kbps, %.2fs, %.1f MB)",
+            result.url.lastPathComponent, kbps, result.duration,
+            Double(result.byteCount) / 1_000_000))
 }

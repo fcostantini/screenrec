@@ -6,6 +6,24 @@
 
 ## Now
 
+- **✅ M38-T2 DONE (2026-09-07) — a take's sound can leave on its own, as an `.m4a`.**
+  **834 tests** (826 → 834). `AudioExporter.exportAudio` + `screenrec-cli export --to-audio`, measured
+  on the 5:01 replay: **one AAC track, no video track**, **300.77 s** against the source's 300.79,
+  **5.6 MB in 1.78 s** from a 1.2 GB take; `--from 2 --to 5` → **3.00 s** named `… trimmed.m4a`.
+  **Decoded rather than assumed** — peak 0.231 / rms 0.0145 over the first 20 s. **Next: M38-T3**
+  (the menu row and the Trim window's button — and the three rulings in the plan artifact).
+  🔴 **Two extractions rather than a copy:** `Exporter.mixedTracks` and
+  `AudioEncodingSettings.mixedPCM` are shared with the MP4 path, so the two exports can't drift on
+  which track is the microphone or what PCM the encoder is fed.
+  ⚠️ **The audio fixtures carry no video**, so they run in the default suite; only the no-sound case
+  needs the VT encoder and stays gated behind `SCREENREC_HW_ENCODE_TESTS=1` (run once, passing).
+  ⚠️ **Franco's replays hold one stereo track, no mic** — so the real-file leg proves the
+  keep-the-sound branch of M33-T2's rule, and the drop-the-mic branch is unit-tested on a fixture.
+  🔴 **`/code-review medium` found two things my own pass didn't**, both fixed before the commit: the
+  result reported the **asset's** length (video-driven) rather than the sound's — 300.79 against the
+  file's 300.77, and the CLI divided bytes by it — and a test aimed its second export at the first
+  one's path, leaving a stray `… 2.m4a` in `$TMPDIR` every run while still passing.
+
 - **✅ M38-T1 DONE (2026-09-07) — the preview keeps playing while you move around in it.**
   **826 tests** (821 → 826). One AX probe run against both binaries, same button and same five keys on
   a 5:01 replay: **before**, `Play` took the clock 0:00 → 0:02 and five `→` froze it at 0:02 with the

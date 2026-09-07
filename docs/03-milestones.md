@@ -3654,7 +3654,7 @@ differently would be worse than the bug.
       next press already stopped.
       ⚠️ **The end-of-clip exception is unit-tested, not live-measured:** it is a 50 ms window at the
       end of a 5-minute clip, and one filmstrip pixel is 0.18 s — the surface can't address it.
-- [ ] M38-T2 **The sound can be exported on its own** (RecorderCore + CLI).
+- [x] M38-T2 **The sound can be exported on its own** (RecorderCore + CLI).
       `AudioExporter.exportAudio(from:to:configuration:range:)`: `AVAssetReaderAudioMixOutput` over
       the audio tracks → 48 kHz stereo PCM → one AAC input on an `AVAssetWriter(fileType: .m4a)`.
       No video output at all, so it is the MP4 path with its expensive half removed.
@@ -3678,6 +3678,33 @@ differently would be worse than the bug.
       one AAC track, **no video track**, duration matching the source; `--from 2 --to 5` → 3 s ± 0.1;
       `--no-microphone` on a two-track take drops the mono one. Unit tests for the sibling naming and
       for the empty-range and output-collides-with-input refusals.
+      ✅ **Done 2026-09-07. 834 tests** (826 → 834). `AudioExporter.exportAudio` and
+      `export --to-audio`.
+      ✅ **Measured on a real take** — the 5:01 replay, 1.2 GB, one stereo track: the whole take gave
+      **one AAC track and no video track**, **300.77 s** against the source's 300.79, **5.6 MB in
+      1.78 s**; `--from 2 --to 5` gave **3.00 s** named `… trimmed.m4a`. **Decoded, not assumed:**
+      peak 0.231 / rms 0.0145 over the first 20 s, so the file holds the sound rather than silence.
+      ✅ **`--no-microphone` on a single-track take keeps the sound** (300.79 s) — "without the
+      microphone" cannot mean "without any sound" (M33-T2), now exercised by a second caller. The
+      dropping itself is unit-tested on a two-track fixture whose mic outlasts the system audio, so
+      losing it is visible in the duration: 2 s → 1 s.
+      🔴 **Two extractions rather than a copy.** `Exporter.mixedTracks` (the async half of the mic
+      rule) and `AudioEncodingSettings.mixedPCM` are shared with the MP4 path now, so the two exports
+      can't drift on which track is the microphone or what the encoder is fed.
+      ⚠️ **The fixtures carry no video**, so these run in the default suite — unlike the MP4/GIF
+      integration tests. Only the no-sound case needs a picture to have none of the sound, so that one
+      is gated behind `SCREENREC_HW_ENCODE_TESTS=1`; run once and passing.
+      ⚠️ **The CLI prints the rate the file carries** — `AAC 156 kbps` on a 160 kbps request — not the
+      configured one: the encoder snaps the request to a rate it supports and AAC spends less on quiet
+      content.
+      🔴 **The review found two things my own pass didn't, both fixed before the commit.** The
+      reported duration was the **asset's** length rather than the sound's — a `.mov`'s duration
+      follows its longest track, normally the video — so a take whose audio stops early would have
+      been quoted a length the file doesn't hold, and the CLI divided its byte count by that number
+      for the rate line. The span now clamps to the audio tracks' own start and end: **300.77 s
+      reported against 300.77 s on the file**, where it had said 300.79. The other was a test aiming
+      its second export at the first one's path (`availableURL` before anything was written), which
+      left a stray `… 2.m4a` in `$TMPDIR` on every run while still passing.
 - [ ] M38-T3 **The row and the button that reach it** (AppCore + AppShell). The whole clip from the
       recents submenu, the trimmed range from the Trim window — Franco asked for both.
       `DeriveOptions.canExportAudio` decides where the row appears (not on a `.gif`, which isn't a

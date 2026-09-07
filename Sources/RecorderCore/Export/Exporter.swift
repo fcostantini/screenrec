@@ -254,22 +254,8 @@ public enum Exporter {
         guard let videoTrack = tracks.first(where: { $0.mediaType == .video }) else {
             throw ExportError.noVideoTrack
         }
-        var audioTracks = tracks.filter { $0.mediaType == .audio }
-        // Channel counts decide which of them the mix keeps — see `mixedTrackIndices`.
-        if !configuration.includesMicrophone, audioTracks.count > 1 {
-            var channels: [Int] = []
-            for track in audioTracks {
-                let formats = (try? await track.load(.formatDescriptions)) ?? []
-                let asbd = formats.first.flatMap {
-                    CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee
-                }
-                channels.append(Int(asbd?.mChannelsPerFrame ?? 0))
-            }
-            let keep = Set(
-                ExportConfiguration.mixedTrackIndices(
-                    channelCounts: channels, includesMicrophone: false))
-            audioTracks = audioTracks.enumerated().filter { keep.contains($0.offset) }.map(\.element)
-        }
+        let audioTracks = await mixedTracks(
+            from: tracks.filter { $0.mediaType == .audio }, configuration: configuration)
         let (naturalSize, videoRange) = try await videoTrack.load(.naturalSize, .timeRange)
         let sourceWidth = Int(naturalSize.width.rounded())
         let sourceHeight = Int(naturalSize.height.rounded())
@@ -334,6 +320,27 @@ public enum Exporter {
         return ExportResult(
             url: output, width: target.width, height: target.height,
             duration: clip.isFinite ? max(0, clip) : 0, byteCount: bytes)
+    }
+
+    /// Which of a source's audio tracks a mix should keep, by loading the channel counts
+    /// `mixedTrackIndices` judges. Shared with the audio-only export (M38-T2), so the two can't
+    /// disagree about which track is the microphone.
+    static func mixedTracks(
+        from audioTracks: [AVAssetTrack], configuration: ExportConfiguration
+    ) async -> [AVAssetTrack] {
+        guard !configuration.includesMicrophone, audioTracks.count > 1 else { return audioTracks }
+        var channels: [Int] = []
+        for track in audioTracks {
+            let formats = (try? await track.load(.formatDescriptions)) ?? []
+            let asbd = formats.first.flatMap {
+                CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee
+            }
+            channels.append(Int(asbd?.mChannelsPerFrame ?? 0))
+        }
+        let keep = Set(
+            ExportConfiguration.mixedTrackIndices(
+                channelCounts: channels, includesMicrophone: false))
+        return audioTracks.enumerated().filter { keep.contains($0.offset) }.map(\.element)
     }
 
     /// True when both URLs resolve to the same file on disk (not merely the same string). Resolve
@@ -411,15 +418,7 @@ private struct TranscodePlan {
             // apps expect a single track (recipe's `amix=inputs=2`).
             let mix = AVAssetReaderAudioMixOutput(
                 audioTracks: audioTracks,
-                audioSettings: [
-                    AVFormatIDKey: kAudioFormatLinearPCM,
-                    AVSampleRateKey: 48_000,
-                    AVNumberOfChannelsKey: 2,
-                    AVLinearPCMBitDepthKey: 16,
-                    AVLinearPCMIsFloatKey: false,
-                    AVLinearPCMIsBigEndianKey: false,
-                    AVLinearPCMIsNonInterleaved: false,
-                ])
+                audioSettings: AudioEncodingSettings.mixedPCM(sampleRate: 48_000, channels: 2))
             mix.alwaysCopiesSampleData = false
             guard reader.canAdd(mix) else {
                 throw ExportError.readerFailed("The reader refused the mixed audio track.")

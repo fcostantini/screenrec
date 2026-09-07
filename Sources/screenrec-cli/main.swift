@@ -26,6 +26,13 @@ func printUsage() {
                                        --width then caps the crop, not the source. Default <out> is
                                        the input's .mp4 sibling, or its " trimmed" one for a range.
                                        The source is read-only.
+      screenrec-cli export --to-audio <in> [--from <t> --to <t>] [<out>]
+                                       Write the recording's sound on its own as an AAC .m4a — the
+                                       whole take, or only --from/--to. No video is read or encoded.
+                                       --no-microphone leaves the mic's track out of the mix, as it
+                                       does for --to-mp4. macOS has no MP3 encoder at all (07), so
+                                       .m4a is the zero-dep audio format. Default <out> is the
+                                       input's .m4a sibling, or its " trimmed" one for a range.
       screenrec-cli export --to-gif <in> [<out>]  Save a clip as a looping animated .gif
                                        (default 480 wide, 15 fps, first 30 s). Override with
                                        --fps <n> --width <px> --seconds <n>. Default <out> is the
