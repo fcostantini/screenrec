@@ -3599,6 +3599,103 @@ the transport both **works** (0:00 → 0:02) and is **not drawn**. Driven headle
 build — no human leg was needed. 🚢 **MINOR as filed (ADR-013): v1.20.0**, since T1 is a capability
 the app never had. **Not yet released.**
 
+## M38 — The preview keeps playing, and the sound can leave on its own (from Franco, 2026-09-07)
+
+Two reports from one trimming session: **moving the playhead stops the preview**, and **there is no
+way to get a take's audio out on its own** — for the whole clip or for the range being trimmed.
+Plan artifact: `claude.ai/code/artifact/e2670924-062b-49d5-b8ef-34c3b33099f5`. **Filed MINOR (ADR-013)** — T2/T3 are a derive the app
+has never had, T1 alone would be a PATCH. ⚠️ **The bump lands at G38, not per task** (M37's rule:
+`CHANGELOG.md` is pinned to `VERSION` and is release prose). It stacks on an **unreleased v1.20.0**,
+so the tag decision already owed covers both.
+
+🔴 **T1 is not a side effect — the pause is deliberate and unconditional.** `TrimView
+.seek(toSeconds:)` calls `player.pause()` before every seek (`TrimView.swift:407`), and
+`step(byFrames:)` pauses again on its own account (`:385`). Every ←/→, ⇧←/⇧→ and filmstrip click
+runs through that one funnel, so all three stop playback.
+
+🔴 **MP3 is not available to this app — measured, not assumed.** Core Audio reports **0 encoders**
+for `kAudioFormatMPEGLayer3` (AAC, ALAC, FLAC and Opus report 1 each), and `afconvert -f MPG3 -d
+.mp3` fails with `ExtAudioFileSetProperty ('cfmt') failed ('fmt?')`. macOS **decodes** MP3 everywhere
+and **encodes** it nowhere; shipping one means vendoring LAME — an ADR-010 exception plus a
+third-party dylib to sign into the bundle.
+✅ **Ruled by Franco before filing (2026-09-07):** the export writes **`.m4a` (AAC)**, the encoder the
+MP4 export already uses, and MP3 is not pursued. Also ruled: "keep playing" covers the **filmstrip
+click as well as the arrows** — they are the same `seek`, and two ways of moving that behave
+differently would be worse than the bug.
+
+- [ ] M38-T1 **Moving the playhead doesn't stop the preview.** Read `timeControlStatus` at the press,
+      seek, and resume if it was playing. The rule has one exception worth stating: a seek that lands
+      **at the end** of the clip does not resume, because playing from there plays nothing and would
+      leave the button saying `Pause` over a stopped clip — the 0.05 s threshold `togglePlayback`
+      already uses to decide "this clip is at its end".
+      **Seams:** no new one — `seek(toSeconds:)` is already the single funnel (`nudge(bySeconds:)`,
+      `step(byFrames:)` and `seek(toFraction:)` all end there), so the fix has exactly one home. The
+      *decision* goes in a pure helper beside `TrimPlayerControls`, unit-tested the same way, since
+      SwiftUI isn't rendered in tests.
+      ⚠️ **`step(byFrames:)` pauses before an `await`**, so its resume has to survive the sample-table
+      walk. `FrameStep` measured **0.0–0.9 ms** (M24-T4), so resuming to the time read at the press
+      cannot rubber-band visibly — but the resume must be issued after the seek lands, not before it.
+      ⚠️ **`playRange()`'s boundary observer is deliberately untouched:** seeking during a range
+      playback leaves it installed today and still pauses at the out-point when it is traversed.
+      **Verify:** unit tests on the rule (playing mid-clip → resumes; playing into the last 0.05 s →
+      stays put; paused → stays paused). Live on the deployed build, the M37-T3 method: play, press →
+      five times, and read the `0:11 / 2:00` clock through AX before and after — it must still be
+      advancing, where today it stops dead.
+- [ ] M38-T2 **The sound can be exported on its own** (RecorderCore + CLI).
+      `AudioExporter.exportAudio(from:to:configuration:range:)`: `AVAssetReaderAudioMixOutput` over
+      the audio tracks → 48 kHz stereo PCM → one AAC input on an `AVAssetWriter(fileType: .m4a)`.
+      No video output at all, so it is the MP4 path with its expensive half removed.
+      **Seams, all reused:** `AudioEncodingSettings.aac` (the bit rate is snapped to what the encoder
+      accepts — an out-of-set value fails the writer with -12651); `ExportConfiguration
+      .mixedTrackIndices`, so Settings' *"exports include the microphone"* (M33-T2) and the CLI's
+      `--no-microphone` mean the same thing here as for MP4 with no second rule; the `.partial` +
+      `OutputLocation.finalizePartial` discipline every writer here follows; and `Exporter`'s
+      ` trimmed` sibling rule for a range (M21-T1), so a clip's audio can't sit in the folder looking
+      like the whole take's.
+      🔴 **A recording can have no sound at all** — system audio is optional (ADR-019) and the mic is
+      opt-in — so `noAudioTrack` is a real path, not a defensive one: it must say so rather than write
+      a silent or zero-length file.
+      ⚠️ **This gives M33-T2's channel-count inference a second caller.** Nothing in the container
+      records a track's role; mono is assumed to be the mic. The parked item's trigger is "the first
+      time export-without-mic is used in anger" — an audio-only export is the likeliest way that
+      happens.
+      **CLI:** `export --to-audio <in> [<out>] [--from <s> --to <s>] [--no-microphone]`, beside
+      `--to-mp4`/`--to-gif`.
+      **Verify:** `screenrec-cli export --to-audio` on a real take, then `swift tools/probe.swift` —
+      one AAC track, **no video track**, duration matching the source; `--from 2 --to 5` → 3 s ± 0.1;
+      `--no-microphone` on a two-track take drops the mono one. Unit tests for the sibling naming and
+      for the empty-range and output-collides-with-input refusals.
+- [ ] M38-T3 **The row and the button that reach it** (AppCore + AppShell). The whole clip from the
+      recents submenu, the trimmed range from the Trim window — Franco asked for both.
+      `DeriveOptions.canExportAudio` decides where the row appears (not on a `.gif`, which isn't a
+      movie; not on a file that is already audio — "a derive must make something you don't already
+      have"). `ExportModel.exportAudio` runs it through `performExport`, so it inherits the
+      one-at-a-time queue, the `Exporting…` row, the disk-space guard and the receipt; its estimate is
+      `audioBitRate × seconds / 8`, which is the one export here whose size really is predictable.
+      ⚠️ **`DeriveOptions` cannot know whether a take has sound** — that needs the asset loaded, and
+      rows are stamped at menu open. The silent case is answered by T2's notice at the point of use,
+      the same shape as every other honest failure on these rows.
+      🔴 **The Trim window's action row cannot take a fourth button:** docs/06 records **39.5 pt of
+      slack** and ~112 pt needed, which is why `Export & Copy` is one button and not a pair — and the
+      window's floor is 500 pt wide (M37-T2). So the button lands on its own row, the `Find bars`
+      idiom: a button with the fact beside it.
+      **Rulings needed:** the placement and copy (in the artifact); whether pressing it dismisses the
+      window as `Export & Copy` and `Trim & Save` both do — recommend **yes**, or it becomes the only
+      button in that row that doesn't; and the menu row's wording (`Export Audio` vs `Export as M4A`,
+      against neighbours `Export as MP4` / `Save as GIF`).
+      **docs/06 amendment:** the Trim window section and the derive rows.
+      **Verify:** `menudriver dump` shows the row on a `.mov` row and not on a `.gif` one; the Trim
+      window driven through AX to press the button, then `probe` what it wrote; unit tests for
+      `DeriveOptions` and for the notification copy.
+
+**Gate G38** — Franco's two reports, answered on the deployed build. With the preview playing, five
+←/→ presses and a filmstrip click leave it **still playing** (the clock read through AX before and
+after), and a press in the last 0.05 s stops rather than pretending. Both surfaces produce a playable
+`.m4a`: the menu row's matches the whole take's duration, the Trim window's matches the trimmed range,
+and `probe` reports one AAC track and no video in each. A take captured with no sound says so instead
+of writing a file. 🚢 **MINOR (ADR-013): v1.21.0** at the gate — an audio derive is a capability the
+app has never had.
+
 ## Dependency graph
 
 ```

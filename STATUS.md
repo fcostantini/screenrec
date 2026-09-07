@@ -6,6 +6,24 @@
 
 ## Now
 
+- **📋 M38 FILED from Franco's own use (2026-09-07) — three tasks, nothing implemented. Next: M38-T1.**
+  Plan artifact: `claude.ai/code/artifact/e2670924-062b-49d5-b8ef-34c3b33099f5`. A `docs:` commit — no code
+  changed, no VERSION bump yet (**MINOR at the gate**, ADR-013: an audio derive is a capability the app
+  has never had).
+  🔴 **T1's pause is deliberate, not a side effect of seeking.** `TrimView.seek(toSeconds:)` calls
+  `player.pause()` before every seek (`:405`) and `step(byFrames:)` pauses again on its own (`:385`),
+  and ←/→, ⇧←/⇧→ and the filmstrip click all funnel through it — so all three stop playback.
+  🔴 **MP3 cannot be written by this app, and that is measured rather than assumed.** Core Audio
+  reports **0 encoders** for `kAudioFormatMPEGLayer3` (AAC, ALAC, FLAC and Opus report 1 each) and
+  `afconvert -f MPG3` fails with `('fmt?')`. Shipping one means vendoring LAME — an ADR-010 exception.
+  In docs/07 with the trap that `afconvert -hf` lists `.mp3` anyway.
+  ✅ **Ruled by Franco before filing:** the export writes **`.m4a` (AAC)**, MP3 is not pursued; and
+  "keep playing" covers the **filmstrip click as well as the arrows**, since both are the same `seek`.
+  ⚠️ **Needs Franco:** the new row's placement and copy, whether `Export Audio` dismisses the Trim
+  window (recommend yes, like its two neighbours), and the menu row's wording (`Export Audio` vs
+  `Export as M4A`).
+  ⚠️ **v1.20.0 is still unreleased** — the tag decision owed from M37 now covers M38's bump too.
+
 - **✅ M37 COMPLETE and G37 PASSED (2026-08-18) — the windows behave like windows. 🚢 v1.20.0.**
   **821 tests** (807 → 821). Three tasks from Franco's own use of the app, all verified **headlessly**
   on the deployed build — the "needs Franco" legs turned out not to, since an AX probe reads

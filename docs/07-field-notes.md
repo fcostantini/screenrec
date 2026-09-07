@@ -7,6 +7,17 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-09-07 (M38 filing, answering "can we export MP3?"): **macOS decodes MP3 everywhere and
+  encodes it nowhere.** `AudioFormatGetProperty(kAudioFormatProperty_Encoders, …)` returns **0
+  encoders** for `kAudioFormatMPEGLayer3`, against **1 each** for AAC, ALAC, FLAC and Opus, and
+  `afconvert -f MPG3 -d .mp3 tone.wav out.mp3` fails with `ExtAudioFileSetProperty ('cfmt') failed
+  ('fmt?')` while the same tone converts to AAC without complaint.
+  ⚠️ **`afconvert -hf` reads like support and isn't.** It lists `'.mp3'` under `m4af`, `caff` and
+  `mp4f` — that table is what each container can *hold*, decoders included, not what this machine can
+  write. Ask `kAudioFormatProperty_Encoders` before believing any format table.
+  ✅ **The zero-dep audio format is `.m4a`** (AAC, the encoder the MP4 export already drives). MP3
+  costs a vendored LAME, an ADR-010 exception and a third-party dylib to sign into the bundle.
+
 - 2026-08-18 (M37-T2, making one window resizable): **two SwiftUI/AppKit facts about growing a
   hosted view with its window.**
   - 🔴 **A modifier ordering that decides where an overlay lands.** `.aspectRatio(_, .fit)`
