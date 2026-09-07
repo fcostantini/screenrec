@@ -6,6 +6,23 @@
 
 ## Now
 
+- **✅ M38-T3 DONE (2026-09-07) — the sound is reachable from the menu and from the Trim window.**
+  **840 tests** (838 → 840). Driven on the deployed build: the recents submenu's `Export Audio` wrote
+  **5.6 MB / 300.77 s / one AAC track**, and the Trim window's button — under the action row, with its
+  caption — **dismissed the window** and wrote **27.82 s** for a 0:27 range. **M38 is code-complete;
+  next is G38** (the gate, and the v1.21.0 bump with it).
+  🔴 **Two defects only the real surface showed, both fixed before the commit.** The export receipt
+  falls back to `Exported to MP4` for any extension it doesn't know, so an `.m4a` would have been
+  announced as an MP4 — M36's sin in a new place. And `OutputLocation.exportExtensions` turns out to be
+  **two rules in one list** — what Recent Exports lists, *and* which orphaned `.partial` the sweep may
+  delete — so without `m4a` an abandoned audio export would have sat in the folder forever.
+  ✅ **An `.m4a` row offers no derive at all** (measured in the menu): three of them need a picture and
+  the fourth would hand back what you have.
+  ⚠️ **The no-sound notice is unit-tested at both layers, never driven live** — no soundless recording
+  exists here.
+  ⚠️ **Instant Replay came back disarmed after this deploy** (it re-armed itself after the T1 one).
+  Franco may want it back on.
+
 - **✅ M38-T2 DONE (2026-09-07) — a take's sound can leave on its own, as an `.m4a`.**
   **834 tests** (826 → 834). `AudioExporter.exportAudio` + `screenrec-cli export --to-audio`, measured
   on the 5:01 replay: **one AAC track, no video track**, **300.77 s** against the source's 300.79,

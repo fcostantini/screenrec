@@ -211,7 +211,7 @@ import Testing
         #expect(row?.view is RecentRowView)          // the thumbnail well (M28-T3)
         #expect(row?.submenu?.items.map(\.title).filter { !$0.isEmpty } == [
             "Reveal in Finder", "Quick Look", "Share…", "Copy",
-            "Export as MP4", "Save as GIF", "Trim…",
+            "Export as MP4", "Save as GIF", "Export Audio", "Trim…",
             "Rename…", "Move to Trash",
         ])
     }

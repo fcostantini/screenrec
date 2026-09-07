@@ -19,6 +19,7 @@ public struct LastExport: Equatable, Sendable {
         let verb: String
         switch url.pathExtension.lowercased() {
         case "gif": verb = "Saved as GIF"
+        case "m4a": verb = "Saved the audio"
         case "mov": verb = "Trimmed"
         default: verb = "Exported to MP4"
         }

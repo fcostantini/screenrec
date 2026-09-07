@@ -3705,7 +3705,7 @@ differently would be worse than the bug.
       reported against 300.77 s on the file**, where it had said 300.79. The other was a test aiming
       its second export at the first one's path (`availableURL` before anything was written), which
       left a stray `… 2.m4a` in `$TMPDIR` on every run while still passing.
-- [ ] M38-T3 **The row and the button that reach it** (AppCore + AppShell). The whole clip from the
+- [x] M38-T3 **The row and the button that reach it** (AppCore + AppShell). The whole clip from the
       recents submenu, the trimmed range from the Trim window — Franco asked for both.
       `DeriveOptions.canExportAudio` decides where the row appears (not on a `.gif`, which isn't a
       movie; not on a file that is already audio — "a derive must make something you don't already
@@ -3727,6 +3727,33 @@ differently would be worse than the bug.
       **Verify:** `menudriver dump` shows the row on a `.mov` row and not on a `.gif` one; the Trim
       window driven through AX to press the button, then `probe` what it wrote; unit tests for
       `DeriveOptions` and for the notification copy.
+      ✅ **Done 2026-09-07. 840 tests** (838 → 840). Rulings taken (Franco): the row as drawn in the
+      artifact, it **dismisses** like its two neighbours, and the menu says `Export Audio`.
+      ✅ **Driven on the deployed build.** The recents submenu carries `Export Audio` between
+      `Save as GIF` and `Trim…`; clicking it wrote **5.6 MB, 300.77 s, one AAC track, no video track**
+      beside the recording. In the Trim window the row sits under the button row with its caption
+      (*"…only the range's sound — AAC 160 kbps .m4a — and no video."*); a filmstrip click and
+      `Set Out` gave `Trimmed length ≈ 0:27`, and the button **dismissed the window** — 0 windows
+      left — and wrote **27.82 s**.
+      🔴 **Two things only the real surface showed, both fixed here.** The receipt row falls back to
+      `Exported to MP4` for anything it doesn't recognise, so an `.m4a` would have been announced as
+      an MP4 — the M36 sin in a new place; it reads `Saved the audio · … .m4a` now. And
+      `OutputLocation.exportExtensions` is **two rules in one list**: what Recent Exports shows *and*
+      which orphaned `.partial` the sweep may delete. Without `m4a` in it, an audio export abandoned
+      mid-write would have been left in the folder forever — recovery only renames `.mov`s, and
+      deletion only touches known export formats.
+      ✅ **An `.m4a` row offers no derive at all**, measured in the menu: Reveal / Quick Look / Share /
+      Copy, then straight to Rename / Move to Trash with the divider gone. Three of the four need a
+      picture and the fourth would hand back what you already have — the rule `DeriveOptions` was
+      built on, now applied to a class of file rather than one extension.
+      ⚠️ **The no-sound notice is unit-tested at both layers, not driven live:** no soundless
+      recording exists on this Mac, and making one means a take with system audio off and no mic.
+      🔴 **And a third, from the review: listing `.m4a` in Recent Exports made the menu re-decode it
+      forever.** `MenuThumbnails.decode` only wrote its cache *inside* the frame loop, and sound loads
+      a duration (so the `.gif` early-return doesn't catch it) while yielding no frame — a fresh
+      `AVAssetImageGenerator` per audio row, on every menu open. It records the miss now, which also
+      covers any file that can be opened and has nothing to show. Not unit-tested: the cache is
+      private and `image(for:)` reads nil either way, so the only observable is work not done.
 
 **Gate G38** — Franco's two reports, answered on the deployed build. With the preview playing, five
 ←/→ presses and a filmstrip click leave it **still playing** (the clock read through AX before and

@@ -15,6 +15,7 @@ import Testing
         #expect(mov.canExportToMP4)
         #expect(mov.canSaveAsGIF)
         #expect(mov.canTrim)
+        #expect(mov.canExportAudio)
     }
 
     @Test func anExportIsNotOfferedAnotherExport() {
@@ -35,7 +36,21 @@ import Testing
         #expect(!gif.canExportToMP4)
         #expect(!gif.canSaveAsGIF)
         #expect(!gif.canTrim)
+        #expect(!gif.canExportAudio)
         #expect(!gif.hasAny)          // …and the menu drops the divider with them
+    }
+
+    @Test func aSoundFileTakesNoDeriveIncludingTheOneThatWouldMakeSound() {
+        // The app writes these itself now (M38-T2), so they are rows in the same menu: three of
+        // the derives need a picture, and the fourth would hand back what you already have.
+        for name in ["Recording.m4a", "Voice.mp3", "Take.WAV", "Clip.aiff", "Loop.caf"] {
+            let audio = options(name)
+            #expect(!audio.canExportAudio, "\(name) should not offer its own sound back")
+            #expect(!audio.canExportToMP4, "\(name) has no picture to put in an MP4")
+            #expect(!audio.canSaveAsGIF)
+            #expect(!audio.canTrim)
+            #expect(!audio.hasAny)        // …and the menu drops the divider with them
+        }
     }
 
     @Test func anUnknownExtensionIsTreatedAsAMovie() {

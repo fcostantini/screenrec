@@ -239,6 +239,43 @@ import RecorderCore
         #expect(posted.first?.fileURL == written)
     }
 
+    /// M38-T3: the receipt names what it is. Without its own verb an `.m4a` fell to the default and
+    /// the row read `Exported to MP4 · … .m4a`, which is a surface stating a thing that isn't so.
+    @Test func audioExportSetsAReceiptThatNamesTheSound() async {
+        let state = makeState()
+        var posted: [RecordingNotification] = []
+        state.notifier = { posted.append($0) }
+        let written = URL(fileURLWithPath: "/tmp/Clip.m4a")
+        state.exports.audioExportFunction = { _, _, _, _ in written }
+
+        state.exportAudio(URL(fileURLWithPath: "/tmp/Clip.mov"))
+        #expect(state.exports.exportInProgress == "Clip.mov")
+        while state.exports.exportInProgress != nil { await Task.yield() }
+
+        #expect(state.exports.lastExport?.url == written)
+        #expect(state.exports.lastExport?.menuTitle == "Saved the audio · Clip.m4a")
+        #expect(posted.first?.title == "Saved the audio")
+        #expect(posted.first?.fileURL == written)
+    }
+
+    /// The microphone rule reaches the audio export through the same Settings toggle as the MP4 one
+    /// (M33-T2), rather than a second switch nobody would find.
+    @Test func audioExportCarriesTheMicrophoneSetting() async {
+        let state = makeState()
+        state.notifier = { _ in }
+        state.exportsIncludeMicrophone = false
+        let seen = Box<Bool>()
+        state.exports.audioExportFunction = { _, output, configuration, _ in
+            seen.value = configuration.includesMicrophone
+            return output
+        }
+
+        state.exportAudio(URL(fileURLWithPath: "/tmp/Clip.mov"))
+        while state.exports.exportInProgress != nil { await Task.yield() }
+
+        #expect(seen.value == false)
+    }
+
     @Test func gifExportUsesTheSettingsCaps() async {
         let state = makeState()
         state.notifier = { _ in }

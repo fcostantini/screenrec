@@ -412,6 +412,9 @@ struct MenuBuilder {
             if derives.canSaveAsGIF {
                 items.append(fileAction("Save as GIF", url) { state.exportToGIF($0) })
             }
+            if derives.canExportAudio {
+                items.append(fileAction("Export Audio", url) { state.exportAudio($0) })
+            }
             if derives.canTrim {
                 items.append(fileAction("Trim…", url) { url in
                     state.exports.trimTarget = url

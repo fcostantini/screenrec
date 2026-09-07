@@ -345,6 +345,64 @@ import RecorderCore
         #expect(model.lastExport == nil)              // an abandoned export leaves no receipt
     }
 
+    // MARK: - Exporting the sound on its own (M38-T3)
+
+    @Test func anAudioExportWritesTheM4aSiblingAndPostsItsReceipt() async {
+        let model = makeModel()
+        var posted: [RecordingNotification] = []
+        model.notify = { posted.append($0) }
+        let written = Box<URL>()
+        model.audioExportFunction = { _, output, _, _ in written.value = output; return output }
+
+        model.exportAudio(Self.source, configuration: ExportConfiguration())
+        await settle(model)
+
+        #expect(written.value?.lastPathComponent == "Clip.m4a")
+        #expect(posted.map(\.title) == ["Saved the audio"])
+        #expect(model.lastExport?.url.lastPathComponent == "Clip.m4a")
+    }
+
+    @Test func aRangesAudioWritesTheTrimmedSiblingAndTheRangeReachesTheExporter() async {
+        let model = makeModel()
+        let written = Box<URL>()
+        let seen = Box<ExportRange>()
+        model.audioExportFunction = { _, output, _, range in
+            written.value = output
+            seen.value = range
+            return output
+        }
+
+        model.exportAudio(
+            Self.source, configuration: ExportConfiguration(),
+            range: ExportRange(start: 1, end: 3))
+        await settle(model)
+
+        #expect(written.value?.lastPathComponent == "Clip trimmed.m4a")
+        #expect(seen.value == ExportRange(start: 1, end: 3))
+    }
+
+    @Test func aTakeWithNoSoundIsToldApartFromAnExportThatFailed() async {
+        // "Try again" is the wrong answer to a recording that never had any sound (ADR-019): the
+        // retry can't work, so the notice has to say what is actually true.
+        let model = makeModel()
+        var posted: [RecordingNotification] = []
+        model.notify = { posted.append($0) }
+        model.audioExportFunction = { _, _, _, _ in throw AudioExportError.noAudioTrack }
+
+        model.exportAudio(Self.source, configuration: ExportConfiguration())
+        await settle(model)
+
+        #expect(posted.map(\.title) == ["That recording has no sound"])
+        #expect(model.lastExport == nil)          // a failure leaves no receipt
+
+        posted.removeAll()
+        model.audioExportFunction = { _, _, _, _ in throw AudioExportError.writerFailed("disk") }
+        model.exportAudio(Self.source, configuration: ExportConfiguration())
+        await settle(model)
+
+        #expect(posted.map(\.title) == ["Couldn't export the audio"])
+    }
+
     // MARK: - Fixtures
 
     /// A real file of a known size, for the estimate paths that read one.

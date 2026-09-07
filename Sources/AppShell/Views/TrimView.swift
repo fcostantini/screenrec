@@ -116,6 +116,13 @@ struct TrimView: View {
             + "⌘V pastes it."
     }
 
+    /// What `Export Audio` will produce (M38-T3). The rate is the one the export profile carries,
+    /// so the caption can't drift from what the encoder is asked for.
+    private var audioNote: String {
+        "Export Audio writes only the range's sound — AAC "
+            + "\(state.exportConfiguration.audioBitRate / 1000) kbps .m4a — and no video."
+    }
+
     var body: some View {
         Group {
             if let url = state.exports.trimTarget {
@@ -215,6 +222,20 @@ struct TrimView: View {
                 .disabled(
                     !hasRange
                         || (crop != nil && !reencodes))
+            }
+
+            // Its own row: the action row above has 39.5 pt of slack where a fourth button needs
+            // ~112 pt (docs/06), and this window's floor is 500 pt wide.
+            HStack(spacing: 8) {
+                Button("Export Audio") {
+                    state.exportAudio(url, range: ExportRange(start: inSeconds, end: outSeconds))
+                    onFinish()
+                }
+                .disabled(!hasRange)
+                Text(audioNote)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack(spacing: 8) {

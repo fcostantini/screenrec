@@ -6,8 +6,9 @@ import RecorderCore
 /// One frame per recents row (M28-T3), decoded off the main thread and cached until the file
 /// changes — the validity rule `RecentRecordings.details(for:cached:)` already uses.
 ///
-/// A file with no readable video (a `.gif`, which AVFoundation cannot open at all) simply never
-/// gets one; the row keeps an empty well so the titles stay aligned.
+/// A file with no readable video — a `.gif`, which AVFoundation cannot open at all, or an `.m4a`
+/// from the audio export (M38-T3), which opens fine and has no picture — simply never gets one; the
+/// row keeps an empty well so the titles stay aligned.
 @MainActor
 public final class MenuThumbnails {
 
@@ -18,7 +19,10 @@ public final class MenuThumbnails {
     private static let maxPixels = 80
 
     private struct Cached {
-        let image: CGImage
+        /// Nil when the file has no picture to show. Remembered rather than left absent: `prime`
+        /// re-decodes anything the cache doesn't hold, so an audio row would otherwise spin up a
+        /// fresh generator on every menu open for as long as it is listed.
+        let image: CGImage?
         let modified: Date
     }
 
@@ -31,7 +35,7 @@ public final class MenuThumbnails {
 
     public init() {}
 
-    public func image(for url: URL) -> CGImage? { cache[url]?.image }
+    public func image(for url: URL) -> CGImage? { cache[url]?.image ?? nil }
 
     /// Decodes whatever is missing or stale, and forgets files that are no longer shown.
     public func prime(_ urls: [URL]) {
@@ -55,11 +59,17 @@ public final class MenuThumbnails {
         else { return }
 
         let times = [duration * Self.position]
+        var landed = false
         for await frame in FilmstripThumbnails.stream(
             for: asset, times: times, maxPixels: Self.maxPixels) {
             cache[url] = Cached(image: frame.image, modified: modified)
             onThumbnail?(url)
+            landed = true
             break
         }
+        // Sound yields no frame and — unlike a `.gif`, which can't be opened at all — gets this far,
+        // its duration loading fine. Recording the miss is what stops `prime` trying again on every
+        // menu open; a file still being written changes its mtime, so it is retried anyway.
+        if !landed { cache[url] = Cached(image: nil, modified: modified) }
     }
 }

@@ -192,7 +192,8 @@ import Testing
         let recording = dir.appendingPathComponent("Recording crashed.mov.partial")
         let mp4 = dir.appendingPathComponent("Clip.mp4.partial")
         let gif = dir.appendingPathComponent("Clip.gif.partial")
-        for url in [recording, mp4, gif] {
+        let audio = dir.appendingPathComponent("Clip.m4a.partial")
+        for url in [recording, mp4, gif, audio] {
             try Data("bytes".utf8).write(to: url)
             try fileManager.setAttributes([.modificationDate: staleDate], ofItemAtPath: url.path)
         }
@@ -202,6 +203,7 @@ import Testing
         #expect(recovered.map(\.lastPathComponent) == ["Recording crashed.mov"])
         #expect(!fileManager.fileExists(atPath: mp4.path))    // deleted, not renamed
         #expect(!fileManager.fileExists(atPath: gif.path))
+        #expect(!fileManager.fileExists(atPath: audio.path))  // M38-T3's format, swept like the rest
         #expect(!fileManager.fileExists(atPath: dir.appendingPathComponent("Clip.mp4").path))
         #expect(!fileManager.fileExists(atPath: dir.appendingPathComponent("Clip.gif").path))
     }
@@ -210,7 +212,7 @@ import Testing
         // Recoverable: a fragmented movie, or the CLI's extension-less exact path.
         ("Recording.mov.partial", true), ("take1.partial", true),
         // Not: exports are torn share files, not playable fragments.
-        ("Clip.mp4.partial", false), ("Clip.gif.partial", false),
+        ("Clip.mp4.partial", false), ("Clip.gif.partial", false), ("Clip.m4a.partial", false),
     ])
     func onlyRecordingPartialsAreRecoverable(name: String, recoverable: Bool) {
         #expect(OutputLocation.isRecoverablePartial(name) == recoverable)

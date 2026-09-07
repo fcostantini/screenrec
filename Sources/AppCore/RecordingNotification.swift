@@ -236,6 +236,31 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
+    /// The audio export (M38-T3) finished — reveal the `.m4a`.
+    public static func exportedAudio(url: URL) -> RecordingNotification {
+        RecordingNotification(
+            title: "Saved the audio",
+            body: "\(url.lastPathComponent) — ready to share. Click to reveal.",
+            fileURL: url)
+    }
+
+    /// A take with no sound gets its own notice: it is a state, not a fault (ADR-019), and the
+    /// generic copy would invite a retry that can never work.
+    public static func audioExportFailed(_ error: Error) -> RecordingNotification {
+        if case AudioExportError.noAudioTrack = error {
+            return RecordingNotification(
+                title: "That recording has no sound",
+                body: "It was captured with no system audio and no microphone, so there's nothing "
+                    + "to export.",
+                fileURL: nil)
+        }
+        return RecordingNotification(
+            title: "Couldn't export the audio",
+            body: "The original recording is untouched. Try again, or check the output folder is "
+                + "writable.",
+            fileURL: nil)
+    }
+
     /// The lossless trim (M10-T4) finished — reveal the clipped copy.
     public static func trimmed(url: URL) -> RecordingNotification {
         RecordingNotification(

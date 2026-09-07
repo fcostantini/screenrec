@@ -194,7 +194,7 @@ Order and grouping (separators between groups):
     contradict this document's own copy rule, so it stays a separate decision.
     (Franco, 2026-07-15: they read as the folder's contents rather than as more commands.) **M10-T2/T3/T4 made each a submenu**, then **M12-T1 added the share/preview
     row** — `<name> ▸ { Reveal in Finder · Quick Look · Share… · Copy | Export as MP4 · Save as GIF ·
-    Trim… }` (the `|` is a divider: act-on-this-file above, derive-a-new-file below) — so the
+    Export Audio · Trim… }` (the `|` is a divider: act-on-this-file above, derive-a-new-file below) — so the
     export/share/edit actions have a home; the old direct click-to-reveal moved into the submenu.
     **Quick Look** opens the system preview panel (`QLPreviewPanel`, space toggles); **Share…** the OS
     share sheet (`NSSharingServicePicker` — AirDrop/Messages/Mail, no screenrec-hosted anything);
@@ -205,8 +205,8 @@ Order and grouping (separators between groups):
     (Start is the first actionable row) and **expires a stale one**: a persisted receipt older than one hour
     (`LastExport.date`, checked at menu open) is dropped, so it can't reappear as fresh from an earlier
     session — the file still lives in Recent Exports. **M12-T2** gave exports a
-    real home: a **`Recent Exports`** group below the recordings (up to 5 most-recent `.mp4`/`.gif` in the
-    output dir, same submenu), and the receipt now **survives relaunch** (persisted `lastExportPath`,
+    real home: a **`Recent Exports`** group below the recordings (up to 5 most-recent `.mp4`/`.gif`/`.m4a`
+    in the output dir, same submenu), and the receipt now **survives relaunch** (persisted `lastExportPath`,
     validated — a receipt whose file was moved/trashed is dropped). The submenu also gained a third,
     **manage** group: **`Rename…`** (an `NSAlert` text field, extension preserved, collisions → ` 2`) and
     **`Move to Trash`** (reversible → no confirmation, red attributed title). Both act on the row's own file
@@ -218,6 +218,13 @@ Order and grouping (separators between groups):
     `Export as MP4` (it is already one, and the action stays available on the `.mov` that produced
     it) but keeps `Save as GIF` and `Trim…`. A `.mov` is unchanged. Hidden rather than disabled: on
     a GIF these were never choices, and M18-T3 shortened this menu rather than annotating it.
+    **M38-T3 added `Export Audio`** — the whole take's sound as an AAC `.m4a` beside it, the same
+    off-main one-at-a-time path with a `Saved the audio` receipt; a take recorded with no sound at all
+    (ADR-019) is told so by name rather than offered a retry that can't work. It carries the same
+    rule the group is built on, now applied to a **class** of file rather than one extension: an
+    `.m4a` — including the ones this app writes — takes **no** derive, since three of them need a
+    picture and the fourth would hand back what you already have. **MP3 is not on offer and cannot
+    be:** macOS decodes MP3 everywhere and encodes it nowhere (docs/07).
     **M24-T3 gave the take that just stopped the same receipt**: `Recording saved · 0:22`, first in the
     receipt group (a take precedes anything derived from it, so Stop & Copy MP4 shows both rows, each
     pointing at its own file). Titled by **length, not filename** — the timestamped name is exactly what
@@ -661,6 +668,14 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   Return stays on `Trim & Save`, since ADR-015 keeps lossless the default action. The size is this recording's own fitted through the Settings width, and is omitted until the
   source's geometry has loaded (M16-T2). Unlike a lossless trim, this holds only the range: a ranged
   read clips at the in-point (docs/07), so no lead-in caveat applies.
+- **Export Audio** (M38-T3) writes the **range's** sound as an AAC `.m4a` beside the recording and
+  dismisses, as its two neighbours do; disabled for a <0.1 s range like them. **Its own row, under
+  the button row**: that row has 39.5 pt of slack where a fourth button needs ~112 pt (the same
+  measurement that made `Export & Copy` one button), and the window's floor is 500 pt wide. It takes
+  the `Find bars` shape — a button with the fact beside it: *"Export Audio writes only the range's
+  sound — AAC 160 kbps .m4a — and no video."* No clipboard: pasting an `.m4a` isn't what
+  `Export & Copy` exists for. A crop is irrelevant to it and goes unmentioned — sound has no
+  rectangle. The rate is read from the export profile, not written into the string.
 - **Crop** (M26-T2, unchecked by default — the window is unchanged until it's asked for): ticking it
   puts a band over the preview; drag to draw, drag again to redraw, `Reset` clears it, and unticking
   discards it — a crop that survived out of sight would crop an export with nothing on screen saying

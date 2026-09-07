@@ -259,13 +259,13 @@ public struct OutputLocation: Sendable {
         return inner == "mov" || inner.isEmpty
     }
 
-    /// The formats `Exporter`/`GifExporter` derive from a recording. One list, so the orphan sweep and
-    /// the menu's Recent Exports can't disagree about what an export is.
-    public static let exportExtensions: Set<String> = ["mp4", "gif"]
+    /// The formats `Exporter`/`GifExporter`/`AudioExporter` derive from a recording. One list, so the
+    /// orphan sweep and the menu's Recent Exports can't disagree about what an export is.
+    public static let exportExtensions: Set<String> = ["mp4", "gif", "m4a"]
 
-    /// Whether an orphaned `.partial` is an abandoned export, and so safe to delete: a torn `.mp4` or
-    /// `.gif` has none of the fragmented-movie property that makes recovery a rename, and renaming one
-    /// would present unplayable bytes as a rescued recording (M15-T3).
+    /// Whether an orphaned `.partial` is an abandoned export, and so safe to delete: a torn `.mp4`,
+    /// `.gif` or `.m4a` has none of the fragmented-movie property that makes recovery a rename, and
+    /// renaming one would present unplayable bytes as a rescued recording (M15-T3).
     static func isAbandonedExportPartial(_ name: String) -> Bool {
         exportExtensions.contains(intendedExtension(of: name))
     }

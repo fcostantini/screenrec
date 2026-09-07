@@ -51,6 +51,9 @@ public final class ExportModel {
     public var gifExportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: GifConfiguration) async throws -> URL = {
         try await GifExporter.exportGIF(from: $0, to: $1, configuration: $2).url
     }
+    public var audioExportFunction: @Sendable (_ source: URL, _ output: URL, _ configuration: ExportConfiguration, _ range: ExportRange?) async throws -> URL = {
+        try await AudioExporter.exportAudio(from: $0, to: $1, configuration: $2, range: $3).url
+    }
     public var trimFunction: @Sendable (_ source: URL, _ output: URL, _ start: Double, _ end: Double, _ mode: TrimMode, _ crop: CropRect?) async throws -> URL = {
         try await Trimmer.trim(from: $0, to: $1, start: $2, end: $3, mode: $4, crop: $5).url
     }
@@ -91,7 +94,7 @@ public final class ExportModel {
             estimate: { await Self.mp4Bytes(of: source, configuration: configuration, range: range) },
             using: { try await export($0, $1, configuration, range, nil, $2) },
             success: { RecordingNotifications.exported(url: $0) },
-            failure: RecordingNotifications.exportFailed,
+            failure: { _ in RecordingNotifications.exportFailed() },
             reportsProgress: true)
     }
 
@@ -117,7 +120,7 @@ public final class ExportModel {
             },
             using: { try await export($0, $1, configuration, range, crop, $2) },
             success: notice,
-            failure: RecordingNotifications.exportFailed,
+            failure: { _ in RecordingNotifications.exportFailed() },
             reportsProgress: true,
             completion: copy)
     }
@@ -134,7 +137,25 @@ public final class ExportModel {
             source, to: Exporter.availableURL(basedOn: GifExporter.gifSibling(of: source)),
             using: { source, output, _ in try await gifExport(source, output, configuration) },
             success: { RecordingNotifications.savedAsGIF(url: $0) },
-            failure: RecordingNotifications.gifExportFailed)
+            failure: { _ in RecordingNotifications.gifExportFailed() })
+    }
+
+    /// Writes `source`'s sound on its own as an `.m4a` (M38-T3), or just `range` of it, on the same
+    /// off-main, one-at-a-time path. The rate and the microphone rule come from the same
+    /// `ExportConfiguration` the MP4 export uses — AppState builds it.
+    public func exportAudio(
+        _ source: URL, configuration: ExportConfiguration, range: ExportRange? = nil
+    ) {
+        let export = audioExportFunction  // snapshot; the closure captures no `self`
+        performExport(
+            source,
+            to: Exporter.availableURL(basedOn: AudioExporter.m4aSibling(of: source, range: range)),
+            estimate: {
+                await Self.audioBytes(of: source, configuration: configuration, range: range)
+            },
+            using: { source, output, _ in try await export(source, output, configuration, range) },
+            success: { RecordingNotifications.exportedAudio(url: $0) },
+            failure: RecordingNotifications.audioExportFailed)
     }
 
     /// Trims `source` to `[start, end]` (M10-T4; `mode` M18-T1), keeping only `crop` of each frame
@@ -150,7 +171,7 @@ public final class ExportModel {
             estimate: { Self.fileBytes(of: source) },
             using: { source, output, _ in try await trim(source, output, start, end, mode, crop) },
             success: { RecordingNotifications.trimmed(url: $0) },
-            failure: RecordingNotifications.trimFailed)
+            failure: { _ in RecordingNotifications.trimFailed() })
     }
 
     /// One queued export: everything `run` needs when its turn comes (M33-T1).
@@ -160,7 +181,7 @@ public final class ExportModel {
         let estimate: (@Sendable () async -> Int64?)?
         let export: @Sendable (URL, URL, @escaping @Sendable (Double) -> Void) async throws -> URL
         let success: (URL) -> RecordingNotification
-        let failure: () -> RecordingNotification
+        let failure: (Error) -> RecordingNotification
         let reportsProgress: Bool
         let completion: (@MainActor (URL) -> Void)?
     }
@@ -188,7 +209,7 @@ public final class ExportModel {
         estimate: (@Sendable () async -> Int64?)? = nil,
         using export: @escaping @Sendable (URL, URL, @escaping @Sendable (Double) -> Void) async throws -> URL,
         success: @escaping (URL) -> RecordingNotification,
-        failure: @escaping () -> RecordingNotification,
+        failure: @escaping (Error) -> RecordingNotification,
         reportsProgress: Bool = false,
         completion: (@MainActor (URL) -> Void)? = nil
     ) {
@@ -237,7 +258,7 @@ public final class ExportModel {
                 notify?(job.success(url))
             } catch {
                 Self.log.error("export failed: \(error.localizedDescription, privacy: .public)")
-                notify?(job.failure())
+                notify?(job.failure(error))
             }
             finish()
         }
@@ -304,6 +325,22 @@ public final class ExportModel {
         return configuration.projectedBytes(
             sourceWidth: crop?.width ?? pixels.width, sourceHeight: crop?.height ?? pixels.height,
             seconds: seconds)
+    }
+
+    /// What an audio export of `source` can weigh: the rate over the length. The one export here
+    /// whose size really is predictable — no picture, and a rate the encoder holds to.
+    nonisolated private static func audioBytes(
+        of source: URL, configuration: ExportConfiguration, range: ExportRange?
+    ) async -> Int64? {
+        let seconds: Double
+        if let range {
+            seconds = max(0, range.end - range.start)
+        } else if let full = await MediaFile.duration(of: source) {
+            seconds = full
+        } else {
+            return nil
+        }
+        return Int64(Double(configuration.audioBitRate) * seconds / 8)
     }
 
     /// The source's size on disk, or nil if it can't be read.
