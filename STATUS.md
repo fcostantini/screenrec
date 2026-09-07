@@ -32,8 +32,9 @@
   ⚠️ **v1.20.0 was never published, so its notes ship inside 1.21.0's** — `release.sh` publishes only
   the section matching `VERSION`, and M37's three items would otherwise have been announced to nobody.
   The tag decision owed since M37 is therefore closed.
-  ⚠️ **Two optional taste checks are open, neither blocking:** nobody has *listened* to an exported
-  `.m4a` (peak/rms measured, ears not applied), and Franco has seen the Trim window's new row in a
+  ✅ **The export sounds right — Franco listened (2026-09-07):** *"just verified the audio, sounds
+  fine"*. That was the one leg no measurement could close; peak/rms only ever proved it wasn't silence.
+  ⚠️ **One optional check left, not blocking:** Franco has seen the Trim window's new row in a
   screenshot rather than on his own screen.
 
 - **✅ M38-T3 DONE (2026-09-07) — the sound is reachable from the menu and from the Trim window.**
