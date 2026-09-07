@@ -7,6 +7,16 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-09-07 (M38-T1 review, pricing a "the await is too slow" objection): **`FrameStep`'s
+  sample-table walk costs 9.42 ms cold and 0.05–0.13 ms warm** on a 1.2 GB, 5:01, 4112×2570 take —
+  measured at seven points across the file, not extrapolated from the 0.0–0.9 ms `KeyframeIndex`
+  figure the code comment quotes.
+  ✅ **Why it matters for `step(byFrames:)`:** the step is issued *after* the walk, so a review
+  reasoned it must seek backwards during playback. It cannot at these numbers — one frame at 41.9 fps
+  nominal is **~24 ms**, which is more than even the cold walk, so the target still lies ahead of
+  where playback has reached. ⚠️ The shape of the objection is only wrong *here*: a source whose frame
+  interval is shorter than the walk would invert it.
+
 - 2026-09-07 (M38 gate run, misreading a locked screen as a wedged app): **with the screen locked,
   an app's AX window list is a lie and `screencapture -R` fails.** Measured, in this order:
   `NSRunningApplication.activate` returns and `isActive` stays **false**; `AXWindows` succeeds but

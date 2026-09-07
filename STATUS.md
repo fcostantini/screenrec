@@ -27,6 +27,14 @@
   seek. All fixed and measured.
   ⚠️ **`exportExtensions` was two rules in one list** — Recent Exports *and* which orphan `.partial` the
   sweep may delete — so adding `m4a` mattered twice.
+  🚢 **RELEASED: v1.21.0 is published, tagged and pushed** —
+  `github.com/fcostantini/screenrec/releases/tag/v1.21.0`, signed bundle attached (1.2 MB).
+  ⚠️ **v1.20.0 was never published, so its notes ship inside 1.21.0's** — `release.sh` publishes only
+  the section matching `VERSION`, and M37's three items would otherwise have been announced to nobody.
+  The tag decision owed since M37 is therefore closed.
+  ⚠️ **Two optional taste checks are open, neither blocking:** nobody has *listened* to an exported
+  `.m4a` (peak/rms measured, ears not applied), and Franco has seen the Trim window's new row in a
+  screenshot rather than on his own screen.
 
 - **✅ M38-T3 DONE (2026-09-07) — the sound is reachable from the menu and from the Trim window.**
   **840 tests** (838 → 840). Driven on the deployed build: the recents submenu's `Export Audio` wrote
