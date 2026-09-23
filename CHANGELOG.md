@@ -7,6 +7,13 @@ one file in the repo whose audience is not us.
 Only versions published as releases appear here; several were tagged during development and never
 published. The commit history is in the repository, where it belongs.
 
+## 1.22.0
+
+**Audio from the Trim window lands on the clipboard.** The Trim window's audio button is now
+**Export Audio & Copy**: it writes the trimmed range's sound as an `.m4a`, as before, and also puts
+the file on the clipboard, so ⌘V drops it straight into Slack, Messages or Finder — the same way
+**Export & Copy** already does with video. The menu's **Export Audio** still just saves the file.
+
 ## 1.21.0
 
 **Export just the audio.** A recording's sound can now leave on its own as an `.m4a` — the whole take
