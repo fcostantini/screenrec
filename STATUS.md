@@ -7,11 +7,12 @@
 ## Now
 
 - **✅ M39 COMPLETE and G39 PASSED (2026-09-23) — the Trim window's audio export also leaves the
-  `.m4a` on the clipboard. 🚢 v1.22.0 (bumped; publish pending Franco's OK).** **846 tests** (841 →
+  `.m4a` on the clipboard. 🚢 v1.22.0 RELEASED** —
+  `github.com/fcostantini/screenrec/releases/tag/v1.22.0`, signed bundle attached (1.2 MB). **846 tests** (841 →
   846). The button is `Export Audio & Copy`; the notice is the shared `Copied — ⌘V to paste`. On the
   deployed build the pasteboard held **exactly the written file** (one AAC track, 4.97 s), and the
   recents submenu's `Export Audio` stayed save-only — `changeCount` unchanged.
-  **Next:** `Scripts/release.sh` (in the background) to tag and publish v1.22.0.
+  **Next:** nothing filed — new work comes from Franco or a review.
   **Needs Franco (optional):** ⌘V the `.m4a` into Slack/WhatsApp once.
 
 - **✅ M38 COMPLETE and G38 PASSED (2026-09-07) — the preview keeps playing, and the sound can leave
