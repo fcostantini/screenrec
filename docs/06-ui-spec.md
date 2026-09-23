@@ -668,14 +668,18 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   Return stays on `Trim & Save`, since ADR-015 keeps lossless the default action. The size is this recording's own fitted through the Settings width, and is omitted until the
   source's geometry has loaded (M16-T2). Unlike a lossless trim, this holds only the range: a ranged
   read clips at the in-point (docs/07), so no lead-in caveat applies.
-- **Export Audio** (M38-T3) writes the **range's** sound as an AAC `.m4a` beside the recording and
-  dismisses, as its two neighbours do; disabled for a <0.1 s range like them. **Its own row, under
-  the button row**: that row has 39.5 pt of slack where a fourth button needs ~112 pt (the same
-  measurement that made `Export & Copy` one button), and the window's floor is 500 pt wide. It takes
-  the `Find bars` shape — a button with the fact beside it: *"Export Audio writes only the range's
-  sound — AAC 160 kbps .m4a — and no video."* No clipboard: pasting an `.m4a` isn't what
-  `Export & Copy` exists for. A crop is irrelevant to it and goes unmentioned — sound has no
-  rectangle. The rate is read from the export profile, not written into the string.
+- **Export Audio & Copy** (M38-T3; copies since M39-T1) writes the **range's** sound as an AAC `.m4a`
+  beside the recording, leaves it on the pasteboard, and dismisses, as its two neighbours do; disabled
+  for a <0.1 s range like them. One notice, the `Export & Copy` one: *"Copied — ⌘V to paste"*. The
+  title names the copy for the same reason `Export & Copy`'s does — the clipboard is taken either way.
+  **Its own row, under the button row**: that row has 39.5 pt of slack where a fourth button needs
+  ~112 pt (the same measurement that made `Export & Copy` one button), and the window's floor is 500 pt
+  wide. It takes the `Find bars` shape — a button with the fact beside it: *"Writes only the range's
+  sound — AAC 160 kbps .m4a, no video — and puts it on the clipboard. ⌘V pastes it."* The caption
+  doesn't repeat the button's name, which would wrap it at the floor. No shortcut: ⌘↩ and Return are
+  taken. A crop is irrelevant to it and goes unmentioned — sound has no rectangle. The rate is read
+  from the export profile, not written into the string. The recents submenu's `Export Audio` row
+  stays save-only, like its `Export as MP4` neighbour.
 - **Crop** (M26-T2, unchecked by default — the window is unchanged until it's asked for): ticking it
   puts a band over the preview; drag to draw, drag again to redraw, `Reset` clears it, and unticking
   discards it — a crop that survived out of sight would crop an export with nothing on screen saying

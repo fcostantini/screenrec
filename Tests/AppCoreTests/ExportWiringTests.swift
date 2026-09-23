@@ -276,6 +276,23 @@ import RecorderCore
         #expect(seen.value == false)
     }
 
+    /// M39-T1: the Trim window's button asks AppState for the copy, and the flag reaches the model.
+    @Test func audioExportCanLeaveTheFileOnThePasteboard() async {
+        let state = makeState()
+        state.notifier = { _ in }
+        let copied = Box<URL>()
+        state.exports.copyToPasteboard = { copied.value = $0 }
+        let written = URL(fileURLWithPath: "/tmp/Clip trimmed.m4a")
+        state.exports.audioExportFunction = { _, _, _, _ in written }
+
+        state.exportAudio(
+            URL(fileURLWithPath: "/tmp/Clip.mov"), range: ExportRange(start: 0, end: 2),
+            copiesToPasteboard: true)
+        while state.exports.exportInProgress != nil { await Task.yield() }
+
+        #expect(copied.value == written)
+    }
+
     @Test func gifExportUsesTheSettingsCaps() async {
         let state = makeState()
         state.notifier = { _ in }

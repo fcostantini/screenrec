@@ -403,6 +403,68 @@ import RecorderCore
         #expect(posted.map(\.title) == ["Couldn't export the audio"])
     }
 
+    // MARK: - Copying the sound (M39-T1)
+
+    @Test func aCopiedAudioExportPutsTheWrittenM4aOnThePasteboardWithOneNotice() async {
+        let model = makeModel()
+        var posted: [RecordingNotification] = []
+        model.notify = { posted.append($0) }
+        let copied = Box<URL>()
+        model.copyToPasteboard = { copied.value = $0 }
+        let written = Box<URL>()
+        model.audioExportFunction = { _, output, _, _ in written.value = output; return output }
+
+        model.exportAudio(
+            Self.source, configuration: ExportConfiguration(),
+            range: ExportRange(start: 0, end: 2), copiesToPasteboard: true)
+        await settle(model)
+
+        #expect(copied.value?.lastPathComponent == "Clip trimmed.m4a")
+        #expect(copied.value == written.value)
+        #expect(posted.map(\.title) == ["Copied — ⌘V to paste"])
+        #expect(posted.first?.fileURL == copied.value)
+    }
+
+    @Test func aCopiedAudioExportWithNoPasteboardDoesNotClaimTheCopy() async {
+        let model = makeModel()
+        var posted: [RecordingNotification] = []
+        model.notify = { posted.append($0) }
+        model.audioExportFunction = { _, output, _, _ in output }
+
+        model.exportAudio(Self.source, configuration: ExportConfiguration(), copiesToPasteboard: true)
+        await settle(model)
+
+        #expect(posted.map(\.title) == ["Saved the audio"])
+    }
+
+    @Test func anAudioExportNotAskedToCopyLeavesThePasteboardAlone() async {
+        // The recents submenu's row: save-only, like its `Export as MP4` neighbour.
+        let model = makeModel()
+        var posted: [RecordingNotification] = []
+        model.notify = { posted.append($0) }
+        let copied = Box<URL>()
+        model.copyToPasteboard = { copied.value = $0 }
+        model.audioExportFunction = { _, output, _, _ in output }
+
+        model.exportAudio(Self.source, configuration: ExportConfiguration())
+        await settle(model)
+
+        #expect(copied.value == nil)
+        #expect(posted.map(\.title) == ["Saved the audio"])
+    }
+
+    @Test func aFailedCopiedAudioExportCopiesNothing() async {
+        let model = makeModel()
+        let copied = Box<URL>()
+        model.copyToPasteboard = { copied.value = $0 }
+        model.audioExportFunction = { _, _, _, _ in throw AudioExportError.writerFailed("disk") }
+
+        model.exportAudio(Self.source, configuration: ExportConfiguration(), copiesToPasteboard: true)
+        await settle(model)
+
+        #expect(copied.value == nil)
+    }
+
     // MARK: - Fixtures
 
     /// A real file of a known size, for the estimate paths that read one.

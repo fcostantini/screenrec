@@ -142,11 +142,18 @@ public final class ExportModel {
 
     /// Writes `source`'s sound on its own as an `.m4a` (M38-T3), or just `range` of it, on the same
     /// off-main, one-at-a-time path. The rate and the microphone rule come from the same
-    /// `ExportConfiguration` the MP4 export uses — AppState builds it.
+    /// `ExportConfiguration` the MP4 export uses — AppState builds it. `copiesToPasteboard` leaves
+    /// the result on the pasteboard as `exportAndCopy` does (M39-T1).
     public func exportAudio(
-        _ source: URL, configuration: ExportConfiguration, range: ExportRange? = nil
+        _ source: URL, configuration: ExportConfiguration, range: ExportRange? = nil,
+        copiesToPasteboard: Bool = false
     ) {
         let export = audioExportFunction  // snapshot; the closure captures no `self`
+        let copy = copiesToPasteboard ? copyToPasteboard : nil
+        // The same guard as `exportAndCopy`: no copy performed, no copy claimed.
+        let notice = copy == nil
+            ? RecordingNotifications.exportedAudio(url:)
+            : RecordingNotifications.copiedToPasteboard(url:)
         performExport(
             source,
             to: Exporter.availableURL(basedOn: AudioExporter.m4aSibling(of: source, range: range)),
@@ -154,8 +161,9 @@ public final class ExportModel {
                 await Self.audioBytes(of: source, configuration: configuration, range: range)
             },
             using: { source, output, _ in try await export(source, output, configuration, range) },
-            success: { RecordingNotifications.exportedAudio(url: $0) },
-            failure: RecordingNotifications.audioExportFailed)
+            success: notice,
+            failure: RecordingNotifications.audioExportFailed,
+            completion: copy)
     }
 
     /// Trims `source` to `[start, end]` (M10-T4; `mode` M18-T1), keeping only `crop` of each frame

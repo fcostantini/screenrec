@@ -3778,6 +3778,37 @@ and `probe` reports one AAC track and no video in each. A take captured with no 
 of writing a file. 🚢 **MINOR (ADR-013): v1.21.0** at the gate — an audio derive is a capability the
 app has never had.
 
+## M39 — The trimmed sound goes to the clipboard too (from Franco, 2026-09-23)
+
+Franco asked whether `Export Audio` in the Trim window copies the file — it doesn't, by a docs/06
+line M38-T3 wrote (*"No clipboard: pasting an `.m4a` isn't what `Export & Copy` exists for"*). He
+wants it to. Plan artifact: `claude.ai/code/artifact/Hsc7vxhUgajLFimVXWZ7u1`.
+✅ **Ruled by Franco (2026-09-23), all four as recommended:** the button is renamed **`Export Audio &
+Copy`** (docs/06: the title names the copy because the clipboard is taken either way); the recents
+submenu's `Export Audio` row **stays save-only**, like its `Export as MP4` neighbour; **MINOR → v1.22.0**
+at G39; and the deployed app may be driven for the verify.
+
+- [x] M39-T1 **The Trim window's audio export also leaves the `.m4a` on the clipboard** (AppCore +
+      AppShell). `ExportModel.exportAudio` takes `copiesToPasteboard` and, when set, hands
+      `copyToPasteboard` to `performExport` as its completion with `exportAndCopy`'s nil guard on the
+      notice — one `Copied — ⌘V to paste`, never a copy claimed that didn't happen. The caption drops
+      its leading button name so the longer title doesn't wrap it at the 500 pt floor.
+      **docs/06 amendment:** the Export Audio bullet.
+      **Verify:** unit tests — the copy receives the written `.m4a`, the notice is the copy one, no
+      injected pasteboard falls back to `Saved the audio`, the default path never copies. Then on the
+      deployed build: the Trim window's button pressed through AX, `NSPasteboard.general`'s file URL
+      read back and matched to the file written, `probe` on it; the menu row clicked once leaves the
+      clipboard unchanged.
+      ✅ **Done 2026-09-23. 846 tests** (841 → 846). Driven on the deployed build against a 5 s
+      CLI take: the Trim window shows `Export Audio & Copy` with its caption on one line at the
+      window's width; pressing it through AX dismissed the window (0 windows) and wrote
+      `m39-test trimmed.m4a` — **one AAC track, no video, 4.97 s** — and the pasteboard's file URL
+      read back as **exactly that path** (`changeCount` 87 → 88). The recents submenu's `Export
+      Audio` then wrote `m39-test.m4a` and left the pasteboard **untouched** (`changeCount` still 88).
+
+**Gate G39** — M39-T1's Verify on the deployed build, plus (human, optional) Franco pasting the
+`.m4a` into Slack or WhatsApp. 🚢 **MINOR (ADR-013): v1.22.0.**
+
 ## Dependency graph
 
 ```

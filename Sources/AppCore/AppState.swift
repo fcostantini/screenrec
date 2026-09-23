@@ -717,8 +717,10 @@ public final class AppState {
         exports.exportAndCopy(source, configuration: exportConfiguration, range: range, crop: crop)
     }
     public func exportToGIF(_ source: URL) { exports.exportToGIF(source, configuration: gifConfiguration) }
-    public func exportAudio(_ source: URL, range: ExportRange? = nil) {
-        exports.exportAudio(source, configuration: exportConfiguration, range: range)
+    public func exportAudio(_ source: URL, range: ExportRange? = nil, copiesToPasteboard: Bool = false) {
+        exports.exportAudio(
+            source, configuration: exportConfiguration, range: range,
+            copiesToPasteboard: copiesToPasteboard)
     }
     public func trim(
         _ source: URL, from start: Double, to end: Double, mode: TrimMode = .lossless,

@@ -116,11 +116,12 @@ struct TrimView: View {
             + "⌘V pastes it."
     }
 
-    /// What `Export Audio` will produce (M38-T3). The rate is the one the export profile carries,
-    /// so the caption can't drift from what the encoder is asked for.
+    /// What `Export Audio & Copy` will produce (M38-T3; copies since M39-T1). The rate is the one
+    /// the export profile carries, so the caption can't drift from what the encoder is asked for.
     private var audioNote: String {
-        "Export Audio writes only the range's sound — AAC "
-            + "\(state.exportConfiguration.audioBitRate / 1000) kbps .m4a — and no video."
+        "Writes only the range's sound — AAC "
+            + "\(state.exportConfiguration.audioBitRate / 1000) kbps .m4a, no video — "
+            + "and puts it on the clipboard. ⌘V pastes it."
     }
 
     var body: some View {
@@ -227,8 +228,9 @@ struct TrimView: View {
             // Its own row: the action row above has 39.5 pt of slack where a fourth button needs
             // ~112 pt (docs/06), and this window's floor is 500 pt wide.
             HStack(spacing: 8) {
-                Button("Export Audio") {
-                    state.exportAudio(url, range: ExportRange(start: inSeconds, end: outSeconds))
+                Button("Export Audio & Copy") {
+                    state.exportAudio(url, range: ExportRange(start: inSeconds, end: outSeconds),
+                                      copiesToPasteboard: true)
                     onFinish()
                 }
                 .disabled(!hasRange)

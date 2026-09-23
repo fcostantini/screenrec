@@ -6,6 +6,15 @@
 
 ## Now
 
+- **✅ M39-T1 DONE (2026-09-23) — the Trim window's audio export also leaves the `.m4a` on the
+  clipboard.** **846 tests** (841 → 846). The button is now `Export Audio & Copy`; the notice is the
+  shared `Copied — ⌘V to paste`. Driven on the deployed build: pressed through AX, the window
+  dismissed, `probe` read **one AAC track, 4.97 s**, and `NSPasteboard.general` held **exactly the
+  written file**. The recents submenu's `Export Audio` stays save-only — measured, `changeCount`
+  unchanged. Rulings (Franco): the rename, the menu row untouched, **MINOR → v1.22.0 at G39**.
+  **Next: G39** — its verify legs are the ones above; what's left is the v1.22.0 bump + CHANGELOG and
+  the release. **Needs Franco (optional):** ⌘V the `.m4a` into Slack/WhatsApp once.
+
 - **✅ M38 COMPLETE and G38 PASSED (2026-09-07) — the preview keeps playing, and the sound can leave
   on its own. 🚢 v1.21.0.** **841 tests** (821 → 841). Two reports from Franco's own trimming, three
   tasks, and **three review fixes on top** — every leg driven **headlessly** on the deployed build.
