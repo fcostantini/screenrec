@@ -3806,8 +3806,12 @@ at G39; and the deployed app may be driven for the verify.
       read back as **exactly that path** (`changeCount` 87 → 88). The recents submenu's `Export
       Audio` then wrote `m39-test.m4a` and left the pasteboard **untouched** (`changeCount` still 88).
 
-**Gate G39** — M39-T1's Verify on the deployed build, plus (human, optional) Franco pasting the
-`.m4a` into Slack or WhatsApp. 🚢 **MINOR (ADR-013): v1.22.0.**
+**Gate G39** — ✅ **PASSED 2026-09-23** (evidence in STATUS.md's gate table and in M39-T1). The Trim
+window's button put **exactly the `.m4a` it wrote** on the pasteboard and dismissed; the recents row
+wrote its file and left the pasteboard untouched. 🚢 **MINOR as filed (ADR-013): v1.22.0.**
+
+As filed — M39-T1's Verify on the deployed build, plus (human, optional) Franco pasting the `.m4a`
+into Slack or WhatsApp.
 
 ## Dependency graph
 
