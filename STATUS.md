@@ -6,6 +6,16 @@
 
 ## Now
 
+- **🔧 2026-11-11 — the live install was on v1.12.0; swapped to 1.22.0. No code change.** Franco
+  reported the Trim window as small and unresizable. That was 1.12.0's fixed window:
+  `/Users/Shared/ScreenRec.app` had not moved since Jul 31, and predates both the resize (M37-T2) and
+  the update notice. Replaced with `dist`'s 1.22.0 — same designated requirement, pid 51936 → 53463,
+  installed binary's sha equal to `dist`'s. Field note filed.
+  ⚠️ **Not driven:** the Trim window has not been opened on the new install this session.
+  **Needs Franco:** confirm it drags larger; re-arm Instant Replay if the swap left it off.
+  **Open question:** should a release also update the live install (`release.sh` only publishes)?
+  **Next:** nothing filed — new work comes from Franco or a review.
+
 - **✅ M39 COMPLETE and G39 PASSED (2026-09-23) — the Trim window's audio export also leaves the
   `.m4a` on the clipboard. 🚢 v1.22.0 RELEASED** —
   `github.com/fcostantini/screenrec/releases/tag/v1.22.0`, signed bundle attached (1.2 MB). **846 tests** (841 →

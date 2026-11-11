@@ -7,6 +7,20 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-11 (support, "the Trim window is small and won't resize"): **the live install was ten
+  releases behind, and nothing could have said so.** `/Users/Shared/ScreenRec.app` was **v1.12.0**
+  (binary dated Jul 31) while `VERSION` and `dist/` were 1.22.0. The report described 1.12.0's fixed
+  500 × 653 window exactly — no Crop row, no Play/Pause row, no `Export Audio & Copy` in the
+  screenshot — not a regression in M37-T2's resize.
+  ✅ **Check the running build before reading any code** when a report contradicts docs/06:
+  `ps axo pid,command | grep '[S]creenRec'` for the path, then `PlistBuddy -c 'Print
+  :CFBundleShortVersionString'` on that bundle. `strings <binary> | grep -c '<copy from the feature>'`
+  settles it when the plist is in doubt.
+  ⚠️ **`release.sh` publishes; it does not install**, and 1.12.0 predates the update notice (no
+  `api.github.com` in its binary), so a stale install is silent. From 1.22.0 on the menu row covers it.
+  ✅ **Plain `kill -TERM <pid>` ended the 1.12.0 instance inside 3 s** — the 2026-07-21 note's
+  `kill -9` wasn't needed here; try TERM first, escalate only if `kill -0` still answers.
+
 - 2026-09-07 (M38-T1 review, pricing a "the await is too slow" objection): **`FrameStep`'s
   sample-table walk costs 9.42 ms cold and 0.05–0.13 ms warm** on a 1.2 GB, 5:01, 4112×2570 take —
   measured at seven points across the file, not extrapolated from the 0.0–0.9 ms `KeyframeIndex`
