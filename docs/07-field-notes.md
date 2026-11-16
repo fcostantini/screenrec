@@ -7,6 +7,40 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-16 (scoping a YouTube upload, nothing implemented): **YouTube's API rules moved twice in
+  2026, and most third-party guides still describe the old ones.** Read
+  `developers.google.com/youtube/v3/revision_history` before trusting any of them. As of today:
+  ✅ **Unaudited API projects are no longer forced to private** (reversed **2026-11-02**; the rule
+  dated from 2020-07-28). Before that an upload from a personal Cloud project could not be made
+  unlisted or public even from Studio, which would have made the feature pointless.
+  ✅ **`videos.insert` has its own quota bucket: 100 calls/day per project, 1 unit each** (since
+  2026-06-01; ~1,600 of 10,000 shared units before 2025-12-04). Resets at midnight Pacific.
+  ✅ **`youtube.upload` is the narrowest scope that uploads**; `videos.update` and `videos.delete`
+  need `youtube`/`youtube.force-ssl`. The device-code flow allows only `youtube` and
+  `youtube.readonly`, so it cannot upload narrowly.
+  ⚠️ **A consent screen in "Testing" issues 7-day refresh tokens**; "In production" and unverified
+  shows a warning page and has a **lifetime** 100-user cap. Google's personal-use exception (< 100
+  users) says verification is then not required.
+  ⚠️ **Omitting `status.privacyStatus` uploads as `public`.** Always send it.
+  ⚠️ **Required minimum functionality:** an upload client must let the user set title, description
+  and public/unlisted/private — so a silent one-click upload is out of step with the terms.
+  ✅ **The share export is already YouTube's recommended file** — MP4, `moov` first, H.264 High, AAC
+  48 kHz stereo (`Exporter.swift`), 6 Mbps at 1920 × 1200 against their suggested 8.
+  ✅ **macOS has no YouTube sharing service.** `NSSharingService.sharingServices(forItems:)` for an
+  `.mp4` on 15.6.1: AirDrop · Mail · Messages · Notes · Add to Photos · Freeform.
+  ✅ **`writeObjects([url as NSURL])` publishes `public.file-url` and `NSFilenamesPboardType` only —
+  no plain-text path** (measured on `NSPasteboard.withUniqueName()`, which leaves the real clipboard
+  alone). So ⌘V into a text field, or a file dialog's Go-to field, gets nothing from `Copy`.
+  ✅ **Tooling: `screencapture -x -o -l <CGWindowID>` shoots one window whatever is in front of it** —
+  the answer to menudriver's "a synthetic click doesn't activate" caveat when the shot is the point.
+  The ID comes from `CGWindowListCopyWindowInfo` filtered by owner pid and `kCGWindowName`.
+  ⚠️ **`menudriver click "Trim…"` is a depth-first title match**, so it lands on whichever file row
+  comes first. To open Trim on one particular file, find the row by its title and press `Trim…` in
+  *its* submenu; descend only into `Recordings`/`Recent…` containers on the way.
+  ⚠️ **Not measured, owed to a spike if this is built:** the Keychain under the self-signed identity,
+  whether Google's token endpoint takes a Desktop client without its secret, and whether the upload
+  response names the channel under the upload-only scope.
+
 - 2026-11-11 (support, "the Trim window is small and won't resize"): **the live install was ten
   releases behind, and nothing could have said so.** `/Users/Shared/ScreenRec.app` was **v1.12.0**
   (binary dated Jul 31) while `VERSION` and `dist/` were 1.22.0. The report described 1.12.0's fixed
