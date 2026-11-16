@@ -39,6 +39,18 @@ file every session is required to read.
   requires verification…"* — and the overview adds *"Your branding is not being shown to users"*
   and *"Verification is required because your app requests sensitive or restricted scopes."* All
   three are the normal state of an unverified personal app, not errors.
+  ✅ **The warning a *published*, unverified app shows** (Franco's screenshot, in Spanish — Google
+  localises the whole flow to the account's language): a red triangle, *"Google hasn't verified
+  this app"*; *"The app is requesting access to sensitive info in your Google Account. Until the
+  developer (‹email›) verifies this app with Google, you shouldn't use it."*; then, in a red box,
+  *"Continue only if you understand the risks and trust the developer (‹email›)"* with the link
+  **`Go to ScreenRec (unsafe)`**. The safe-looking button is `Back to safety`.
+  ⚠️ **It prints the developer's e-mail address twice**, to everyone who signs in. Whoever is handed
+  a build sees it.
+  ⚠️ **Never quote Google's button labels in the app's own copy.** They are localised (*"Ir a
+  ScreenRec (no segura)"*, *"Volver a lugar seguro"*) and differ between Testing and production.
+  Describe the step — "Google will warn that it hasn't verified ScreenRec; continue past it".
+  ✅ **"Sensitive", not restricted:** the page's own word for what the upload scope asks for.
 
 - 2026-11-16 (M40-T1, the CLI spike's live legs — seven uploads to Franco's channel through his own
   Google project): **what the Keychain, URLSession and YouTube actually do.**

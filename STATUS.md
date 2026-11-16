@@ -255,9 +255,9 @@
       restricted.
 - [x] **M40 — the sign-in clicks for T1** (Franco, 2026-11-16, with screenshots of Google's pages).
 - [x] **M40 — `Publish app`** (Franco, 2026-11-16): the Google project is **In production**, after
-      the Branding page was given a home page and a privacy link. ⚠️ Still owed: reconnect in
-      Settings (a sign-in made in Testing keeps its 7 days) and a screenshot of the warning page a
-      published, unverified app shows — T3's connect alert describes it.
+      the Branding page was given a home page and a privacy link. He sent the warning page a
+      published, unverified app shows (docs/07) — it prints the developer's e-mail to everyone who
+      signs in. ⚠️ Still owed: whether Settings reads `Connected` with no orange line afterwards.
 - [x] **YouTube upload — the six rulings** (Franco, 2026-11-16, all as recommended; encoded as M40 and
       ADR-024).
 

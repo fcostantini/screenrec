@@ -3983,7 +3983,9 @@ uploaded. Detail in docs/07.
       under `Export Audio & Copy` in the same shape — a button with the fact beside it:
       `Upload to YouTube…`. Its caption has three states: connected, not connected yet, and no
       credentials (button disabled). The first press with no account explains the browser step in an
-      alert before opening anything; nothing is exported until an account exists. Every press ends in
+      alert before opening anything; nothing is exported until an account exists. ⚠️ That alert must
+      **describe** Google's warning, never quote its buttons: the pages are localised and differ
+      between Testing and production (docs/07 has both, word for word). Every press ends in
       the sheet: **Title** (the clip's base name, selected, so Return uploads as is), **Description**
       (optional), **Visibility** (from Settings), the size and length, the terms line, and — past 15
       minutes — the line about verified channels. `Upload` dismisses the Trim window as its
