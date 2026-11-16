@@ -18,7 +18,7 @@
   ⚠️ **`/code-review medium`: ten found, eight fixed, one to T5, one rejected** (no Keychain
   migration — T1's item is gone).
   ⚠️ **The app can hold a sign-in and still cannot upload** — that is T3. The installed app at
-  `/Users/Shared` is this development build, signed out.
+  `/Users/Shared` is this development build, **connected** to Franco's channel since he published.
   ✅ **Franco's Google project is In production** (published 2026-11-16, after T2), so a new
   sign-in no longer ends after 7 days. The Settings line that says so appears only in Testing.
 
@@ -257,7 +257,7 @@
 - [x] **M40 — `Publish app`** (Franco, 2026-11-16): the Google project is **In production**, after
       the Branding page was given a home page and a privacy link. He sent the warning page a
       published, unverified app shows (docs/07) — it prints the developer's e-mail to everyone who
-      signs in. ⚠️ Still owed: whether Settings reads `Connected` with no orange line afterwards.
+      signs in. ✅ He reconnected: the saved sign-in carries no end date, so the 7-day line is gone.
 - [x] **YouTube upload — the six rulings** (Franco, 2026-11-16, all as recommended; encoded as M40 and
       ADR-024).
 

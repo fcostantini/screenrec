@@ -51,6 +51,16 @@ file every session is required to read.
   ScreenRec (no segura)"*, *"Volver a lugar seguro"*) and differ between Testing and production.
   Describe the step — "Google will warn that it hasn't verified ScreenRec; continue past it".
   ✅ **"Sensitive", not restricted:** the page's own word for what the upload scope asks for.
+  ✅ **A sign-in made after publishing carries no end date.** The saved token has no
+  `refreshTokenExpiry` — Google sent no `refresh_token_expires_in` — so Settings shows `Connected`
+  with no line under it. The 7-day fuse was Testing's alone.
+  ✅ **The published app's permission page** adds an amber box — *"This app isn't verified by
+  Google. If you're the developer, you need to ask Google to verify it. Otherwise this app may
+  lose some of its access to Google user data."* — above the same *"Manage your YouTube videos"*,
+  and its *Privacy Policy* is now a link: the one entered on the Branding page.
+  ⚠️ **That amber sentence is the standing risk of staying unverified** (ADR-024): Google reserves
+  the right to cut an unverified app's access. If uploads ever start failing for everyone at once,
+  look here first.
 
 - 2026-11-16 (M40-T1, the CLI spike's live legs — seven uploads to Franco's channel through his own
   Google project): **what the Keychain, URLSession and YouTube actually do.**
