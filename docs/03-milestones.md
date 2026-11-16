@@ -3872,6 +3872,7 @@ uploaded. Detail in docs/07.
 
 - [ ] M40-T1 **Spike, CLI-first: sign in and upload one file** (new target `UploadCore` +
       `screenrec-cli`, ADR-011). `screenrec-cli youtube connect | upload <file> | disconnect`.
+      Plan artifact: `claude.ai/artifact/6Zhtq6Gmoi9WHdxqSSJjCw` — ⚠️ awaiting Franco's go.
       Sign-in is the installed-app flow Google documents for desktop: system browser, loopback
       redirect on `127.0.0.1` at an ephemeral port (`NWListener`), PKCE S256, `state` checked. The
       upload is the resumable protocol: initiate with the metadata, `PUT` the file, and after a

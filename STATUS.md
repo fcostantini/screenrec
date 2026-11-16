@@ -7,7 +7,8 @@
 ## Now
 
 - **📋 M40 FILED from Franco's rulings (2026-11-16) — a trimmed clip can go to YouTube. Five tasks,
-  nothing implemented. Next: M40-T1 — its plan artifact is published and waits for Franco's go.**
+  nothing implemented. Next: M40-T1 — its plan artifact is published and waits for Franco's go**
+  (`claude.ai/artifact/6Zhtq6Gmoi9WHdxqSSJjCw`).
   ✅ **The Google Cloud project exists and was checked live (2026-11-16).** 🔴 The check also settled
   one of T1's unknowns: **a Desktop client's secret is required even with PKCE**, so it ships.
   Scoping artifact: `claude.ai/artifact/1xC4iSiiCSRsaatL3A9qRP`. `docs:` commits — no code changed, no
