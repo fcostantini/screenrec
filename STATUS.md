@@ -19,8 +19,8 @@
   migration — T1's item is gone).
   ⚠️ **The app can hold a sign-in and still cannot upload** — that is T3. The installed app at
   `/Users/Shared` is this development build, signed out.
-  ⚠️ **Franco's Google project is still in Testing**, so every sign-in ends after 7 days; the
-  Settings line now says why and links what to do (`Publish app`).
+  ✅ **Franco's Google project is In production** (published 2026-11-16, after T2), so a new
+  sign-in no longer ends after 7 days. The Settings line that says so appears only in Testing.
 
 - **✅ M40-T1 DONE (2026-11-16) — the CLI signs in to YouTube and uploads a file.** New target
   `UploadCore` + `screenrec-cli youtube connect | upload | disconnect`. Live on Franco's own Google
@@ -254,7 +254,10 @@
       firewall dialog ever appeared, and whether the console lists the scope as sensitive or
       restricted.
 - [x] **M40 — the sign-in clicks for T1** (Franco, 2026-11-16, with screenshots of Google's pages).
-- [ ] **M40 — `Publish app` before G40** (Audience page): in Testing every sign-in expires in 7 days.
+- [x] **M40 — `Publish app`** (Franco, 2026-11-16): the Google project is **In production**, after
+      the Branding page was given a home page and a privacy link. ⚠️ Still owed: reconnect in
+      Settings (a sign-in made in Testing keeps its 7 days) and a screenshot of the warning page a
+      published, unverified app shows — T3's connect alert describes it.
 - [x] **YouTube upload — the six rulings** (Franco, 2026-11-16, all as recommended; encoded as M40 and
       ADR-024).
 

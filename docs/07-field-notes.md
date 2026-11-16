@@ -31,6 +31,14 @@ file every session is required to read.
   ⚠️ **"Why do I have to sign in every week?"** was Franco's first question on seeing the testing
   line. Only `Publish app` on the console's Audience page lifts it, and a sign-in made while in
   Testing keeps its 7 days — reconnect after publishing.
+  ✅ **Publishing an External app needs two links first** (Franco, 2026-11-16). `Publish app`
+  answered: *"Valid app name, support email, homepage url, and privacy policy url are required for
+  switching the app to external production mode."* Both go on the **Branding** page, with their
+  domain under Authorized domains; the README's *What ScreenRec sends* section is the privacy link.
+  After that the Audience page reads **In production**, under a standing banner — *"Your app
+  requires verification…"* — and the overview adds *"Your branding is not being shown to users"*
+  and *"Verification is required because your app requests sensitive or restricted scopes."* All
+  three are the normal state of an unverified personal app, not errors.
 
 - 2026-11-16 (M40-T1, the CLI spike's live legs — seven uploads to Franco's channel through his own
   Google project): **what the Keychain, URLSession and YouTube actually do.**

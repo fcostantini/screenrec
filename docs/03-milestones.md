@@ -4038,8 +4038,8 @@ uploaded. Detail in docs/07.
       **(human)** remove ScreenRec's access in the Google account, press upload, read *needs
       reconnecting*.
 
-**Gate G40** — on the deployed build, with the consent screen **published** (**(human)** Audience →
-Publish app: in Testing every sign-in dies after 7 days):
+**Gate G40** — on the deployed build, with the consent screen **published** (✅ done by Franco
+2026-11-16 — it first needed a home page and a privacy link on the Branding page; docs/07):
 - Trim → `Upload to YouTube…` → Return → the menu shows the export and then the upload moving → the
   notice → ⌘V pastes a link, and **(human)** the video plays for Franco as unlisted.
 - The clipboard rule both ways; `Cancel Upload` if ruled in; `Disconnect` and reconnect.
