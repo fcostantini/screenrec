@@ -6,12 +6,31 @@
 
 ## Now
 
+- **⏸ M40-T3 BUILT, NOT COMMITTED (2026-11-16) — it waits for YouTube's daily upload limit to
+  reset.** The Trim window's `Upload to YouTube…` row, the connect alert and the sheet are in the
+  **working tree on Franco's Mac, uncommitted by his call** (*"let's wait until tomorrow"*).
+  **974 tests** (944 → 974); **17 breaks, 17 red**. The deployed app at `/Users/Shared` **is** this
+  uncommitted build, connected to his channel.
+  ✅ **Live, on the deployed build:** the row at the 500 pt floor; the sheet (after a clipped
+  `Title` label was fixed); limits applied as typed; `Cancel` back to an intact range; `Upload`
+  closes the window and the export runs; the first-time path, which Franco drove himself.
+  🔴 **The one leg missing: a real upload landing.** Both attempts from the app were refused
+  `uploadLimitExceeded` — T1's seven test uploads spent the channel's daily limit. The refusal was
+  handled correctly, but the task's Verify asks for an upload that lands.
+  **Next, in this order:** (1) when the limit has reset, **one** unlisted upload from the Trim
+  window, confirmed by oEmbed; (2) present `/code-review medium`'s findings to Franco — the review
+  ran on 2026-11-16 and its findings are **not yet ruled on**; (3) fix, re-verify, tick, commit
+  `M40-T3`.
+  ⚠️ **Test uploads are a budget now:** one or two a day. Verify with oEmbed, not with more uploads.
+  ⚠️ **Asked of Franco, unanswered:** whether the sheet opened by itself after the sign-in, and
+  whether a notice appeared when the upload was refused.
+
 - **✅ M40-T2 DONE (2026-11-16) — Settings connects a YouTube account, and a build carries the
   credentials to do it.** `UploadModel` + a **YouTube** section in Settings › Sharing; `bundle.sh`
   stamps the client. **944 tests** (905 → 944); **12 + 9 breaks, all red**. Live on the deployed
   build: connected, relaunched, **swapped to a build with another `CDHash` — still connected, no
   dialog**, disconnected, folder empty. **Next: M40-T3** — plan artifact published, awaiting Franco's
-  go (`claude.ai/artifact/9ked9JDke2DStc8yGn8kL7`).
+  go (`claude.ai/artifact/9ked9JDke2DStc8yGn8kL7`) — approved; see the entry above.
   🔴 **Ruled by Franco: the sign-in is a private file, not a Keychain item** (ADR-024 amended). The
   data-protection Keychain refuses a self-signed program outright (`-34018`).
   🔴 **Two defects only running it showed:** `plutil -extract` prints its failure on *stdout*, so
@@ -34,14 +53,9 @@
   ⚠️ **Not exercised live:** the access-token refresh. **Seven test videos** sit on Franco's channel.
 
 - **📋 M40 FILED from Franco's rulings (2026-11-16) — a trimmed clip can go to YouTube; five tasks.**
-  Scoping artifact `claude.ai/artifact/1xC4iSiiCSRsaatL3A9qRP`; **MINOR → 1.23.0 at G40**.
-  🔴 **Buildable only since 2026-11-02**, when Google stopped forcing uploads from unaudited API
-  projects to private. **ADR-024 reverses the brief's upload non-goal** for this one case.
-  ✅ **Ruled, all six as recommended:** upload from the app; credentials stamped into his builds;
-  its own Trim-window row, `Upload to YouTube…`; a sheet each time; Unlisted by default; the link
-  copied only if the clipboard is untouched since the upload began.
-  ⚠️ **Not ruled, only not objected to:** `Cancel Upload`, a notification click that opens the video,
-  and sending no "made for kids" declaration. Each returns in its task's plan artifact.
+  Scoping artifact `claude.ai/artifact/1xC4iSiiCSRsaatL3A9qRP`; **MINOR → 1.23.0 at G40**. Rulings,
+  ADR-024 and the task specs are in docs/03 and docs/05.
+  ⚠️ **Not ruled, only not objected to:** `Cancel Upload`, a notification click that opens the video.
   🔴 **This Mac's `gcloud` has an unrelated account and project active** — never run it for M40
   without an explicit `--project`.
 

@@ -7,6 +7,33 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-16 (M40-T3, the Trim window's upload — live on the deployed build): **the app's first
+  real upload was refused by YouTube, and that was the test bench's doing.**
+  🔴 **`uploadLimitExceeded` after seven uploads in a day.** T1's legs put seven test videos on
+  Franco's channel; the eighth and ninth, from the app, were refused — the channel's own daily
+  limit, not the project's quota (100) and not a fault in the request. **Test uploads are a budget:
+  a milestone that needs a live upload per task cannot spend the day's allowance on its first.**
+  It resets on YouTube's schedule, not ours.
+  ✅ **The refusal still proved the chain.** Export written and listed, upload attempted with the
+  sheet's metadata, YouTube's reason logged, the failure notice posted, the account left connected
+  — ADR-007 held on a failure nobody staged.
+  🔴 **An `NSAlert` accessory view sized before its labels have text comes out a line short and
+  clips its top row.** The sheet's `Title` label was in the AX tree and not on screen — only the
+  screenshot showed it. Fill the wrapping labels, `layoutSubtreeIfNeeded()`, *then* take
+  `fittingSize`.
+  ⚠️ **The Trim window's floor is 500 × 736 pt now** (653 before): the new row raises the minimum
+  height, and AX `kAXSizeAttribute` clamps to it.
+  🔴 **`log` is a zsh builtin.** `log stream …` in this harness's shell prints *"too many
+  arguments"* and captures nothing; a three-minute wait for a line that could never arrive
+  followed. Always `/usr/bin/log`.
+  🔴 **`defaults read <domain> <key> 2>&1` "succeeds" on a missing key** — the error text is the
+  output. Piped through `sed` it read as "a name is saved". Test the exit status.
+  ✅ **AX-setting a text field's value does fire `controlTextDidChange`:** `alertdriver type` with
+  angle brackets in the title came back filtered, so the sheet's live rules are drivable.
+  ✅ **Franco drove the first-time path himself** before the driver could: the connect alert, both
+  of Google's pages, the sheet, `Upload`. The row read *"Waiting for Google in your browser…"*
+  while he was in the browser.
+
 - 2026-11-16 (M40-T2, the account in the app — live on the deployed build): **a private file does
   what the Keychain could not.**
   ✅ **A build with a different `CDHash` read the saved sign-in with no dialog.** Connected on one
