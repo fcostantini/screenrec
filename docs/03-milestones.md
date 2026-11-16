@@ -3889,8 +3889,9 @@ uploaded. Detail in docs/07.
       ✅ answered by the setup check (2026-11-16): `invalid_request: client_secret is missing.`
       The secret ships; (c) whether the insert response carries `snippet.channelTitle` under the
       upload-only scope; (d) what Studio shows for a video sent with no audience declaration;
-      (e) the real wording of Google's warning and consent pages, and whether the app name is shown
-      while unverified; (f) whether `youtube.upload` is listed as sensitive or restricted;
+      (e) the real wording of Google's warning and consent pages (✅ the app name **is** shown
+      while unverified and in Testing — Franco, 2026-11-16; the wording is still owed, to be
+      screenshotted at T1's sign-in); (f) whether `youtube.upload` is listed as sensitive or restricted;
       (g) whether an unlisted upload answers the public oEmbed endpoint, which would make later
       verifies headless.
       **Verify:** unit tests on the pure halves — the PKCE challenge against RFC 7636's vector, the

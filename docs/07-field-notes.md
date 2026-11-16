@@ -24,6 +24,9 @@ file every session is required to read.
   ✅ **A resumable session opens under the upload-only scope** (`200` + `Location`), and `DELETE` on
   the session URL cancels it with `499` — nothing reaches the channel. `oauth2.googleapis.com/revoke`
   answers `200`.
+  ✅ **The consent pages show the app's name ("ScreenRec") while it is unverified and in Testing**
+  (Franco saw it) — Google's Branding page says the name needs verification to be displayed, and
+  for a test user that is not what happens.
   ⚠️ **The console's New Project form requires a billing account whenever the account has one** (a
   Free Trial counts). Create with it, then Billing → Your projects → ⋮ → Disable billing.
   ⚠️ **"Google Auth Platform" is not pinned in the console menu.** Google's own docs link
