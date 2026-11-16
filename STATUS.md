@@ -251,6 +251,8 @@
       and in that session's reply): project `ScreenRec`, YouTube Data API v3 enabled, consent screen
       External + the `youtube.upload` scope, yourself as a test user, a **Desktop app** client, its
       JSON saved as `~/.config/screenrec/youtube-client.json` (mode 600). Console only — not `gcloud`.
+      🔴 Franco activated the console's Free Trial (2026-11-16): the project must be **unlinked from
+      that billing account** (Disable billing), or it stops when the trial closes in 90 days.
 - [ ] **M40 — one consent click during T1**, on the account whose channel should receive the test
       upload (it lands as private).
 - [ ] **M40 — `Publish app` before G40** (Audience page): in Testing every sign-in expires in 7 days.

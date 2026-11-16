@@ -37,6 +37,10 @@ file every session is required to read.
   ⚠️ **`menudriver click "Trim…"` is a depth-first title match**, so it lands on whichever file row
   comes first. To open Trim on one particular file, find the row by its title and press `Trim…` in
   *its* submenu; descend only into `Recordings`/`Recent…` containers on the way.
+  🔴 **A Google Cloud project linked to a Free Trial billing account has a 90-day fuse.** The trial
+  never charges on its own, but when it closes Google stops every linked project, and a project
+  linked to a closed billing account cannot use even free APIs (`cloud.google.com/billing/docs/
+  how-to/modify-project`). The YouTube Data API needs no billing at all — unlink the project.
   ⚠️ **Not measured, owed to a spike if this is built:** the Keychain under the self-signed identity,
   whether Google's token endpoint takes a Desktop client without its secret, and whether the upload
   response names the channel under the upload-only scope.

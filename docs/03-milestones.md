@@ -3849,7 +3849,11 @@ recommended container and codecs. Never the `.mov`: it carries two audio tracks.
 **Needs Franco before T1 — the Google Cloud project (~20 min, console only).** ⚠️ This Mac's `gcloud`
 CLI has an unrelated account and project active; do this in the web console so nothing touches that
 config, and choose deliberately which Google account owns the project.
-1. New project `ScreenRec`; keep it selected for every step.
+1. New project `ScreenRec`; keep it selected for every step. 🔴 **It must have no billing account
+   linked.** If the console's Free Trial was activated, new projects attach to its billing account,
+   and when the trial closes (90 days, or the credit spent) Google stops every project linked to it
+   — free APIs included. Billing → Account management → the project's ⋮ → **Disable billing**.
+   Nothing here needs billing, and "Activate full account" is never the answer.
 2. APIs & Services → Library → **YouTube Data API v3** → Enable (the scope below is only listed once
    the API is on).
 3. Google Auth Platform → Get started: app name `ScreenRec`, support email, audience **External**,
