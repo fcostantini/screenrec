@@ -18,6 +18,10 @@ file every session is required to read.
   a rebuild because TCC keys on the designated requirement; **the Keychain does not**.
   ⚠️ For the app this means a password prompt after every update, and a `Disconnect` that revokes
   with Google and then fails to remove the item. T2 must settle storage before it saves anything.
+  🔴 **The data-protection Keychain is not a way out:** `SecItemAdd` with
+  `kSecUseDataProtectionKeychain` from a `screenrec-dev`-signed binary answers **`-34018`**, *"A
+  required entitlement isn't present"* — it needs an application identifier, which needs an Apple
+  team. Same wall as the time-sensitive entitlement `bundle.sh` already documents.
   ✅ **After a transfer breaks, YouTube needs about two seconds to say what it kept.** Asked at once:
   `308` with no `Range` — "nothing held". Asked at +2 s, +6 s and +14 s: `bytes=0-24117247`, the
   same each time, and exactly 23 MiB — it keeps whole mebibytes. A stale zero is survivable (the

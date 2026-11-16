@@ -3929,7 +3929,10 @@ uploaded. Detail in docs/07.
       Studio flags an upload with no audience answer, (f) sensitive or restricted, the Keychain
       dialog's wording, and whether a firewall dialog ever appeared.
 
-- [ ] M40-T2 **The account lives in the app** (AppCore + AppShell + `Scripts/bundle.sh`). An
+- [ ] M40-T2 **The account lives in the app** (AppCore + AppShell + `Scripts/bundle.sh`).
+      Plan artifact: `claude.ai/artifact/QwXjfEULvBmvGVBfavL2aw` — ⚠️ awaiting Franco's go, and his ruling
+      on storage: T1 showed the Keychain can't hold the sign-in for a self-signed app, and the
+      data-protection Keychain refuses one outright (`-34018`, measured 2026-11-16). An
       `UploadModel` beside `ExportModel` — the same `@MainActor @Observable` sub-model pattern, owned
       by `AppState` — holding the account's state: unavailable (no credentials in this build), not
       connected, connecting, connected. Settings › **Sharing** gains a **YouTube** section under MP4

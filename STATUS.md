@@ -10,7 +10,8 @@
   `UploadCore` + `screenrec-cli youtube connect | upload | disconnect`. **905 tests** (846 → 905);
   **10 breaks, 10 red**. Live on Franco's own Google project with the final build: a **59.8 MB** clip
   cut at 40 % resumed from the **24.6 MB** YouTube held and landed private in **19.7 s**; an unlisted
-  one answered oEmbed `200` at once. **Next: M40-T2** — its plan artifact first.
+  one answered oEmbed `200` at once. **Next: M40-T2** — plan artifact published, awaiting Franco's
+  go and his storage ruling (`claude.ai/artifact/QwXjfEULvBmvGVBfavL2aw`).
   🔴 **The spike's one "no" reshapes T2: the Keychain binds an item to the build that made it.**
   `screenrec-dev` has no team ID, so another build gets macOS's password dialog on first read and
   **cannot delete** the item (`errSecInvalidOwnerEdit`). TCC survives a rebuild; the Keychain does
