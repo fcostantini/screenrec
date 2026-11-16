@@ -10,7 +10,8 @@
   credentials to do it.** `UploadModel` + a **YouTube** section in Settings › Sharing; `bundle.sh`
   stamps the client. **944 tests** (905 → 944); **12 + 9 breaks, all red**. Live on the deployed
   build: connected, relaunched, **swapped to a build with another `CDHash` — still connected, no
-  dialog**, disconnected, folder empty. **Next: M40-T3** — its plan artifact first.
+  dialog**, disconnected, folder empty. **Next: M40-T3** — plan artifact published, awaiting Franco's
+  go (`claude.ai/artifact/9ked9JDke2DStc8yGn8kL7`).
   🔴 **Ruled by Franco: the sign-in is a private file, not a Keychain item** (ADR-024 amended). The
   data-protection Keychain refuses a self-signed program outright (`-34018`).
   🔴 **Two defects only running it showed:** `plutil -extract` prints its failure on *stdout*, so

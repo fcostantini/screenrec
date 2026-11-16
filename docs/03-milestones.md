@@ -3979,7 +3979,8 @@ uploaded. Detail in docs/07.
       **Owed by Franco:** that ScreenRec is gone from his Google account's access page; and
       `Publish app`, which is what ends the 7-day sign-ins.
 
-- [ ] M40-T3 **The Trim window: the row, the connect alert, the sheet** (AppShell + AppCore). A row
+- [ ] M40-T3 **The Trim window: the row, the connect alert, the sheet** (AppShell + AppCore).
+      Plan artifact: `claude.ai/artifact/9ked9JDke2DStc8yGn8kL7` — ⚠️ awaiting Franco's go. A row
       under `Export Audio & Copy` in the same shape — a button with the fact beside it:
       `Upload to YouTube…`. Its caption has three states: connected, not connected yet, and no
       credentials (button disabled). The first press with no account explains the browser step in an
