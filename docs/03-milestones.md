@@ -3813,6 +3813,172 @@ wrote its file and left the pasteboard untouched. 🚢 **MINOR as filed (ADR-013
 As filed — M39-T1's Verify on the deployed build, plus (human, optional) Franco pasting the `.m4a`
 into Slack or WhatsApp.
 
+## M40 — A trimmed clip can go to YouTube (from Franco, 2026-11-16)
+
+Franco: *"after trimming a clip, we currently copy it to the clipboard. how can we also add the option
+to upload it to youtube?"* Scoping artifact, with the mockups every task below refers to:
+`claude.ai/artifact/1xC4iSiiCSRsaatL3A9qRP`. **Filed MINOR (ADR-013)** — a capability the app has
+never had; ⚠️ the bump (**→ v1.23.0**) lands at G40, not per task. Rests on **ADR-024**, which
+reverses the brief's *"uploading it somewhere is not [in]"* for this one case.
+
+🔴 **Why this is buildable now and was not a month ago.** Until **2026-11-02** YouTube forced every
+`videos.insert` from an unaudited API project to private, with no way to lift it short of a
+compliance audit. Google reversed that. Read `developers.google.com/youtube/v3/revision_history`
+before trusting any guide: most still describe the old rule and the old quota (docs/07, 2026-11-16).
+
+✅ **Ruled by Franco before filing (2026-11-16), all six as recommended:**
+1. **Route:** upload from the app through the YouTube Data API, not a hand-off to the browser.
+2. **Credentials:** stamped into his builds from an untracked file, never committed (ADR-024).
+3. **Trim window:** its own row, `Upload to YouTube…`, under `Export Audio & Copy`.
+4. **Each time:** a sheet — title, description, visibility. YouTube's required minimum functionality
+   says an upload client must let the user set all three, so a silent one-click is out.
+5. **Default visibility:** Unlisted.
+6. **Clipboard:** the link is copied **only if the clipboard is untouched since the upload began**;
+   otherwise it lives in the menu. An upload can finish minutes later, and overwriting something
+   copied in the meantime is worse than one more click.
+
+⚠️ **Proposed in the artifact and not objected to, but not ruled — each task's plan artifact shows
+them again:** a `Cancel Upload` menu row (exports have none); a notification click that opens the
+video rather than revealing the file (docs/06 says "click always reveals"); the upload code in a new
+SPM target; and sending **no** "made for kids" declaration so the channel's own default applies.
+
+**What it uploads.** The file `Export & Copy` already writes — MP4, `moov` first, H.264 High, AAC
+48 kHz stereo, the range and crop applied, the microphone rule from Settings — which is YouTube's
+recommended container and codecs. Never the `.mov`: it carries two audio tracks.
+
+**Needs Franco before T1 — the Google Cloud project (~20 min, console only).** ⚠️ This Mac's `gcloud`
+CLI has an unrelated account and project active; do this in the web console so nothing touches that
+config, and choose deliberately which Google account owns the project.
+1. New project `ScreenRec`; keep it selected for every step.
+2. APIs & Services → Library → **YouTube Data API v3** → Enable (the scope below is only listed once
+   the API is on).
+3. Google Auth Platform → Get started: app name `ScreenRec`, support email, audience **External**,
+   contact email, agree, Create. No logo.
+4. Audience → Test users → add the Google account that owns the YouTube channel. Leave it in
+   **Testing** (7-day sign-ins, test users only) until G40.
+5. Data Access → Add or remove scopes → `https://www.googleapis.com/auth/youtube.upload` → Save.
+6. Clients → Create client → **Desktop app** → Create → **Download JSON at once** (since 2025 the
+   secret is shown only at creation).
+7. Save it as `~/.config/screenrec/youtube-client.json`, mode 600. That path is the contract: the CLI
+   reads it directly, and `Scripts/bundle.sh` stamps the bundle from it.
+
+- [ ] M40-T1 **Spike, CLI-first: sign in and upload one file** (new target `UploadCore` +
+      `screenrec-cli`, ADR-011). `screenrec-cli youtube connect | upload <file> | disconnect`.
+      Sign-in is the installed-app flow Google documents for desktop: system browser, loopback
+      redirect on `127.0.0.1` at an ephemeral port (`NWListener`), PKCE S256, `state` checked. The
+      upload is the resumable protocol: initiate with the metadata, `PUT` the file, and after a
+      failure ask `Content-Range: bytes */N` and continue from the `Range` it answers.
+      **Seams:** `UploadCore` imports Foundation, Network, CryptoKit and Security only — no AppKit,
+      and `RecorderCore` never depends on it (ADR-024). Both `screenrec-cli` and `AppCore` will. The
+      CLI opens the browser with `/usr/bin/open`; the app gets an injected closure in T2.
+      **docs/01 amendment:** the new target in the package layout and the agents' rule.
+      🔴 **`status.privacyStatus` is always sent** — omitted, the API uploads as `public`.
+      ⚠️ **It is a spike: these are measured and written to docs/07 before T2 is planned** —
+      (a) the Keychain under the `screenrec-dev` identity, across a rebuild (sign the CLI with
+      `Scripts/devsign.sh` for this leg; an ad-hoc binary proves nothing about the app);
+      (b) whether the token exchange succeeds **without** the client secret under PKCE — Google's
+      page marks it optional and a forum report says `invalid_request`; this decides whether the
+      secret ships at all; (c) whether the insert response carries `snippet.channelTitle` under the
+      upload-only scope; (d) what Studio shows for a video sent with no audience declaration;
+      (e) the real wording of Google's warning and consent pages, and whether the app name is shown
+      while unverified; (f) whether `youtube.upload` is listed as sensitive or restricted;
+      (g) whether an unlisted upload answers the public oEmbed endpoint, which would make later
+      verifies headless.
+      **Verify:** unit tests on the pure halves — the PKCE challenge against RFC 7636's vector, the
+      authorization URL, redirect parsing (code / `state` mismatch / `error=access_denied`), token
+      decoding and expiry, the initiation body, `Range` → next offset, and the error mapping. Then
+      live, with **(human)** one consent click from Franco: `connect`, then `upload` of a synthetic
+      clip as **private** prints the video id and the status the API returned; a second run needs no
+      browser (the token was stored); and an upload that cancels its own `PUT` part-way resumes from
+      the server's `Range` and completes.
+
+- [ ] M40-T2 **The account lives in the app** (AppCore + AppShell + `Scripts/bundle.sh`). An
+      `UploadModel` beside `ExportModel` — the same `@MainActor @Observable` sub-model pattern, owned
+      by `AppState` — holding the account's state: unavailable (no credentials in this build), not
+      connected, connecting, connected. Settings › **Sharing** gains a **YouTube** section under MP4
+      and GIF: the account row with `Connect…` / `Disconnect`, `Visibility for new uploads`
+      (Unlisted), and a caption carrying the three links the API terms ask for. `Disconnect` revokes
+      the token with Google and deletes the Keychain item. `bundle.sh` stamps the credentials into
+      the bundle from `~/.config/screenrec/youtube-client.json`, and says in its output whether it
+      did; without the file the build succeeds and the section reads as unavailable.
+      **Seams:** the browser is an injected closure, as `copyToPasteboard` is — AppCore may not
+      import AppKit. The visibility default is a `Settings` value with `nearest`-style validation.
+      **Also:** a README section, *What ScreenRec sends*, and how to build with your own credentials
+      file. **docs/06 amendment:** the Settings section.
+      ⚠️ **The app's Keychain item is not the CLI's** — a different code identity — so T1's finding
+      has to be re-measured on the signed bundle, across a rebuild.
+      **Verify:** unit tests — every state transition against a fake sign-in, the settings
+      round-trip, no credentials ⇒ unavailable. On the deployed build, driven by AX: the section
+      renders on the Sharing page; **(human)** `Connect…` and one consent click → the row reads
+      `Connected`; relaunch and rebuild → still connected, no Keychain prompt; `Disconnect` → `Not
+      connected`, and **(human)** ScreenRec is gone from the Google account's third-party access page.
+
+- [ ] M40-T3 **The Trim window: the row, the connect alert, the sheet** (AppShell + AppCore). A row
+      under `Export Audio & Copy` in the same shape — a button with the fact beside it:
+      `Upload to YouTube…`. Its caption has three states: connected, not connected yet, and no
+      credentials (button disabled). The first press with no account explains the browser step in an
+      alert before opening anything; nothing is exported until an account exists. Every press ends in
+      the sheet: **Title** (the clip's base name, selected, so Return uploads as is), **Description**
+      (optional), **Visibility** (from Settings), the size and length, the terms line, and — past 15
+      minutes — the line about verified channels. `Upload` dismisses the Trim window as its
+      neighbours do; `Cancel` returns to it with the range intact.
+      **Seams:** the export is `exportAndCopy`'s — same `Exporter` call, range and crop — with the
+      upload chained from `performExport(… completion:)`, the hook the pasteboard copy already rides.
+      It does **not** put the file on the clipboard. The sheet is an `NSAlert` with an accessory
+      view, the `Rename…` pattern, so `alertdriver.swift` can drive it. Title and description limits
+      (100 characters, 5000 bytes, no `<` or `>`) live in a pure helper.
+      **docs/06 amendment:** the Trim window bullet, and the first multi-field prompt in the spec.
+      **Verify:** unit tests — the uploader receives the written `.mp4` and the entered metadata;
+      a cancelled sheet exports nothing; the limits. On the deployed build: the row at the 500 pt
+      floor with the button unwrapped; the sheet's three controls read through AX; `Upload` leaves
+      0 windows; one real **unlisted** upload of a synthetic clip.
+
+- [ ] M40-T4 **The menu and the notices carry it** (AppCore + AppShell). While it runs, the export
+      row's successor: `Uploading to YouTube… 37%` with the same bar. When it lands: a receipt row,
+      `Uploaded to YouTube · <title>`, whose submenu is `Copy Link`, `Open on YouTube`, `Edit in
+      YouTube Studio`, `Reveal File in Finder`; and one notice in two forms — *link copied*, or *the
+      link is in the menu* — chosen by ruling 6: the pasteboard's `changeCount` is read when the
+      sheet is confirmed and again at completion, and the link is written only if they match. Quitting
+      mid-upload asks, as it does for an export. `.mp4` rows under Recent Exports, and the export
+      receipt, gain `Upload to YouTube…` — the same sheet — so a failed upload is retried without
+      re-trimming.
+      **Seams:** `MenuHeader` for the row's words, `ExportProgressRowView` for the bar,
+      `RecordingNotifications` for the copy, `QuitFlow` for the question, `LastExport`'s shape for
+      the receipt. `changeCount` reaches AppCore as an injected closure.
+      ⚠️ **Three things here need Franco's word in the plan artifact:** `Cancel Upload`; the
+      notification click opening the video; and whether the status item says anything when an upload
+      lands while Instant Replay is hiding banners (M35's lesson).
+      **docs/06 amendment:** the idle menu's rows, the Notifications list.
+      **Verify:** `AppShellTests` for the menu in the uploading and uploaded states; the catalog's
+      strings; both clipboard legs with an injected `changeCount`. On the deployed build, during a
+      real upload large enough to watch: `menudriver dump` shows the row and a moving percentage;
+      untouched clipboard → the link is on it; a copy made mid-upload → the clipboard is unchanged
+      and the notice names the menu.
+
+- [ ] M40-T5 **Every failure says what happened and leaves the file** (ADR-007). The dropped
+      connection (resume, bounded retries, then *Couldn't upload — the clip is saved*); the sign-in
+      that expired or was removed (*YouTube needs reconnecting*, account back to not connected);
+      the day's quota (*resets at midnight Pacific*); an account with no channel; a rejected length;
+      a cancel; a quit. Each is a distinct notice that names the fix, never an HTTP status.
+      **Verify:** each row of the artifact's failure table reached by a unit test against stubbed
+      responses (`URLProtocol`); the export is on disk and in Recent Exports after every one. Live:
+      **(human)** remove ScreenRec's access in the Google account, press upload, read *needs
+      reconnecting*.
+
+**Gate G40** — on the deployed build, with the consent screen **published** (**(human)** Audience →
+Publish app: in Testing every sign-in dies after 7 days):
+- Trim → `Upload to YouTube…` → Return → the menu shows the export and then the upload moving → the
+  notice → ⌘V pastes a link, and **(human)** the video plays for Franco as unlisted.
+- The clipboard rule both ways; `Cancel Upload` if ruled in; `Disconnect` and reconnect.
+- A bundle built **without** the credentials file shows the feature as unavailable and makes no
+  request; `git grep` over the tree and the history finds no client secret.
+- The README's *What ScreenRec sends* section exists; `CHANGELOG.md` has 1.23.0; `VERSION` bumped.
+
+**Left out, on purpose:** uploading a whole `.mov` straight from Recordings (it needs an export
+first); resuming an upload after a relaunch; thumbnails, tags, playlists, scheduling; more than one
+account; any other destination (ADR-024); waiting for YouTube's processing; Google's app
+verification, which is only worth it if this outgrows personal use.
+
 ## Dependency graph
 
 ```

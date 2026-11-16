@@ -286,6 +286,57 @@ window" without answering "let me switch apps mid-trim and come back", which is 
 - **The status item is unchanged**, and keeps its own ⌘, and ⌘Q: the app menu exists only while a
   window is open, so the status menu cannot rely on it.
 
+## ADR-024 ✅ The app may upload a clip the user sends to YouTube (Franco, 2026-11-16)
+The brief's non-goals say *"Handing a file off locally — the share sheet, the clipboard — is in;
+uploading it somewhere is not"*, and ADR-020 put anything that sends **a recording** off the machine
+on the far side of its line: *"a reversal is a new ADR."* This is that ADR. **Decided: one upload
+destination is allowed — YouTube, from a button that names it, one clip at a time** (M40).
+
+**Why now, and why this is not drift.** A trimmed clip already leaves by the clipboard; what Franco
+does next with most of them is put them on YouTube by hand. Until **2026-11-02** an upload through
+the YouTube Data API from an unaudited project was forced to private, which made a native upload
+pointless for a personal tool; Google reversed that (docs/07, 2026-11-16). The identity ADR-015 names
+— *a dependable, native, private capture tool* — holds because nothing here is automatic: the app
+uploads what the user points at, when they press the button, and nothing otherwise.
+
+**Bounds — this ADR authorises exactly this and nothing more:**
+- **Only on a control that names YouTube, one clip at a time.** Never automatic, never in the
+  background, no "upload every recording", no upload on stop or on replay save.
+- **Sends only that exported file** and the title, description and visibility entered for it.
+  Nothing about the machine, other recordings, or how the app is used. No telemetry rides along.
+- **Only to Google's sign-in and YouTube endpoints.** Another destination is another ADR.
+- **Stores one thing: the sign-in token, in the Keychain.** Disconnect revokes it with Google and
+  deletes it.
+- **Silent until connected.** A build nobody has connected makes no YouTube request at all, and a
+  build with no credentials cannot.
+- **The narrowest scope that uploads** (`youtube.upload`): the app can add videos and cannot edit or
+  delete what is already on the channel.
+- **Recording, replay and export never depend on it.** The export is written before the upload
+  starts, so a failed upload leaves the file exactly where an export always leaves it (ADR-007).
+- **`RecorderCore` stays free of network code.** The upload lives in its own target.
+- **No external dependency** (ADR-010): `URLSession`, `Network`, `CryptoKit`, `Security`. No Google SDK.
+
+**The credentials (Franco's ruling).** The OAuth client ID and secret come from a Google Cloud
+project Franco owns and are **never committed**: `Scripts/bundle.sh` stamps them into the bundle from
+`~/.config/screenrec/youtube-client.json`, an untracked file outside the tree. His signed releases
+can upload; a build made without the file shows the feature as unavailable; someone who clones the
+repo supplies their own file. Google states that an installed app's secret *"is obviously not treated
+as a secret"*, so this is about keeping it out of git history and scanners, not about hiding it.
+
+**Unverified, on purpose.** The consent screen stays unverified under Google's personal-use
+exception (fewer than 100 users), so each person clicks through one warning page. That is ADR-021's
+posture applied again: the friction is accepted, not paid for. Revisit only if the audience outgrows
+that exception — the lifetime cap is 100 users, and the upload quota is 100 a day per project.
+
+⚠️ **The cost, stated rather than buried:** an upload tells Google the machine's IP address and hands
+it the clip — which is the point of the feature, and is exactly what the non-goal existed to prevent
+happening by accident. The feature also depends on a third party's policy, which changed twice in
+2026; when it breaks, the app must say so and leave the file intact. YouTube's API terms apply to it:
+a privacy note in the README, a link to YouTube's Terms of Service, and a disconnect that revokes.
+
+**A reversal is a new ADR**, and so is any widening: another destination, an automatic upload, a
+broader scope, or anything sent that the user did not type or point at.
+
 ## ADR-021 ✅ The repository is public; distribution and signing are unchanged (Franco, 2026-08-05)
 ADR-014 said screenrec is **"never public"**, and M32 ran straight into the consequence: the update
 check it needed could not read a private repo's releases, and — the part that reshaped the milestone

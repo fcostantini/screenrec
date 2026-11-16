@@ -56,7 +56,9 @@ demos, bug reports, and meetings" — not streamers, not video editors.
 - Webcam capture/overlay. **Settled no (ADR-017, 2026-07-22)** — screenrec stays a *screen* recorder.
   (Architecture still *leaves room* — it would be a 4th source — but that's a fact, not an intention.)
 - Streaming, cloud anything. (Handing a file *off locally* — the share sheet, the clipboard — is in;
-  uploading it somewhere is not.)
+  uploading it somewhere is not.) **Amended (ADR-024, 2026-11-16):** one exception — a clip the user
+  explicitly sends to YouTube, one at a time, from a control that names it (M40). Nothing is ever
+  uploaded automatically, and no other destination is in scope.
 - App Store distribution / sandboxing (see ADR-006). Windows. macOS < 15 (see ADR-001).
 - Echo cancellation (document "use headphones"; see 02-technical-reference §8).
 

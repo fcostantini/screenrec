@@ -6,23 +6,29 @@
 
 ## Now
 
-- **📋 2026-11-16 — YouTube upload SCOPED, not filed. No code changed.** Franco asked how a trimmed
-  clip could also go to YouTube. Scoping artifact, with a decision form:
-  `claude.ai/artifact/1xC4iSiiCSRsaatL3A9qRP`.
-  🔴 **The finding the whole plan turns on:** until **2026-11-02** YouTube forced every upload from an
-  unaudited API project to private; Google reversed that two weeks ago. A native upload is now useful
-  to a personal tool, and it needs no dependency (ADR-010 holds). Facts and sources in docs/07.
-  ✅ **Two routes:** hand the file to the browser (1 task, no ADR), or upload from the app through the
-  YouTube Data API (recommended; a CLI spike plus four tasks, **MINOR → 1.23.0**).
-  🔴 **The native route reverses a non-goal** — docs/00 says "uploading it somewhere is not [in]" and
-  ADR-020 says sending a recording anywhere needs a new ADR. That would be **ADR-024**; bounds are
-  drafted in the artifact, nothing is written into docs/05 yet.
-  ⚠️ **Needs Franco:** the six rulings in the artifact (route, where the Google credentials live,
-  placement in the Trim window, what it asks each time, default visibility, link vs clipboard), and
-  for the native route a Google Cloud project only he can create.
+- **📋 M40 FILED from Franco's rulings (2026-11-16) — a trimmed clip can go to YouTube. Five tasks,
+  nothing implemented. Next: M40-T1, blocked on a Google Cloud project only Franco can create.**
+  Scoping artifact: `claude.ai/artifact/1xC4iSiiCSRsaatL3A9qRP`. `docs:` commits — no code changed, no
+  VERSION bump yet (**MINOR → 1.23.0 at G40**, ADR-013).
+  🔴 **The finding the plan turns on:** until **2026-11-02** YouTube forced every upload from an
+  unaudited API project to private; Google reversed it two weeks before this was scoped. Facts, dates
+  and sources in docs/07 — most third-party guides still describe the old rule.
+  ✅ **Ruled by Franco, all six as recommended:** upload from the app (not a browser hand-off);
+  credentials stamped into his builds from an untracked file; its own Trim-window row,
+  `Upload to YouTube…`; a sheet each time (title, description, visibility); Unlisted by default; the
+  link copied only if the clipboard is untouched since the upload began.
+  🔴 **ADR-024 reverses a non-goal** — the brief's *"uploading it somewhere is not [in]"* — for this
+  one case, and bounds it: a named button, one clip, YouTube only, the token in the Keychain,
+  `RecorderCore` free of network code, no dependency. docs/00 is amended to point at it.
+  ⚠️ **Four proposals were not objected to but not ruled** — `Cancel Upload`, a notification click
+  that opens the video, the new `UploadCore` target, and sending no "made for kids" declaration. Each
+  comes back in its task's plan artifact; don't treat them as settled.
+  ⚠️ **docs/06 is not amended at filing.** Each task carries its own amendment, as M38 and M39 did,
+  so the spec never describes a surface that doesn't exist.
+  🔴 **This Mac's `gcloud` has an unrelated account and project active.** Nothing in M40 should run
+  `gcloud` without an explicit `--project`; the setup is console-only for that reason.
   ✅ **Incidental:** the Trim window opened at **1648 × 1026 pt** on the live 1.22.0 install, so it
   has been dragged past its 500 × 653 floor since the entry below — the leg that one left undriven.
-  **Next:** nothing filed. On Franco's rulings: file M40 (+ ADR-024 if native), then M40-T1.
 
 - **🔧 2026-11-11 — the live install was on v1.12.0; swapped to 1.22.0. No code change.** Franco
   reported the Trim window as small and unresizable. That was 1.12.0's fixed window:
@@ -241,11 +247,15 @@
 
 **Open:**
 
-- [ ] **YouTube upload — six rulings before anything is filed** (scoped 2026-11-16, artifact
-      `claude.ai/artifact/1xC4iSiiCSRsaatL3A9qRP`): route (hand-off vs native upload), where the
-      Google credentials live, placement in the Trim window, what it asks each time, default
-      visibility, and whether the link takes the clipboard. The native route also needs ADR-024 and a
-      Google Cloud project only Franco can create (~20 min; steps in the artifact).
+- [ ] **M40 — the Google Cloud project, before T1 can start** (filed 2026-11-16; steps in docs/03's M40
+      and in that session's reply): project `ScreenRec`, YouTube Data API v3 enabled, consent screen
+      External + the `youtube.upload` scope, yourself as a test user, a **Desktop app** client, its
+      JSON saved as `~/.config/screenrec/youtube-client.json` (mode 600). Console only — not `gcloud`.
+- [ ] **M40 — one consent click during T1**, on the account whose channel should receive the test
+      upload (it lands as private).
+- [ ] **M40 — `Publish app` before G40** (Audience page): in Testing every sign-in expires in 7 days.
+- [x] **YouTube upload — the six rulings** (Franco, 2026-11-16, all as recommended; encoded as M40 and
+      ADR-024).
 
 - [x] **The replay-save confirmation — RULED and encoded as M35** (Franco, 2026-08-06): (b) the flash
       is the **floor**, (a) onboarding-verify is the **improvement on top**, and the honest-copy fix
