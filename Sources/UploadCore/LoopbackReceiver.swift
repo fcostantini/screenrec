@@ -14,7 +14,7 @@ public enum LoopbackError: Error, Equatable {
 /// that says the browser's part is over, and hands back the redirect's query.
 ///
 /// `@unchecked Sendable`: the listener and every connection are confined to `queue`.
-public final class LoopbackReceiver: @unchecked Sendable {
+final class LoopbackReceiver: @unchecked Sendable {
     private let listener: NWListener
     private let isExpected: @Sendable (String) -> Bool
     private let queue = DispatchQueue(label: "dev.fcostantini.screenrec.loopback")
@@ -23,7 +23,7 @@ public final class LoopbackReceiver: @unchecked Sendable {
 
     /// `isExpected` picks the redirect out of whatever else reaches the port. A request it turns
     /// down is answered 404 and never handed on, so it can neither finish a sign-in nor end one.
-    public init(accepting isExpected: @escaping @Sendable (String) -> Bool) throws {
+    init(accepting isExpected: @escaping @Sendable (String) -> Bool) throws {
         let parameters = NWParameters.tcp
         // Loopback only: nothing off this machine can reach the port.
         parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: .any)
@@ -38,7 +38,7 @@ public final class LoopbackReceiver: @unchecked Sendable {
     }
 
     /// Starts listening and returns the redirect URI to hand Google.
-    public func start() async throws -> String {
+    func start() async throws -> String {
         try await withCheckedThrowingContinuation { ready in
             // The handler fires again on later state changes; only the first verdict resumes.
             let answered = OSAllocatedUnfairLock(initialState: false)
@@ -74,7 +74,7 @@ public final class LoopbackReceiver: @unchecked Sendable {
     }
 
     /// The query of the first expected redirect to arrive.
-    public func redirectQuery(timeout: Duration) async throws -> String {
+    func redirectQuery(timeout: Duration) async throws -> String {
         try await withThrowingTaskGroup(of: String.self) { group in
             group.addTask { [redirects] in
                 for await query in redirects { return query }
@@ -90,7 +90,7 @@ public final class LoopbackReceiver: @unchecked Sendable {
         }
     }
 
-    public func stop() {
+    func stop() {
         listener.cancel()
         continuation.finish()
     }

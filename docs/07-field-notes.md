@@ -7,6 +7,31 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-16 (M40-T2, the account in the app — live on the deployed build): **a private file does
+  what the Keychain could not.**
+  ✅ **A build with a different `CDHash` read the saved sign-in with no dialog.** Connected on one
+  build, swapped `/Users/Shared/ScreenRec.app` for another signed with the same `screenrec-dev`
+  identity (`87ff7dd8…` → `9a05504c…`), and Settings read `Connected` five seconds after the swap
+  began. `Disconnect` from the second build left `~/Library/Application Support/ScreenRec/` empty.
+  The file is `-rw-------` in a `drwx------` folder.
+  ✅ **A "later build" can be made without touching source:** add any file under
+  `Contents/Resources` and re-sign. The resource seal is hashed into the code directory, so the
+  `CDHash` changes while the designated requirement does not — exactly what an update looks like to
+  the Keychain and to TCC.
+  🔴 **`plutil -extract … raw` reports a miss on *stdout*, with exit 1.** `$(plutil … || true)`
+  therefore captures *"Could not extract value, error: No value at that key path…"* as the value —
+  `bundle.sh`'s first cut stamped that sentence into the bundle as a client ID and called it
+  `stamped`. Judge `plutil` by its status, never by whether it printed.
+  ⚠️ **A SwiftUI `Form`'s section titles are not `AXStaticText`** in the Settings window's tree
+  (`MP4`, `GIF`, `YouTube` never appear among them). Find a row by its own label.
+  ⚠️ **`.foregroundStyle` on a row reaches a `Link` inside it** and dims it into prose. Colour the
+  `Text`, not the `HStack`.
+  ✅ **Settings › Sharing is 460 × 792 pt with the YouTube section** (522 before). docs/06's
+  "tallest measured 437 pt" predates both.
+  ⚠️ **"Why do I have to sign in every week?"** was Franco's first question on seeing the testing
+  line. Only `Publish app` on the console's Audience page lifts it, and a sign-in made while in
+  Testing keeps its 7 days — reconnect after publishing.
+
 - 2026-11-16 (M40-T1, the CLI spike's live legs — seven uploads to Franco's channel through his own
   Google project): **what the Keychain, URLSession and YouTube actually do.**
   🔴 **A login-Keychain item belongs to the *build* that made it when the signing identity has no

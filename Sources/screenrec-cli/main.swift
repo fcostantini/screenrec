@@ -50,8 +50,9 @@ func printUsage() {
                                        tracks are kept.
                                        Default <out> is the input's " trimmed" sibling; read-only.
       screenrec-cli youtube connect    Sign in to YouTube in the browser, with the upload-only
-                                       permission, and keep the sign-in in the Keychain (M40,
-                                       ADR-024). Needs ~/.config/screenrec/youtube-client.json.
+                                       permission, and keep the sign-in in a private file under
+                                       ~/Library/Application Support/ScreenRec (M40, ADR-024).
+                                       Needs ~/.config/screenrec/youtube-client.json.
       screenrec-cli youtube upload <file> [--title <t>] [--description <d>]
                                [--privacy private|unlisted|public] [--interrupt-at <0-1>]
                                        Upload a file to the connected channel and print its link.

@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import Observation
 import RecorderCore
+import UploadCore
 import os
 
 /// One Hashable tag for the Source picker's two kinds of row (docs/06 item 5, M7-T2).
@@ -169,6 +170,11 @@ public final class AppState {
     /// Whether a share export mixes the microphone in (M33-T2). A pure export pref, persisted.
     public var exportsIncludeMicrophone: Bool {
         didSet { if exportsIncludeMicrophone != oldValue { persist() } }
+    }
+
+    /// The visibility a new YouTube upload starts with (M40-T2). Persisted.
+    public var uploadVisibility: VideoMetadata.Privacy {
+        didSet { if uploadVisibility != oldValue { persist() } }
     }
 
     /// Whether the app looks for a newer release (M32-T3). Persisted, opt-out. Turning it off takes
@@ -459,6 +465,10 @@ public final class AppState {
     /// configuration, which only AppState holds.
     public let exports: ExportModel
 
+    /// The YouTube account (M40-T2). The app hands in `UploadModel.bundled()`; left out, the
+    /// account is unavailable and nothing is read from disk — what every test gets by default.
+    public let uploads: UploadModel
+
     /// The take that just finished — after any rename (M21-T3), so Stop & Copy MP4 shares the file
     /// under the name it was just given, and the menu's receipt row (M24-T3) names it correctly.
     /// Cleared when the next take starts. Only set for an ending that leaves an actionable file:
@@ -524,9 +534,11 @@ public final class AppState {
     /// live capture engines.
     public init(
         defaults: UserDefaults = .standard,
-        replayController: (any ReplayControlling)? = nil
+        replayController: (any ReplayControlling)? = nil,
+        uploads: UploadModel? = nil
     ) {
         self.defaults = defaults
+        self.uploads = uploads ?? UploadModel(credentials: nil, store: InMemoryTokenStore())
         let settings = SettingsStore.load(from: defaults)
         outputDirectory = settings.outputDirectory
         outputLocation = OutputLocation(directory: settings.outputDirectory)
@@ -557,6 +569,7 @@ public final class AppState {
         mp4Width = settings.mp4Width
         exportsIncludeMicrophone = settings.exportsIncludeMicrophone
         checksForUpdates = settings.checksForUpdates
+        uploadVisibility = settings.uploadVisibility
         stopAfterMinutes = settings.stopAfterMinutes
         hasSeenReplayBannerWarning = settings.seenReplayBannerWarning
         // The export cluster (M14-T1): it seeds its own persisted receipt from `defaults`.
@@ -635,6 +648,7 @@ public final class AppState {
                 stopAfterMinutes: stopAfterMinutes, mp4Width: mp4Width,
                 exportsIncludeMicrophone: exportsIncludeMicrophone,
                 checksForUpdates: checksForUpdates,
+                uploadVisibility: uploadVisibility,
                 seenReplayBannerWarning: hasSeenReplayBannerWarning),
             to: defaults)
     }

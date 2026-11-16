@@ -19,6 +19,13 @@ public struct GoogleClientCredentials: Equatable, Sendable {
             .appendingPathComponent(".config/screenrec/youtube-client.json")
     }
 
+    /// The credentials `Scripts/bundle.sh` stamped into this build, or nil for a build made
+    /// without them — which can then never sign in.
+    public static func bundled(in bundle: Bundle = .main) -> GoogleClientCredentials? {
+        bundle.url(forResource: "youtube-client", withExtension: "json")
+            .flatMap { try? GoogleClientCredentials(contentsOf: $0) }
+    }
+
     public init(contentsOf url: URL) throws {
         let data: Data
         do {

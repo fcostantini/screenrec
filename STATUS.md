@@ -6,39 +6,43 @@
 
 ## Now
 
+- **✅ M40-T2 DONE (2026-11-16) — Settings connects a YouTube account, and a build carries the
+  credentials to do it.** `UploadModel` + a **YouTube** section in Settings › Sharing; `bundle.sh`
+  stamps the client. **944 tests** (905 → 944); **12 + 9 breaks, all red**. Live on the deployed
+  build: connected, relaunched, **swapped to a build with another `CDHash` — still connected, no
+  dialog**, disconnected, folder empty. **Next: M40-T3** — its plan artifact first.
+  🔴 **Ruled by Franco: the sign-in is a private file, not a Keychain item** (ADR-024 amended). The
+  data-protection Keychain refuses a self-signed program outright (`-34018`).
+  🔴 **Two defects only running it showed:** `plutil -extract` prints its failure on *stdout*, so
+  `bundle.sh` first stamped an error sentence as the client ID; and a link dimmed into prose.
+  ⚠️ **`/code-review medium`: ten found, eight fixed, one to T5, one rejected** (no Keychain
+  migration — T1's item is gone).
+  ⚠️ **The app can hold a sign-in and still cannot upload** — that is T3. The installed app at
+  `/Users/Shared` is this development build, signed out.
+  ⚠️ **Franco's Google project is still in Testing**, so every sign-in ends after 7 days; the
+  Settings line now says why and links what to do (`Publish app`).
+
 - **✅ M40-T1 DONE (2026-11-16) — the CLI signs in to YouTube and uploads a file.** New target
-  `UploadCore` + `screenrec-cli youtube connect | upload | disconnect`. **905 tests** (846 → 905);
-  **10 breaks, 10 red**. Live on Franco's own Google project with the final build: a **59.8 MB** clip
-  cut at 40 % resumed from the **24.6 MB** YouTube held and landed private in **19.7 s**; an unlisted
-  one answered oEmbed `200` at once. **Next: M40-T2** — plan artifact published, awaiting Franco's
-  go and his storage ruling (`claude.ai/artifact/QwXjfEULvBmvGVBfavL2aw`).
-  🔴 **The spike's one "no" reshapes T2: the Keychain binds an item to the build that made it.**
-  `screenrec-dev` has no team ID, so another build gets macOS's password dialog on first read and
-  **cannot delete** the item (`errSecInvalidOwnerEdit`). TCC survives a rebuild; the Keychain does
-  not. T2 must settle where the sign-in lives before it stores anything — ADR-024 says "Keychain".
+  `UploadCore` + `screenrec-cli youtube connect | upload | disconnect`. Live on Franco's own Google
+  project: a **59.8 MB** clip cut at 40 % resumed from the **24.6 MB** YouTube held and landed in
+  **19.7 s**; an unlisted one answered oEmbed `200` at once.
+  🔴 **Its one "no" reshaped T2:** with a self-signed identity the Keychain binds an item to the
+  build that made it — another build gets the password dialog and cannot delete it.
   ✅ **Measured, in docs/07:** the secret is required even with PKCE; the response names the channel;
-  YouTube needs ~2 s after a break before it reports what it kept; `didSendBodyData` is an honest
-  bar; uplink here is 2.6–3.8 MB/s; Google's two pages word for word (the button is `Continue`).
-  ⚠️ **`/code-review medium` found ten; nine fixed, one written into T5** (a `401` mid-upload should
-  refresh and retry). The stray-request one mattered: anything on the Mac could end a sign-in.
-  ⚠️ **Not exercised live:** the access-token refresh — every leg ran inside the token's first hour.
-  ⚠️ **Seven test videos sit on Franco's channel** ("ScreenRec test …"; the app's scope can't delete).
+  YouTube needs ~2 s after a break before it reports what it kept; uplink here is 2.6–3.8 MB/s.
+  ⚠️ **Not exercised live:** the access-token refresh. **Seven test videos** sit on Franco's channel.
 
 - **📋 M40 FILED from Franco's rulings (2026-11-16) — a trimmed clip can go to YouTube; five tasks.**
   Scoping artifact `claude.ai/artifact/1xC4iSiiCSRsaatL3A9qRP`; **MINOR → 1.23.0 at G40**.
   🔴 **Buildable only since 2026-11-02**, when Google stopped forcing uploads from unaudited API
-  projects to private (docs/07).
-  ✅ **Ruled, all six as recommended:** upload from the app; credentials stamped into his builds from
-  an untracked file; its own Trim-window row, `Upload to YouTube…`; a sheet each time; Unlisted by
-  default; the link copied only if the clipboard is untouched since the upload began.
-  🔴 **ADR-024 reverses the brief's upload non-goal** for this one case and bounds it.
+  projects to private. **ADR-024 reverses the brief's upload non-goal** for this one case.
+  ✅ **Ruled, all six as recommended:** upload from the app; credentials stamped into his builds;
+  its own Trim-window row, `Upload to YouTube…`; a sheet each time; Unlisted by default; the link
+  copied only if the clipboard is untouched since the upload began.
   ⚠️ **Not ruled, only not objected to:** `Cancel Upload`, a notification click that opens the video,
   and sending no "made for kids" declaration. Each returns in its task's plan artifact.
-  ⚠️ **docs/06 is amended per task**, not at filing, as M38 and M39 did.
   🔴 **This Mac's `gcloud` has an unrelated account and project active** — never run it for M40
-  without an explicit `--project`. The Google Cloud project exists and was checked live.
-  ✅ **Incidental:** the Trim window opened at **1648 × 1026 pt** on the live 1.22.0 install — the
-  leg the entry below left undriven.
+  without an explicit `--project`.
 
 - **🔧 2026-11-11 — the live install was on v1.12.0; swapped to 1.22.0. No code change.** Franco
   reported the Trim window as small and unresizable. That was 1.12.0's fixed window:
@@ -90,9 +94,9 @@
   ⚠️ **One optional check left, not blocking:** Franco has seen the Trim window's new row in a
   screenshot rather than on his own screen.
 
-- **M37's and M38's per-task detail is in `docs/history/2026-09-sessions.md`** (rotated 2026-11-16, when
-  "Now" reached 338 lines). Their milestone summaries and **all** gate evidence stay here. Read the
-  history only to answer "why did we".
+- **M37's and M38's per-task detail, and the README demo GIF's entry, are in
+  `docs/history/2026-09-sessions.md`** (rotated 2026-11-16, when "Now" reached 338 lines). Their
+  milestone summaries and **all** gate evidence stay here. Read the history only to answer "why did we".
 
 - **✅ M37 COMPLETE and G37 PASSED (2026-08-18) — the windows behave like windows. 🚢 v1.20.0.**
   **821 tests** (807 → 821). Three tasks from Franco's own use of the app, all verified **headlessly**
@@ -114,24 +118,6 @@
   picker". `SourcesModel.refreshApps` has self-excluded since M7. Corrected in the plan artifact, the
   milestone and ADR-023; the code written for it was deleted.
   ⚠️ **Needs Franco:** whether to tag and release v1.20.0.
-
-- **📎 README demo GIF added (2026-08-07) — a `docs:` commit, no VERSION bump (ADR-013).**
-  17.6 s, 720×684, 20 fps, 1.6 MB at `docs/assets/demo.gif`, shot against the deployed v1.19.0: menu
-  opens → Instant Replay armed (cost row and all) → Start → the clock ticking in the bar → Stop & Save
-  → `✓ Saved` **and** the banner. Plan artifact:
-  `claude.ai/code/artifact/4724df6a-6eba-4626-8f26-10cde3bc5060`.
-  🔴 **Found a real defect in `Save as GIF`, not fixed:** it stamps a uniform `1/fps` delay on
-  every frame, but SCK only emits frames where the screen changed, so any recording of a mostly-still
-  screen comes out **time-compressed** — this clip would have played **2.2× fast** (112 frames × 0.08 s
-  = 8.96 s for a 19.70 s take). Worked around with an `ffmpeg -vf fps=20` constant-rate pass before the
-  export. **Filed in 07 with a fix direction** (per-frame delays from presentation timestamps).
-  ⚠️ **A stop while replay was armed DID raise its notification banner** — against docs/06's claim that
-  macOS suppresses banners *whenever* replay is armed, since an armed stream holds the display
-  captured. Both confirmations fired here, measured on macOS 15.6.1. **The claim appears in the M35-T2
-  status-item row and in M5-T5's reasoning; it should be re-checked before anything else leans on it.**
-  ⚠️ **Two planned beats were cut after measuring:** `Recordings ▸` is **503 pt wide, 23 rows** and
-  lists real filenames; `Source ▸` reaches to x=1650, far enough left to pull other apps' menu-bar
-  icons into frame. The clip stays in the root menu.
 
 - **✅ M36 COMPLETE and G36 PASSED (2026-08-06) — the surfaces state facts, not configurations.**
   Three tasks from the UI/UX audit: the fourth banner caption, the armed row's real holding, and a cap
@@ -260,10 +246,9 @@
 - [x] **M40 — the Google Cloud project** (Franco, 2026-11-16): created with no billing linked, the
       client JSON is at `~/.config/screenrec/youtube-client.json`, and a live check passed — sign-in,
       upload scope, an upload session opened and cancelled, sign-in revoked. Detail in docs/07.
-- [ ] **M40-T2 — where the sign-in is stored** (found by T1, 2026-11-16): the Keychain ties it to
-      one build, so every update would ask for the Mac password and `Disconnect` would half-fail.
-      Options and a recommendation come in T2's plan artifact; ADR-024 names the Keychain, so a
-      change amends it.
+- [x] **M40-T2 — where the sign-in is stored** (Franco, 2026-11-16): a private file; ADR-024 amended.
+- [ ] **M40 — confirm ScreenRec is gone from your Google account's access page** after T2's
+      Disconnect (`security.google.com/settings/security/permissions`).
 - [ ] **M40 — delete the seven test videos** in YouTube Studio ("ScreenRec test …"), and say whether
       Studio flags any about audience. Also still owed: the Keychain dialog's wording, whether a
       firewall dialog ever appeared, and whether the console lists the scope as sensitive or

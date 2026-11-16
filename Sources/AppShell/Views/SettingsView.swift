@@ -302,8 +302,83 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            youTube
         }
         .formStyle(.grouped)
+    }
+
+    /// The YouTube account (M40-T2, ADR-024): the one place to connect, see what is saved, and
+    /// disconnect. Every word comes from `UploadCopy`, so the states are asserted without a view.
+    private var youTube: some View {
+        let uploads = state.uploads
+        let account = uploads.account
+        let note = UploadCopy.note(
+            for: account, failure: uploads.lastFailure, canSignIn: uploads.canSignIn)
+        let noteLink = UploadCopy.noteLink(
+            for: account, failure: uploads.lastFailure, canSignIn: uploads.canSignIn)
+        return Section("YouTube") {
+            LabeledContent("Account") {
+                HStack(spacing: 8) {
+                    Text(UploadCopy.status(account))
+                        .foregroundStyle(account == .disconnected ? .secondary : .primary)
+                    switch account {
+                    case .unavailable:
+                        Button("Connect…") {}.disabled(true)
+                    case .disconnected:
+                        Button("Connect…") { uploads.connect() }
+                    case .connecting:
+                        Button("Cancel") { uploads.cancelConnect() }
+                    case .connected:
+                        Button("Disconnect") { Task { await uploads.disconnect() } }
+                    case .disconnecting:
+                        Button("Disconnect") {}.disabled(true)
+                    }
+                }
+            }
+            if let note {
+                // The colour goes on the text alone: on the row it would dim the link into prose.
+                // Orange is for what needs doing something about; a build's lack of credentials
+                // is a fact about the build.
+                HStack(spacing: 4) {
+                    Text(note)
+                        .foregroundStyle(
+                            uploads.lastFailure != nil || uploads.canSignIn
+                                ? Color.orange : Color.secondary)
+                    if let noteLink {
+                        Link(noteLink, destination: UploadCopy.credentialsHelpURL)
+                    }
+                }
+                .font(.caption)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Picker("Visibility for new uploads", selection: $state.uploadVisibility) {
+                ForEach(UploadCopy.visibilityChoices, id: \.self) {
+                    Text(UploadCopy.visibilityLabel($0)).tag($0)
+                }
+            }
+            .disabled(!uploads.canSignIn)
+            Text(UploadCopy.visibilityCaption(state.uploadVisibility))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("ScreenRec uploads a clip only when you ask it to, one at a time. "
+                    + "Disconnecting withdraws its access with Google and removes the saved sign-in.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) {
+                    Link("YouTube Terms of Service", destination: UploadCopy.termsURL)
+                    Link("Google Privacy Policy", destination: UploadCopy.googlePrivacyURL)
+                    Link("What ScreenRec sends", destination: UploadCopy.whatIsSentURL)
+                }
+            }
+            .font(.caption)
+        }
+        // The page can sit open for days; a sign-in past its announced end must not read as live.
+        .onAppear { uploads.expireEndedSignIn() }
     }
 
     /// The replay slider's range as `Double`s (M9-T8), kept off the view body so the type-checker

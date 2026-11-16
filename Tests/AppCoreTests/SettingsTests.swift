@@ -185,7 +185,7 @@ import RecorderCore
             "replayArmed", "replaySeconds", "replayHotkey", "showsMenuBarTimer", "showsMenuBarLevel",
             "gifFPS", "gifWidth", "gifMaxSeconds", "mp4Width", "stopAfterMinutes",
             "seenReplayBannerWarning", "countInEnabled", "namesTakeOnStop", "stopHotkeyCopies",
-            "exportsIncludeMicrophone", "checksForUpdates",
+            "exportsIncludeMicrophone", "checksForUpdates", "youtubeVisibility",
         ])
     }
 

@@ -22,17 +22,18 @@ screenrec-app/
 │   │   │                     #   Timecode (M22), MediaFile, SampleTiming, WriterDrain,
 │   │   │                     #   PCMSampleBuffer, AudioFormatIdentity, ApproximateBytes
 │   ├── UploadCore/            # Library. Google sign-in + the YouTube upload (M40, ADR-024).
-│   │   │                     #   Foundation/Network/CryptoKit/Security only — no UI imports, and
+│   │   │                     #   Foundation/Network/CryptoKit only — no UI imports, and
 │   │   │                     #   RecorderCore never depends on it. GoogleSignIn (+ PKCE,
 │   │   │                     #   GoogleToken, GoogleClientCredentials), LoopbackReceiver,
-│   │   │                     #   TokenStore (Keychain), YouTubeUploader (+ YouTubeError),
+│   │   │                     #   TokenStore (a private file), YouTubeUploader (+ YouTubeError),
 │   │   │                     #   HTTPTransport — the one seam to the network
 │   ├── screenrec-cli/         # Dev harness (ADR-011). main + Export/Trim/ReplayArm/ProbeStream
 │   │   │                     #   + YouTube (connect/upload/disconnect — depends on UploadCore too)
 │   ├── AppCore/               # Library. App state + view models. No AppKit/SwiftUI (M4-T1).
 │   │   │                     #   AppState (@Observable, MainActor; owns the sub-models below),
 │   │   │                     #   SourcesModel + SessionModel (M22), PermissionsModel (M9),
-│   │   │                     #   ExportModel (M14), ReplayController, RecordingRoom,
+│   │   │                     #   ExportModel (M14), UploadModel + UploadCopy (M40 — AppCore
+│   │   │                     #   depends on UploadCore), ReplayController, RecordingRoom,
 │   │   │                     #   Settings (+ Hotkey), OnboardingModel, RecordingNotification,
 │   │   │                     #   RecordingClock, MicrophoneLevel, StatusIcon, DisplayOption,
 │   │   │                     #   LoginItem, MenuHeader, CountInOutcome, RenameTarget,

@@ -21,20 +21,43 @@ public enum GoogleSignInError: Error, Equatable {
 /// and the token endpoint (developers.google.com/identity/protocols/oauth2/native-app).
 public enum GoogleSignIn {
     /// Adds videos; cannot edit or delete what is already on the channel (ADR-024).
-    public static let uploadScope = "https://www.googleapis.com/auth/youtube.upload"
+    static let uploadScope = "https://www.googleapis.com/auth/youtube.upload"
 
     // Literals: a constant that parses once parses always.
     static let authorizationEndpoint = URL(string: "https://accounts.google.com/o/oauth2/v2/auth")!
     static let tokenEndpoint = URL(string: "https://oauth2.googleapis.com/token")!
     static let revocationEndpoint = URL(string: "https://oauth2.googleapis.com/revoke")!
 
+    /// The whole sign-in, start to finish: listen on loopback, hand `open` the URL for the
+    /// browser, wait for the redirect that is ours, and redeem it. Cancelling the task ends the wait.
+    public static func signIn(
+        credentials: GoogleClientCredentials,
+        transport: any HTTPTransport = URLSessionTransport(),
+        timeout: Duration = .seconds(300),
+        open: @Sendable (URL) async throws -> Void
+    ) async throws -> GoogleToken {
+        let pkce = PKCE()
+        let state = makeState()
+        let receiver = try LoopbackReceiver { isRedirect($0, forState: state) }
+        defer { receiver.stop() }
+        let redirectURI = try await receiver.start()
+        try await open(
+            authorizationURL(
+                clientID: credentials.clientID, redirectURI: redirectURI, pkce: pkce, state: state))
+        let query = try await receiver.redirectQuery(timeout: timeout)
+        let code = try authorizationCode(fromRedirectQuery: query, expectedState: state)
+        return try await exchange(
+            code: code, pkce: pkce, redirectURI: redirectURI, credentials: credentials,
+            transport: transport)
+    }
+
     /// An unguessable value the redirect must echo; `isRedirect` is how anything else is ignored.
-    public static func makeState() -> String {
+    static func makeState() -> String {
         Data.random(count: 16).base64URLEncodedString()
     }
 
     /// No `access_type`: the installed-app flow returns a refresh token without it (07).
-    public static func authorizationURL(
+    static func authorizationURL(
         clientID: String, redirectURI: String, pkce: PKCE, state: String
     ) -> URL {
         authorizationEndpoint.appending(queryItems: [
@@ -50,7 +73,7 @@ public enum GoogleSignIn {
 
     /// Whether a query reaching the loopback port answers the sign-in that sent `state` — what a
     /// `LoopbackReceiver` is told to accept, so nothing else can finish this sign-in or end it.
-    public static func isRedirect(_ query: String, forState state: String) -> Bool {
+    static func isRedirect(_ query: String, forState state: String) -> Bool {
         value("state", in: query) == state
     }
 
@@ -60,7 +83,7 @@ public enum GoogleSignIn {
 
     /// The authorization code in a redirect's query. `state` is judged first: a redirect that isn't
     /// this sign-in's has nothing to say about it, error or not.
-    public static func authorizationCode(
+    static func authorizationCode(
         fromRedirectQuery query: String, expectedState: String
     ) throws -> String {
         func value(_ name: String) -> String? { Self.value(name, in: query) }
@@ -77,7 +100,7 @@ public enum GoogleSignIn {
         return code
     }
 
-    public static func exchange(
+    static func exchange(
         code: String, pkce: PKCE, redirectURI: String, credentials: GoogleClientCredentials,
         transport: any HTTPTransport, now: Date = Date()
     ) async throws -> GoogleToken {

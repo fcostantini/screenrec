@@ -499,7 +499,7 @@ the old line is simply false above three green ticks.
 collapses toolbar tabs into a `»` overflow menu, hiding three of the four pages behind a chevron.
 **General** (output folder, launch at login, the menu-bar toggles, the version footer) ·
 **Recording** (quality, frame rate, count-in, the two global shortcuts) · **Instant Replay** ·
-**Sharing** (MP4 + GIF). The window sizes to the current tab — tallest measured **437 pt**, against
+**Sharing** (MP4 + GIF + YouTube). The window sizes to the current tab — tallest measured **437 pt**, against
 **1137 pt** as one page (90% of a 1260 pt usable screen).
 
 - Output folder (choose → `opendir` preflight immediately, friendly error per 02 §2)
@@ -578,6 +578,45 @@ collapses toolbar tabs into a `»` overflow menu, hiding three of the four pages
   **Frames per second** (12/15/20/24) · **Width** (320/480/640/800 px; caps height too) · **Maximum
   length** (10/15/30/60 s). Defaults 15 / 480 / 30. The CLI (`export --to-gif`) has its own
   `--fps/--width/--seconds` flags and does not read these prefs.
+- **YouTube** (M40-T2, ADR-024) — a section below GIF: all three answer "what comes out when I
+  share this". It is the one place to connect, see what is saved, and disconnect. Every string is
+  `UploadCopy`'s, so each state is asserted without a view.
+  - **Account** — a status and one button, by state:
+    `Not connected` · **`Connect…`** → `Waiting for Google in your browser…` · **`Cancel`** →
+    `Connected` · **`Disconnect`** → `Disconnecting…` (button disabled) → `Not connected`; and, for
+    a build made without credentials, `Not available in this build` with `Connect…` disabled.
+    `Connect…` opens Google's sign-in in the default browser, waits five minutes for it, and brings
+    the app back to the front when it has an outcome. **`Cancel` explains nothing** — it was pressed
+    here — and a sign-in that arrives after it is revoked, not kept.
+  - **One line under the row, only when there is something to say:**
+    - why the last attempt failed (orange) — *"Sign-in was cancelled in the browser."*, *"Couldn't
+      open the browser."*, *"Couldn't reach Google, so you are still connected."* — cleared by the
+      next attempt;
+    - while connected to a Google project still in testing (orange): *"This sign-in ends on
+      23 November because the Google project behind this build is still in testing."* with a
+      **`What to do`** link to the README. Google announces that end, and a sign-in that stops
+      working unannounced is the worse surface. The date is re-checked each time the page appears:
+      once it has passed, the row reads `Not connected` with *"The last sign-in has ended. Connect
+      again."*;
+    - for a build with no credentials (secondary): *"This build has no YouTube credentials."* with a
+      **`How to add them`** link. If such a build finds a sign-in another build saved, the row
+      still reads **`Connected` · `Disconnect`** — *"…so it can't use this sign-in. Disconnect
+      removes it."* — because a live sign-in must stay visible and endable.
+  - **Visibility for new uploads** — `Unlisted` (default) / `Private` / `Public`, with a caption
+    that follows the pick: *"Anyone with the link can watch. It isn't shown on your channel."* The
+    upload sheet starts from this and can change it. Disabled in a build with no credentials.
+  - **A closing caption and three links** the YouTube API terms ask for: *"ScreenRec uploads a clip
+    only when you ask it to, one at a time. Disconnecting withdraws its access with Google and
+    removes the saved sign-in."* · `YouTube Terms of Service` · `Google Privacy Policy` ·
+    `What ScreenRec sends` (the README). ⚠️ It names no button: `Upload to YouTube…` arrives with
+    M40-T3, and until then a caption pointing at it would describe something that isn't there.
+  - **`Disconnect` revokes with Google first, then removes the saved copy.** If Google can't be
+    reached the sign-in is **kept** and the line says so — deleting it would leave a live grant
+    nothing on this Mac could end. A saved copy that can't be *read* is the other case: nothing was
+    sent, so the row goes to `Not connected` and says Google wasn't told.
+  - **No request at launch.** `Connected` means a sign-in is saved; one Google has since dropped is
+    found when it is next used (M40-T5). The exception is local: a sign-in past the end Google
+    announced for it is dropped at launch, with *"The last sign-in has ended. Connect again."*
 
 ⚠️ **AMENDED 2026-07-15 (Franco): the last two rows do not ship with M4-T4.**
 - **Instant replay settings move to M5, with the feature.** M4-T4 was going to store the keys
@@ -613,6 +652,7 @@ moved):
 | `seenReplayBannerWarning` | Bool; **absent ⇒ false** (not seen). Once true the first-arm banner-suppression alert never fires again (M12-T5) | M12-T5 |
 | `gifFPS` · `gifWidth` · `gifMaxSeconds` | Int; each snaps to its nearest picker choice on load, absent ⇒ 15 / 480 / 30. The `Save as GIF` caps (M10-T3 follow-up) | M10-T3 follow-up |
 | `stopAfterMinutes` | Int; snaps to its nearest picker choice on load, absent ⇒ 0 (Off). Bounds a take (M18-T4) | M18-T4 |
+| `youtubeVisibility` | String `unlisted`\|`private`\|`public`; absent or anything else ⇒ `unlisted`. What a new YouTube upload starts as (M40-T2) | M40-T2 |
 | `mp4Width` | Int; snaps to its nearest picker choice on load, absent ⇒ 1920. The `Export as MP4` width cap; 4096 means "largest the source allows inside Level 5.2" (M18-T2) | M18-T2 |
 | `lastExportPath` · `lastExportDate` | String path + Date (M12-T2/T3); **absent ⇒ no receipt**. The last export, so its menu receipt survives relaunch — dropped on load if the file is gone (moved/trashed) **or has no date** (a pre-T3 entry), and expired at menu open once the date is **older than one hour** (M12-T3). Not part of `Settings` — a transient pointer, not user config; its own load/save | M12-T2/T3 |
 

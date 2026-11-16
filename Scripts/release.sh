@@ -77,6 +77,9 @@ step "encode: GifExporter"  env SCREENREC_HW_ENCODE_TESTS=1 swift test --filter 
 step "encode: VideoFrameReader" env SCREENREC_HW_ENCODE_TESTS=1 swift test --filter VideoFrameReaderTests
 step "swift build -c release"  swift build -c release
 step "bundle + sign"        ./Scripts/bundle.sh
+# A release carries the YouTube credentials (ADR-024). bundle.sh builds happily without them, so a
+# release cut on a machine that lacks the file would ship with upload unavailable and say nothing.
+step "YouTube credentials stamped" test -f dist/ScreenRec.app/Contents/Resources/youtube-client.json
 
 # --- the release notes: how to get past Gatekeeper, then what changed ---
 # The install note is not decoration: this build is signed by us and deliberately NOT notarized

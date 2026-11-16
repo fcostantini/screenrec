@@ -10,8 +10,8 @@ let package = Package(
             name: "RecorderCore",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        // Google sign-in and the YouTube upload (M40, ADR-024). Foundation, Network, CryptoKit and
-        // Security only. RecorderCore must never depend on it: the recorder cannot reach the network.
+        // Google sign-in and the YouTube upload (M40, ADR-024). Foundation, Network and CryptoKit
+        // only. RecorderCore must never depend on it: the recorder cannot reach the network.
         .target(
             name: "UploadCore",
             swiftSettings: [.swiftLanguageMode(.v6)]
@@ -27,7 +27,7 @@ let package = Package(
         // host (there is no Xcode here to run one). Views stay in ScreenRecApp.
         .target(
             name: "AppCore",
-            dependencies: ["RecorderCore"],
+            dependencies: ["RecorderCore", "UploadCore"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // The app's AppKit shell and SwiftUI windows. A library, not part of the executable, for
@@ -64,7 +64,7 @@ let package = Package(
         // that leak closes.
         .testTarget(
             name: "AppCoreTests",
-            dependencies: ["AppCore", "RecorderCore"],
+            dependencies: ["AppCore", "RecorderCore", "UploadCore"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // No network: every Google answer is scripted through `HTTPTransport`.

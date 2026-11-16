@@ -3,11 +3,11 @@ import Foundation
 
 /// A PKCE verifier and its S256 challenge (RFC 7636): what proves that the process redeeming an
 /// authorization code is the one that asked for it.
-public struct PKCE: Equatable, Sendable {
-    public let verifier: String
+struct PKCE: Equatable, Sendable {
+    let verifier: String
 
     /// 32 random bytes, the size RFC 7636 §4.1 recommends.
-    public init() {
+    init() {
         verifier = Data.random(count: 32).base64URLEncodedString()
     }
 
@@ -15,7 +15,7 @@ public struct PKCE: Equatable, Sendable {
         self.verifier = verifier
     }
 
-    public var challenge: String {
+    var challenge: String {
         Data(SHA256.hash(data: Data(verifier.utf8))).base64URLEncodedString()
     }
 }

@@ -305,8 +305,8 @@ uploads what the user points at, when they press the button, and nothing otherwi
 - **Sends only that exported file** and the title, description and visibility entered for it.
   Nothing about the machine, other recordings, or how the app is used. No telemetry rides along.
 - **Only to Google's sign-in and YouTube endpoints.** Another destination is another ADR.
-- **Stores one thing: the sign-in token, in the Keychain.** Disconnect revokes it with Google and
-  deletes it.
+- **Stores one thing: the sign-in token, in a file only its owner can read** (amended below — this
+  said "in the Keychain"). Disconnect revokes it with Google and deletes it.
 - **Silent until connected.** A build nobody has connected makes no YouTube request at all, and a
   build with no credentials cannot.
 - **The narrowest scope that uploads** (`youtube.upload`): the app can add videos and cannot edit or
@@ -314,7 +314,7 @@ uploads what the user points at, when they press the button, and nothing otherwi
 - **Recording, replay and export never depend on it.** The export is written before the upload
   starts, so a failed upload leaves the file exactly where an export always leaves it (ADR-007).
 - **`RecorderCore` stays free of network code.** The upload lives in its own target.
-- **No external dependency** (ADR-010): `URLSession`, `Network`, `CryptoKit`, `Security`. No Google SDK.
+- **No external dependency** (ADR-010): `URLSession`, `Network`, `CryptoKit`. No Google SDK.
 
 **The credentials (Franco's ruling).** The OAuth client ID and secret come from a Google Cloud
 project Franco owns and are **never committed**: `Scripts/bundle.sh` stamps them into the bundle from
@@ -336,6 +336,18 @@ a privacy note in the README, a link to YouTube's Terms of Service, and a discon
 
 **A reversal is a new ADR**, and so is any widening: another destination, an automatic upload, a
 broader scope, or anything sent that the user did not type or point at.
+
+⚠️ **Amended 2026-11-16 (M40-T2, Franco): the sign-in is a private file, not a Keychain item** —
+`~/Library/Application Support/ScreenRec/youtube-sign-in.json`, mode 600 in a 700 folder. M40-T1
+measured why the Keychain cannot hold it: `screenrec-dev` has no team ID, so an item there belongs
+to the **build** that made it. An updated app is asked for the login password before it may read
+the sign-in, and cannot delete it even then (`errSecInvalidOwnerEdit`) — so `Disconnect` would revoke
+with Google and leave the copy behind. The data-protection Keychain has no such binding and refuses
+a self-signed program outright (`-34018`), which is ADR-014's wall again.
+**The cost, stated:** any program running as the user can read the file, where the Keychain would
+have put a prompt in front of it. What it yields is bounded by the scope — add videos, nothing else
+— and by the user's own Google account, which can end it at any time. Revisit if the app ever signs
+with a team identity; the Keychain is the better home the day it can be one.
 
 ## ADR-021 ✅ The repository is public; distribution and signing are unchanged (Franco, 2026-08-05)
 ADR-014 said screenrec is **"never public"**, and M32 ran straight into the consequence: the update

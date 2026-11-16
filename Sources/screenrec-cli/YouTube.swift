@@ -1,10 +1,8 @@
 import Foundation
 import UploadCore
 
-/// The CLI's own Keychain item: the app is a different signed program and keeps its own.
-private let tokenStore = KeychainTokenStore(service: "dev.fcostantini.screenrec.youtube-cli")
-
-private let signInTimeout = Duration.seconds(300)
+/// The CLI's own sign-in, apart from the app's: a test harness must never disconnect the app.
+private let tokenStore = FileTokenStore(url: FileTokenStore.standardURL(named: "youtube-sign-in-cli"))
 
 private func megabytes(_ bytes: Int64) -> String {
     String(format: "%.1f MB", Double(bytes) / 1_000_000)
@@ -54,9 +52,6 @@ private func youTubeErrorMessage(_ error: Error) -> String {
         return "That isn't a readable, non-empty file."
     case YouTubeError.rejected(let status, let reason, let message):
         return "YouTube refused the upload (\(reason ?? String(status))): \(message ?? "no reason given")"
-    case KeychainError.status(let status):
-        let text = SecCopyErrorMessageString(status, nil) as String? ?? "status \(status)"
-        return "The Keychain refused: \(text)"
     default:
         return "Couldn't finish: \(error.localizedDescription)"
     }
@@ -86,25 +81,14 @@ private func connect(_ args: [String]) async throws {
     guard try tokenStore.load() == nil else {
         die("Already connected. Run `screenrec-cli youtube disconnect` first.", code: 70)
     }
-    let pkce = PKCE()
-    let state = GoogleSignIn.makeState()
-    let receiver = try LoopbackReceiver { GoogleSignIn.isRedirect($0, forState: state) }
-    defer { receiver.stop() }
-    let redirectURI = try await receiver.start()
-
-    print("Opening Google's sign-in in your browser…")
-    try openInBrowser(
-        GoogleSignIn.authorizationURL(
-            clientID: credentials.clientID, redirectURI: redirectURI, pkce: pkce, state: state))
-    print("Waiting for you to finish there. Ctrl-C cancels.")
-    let query = try await receiver.redirectQuery(timeout: signInTimeout)
-    let code = try GoogleSignIn.authorizationCode(fromRedirectQuery: query, expectedState: state)
-    let token = try await GoogleSignIn.exchange(
-        code: code, pkce: pkce, redirectURI: redirectURI, credentials: credentials,
-        transport: URLSessionTransport())
+    let token = try await GoogleSignIn.signIn(credentials: credentials) { url in
+        print("Opening Google's sign-in in your browser…")
+        try openInBrowser(url)
+        print("Waiting for you to finish there. Ctrl-C cancels.")
+    }
     try tokenStore.save(token)
 
-    print("Connected. The sign-in is saved in your Keychain.")
+    print("Connected. The sign-in is saved in ~/Library/Application Support/ScreenRec.")
     if let expiry = token.refreshTokenExpiry {
         let days = Int((expiry.timeIntervalSinceNow / 86_400).rounded())
         print("This Google project is in Testing, so the sign-in expires in \(days) days.")
@@ -269,11 +253,11 @@ private func disconnect(_ args: [String]) async throws {
     do {
         try tokenStore.delete()
     } catch {
-        // The half that matters has happened; saying only "the Keychain refused" would hide it.
+        // The half that matters has happened; reporting only the failed delete would hide it.
         die(
             "Google has revoked the sign-in, but the saved copy couldn't be removed. "
                 + youTubeErrorMessage(error),
             code: 70)
     }
-    print("Disconnected. Google has revoked the sign-in and the Keychain item is gone.")
+    print("Disconnected. Google has revoked the sign-in and the saved copy is gone.")
 }

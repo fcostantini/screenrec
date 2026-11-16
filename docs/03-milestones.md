@@ -3929,29 +3929,55 @@ uploaded. Detail in docs/07.
       Studio flags an upload with no audience answer, (f) sensitive or restricted, the Keychain
       dialog's wording, and whether a firewall dialog ever appeared.
 
-- [ ] M40-T2 **The account lives in the app** (AppCore + AppShell + `Scripts/bundle.sh`).
-      Plan artifact: `claude.ai/artifact/QwXjfEULvBmvGVBfavL2aw` — ⚠️ awaiting Franco's go, and his ruling
-      on storage: T1 showed the Keychain can't hold the sign-in for a self-signed app, and the
-      data-protection Keychain refuses one outright (`-34018`, measured 2026-11-16). An
-      `UploadModel` beside `ExportModel` — the same `@MainActor @Observable` sub-model pattern, owned
-      by `AppState` — holding the account's state: unavailable (no credentials in this build), not
-      connected, connecting, connected. Settings › **Sharing** gains a **YouTube** section under MP4
-      and GIF: the account row with `Connect…` / `Disconnect`, `Visibility for new uploads`
-      (Unlisted), and a caption carrying the three links the API terms ask for. `Disconnect` revokes
-      the token with Google and deletes the Keychain item. `bundle.sh` stamps the credentials into
-      the bundle from `~/.config/screenrec/youtube-client.json`, and says in its output whether it
-      did; without the file the build succeeds and the section reads as unavailable.
+- [x] M40-T2 **The account lives in the app** (AppCore + AppShell + `Scripts/bundle.sh`).
+      Plan artifact: `claude.ai/artifact/QwXjfEULvBmvGVBfavL2aw` — approved by Franco 2026-11-16,
+      with his ruling on storage: **a private file, not the Keychain** (ADR-024 amended).
+      An `UploadModel` beside `ExportModel` — the same `@MainActor @Observable` sub-model pattern,
+      owned by `AppState` — holding the account's state: unavailable (no credentials in this
+      build), not connected, connecting, connected, disconnecting. Settings › **Sharing** gains a
+      **YouTube** section under MP4 and GIF: the account row with `Connect…` / `Disconnect`,
+      `Visibility for new uploads` (Unlisted), and a caption carrying the three links the API terms
+      ask for. `Disconnect` revokes the token with Google and deletes the saved sign-in.
+      `bundle.sh` stamps the credentials into the bundle from
+      `~/.config/screenrec/youtube-client.json`, and says in its output whether it did; without the
+      file the build succeeds and the section reads as unavailable.
       **Seams:** the browser is an injected closure, as `copyToPasteboard` is — AppCore may not
-      import AppKit. The visibility default is a `Settings` value with `nearest`-style validation.
+      import AppKit. The sign-in and the revocation are injected too, `ExportModel`'s
+      `exportFunction` pattern. Every string is `UploadCopy`'s.
       **Also:** a README section, *What ScreenRec sends*, and how to build with your own credentials
       file. **docs/06 amendment:** the Settings section.
-      ⚠️ **The app's Keychain item is not the CLI's** — a different code identity — so T1's finding
-      has to be re-measured on the signed bundle, across a rebuild.
       **Verify:** unit tests — every state transition against a fake sign-in, the settings
       round-trip, no credentials ⇒ unavailable. On the deployed build, driven by AX: the section
       renders on the Sharing page; **(human)** `Connect…` and one consent click → the row reads
-      `Connected`; relaunch and rebuild → still connected, no Keychain prompt; `Disconnect` → `Not
+      `Connected`; relaunch and rebuild → still connected, no dialog; `Disconnect` → `Not
       connected`, and **(human)** ScreenRec is gone from the Google account's third-party access page.
+      ✅ **Done 2026-11-16. 944 tests** (905 → 944); two sweeps, **12 + 9 breaks, all red**.
+      On the deployed build, read through AX: a build with no credentials file →
+      `Not available in this build`, `Connect…` disabled; the stamped build → `Not connected` →
+      `Connect…` → `Waiting for Google in your browser…` → Franco's two clicks → **`Connected`**
+      with the testing line; the sign-in `-rw-------` in a `drwx------` folder; relaunch →
+      `Connected`; **a build with another `CDHash` (`87ff7dd8…` → `9a05504c…`) → `Connected` five
+      seconds after the swap, no dialog** — the leg the Keychain failed in T1; `Disconnect` →
+      `Not connected`, the folder empty. On the final build after the review: `Connect…` then
+      `Cancel` → `Not connected` with no line; a full connect and disconnect again.
+      ✅ **`bundle.sh`, four cases:** stamped; none (`upload will be unavailable`); a file that isn't
+      Google's → `✗`, exit 1; a secret that needs escaping → `✗`, exit 1 (read back like the version).
+      🔴 **Two defects only running it showed.** `plutil -extract` prints its failure on *stdout*, so
+      the first stamp wrote an error sentence into the bundle as a client ID and called it
+      `stamped`; and `How to add them` rendered as grey prose, dimmed by the row's colour.
+      ⚠️ **`/code-review medium` found ten; eight fixed** — a Cancel that lost the race with Google
+      kept the sign-in, a browser that never opened was waited on for five minutes, a build without
+      credentials hid a live sign-in it could have ended, the end date was only checked at launch.
+      **One went to T5** (a revoked sign-in whose copy can't be deleted reads `Connected` at the next
+      launch). **One rejected:** no migration from T1's Keychain item — T1 lasted one commit, its
+      sign-ins were revoked, and the item is confirmed gone.
+      ⚠️ **Differs from the plan artifact:** a sixth state, `Disconnecting…`; the testing line now
+      says *why* and links **`What to do`** — Franco's first question on seeing it was "why do I
+      have to sign in every week?"; a sign-in saved by another build stays visible in a build
+      without credentials; and the window grew 270 pt (to 792), not ~150.
+      ⚠️ **Not verified:** the grey-link fix was not re-photographed in the no-credentials state.
+      **Owed by Franco:** that ScreenRec is gone from his Google account's access page; and
+      `Publish app`, which is what ends the 7-day sign-ins.
 
 - [ ] M40-T3 **The Trim window: the row, the connect alert, the sheet** (AppShell + AppCore). A row
       under `Export Audio & Copy` in the same shape — a button with the fact beside it:
@@ -4004,6 +4030,9 @@ uploaded. Detail in docs/07.
       clock. A `401` on a status query or a resumed `PUT` — an upload that outlives the access
       token's hour — must **refresh and retry once** before it is called an expired sign-in; today
       it tells the user to reconnect while the refresh token is still good.
+      ⚠️ **Owed from T2's review:** a sign-in Google has revoked whose saved copy could not be
+      deleted reads as `Connected` again at the next launch — there is no request at launch to
+      learn otherwise. Finding a dead sign-in at its next use, and dropping it then, is this task.
       **Verify:** each row of the artifact's failure table reached by a unit test against stubbed
       responses (`URLProtocol`); the export is on disk and in Recent Exports after every one. Live:
       **(human)** remove ScreenRec's access in the Google account, press upload, read *needs
@@ -4016,7 +4045,8 @@ Publish app: in Testing every sign-in dies after 7 days):
 - The clipboard rule both ways; `Cancel Upload` if ruled in; `Disconnect` and reconnect.
 - A bundle built **without** the credentials file shows the feature as unavailable and makes no
   request; `git grep` over the tree and the history finds no client secret.
-- The README's *What ScreenRec sends* section exists; `CHANGELOG.md` has 1.23.0; `VERSION` bumped.
+- The README's *What ScreenRec sends* section exists and has lost its "arriving in 1.23" note;
+  `CHANGELOG.md` has 1.23.0; `VERSION` bumped.
 
 **Left out, on purpose:** uploading a whole `.mov` straight from Recordings (it needs an export
 first); resuming an upload after a relaunch; thumbnails, tags, playlists, scheduling; more than one

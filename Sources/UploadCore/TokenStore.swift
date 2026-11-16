@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 public protocol TokenStore: Sendable {
     func load() throws -> GoogleToken?
@@ -7,60 +6,74 @@ public protocol TokenStore: Sendable {
     func delete() throws
 }
 
-public enum KeychainError: Error, Equatable {
-    case status(OSStatus)
-}
+/// The sign-in as one file only its owner can read (ADR-024). Not the Keychain: with a signing
+/// identity that has no team ID, an item there belongs to the build that made it (07) — a rebuilt
+/// app is asked for the login password, and cannot delete what it finds.
+public struct FileTokenStore: TokenStore {
+    private let url: URL
 
-/// The sign-in as one generic-password item in the login Keychain. An item belongs to the program
-/// that made it, so each signed program keeps its own under its own `service`.
-public struct KeychainTokenStore: TokenStore {
-    private let service: String
-    private static let account = "google"
-
-    public init(service: String) {
-        self.service = service
+    public init(url: URL) {
+        self.url = url
     }
 
-    private var item: [CFString: Any] {
-        [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: Self.account,
-        ]
+    /// `~/Library/Application Support/ScreenRec/<name>.json`. Each program keeps its own `name`,
+    /// so the CLI can never disconnect the app.
+    public static func standardURL(named name: String) -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/ScreenRec/\(name).json")
     }
 
     public func load() throws -> GoogleToken? {
-        var query = item
-        query[kSecReturnData] = true
-        query[kSecMatchLimit] = kSecMatchLimitOne
-        var found: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &found)
-        guard status != errSecItemNotFound else { return nil }
-        guard status == errSecSuccess, let data = found as? Data else {
-            throw KeychainError.status(status)
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch CocoaError.fileReadNoSuchFile {
+            return nil
         }
-        // An item this build cannot decode is a sign-in it cannot use; the caller reconnects.
+        // A file this build cannot decode is a sign-in it cannot use; the caller reconnects.
         return try? JSONDecoder().decode(GoogleToken.self, from: data)
     }
 
+    /// Written beside the file with its final permissions and renamed over it: the token is never
+    /// on disk readable by anyone else, and a crash mid-write leaves the old sign-in whole.
     public func save(_ token: GoogleToken) throws {
-        let data = try JSONEncoder().encode(token)
-        let updated = SecItemUpdate(item as CFDictionary, [kSecValueData: data] as CFDictionary)
-        guard updated == errSecItemNotFound else {
-            guard updated == errSecSuccess else { throw KeychainError.status(updated) }
-            return
+        let files = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        try files.createDirectory(at: directory, withIntermediateDirectories: true)
+        try files.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+
+        let temporary = directory.appendingPathComponent(".\(UUID().uuidString).tmp")
+        guard files.createFile(
+            atPath: temporary.path, contents: try JSONEncoder().encode(token),
+            attributes: [.posixPermissions: 0o600])
+        else { throw CocoaError(.fileWriteUnknown) }
+        guard rename(temporary.path, url.path) == 0 else {
+            let failure = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            try? files.removeItem(at: temporary)
+            throw failure
         }
-        var attributes = item
-        attributes[kSecValueData] = data
-        attributes[kSecAttrLabel] = "ScreenRec YouTube sign-in"
-        let added = SecItemAdd(attributes as CFDictionary, nil)
-        guard added == errSecSuccess else { throw KeychainError.status(added) }
     }
 
     public func delete() throws {
-        let status = SecItemDelete(item as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.status(status)
+        do {
+            try FileManager.default.removeItem(at: url)
+        } catch CocoaError.fileNoSuchFile {
+            return
         }
     }
+}
+
+/// A sign-in that lives only as long as the process — what an app with no account storage holds,
+/// and what tests hand in.
+public final class InMemoryTokenStore: TokenStore, @unchecked Sendable {
+    private let lock = NSLock()
+    private var token: GoogleToken?
+
+    public init(_ token: GoogleToken? = nil) {
+        self.token = token
+    }
+
+    public func load() -> GoogleToken? { lock.withLock { token } }
+    public func save(_ token: GoogleToken) { lock.withLock { self.token = token } }
+    public func delete() { lock.withLock { token = nil } }
 }

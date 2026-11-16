@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import RecorderCore
+import UploadCore
 
 /// A global shortcut combo (save-replay, or start/stop recording — M9-T4). Raw Carbon values —
 /// `keyCode` is a virtual key code (kVK_*) and `modifiers` a Carbon modifier mask
@@ -254,6 +255,9 @@ public struct Settings: Sendable, Equatable {
     /// Whether the app looks for a newer release (M32-T3, ADR-020/021). Default on. Off stops the
     /// only network request this app makes — see the Settings caption for what it costs.
     public var checksForUpdates: Bool
+    /// The visibility a new YouTube upload starts with (M40-T2); the upload sheet can still change
+    /// it. Absent or unrecognised ⇒ unlisted.
+    public var uploadVisibility: VideoMetadata.Privacy
     /// Whether the one-time "banners are hidden while armed" alert has been shown (M12-T5). Absent
     /// ⇒ false (not yet seen); once true the alert never fires again — the dimmed menu row is the
     /// ongoing reminder.
@@ -334,6 +338,7 @@ public struct Settings: Sendable, Equatable {
             mp4Width: 1920,
             exportsIncludeMicrophone: true,
             checksForUpdates: true,
+            uploadVisibility: .unlisted,
             seenReplayBannerWarning: false)
     }
 }
@@ -404,6 +409,8 @@ public enum SettingsStore {
         /// Absent ⇒ on (M32-T3): the update check is opt-out, like the other opt-outs here.
         public static let checksForUpdates = "checksForUpdates"
         public static let stopAfterMinutes = "stopAfterMinutes"
+        /// `unlisted`|`private`|`public` (M40-T2); absent or anything else ⇒ unlisted.
+        public static let youtubeVisibility = "youtubeVisibility"
         /// The last export's path, for the receipt that survives relaunch (M12-T2). Absent ⇒ no
         /// receipt. Not part of `Settings` (it's a transient pointer, not user config) — its own
         /// load/save below. Dropped on load if the file is gone (moved/trashed).
@@ -557,6 +564,10 @@ public enum SettingsStore {
         if rawMP4Width > 0, let width = Settings.nearest(rawMP4Width, in: Settings.allowedMP4Widths) {
             settings.mp4Width = width
         }
+        if let stored = defaults.string(forKey: Key.youtubeVisibility),
+           let visibility = VideoMetadata.Privacy(rawValue: stored) {
+            settings.uploadVisibility = visibility
+        }
         // No `> 0` guard, unlike its siblings: 0 is a real pick here (Off) and also the default,
         // so absent, negative and garbage all land on it through `nearest`.
         if let minutes = Settings.nearest(
@@ -681,5 +692,6 @@ public enum SettingsStore {
         defaults.set(settings.exportsIncludeMicrophone, forKey: Key.exportsIncludeMicrophone)
         defaults.set(settings.checksForUpdates, forKey: Key.checksForUpdates)
         defaults.set(settings.stopAfterMinutes, forKey: Key.stopAfterMinutes)
+        defaults.set(settings.uploadVisibility.rawValue, forKey: Key.youtubeVisibility)
     }
 }

@@ -37,6 +37,29 @@ security find-certificate -c screenrec-dev -p > /tmp/screenrec-dev.pem
 security add-trusted-cert -r trustRoot -p codeSign /tmp/screenrec-dev.pem
 ```
 
+### YouTube credentials
+
+Signing in to YouTube needs a Google OAuth client, and the repository does not contain one.
+Release builds carry the author's. A build you make yourself has none, and its Settings will read
+**Not available in this build** — everything else works. To give your own build one:
+
+1. In the [Google Cloud console](https://console.cloud.google.com), create a project and enable
+   **YouTube Data API v3**. It needs no billing account.
+2. Under **Google Auth Platform**, set up the consent screen (audience **External**), add yourself
+   as a test user, and add the scope `https://www.googleapis.com/auth/youtube.upload`.
+3. Create a client of type **Desktop app** and download its JSON straight away — the secret is
+   shown only once.
+4. Save it as `~/.config/screenrec/youtube-client.json`.
+
+`Scripts/bundle.sh` stamps the client ID and secret from that file into the bundle and says so
+(`YouTube credentials: stamped`). The file lives outside the repository on purpose: don't commit it.
+
+**If Settings says the sign-in ends on a date:** the Google project is still in *Testing*, where
+Google ends every sign-in after seven days and only the test users you listed can connect. Open
+**Google Auth Platform › Audience** in the console and press **Publish app** — no verification is
+needed for personal use — then disconnect and connect again, because a sign-in made while testing
+keeps its seven days.
+
 ## First launch
 
 The app onboards itself — no manual permission-granting. On first run it opens a
@@ -89,6 +112,30 @@ Two ways in:
   **Open Anyway** (macOS 15 removed the old right-click → Open shortcut). After that it launches
   normally, and screen-recording and microphone grants **persist across every future build**, because
   the stable code-signing identity keys the grant to the app rather than to Apple's trust chain.
+
+## What ScreenRec sends
+
+ScreenRec has no server and no analytics. Your recordings stay on your Mac unless you send one
+somewhere yourself. It talks to the network in two cases:
+
+- **Checking for a newer version.** At launch and once a day it reads the public list of releases
+  from GitHub, which tells GitHub your IP address and nothing else. Turn it off in
+  **Settings › General › Check for new versions**.
+- **YouTube** *(arriving in 1.23; development builds already have the sign-in)*. Only if you connect
+  an account in **Settings › Sharing**, and then only when you ask for an upload, one clip at a time:
+  - **What goes to Google:** the clip you chose, and the title, description and visibility you gave it.
+  - **What ScreenRec may do with your account:** add videos. It asks Google for that one permission
+    and cannot see, edit or delete anything already on your channel.
+  - **What is kept on your Mac:** the sign-in, in
+    `~/Library/Application Support/ScreenRec/youtube-sign-in.json`, readable only by your user.
+  - **How to end it:** **Disconnect** in Settings withdraws the sign-in with Google and deletes that
+    file. You can also remove ScreenRec's access at any time from your Google account's
+    [third-party access page](https://security.google.com/settings/security/permissions).
+
+  ScreenRec uses YouTube API Services. Uploading through it is subject to the
+  [YouTube Terms of Service](https://www.youtube.com/t/terms), and Google's handling of what you
+  upload to the [Google Privacy Policy](https://policies.google.com/privacy). Questions about any of
+  this: open an issue on this repository.
 
 ## Repository map
 

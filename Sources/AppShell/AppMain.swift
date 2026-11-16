@@ -26,7 +26,7 @@ public enum ScreenRec {
 /// Owns the one `AppState` and everything AppKit that hangs off it.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let state = AppState()
+    private let state = AppState(uploads: .bundled())
     private let notifier = Notifier()
     private let hotkeys = HotkeyCenter()
     /// One overlay controller, reused per region pick (M11-T2).
@@ -80,6 +80,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Stop & Copy MP4 (M21-T2): the pasteboard is AppKit, so the app performs the copy the
         // export path asks for — the same write the per-file `Copy` row does.
         state.exports.copyToPasteboard = { ShareActions.copy($0) }
+        // The YouTube sign-in (M40-T2) happens in the browser, and its outcome is shown in
+        // Settings — so the app opens the one and comes back in front of it for the other.
+        state.uploads.openURL = { NSWorkspace.shared.open($0) }
+        state.uploads.bringToFront = { NSApplication.shared.activate(ignoringOtherApps: true) }
         // Naming a take as it stops (M21-T3): the same `NSAlert` the Rename… row uses.
         state.promptForTakeName = { ShareActions.nameTake($0, duration: $1) }
         // Global shortcuts (M9-T4): map each intent to a Carbon hotkey id + the action it fires.
