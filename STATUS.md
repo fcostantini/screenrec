@@ -22,8 +22,8 @@
   ran on 2026-11-16 and its findings are **not yet ruled on**; (3) fix, re-verify, tick, commit
   `M40-T3`.
   ⚠️ **Test uploads are a budget now:** one or two a day. Verify with oEmbed, not with more uploads.
-  ⚠️ **Asked of Franco, unanswered:** whether the sheet opened by itself after the sign-in, and
-  whether a notice appeared when the upload was refused.
+  ✅ **Franco, by eye:** the sheet opened by itself after his sign-in, and a notice explained the
+  limit. The review's ten findings and what is proposed for each are in docs/03 under M40-T3.
 
 - **✅ M40-T2 DONE (2026-11-16) — Settings connects a YouTube account, and a build carries the
   credentials to do it.** `UploadModel` + a **YouTube** section in Settings › Sharing; `bundle.sh`

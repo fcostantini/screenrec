@@ -3980,7 +3980,25 @@ uploaded. Detail in docs/07.
       `Publish app`, which is what ends the 7-day sign-ins.
 
 - [ ] M40-T3 **The Trim window: the row, the connect alert, the sheet** (AppShell + AppCore).
-      Plan artifact: `claude.ai/artifact/9ked9JDke2DStc8yGn8kL7` — ⚠️ awaiting Franco's go. A row
+      Plan artifact: `claude.ai/artifact/9ked9JDke2DStc8yGn8kL7` — approved by Franco 2026-11-16.
+      ⏸ **Built and uncommitted (2026-11-16); two things stand between it and its tick.**
+      **(1) A real upload landing.** Both attempts from the deployed build were refused
+      `uploadLimitExceeded` — T1's seven test uploads spent the channel's daily limit. Everything
+      else in the Verify passed live, and Franco confirmed by eye that **the sheet opened by itself**
+      after his sign-in and that **a notice explained the limit**.
+      **(2) `/code-review medium`'s ten findings, presented to Franco and not yet ruled on.**
+      Proposed — *fix in T3:* a disconnect during the token refresh rewrites the sign-in file
+      (re-check the account after the `await`); the channel's name is saved after a disconnect and
+      erased when YouTube returns none; the sheet opened after a sign-in doesn't re-check the range,
+      the account or the recording; the "open the sheet once connected" flag can stay armed when a
+      sign-in fails before the view sees it (drop the flag: await the sign-in instead); the default
+      failure reason blames YouTube for local failures; a doc comment landed on the wrong function
+      in `RecordingNotification.swift`; and the sheet's live rules move the caret to the end and
+      drop IME composition. *To T4:* quitting ignores an upload in flight, and "Wait for Export"
+      then drops the upload it was chained to. *To T5:* a `401` mid-transfer (already owed), the
+      fuller failure taxonomy shared with the CLI, and whether YouTube counts a title's 100 in
+      characters or in something smaller — unmeasured, and worth one upload when there is budget.
+      A row
       under `Export Audio & Copy` in the same shape — a button with the fact beside it:
       `Upload to YouTube…`. Its caption has three states: connected, not connected yet, and no
       credentials (button disabled). The first press with no account explains the browser step in an
