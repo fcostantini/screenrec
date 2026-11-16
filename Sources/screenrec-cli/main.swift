@@ -49,6 +49,16 @@ func printUsage() {
                                        re-encode. Unlike export --to-mp4 the codec and both audio
                                        tracks are kept.
                                        Default <out> is the input's " trimmed" sibling; read-only.
+      screenrec-cli youtube connect    Sign in to YouTube in the browser, with the upload-only
+                                       permission, and keep the sign-in in the Keychain (M40,
+                                       ADR-024). Needs ~/.config/screenrec/youtube-client.json.
+      screenrec-cli youtube upload <file> [--title <t>] [--description <d>]
+                               [--privacy private|unlisted|public] [--interrupt-at <0-1>]
+                                       Upload a file to the connected channel and print its link.
+                                       Private unless --privacy says otherwise; the title is the
+                                       file's name by default. --interrupt-at cuts the transfer at
+                                       that fraction and resumes it from wherever YouTube got to.
+      screenrec-cli youtube disconnect Revoke the sign-in with Google and delete it.
       screenrec-cli list-mics          List audio input devices
       screenrec-cli list-apps          List running apps capturable with record --app
       screenrec-cli list-windows       List on-screen windows capturable with record --window
@@ -816,6 +826,8 @@ case "export":
     await runExport(Array(arguments.dropFirst()))
 case "trim":
     await runTrim(Array(arguments.dropFirst()))
+case "youtube":
+    await runYouTube(Array(arguments.dropFirst()))
 case "-h", "--help":
     printUsage()
 default:

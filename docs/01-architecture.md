@@ -21,7 +21,14 @@ screenrec-app/
 │   │   │                     #   RecordingFileSentinel (M6), ResampledMicInput (M8), CoreInfo,
 │   │   │                     #   Timecode (M22), MediaFile, SampleTiming, WriterDrain,
 │   │   │                     #   PCMSampleBuffer, AudioFormatIdentity, ApproximateBytes
+│   ├── UploadCore/            # Library. Google sign-in + the YouTube upload (M40, ADR-024).
+│   │   │                     #   Foundation/Network/CryptoKit/Security only — no UI imports, and
+│   │   │                     #   RecorderCore never depends on it. GoogleSignIn (+ PKCE,
+│   │   │                     #   GoogleToken, GoogleClientCredentials), LoopbackReceiver,
+│   │   │                     #   TokenStore (Keychain), YouTubeUploader (+ YouTubeError),
+│   │   │                     #   HTTPTransport — the one seam to the network
 │   ├── screenrec-cli/         # Dev harness (ADR-011). main + Export/Trim/ReplayArm/ProbeStream
+│   │   │                     #   + YouTube (connect/upload/disconnect — depends on UploadCore too)
 │   ├── AppCore/               # Library. App state + view models. No AppKit/SwiftUI (M4-T1).
 │   │   │                     #   AppState (@Observable, MainActor; owns the sub-models below),
 │   │   │                     #   SourcesModel + SessionModel (M22), PermissionsModel (M9),
@@ -45,13 +52,16 @@ screenrec-app/
 ├── Scripts/                   # bundle.sh, devsign.sh, release.sh, smoke.sh (M13), hooks/pre-push
 ├── Tests/                     # RecorderCoreTests + AppCoreTests (pure-decision + integration)
 │                              #   + AppShellTests (the menu, built and asserted in-process — M29)
+│                              #   + UploadCoreTests (every Google answer scripted; no network)
 ├── tools/                     # probe, frames, menudriver, settingsdriver, hoverprobe, axdump,
 │                              #   busyscene (load stimulus), makeicon
 └── docs/                      # you are here
 ```
 
 **Rule for agents:** `RecorderCore` must never import AppKit/SwiftUI (CoreGraphics is
-fine), and `AppCore` never imports either. Everything testable lives there — **and since M29-T1 the
+fine), and `AppCore` never imports either. **`RecorderCore` must never depend on `UploadCore`**
+(ADR-024): the recorder cannot reach the network, and that stays checkable in `Package.swift`.
+Everything `UploadCore` says to Google goes through `HTTPTransport`, so tests script the answers. Everything testable lives there — **and since M29-T1 the
 AppKit shell is testable too**: `AppShell` is a library, so `AppShellTests` reaches its internals
 through `@testable`. `AppShell`'s only `public` symbol is `ScreenRec.run()`; keep it that way. The CLI stays the
 headless verification surface (ADR-011) — most gate evidence is easier to get through it than

@@ -2,19 +2,24 @@ import Foundation
 import RecorderCore
 
 /// Throttled one-line progress on stdout (unbuffered — 02 §10), redrawn with a carriage return.
-private final class ProgressPrinter: @unchecked Sendable {
+final class ProgressPrinter: @unchecked Sendable {
+    private let verb: String
     private let lock = NSLock()
     private var lastReport = Date.distantPast
+
+    init(verb: String) {
+        self.verb = verb
+    }
 
     func report(_ fraction: Double) {
         lock.lock(); defer { lock.unlock() }
         let now = Date()
         guard now.timeIntervalSince(lastReport) >= 0.5 else { return }
         lastReport = now
-        print("\r  encoding \(Int((fraction * 100).rounded()))%   ", terminator: "")
+        print("\r  \(verb) \(Int((fraction * 100).rounded()))%   ", terminator: "")
     }
 
-    func finish() { print("\r  encoding 100%     ") }
+    func finish() { print("\r  \(verb) 100%     ") }
 }
 
 private func exportErrorMessage(_ error: Error) -> String {
@@ -167,7 +172,7 @@ private func runMP4(
     }
     let output = explicitOutput
         ?? Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: input, range: range))
-    let progress = ProgressPrinter()
+    let progress = ProgressPrinter(verb: "encoding")
     let configuration = ExportConfiguration(
         maxWidth: width ?? ExportConfiguration().maxWidth, includesMicrophone: includesMicrophone)
     if let range {

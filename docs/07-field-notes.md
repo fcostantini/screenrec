@@ -7,6 +7,53 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-16 (M40-T1, the CLI spike's live legs — seven uploads to Franco's channel through his own
+  Google project): **what the Keychain, URLSession and YouTube actually do.**
+  🔴 **A login-Keychain item belongs to the *build* that made it when the signing identity has no
+  team ID.** `screenrec-dev` is self-signed, so `codesign -dvvv` reads `TeamIdentifier=not set`; three
+  builds signed with it under one identifier differ only in `CDHash`, and that is what the Keychain
+  keys on. A build other than the creator's **raises macOS's login-password dialog on its first
+  read** (Franco saw it), and even after `Always Allow` it **cannot delete the item**:
+  `errSecInvalidOwnerEdit`, *"Invalid attempt to change the owner of this item."* TCC grants survive
+  a rebuild because TCC keys on the designated requirement; **the Keychain does not**.
+  ⚠️ For the app this means a password prompt after every update, and a `Disconnect` that revokes
+  with Google and then fails to remove the item. T2 must settle storage before it saves anything.
+  ✅ **After a transfer breaks, YouTube needs about two seconds to say what it kept.** Asked at once:
+  `308` with no `Range` — "nothing held". Asked at +2 s, +6 s and +14 s: `bytes=0-24117247`, the
+  same each time, and exactly 23 MiB — it keeps whole mebibytes. A stale zero is survivable (the
+  whole file re-sent into the same session produced one video) but it re-sends everything; hence
+  `YouTubeUploader.settleDelay`.
+  ✅ **A resume can stream from the file.** `InputStream(url:)` with `.fileCurrentOffsetKey` set
+  before it opens, as `httpBodyStream`, with an explicit `Content-Length` and
+  `Content-Range: bytes N-(total-1)/total` → `200` and one video. 59.8 MB cut at 40 % resumed from
+  24.4 MB, 22.3 s end to end.
+  ✅ **`URLSession` returns Google's `308` as a response** — it carries no `Location`, so there is
+  nothing to follow.
+  ✅ **`didSendBodyData` makes an honest bar.** On 59.8 MB it climbed steadily from 2 % to 91 % over
+  10.7 s, then waited ~1.6 s at the top for YouTube's answer. Nothing jumped.
+  ✅ **Uplink from here: 2.6–3.8 MB/s** on 59.8 MB (15.7–23 s). A 1.8 MB clip takes ~4 s, which is
+  round trips rather than bytes.
+  ✅ **The insert response names the channel** (`snippet.channelTitle`) under the upload-only scope,
+  and reports `status.uploadStatus = uploaded` — YouTube is still processing when the call returns.
+  ✅ **An unlisted upload can be verified without a browser:**
+  `youtube.com/oembed?url=https://youtu.be/<id>&format=json` answers `200` with the title within a
+  second of the upload returning. A private video answers `403`, a made-up id `404`.
+  ✅ **Google's two pages for a test user** (Franco's screenshots). First: *"Google hasn't verified
+  this app — You've been given access to an app that's currently being tested. You should only
+  continue if you know the developer that invited you."* (`Continue` / `Back to safety`). Then:
+  *"ScreenRec wants access to your Google Account … will be able to: Manage your YouTube videos"*
+  (`Cancel` / `Continue`). **The button is `Continue`, never "Allow".** The second page says it has
+  no links to a privacy policy or terms; the console's Branding page takes both.
+  ⚠️ The warning a *published* unverified app shows is still unseen — it will differ.
+  ✅ **Tooling: `codesign -f -s screenrec-dev -i <identifier> <binary>`** gives an SPM executable a
+  stable identifier; left alone, its ad-hoc one embeds a per-build hash.
+  ⚠️ **Not exercised live:** the access-token refresh — every leg ran inside the token's first hour.
+  It is unit-tested only.
+  ✅ **A stray request to the loopback port must be ignored, not obeyed.** The first cut handed the
+  first `/?…` to arrive to the sign-in, so anything on the machine could end it — and was shown the
+  "finished" page. `LoopbackReceiver` now takes the test for "is this ours" and answers the rest 404.
+  ✅ **Mutation sweep, ten guards broken one at a time: 10 red**, each by the test meant for it.
+
 - 2026-11-16 (M40 setup check, a throwaway script before T1): **what Google's endpoints actually
   answer for a Desktop client in Testing** — one real sign-in, one upload session with no bytes sent.
   🔴 **The client secret is required even with PKCE.** A token exchange without it answers

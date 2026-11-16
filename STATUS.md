@@ -6,32 +6,38 @@
 
 ## Now
 
-- **📋 M40 FILED from Franco's rulings (2026-11-16) — a trimmed clip can go to YouTube. Five tasks,
-  nothing implemented. Next: M40-T1 — its plan artifact is published and waits for Franco's go**
-  (`claude.ai/artifact/6Zhtq6Gmoi9WHdxqSSJjCw`).
-  ✅ **The Google Cloud project exists and was checked live (2026-11-16).** 🔴 The check also settled
-  one of T1's unknowns: **a Desktop client's secret is required even with PKCE**, so it ships.
-  Scoping artifact: `claude.ai/artifact/1xC4iSiiCSRsaatL3A9qRP`. `docs:` commits — no code changed, no
-  VERSION bump yet (**MINOR → 1.23.0 at G40**, ADR-013).
-  🔴 **The finding the plan turns on:** until **2026-11-02** YouTube forced every upload from an
-  unaudited API project to private; Google reversed it two weeks before this was scoped. Facts, dates
-  and sources in docs/07 — most third-party guides still describe the old rule.
-  ✅ **Ruled by Franco, all six as recommended:** upload from the app (not a browser hand-off);
-  credentials stamped into his builds from an untracked file; its own Trim-window row,
-  `Upload to YouTube…`; a sheet each time (title, description, visibility); Unlisted by default; the
-  link copied only if the clipboard is untouched since the upload began.
-  🔴 **ADR-024 reverses a non-goal** — the brief's *"uploading it somewhere is not [in]"* — for this
-  one case, and bounds it: a named button, one clip, YouTube only, the token in the Keychain,
-  `RecorderCore` free of network code, no dependency. docs/00 is amended to point at it.
-  ⚠️ **Four proposals were not objected to but not ruled** — `Cancel Upload`, a notification click
-  that opens the video, the new `UploadCore` target, and sending no "made for kids" declaration. Each
-  comes back in its task's plan artifact; don't treat them as settled.
-  ⚠️ **docs/06 is not amended at filing.** Each task carries its own amendment, as M38 and M39 did,
-  so the spec never describes a surface that doesn't exist.
-  🔴 **This Mac's `gcloud` has an unrelated account and project active.** Nothing in M40 should run
-  `gcloud` without an explicit `--project`; the setup is console-only for that reason.
-  ✅ **Incidental:** the Trim window opened at **1648 × 1026 pt** on the live 1.22.0 install, so it
-  has been dragged past its 500 × 653 floor since the entry below — the leg that one left undriven.
+- **✅ M40-T1 DONE (2026-11-16) — the CLI signs in to YouTube and uploads a file.** New target
+  `UploadCore` + `screenrec-cli youtube connect | upload | disconnect`. **905 tests** (846 → 905);
+  **10 breaks, 10 red**. Live on Franco's own Google project with the final build: a **59.8 MB** clip
+  cut at 40 % resumed from the **24.6 MB** YouTube held and landed private in **19.7 s**; an unlisted
+  one answered oEmbed `200` at once. **Next: M40-T2** — its plan artifact first.
+  🔴 **The spike's one "no" reshapes T2: the Keychain binds an item to the build that made it.**
+  `screenrec-dev` has no team ID, so another build gets macOS's password dialog on first read and
+  **cannot delete** the item (`errSecInvalidOwnerEdit`). TCC survives a rebuild; the Keychain does
+  not. T2 must settle where the sign-in lives before it stores anything — ADR-024 says "Keychain".
+  ✅ **Measured, in docs/07:** the secret is required even with PKCE; the response names the channel;
+  YouTube needs ~2 s after a break before it reports what it kept; `didSendBodyData` is an honest
+  bar; uplink here is 2.6–3.8 MB/s; Google's two pages word for word (the button is `Continue`).
+  ⚠️ **`/code-review medium` found ten; nine fixed, one written into T5** (a `401` mid-upload should
+  refresh and retry). The stray-request one mattered: anything on the Mac could end a sign-in.
+  ⚠️ **Not exercised live:** the access-token refresh — every leg ran inside the token's first hour.
+  ⚠️ **Seven test videos sit on Franco's channel** ("ScreenRec test …"; the app's scope can't delete).
+
+- **📋 M40 FILED from Franco's rulings (2026-11-16) — a trimmed clip can go to YouTube; five tasks.**
+  Scoping artifact `claude.ai/artifact/1xC4iSiiCSRsaatL3A9qRP`; **MINOR → 1.23.0 at G40**.
+  🔴 **Buildable only since 2026-11-02**, when Google stopped forcing uploads from unaudited API
+  projects to private (docs/07).
+  ✅ **Ruled, all six as recommended:** upload from the app; credentials stamped into his builds from
+  an untracked file; its own Trim-window row, `Upload to YouTube…`; a sheet each time; Unlisted by
+  default; the link copied only if the clipboard is untouched since the upload began.
+  🔴 **ADR-024 reverses the brief's upload non-goal** for this one case and bounds it.
+  ⚠️ **Not ruled, only not objected to:** `Cancel Upload`, a notification click that opens the video,
+  and sending no "made for kids" declaration. Each returns in its task's plan artifact.
+  ⚠️ **docs/06 is amended per task**, not at filing, as M38 and M39 did.
+  🔴 **This Mac's `gcloud` has an unrelated account and project active** — never run it for M40
+  without an explicit `--project`. The Google Cloud project exists and was checked live.
+  ✅ **Incidental:** the Trim window opened at **1648 × 1026 pt** on the live 1.22.0 install — the
+  leg the entry below left undriven.
 
 - **🔧 2026-11-11 — the live install was on v1.12.0; swapped to 1.22.0. No code change.** Franco
   reported the Trim window as small and unresizable. That was 1.12.0's fixed window:
@@ -253,8 +259,15 @@
 - [x] **M40 — the Google Cloud project** (Franco, 2026-11-16): created with no billing linked, the
       client JSON is at `~/.config/screenrec/youtube-client.json`, and a live check passed — sign-in,
       upload scope, an upload session opened and cancelled, sign-in revoked. Detail in docs/07.
-- [ ] **M40 — one consent click during T1**, on the account whose channel should receive the test
-      upload (it lands as private).
+- [ ] **M40-T2 — where the sign-in is stored** (found by T1, 2026-11-16): the Keychain ties it to
+      one build, so every update would ask for the Mac password and `Disconnect` would half-fail.
+      Options and a recommendation come in T2's plan artifact; ADR-024 names the Keychain, so a
+      change amends it.
+- [ ] **M40 — delete the seven test videos** in YouTube Studio ("ScreenRec test …"), and say whether
+      Studio flags any about audience. Also still owed: the Keychain dialog's wording, whether a
+      firewall dialog ever appeared, and whether the console lists the scope as sensitive or
+      restricted.
+- [x] **M40 — the sign-in clicks for T1** (Franco, 2026-11-16, with screenshots of Google's pages).
 - [ ] **M40 — `Publish app` before G40** (Audience page): in Testing every sign-in expires in 7 days.
 - [x] **YouTube upload — the six rulings** (Franco, 2026-11-16, all as recommended; encoded as M40 and
       ADR-024).

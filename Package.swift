@@ -10,10 +10,16 @@ let package = Package(
             name: "RecorderCore",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        // Google sign-in and the YouTube upload (M40, ADR-024). Foundation, Network, CryptoKit and
+        // Security only. RecorderCore must never depend on it: the recorder cannot reach the network.
+        .target(
+            name: "UploadCore",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         // Dev harness and primary verification surface until M4 (ADR-011).
         .executableTarget(
             name: "screenrec-cli",
-            dependencies: ["RecorderCore"],
+            dependencies: ["RecorderCore", "UploadCore"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // The app's state and view models. Like RecorderCore it imports no AppKit/SwiftUI,
@@ -59,6 +65,12 @@ let package = Package(
         .testTarget(
             name: "AppCoreTests",
             dependencies: ["AppCore", "RecorderCore"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        // No network: every Google answer is scripted through `HTTPTransport`.
+        .testTarget(
+            name: "UploadCoreTests",
+            dependencies: ["UploadCore"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // Reaches `AppShell` through `@testable`, so the menu's types stay internal (M29-T1).

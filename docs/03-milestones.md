@@ -3870,9 +3870,9 @@ config, and choose deliberately which Google account owns the project.
 refresh token, YouTube opened an upload session for it, and the sign-in was revoked — nothing was
 uploaded. Detail in docs/07.
 
-- [ ] M40-T1 **Spike, CLI-first: sign in and upload one file** (new target `UploadCore` +
+- [x] M40-T1 **Spike, CLI-first: sign in and upload one file** (new target `UploadCore` +
       `screenrec-cli`, ADR-011). `screenrec-cli youtube connect | upload <file> | disconnect`.
-      Plan artifact: `claude.ai/artifact/6Zhtq6Gmoi9WHdxqSSJjCw` — ⚠️ awaiting Franco's go.
+      Plan artifact: `claude.ai/artifact/6Zhtq6Gmoi9WHdxqSSJjCw` — approved by Franco 2026-11-16.
       Sign-in is the installed-app flow Google documents for desktop: system browser, loopback
       redirect on `127.0.0.1` at an ephemeral port (`NWListener`), PKCE S256, `state` checked. The
       upload is the resumable protocol: initiate with the metadata, `PUT` the file, and after a
@@ -3901,6 +3901,33 @@ uploaded. Detail in docs/07.
       clip as **private** prints the video id and the status the API returned; a second run needs no
       browser (the token was stored); and an upload that cancels its own `PUT` part-way resumes from
       the server's `Range` and completes.
+      ✅ **Done 2026-11-16. 905 tests** (846 → 905), and a sweep of **10 breaks, 10 red**. Live on
+      Franco's own Google project, with the final build signed `screenrec-dev`: `connect` →
+      *"Connected … the sign-in expires in 7 days"*; a second `connect` → *"Already connected"*; a
+      **59.8 MB** clip cut at 40 % → *"YouTube holds 24.6 MB — resuming from there"* → uploaded
+      private in **19.7 s (3.0 MB/s)**; `disconnect` → the Keychain item gone; the next `upload` →
+      *"Not connected"*. Earlier legs: a 1.8 MB clip private in ~4 s; an **unlisted** one answered
+      YouTube's oEmbed `200` with its title at once, a private one `403`.
+      ✅ **The measurements, all in docs/07:** (b) the secret is required; (c) the response names
+      the channel; (e) Google's two pages, word for word — the button is `Continue`; (g) oEmbed
+      verifies an unlisted upload headlessly. Also: `didSendBodyData` makes an honest bar, a resume
+      streams from the file at an offset, and YouTube needs ~2 s after a break before it says what
+      it kept (`YouTubeUploader.settleDelay`).
+      🔴 **(a) is a no, and it reshapes T2:** with a self-signed identity a Keychain item belongs to
+      the *build* that made it. Another build gets macOS's password dialog on first read and cannot
+      delete the item even after `Always Allow`. **T2 must settle where the sign-in lives before it
+      stores anything.**
+      ⚠️ **`/code-review medium` found ten things; nine are fixed** — among them a stray request to
+      the loopback port ending the sign-in, a `5xx` mid-upload treated as a refusal, and a resume
+      from an offset at the file's end. The tenth (a `401` mid-upload should refresh and retry) is
+      written into T5.
+      ⚠️ **Differs from the plan artifact:** the browser page reads *"Sign-in finished"*, not
+      *"ScreenRec is connected"* — it is served before the code is redeemed; progress is `export`'s
+      redrawn line, not four printed ones; two more files than listed (`GoogleToken`,
+      `HTTPTransport`); and **seven** test uploads rather than three.
+      ⚠️ **Not exercised live:** the access-token refresh. **Still owed by Franco:** (d) whether
+      Studio flags an upload with no audience answer, (f) sensitive or restricted, the Keychain
+      dialog's wording, and whether a firewall dialog ever appeared.
 
 - [ ] M40-T2 **The account lives in the app** (AppCore + AppShell + `Scripts/bundle.sh`). An
       `UploadModel` beside `ExportModel` — the same `@MainActor @Observable` sub-model pattern, owned
@@ -3970,6 +3997,10 @@ uploaded. Detail in docs/07.
       that expired or was removed (*YouTube needs reconnecting*, account back to not connected);
       the day's quota (*resets at midnight Pacific*); an account with no channel; a rejected length;
       a cancel; a quit. Each is a distinct notice that names the fix, never an HTTP status.
+      ⚠️ **Owed from T1's review:** the sign-in is refreshed once, before the upload, on the local
+      clock. A `401` on a status query or a resumed `PUT` — an upload that outlives the access
+      token's hour — must **refresh and retry once** before it is called an expired sign-in; today
+      it tells the user to reconnect while the refresh token is still good.
       **Verify:** each row of the artifact's failure table reached by a unit test against stubbed
       responses (`URLProtocol`); the export is on disk and in Recent Exports after every one. Live:
       **(human)** remove ScreenRec's access in the Google account, press upload, read *needs
