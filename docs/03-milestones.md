@@ -3866,6 +3866,10 @@ config, and choose deliberately which Google account owns the project.
 7. Save it as `~/.config/screenrec/youtube-client.json`, mode 600. That path is the contract: the CLI
    reads it directly, and `Scripts/bundle.sh` stamps the bundle from it.
 
+✅ **Done and checked live (Franco, 2026-11-16):** one real sign-in returned the upload scope and a
+refresh token, YouTube opened an upload session for it, and the sign-in was revoked — nothing was
+uploaded. Detail in docs/07.
+
 - [ ] M40-T1 **Spike, CLI-first: sign in and upload one file** (new target `UploadCore` +
       `screenrec-cli`, ADR-011). `screenrec-cli youtube connect | upload <file> | disconnect`.
       Sign-in is the installed-app flow Google documents for desktop: system browser, loopback
@@ -3880,9 +3884,9 @@ config, and choose deliberately which Google account owns the project.
       ⚠️ **It is a spike: these are measured and written to docs/07 before T2 is planned** —
       (a) the Keychain under the `screenrec-dev` identity, across a rebuild (sign the CLI with
       `Scripts/devsign.sh` for this leg; an ad-hoc binary proves nothing about the app);
-      (b) whether the token exchange succeeds **without** the client secret under PKCE — Google's
-      page marks it optional and a forum report says `invalid_request`; this decides whether the
-      secret ships at all; (c) whether the insert response carries `snippet.channelTitle` under the
+      (b) ~~whether the token exchange succeeds without the client secret under PKCE~~ —
+      ✅ answered by the setup check (2026-11-16): `invalid_request: client_secret is missing.`
+      The secret ships; (c) whether the insert response carries `snippet.channelTitle` under the
       upload-only scope; (d) what Studio shows for a video sent with no audience declaration;
       (e) the real wording of Google's warning and consent pages, and whether the app name is shown
       while unverified; (f) whether `youtube.upload` is listed as sensitive or restricted;

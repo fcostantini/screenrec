@@ -7,7 +7,9 @@
 ## Now
 
 - **📋 M40 FILED from Franco's rulings (2026-11-16) — a trimmed clip can go to YouTube. Five tasks,
-  nothing implemented. Next: M40-T1, blocked on a Google Cloud project only Franco can create.**
+  nothing implemented. Next: M40-T1 — its plan artifact is published and waits for Franco's go.**
+  ✅ **The Google Cloud project exists and was checked live (2026-11-16).** 🔴 The check also settled
+  one of T1's unknowns: **a Desktop client's secret is required even with PKCE**, so it ships.
   Scoping artifact: `claude.ai/artifact/1xC4iSiiCSRsaatL3A9qRP`. `docs:` commits — no code changed, no
   VERSION bump yet (**MINOR → 1.23.0 at G40**, ADR-013).
   🔴 **The finding the plan turns on:** until **2026-11-02** YouTube forced every upload from an
@@ -247,12 +249,9 @@
 
 **Open:**
 
-- [ ] **M40 — the Google Cloud project, before T1 can start** (filed 2026-11-16; steps in docs/03's M40
-      and in that session's reply): project `ScreenRec`, YouTube Data API v3 enabled, consent screen
-      External + the `youtube.upload` scope, yourself as a test user, a **Desktop app** client, its
-      JSON saved as `~/.config/screenrec/youtube-client.json` (mode 600). Console only — not `gcloud`.
-      🔴 Franco activated the console's Free Trial (2026-11-16): the project must be **unlinked from
-      that billing account** (Disable billing), or it stops when the trial closes in 90 days.
+- [x] **M40 — the Google Cloud project** (Franco, 2026-11-16): created with no billing linked, the
+      client JSON is at `~/.config/screenrec/youtube-client.json`, and a live check passed — sign-in,
+      upload scope, an upload session opened and cancelled, sign-in revoked. Detail in docs/07.
 - [ ] **M40 — one consent click during T1**, on the account whose channel should receive the test
       upload (it lands as private).
 - [ ] **M40 — `Publish app` before G40** (Audience page): in Testing every sign-in expires in 7 days.

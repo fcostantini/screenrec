@@ -7,6 +7,28 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-16 (M40 setup check, a throwaway script before T1): **what Google's endpoints actually
+  answer for a Desktop client in Testing** — one real sign-in, one upload session with no bytes sent.
+  🔴 **The client secret is required even with PKCE.** A token exchange without it answers
+  `400 invalid_request: "client_secret is missing."` — so the secret ships in the bundle (ADR-024's
+  stamping), and Google's "optional" in the native-app doc does not apply to Desktop clients.
+  ✅ **A setup can be checked without signing anyone in:** the authorization URL answers `302` to
+  `accounts.google.com/v3/signin/identifier` when the client is known and takes a loopback redirect
+  (an unknown one goes to an error page), and a token exchange with a made-up code answers
+  `invalid_grant` when the ID and secret are accepted — `invalid_client` otherwise.
+  ✅ **The installed-app flow returns a refresh token without `access_type=offline`.** Token fields:
+  `access_token`, `expires_in` (3599), `refresh_token`, `refresh_token_expires_in`, `scope`,
+  `token_type`.
+  ✅ **Testing mode announces its own fuse:** `refresh_token_expires_in = 604799` (7 days) is in the
+  token response, so a client can say the sign-in will lapse instead of failing silently a week on.
+  ✅ **A resumable session opens under the upload-only scope** (`200` + `Location`), and `DELETE` on
+  the session URL cancels it with `499` — nothing reaches the channel. `oauth2.googleapis.com/revoke`
+  answers `200`.
+  ⚠️ **The console's New Project form requires a billing account whenever the account has one** (a
+  Free Trial counts). Create with it, then Billing → Your projects → ⋮ → Disable billing.
+  ⚠️ **"Google Auth Platform" is not pinned in the console menu.** Google's own docs link
+  `console.developers.google.com/auth/{overview,audience,scopes,clients}`.
+
 - 2026-11-16 (scoping a YouTube upload, nothing implemented): **YouTube's API rules moved twice in
   2026, and most third-party guides still describe the old ones.** Read
   `developers.google.com/youtube/v3/revision_history` before trusting any of them. As of today:
