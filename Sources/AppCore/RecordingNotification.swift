@@ -300,12 +300,20 @@ public enum RecordingNotifications {
             fileURL: file, link: UploadCopy.studioURL)
     }
 
-    /// The export always finishes before the upload starts, so there is a file to name (ADR-007).
-    public static func uploadFailed(reason: String, file: URL) -> RecordingNotification {
-        RecordingNotification(
+    /// An upload failed (M40-T5). `reason` first, then two sentences said only when true: that
+    /// the clip is still on disk — the export always finishes first (ADR-007), but a clip gone
+    /// missing can be the failure itself — and that YouTube keeps an unfinished entry (07).
+    public static func uploadFailed(
+        reason: String, title: String, file: URL, clipExists: Bool, leavesEntry: Bool
+    ) -> RecordingNotification {
+        let saved = clipExists ? "The clip is saved as \(file.lastPathComponent)." : nil
+        let entry = leavesEntry
+            ? "YouTube keeps an unfinished entry named “\(title)”; delete it in YouTube Studio."
+            : nil
+        return RecordingNotification(
             title: "Couldn't upload to YouTube",
-            body: "\(reason) The clip is saved as \(file.lastPathComponent).",
-            fileURL: file)
+            body: [reason, saved, entry].compactMap { $0 }.joined(separator: " "),
+            fileURL: clipExists ? file : nil)
     }
 
     /// The lossless trim (M10-T4) finished — reveal the clipped copy.

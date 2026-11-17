@@ -55,7 +55,7 @@ import UploadCore
         let (model, posted) = makeModel(store: InMemoryTokenStore(token()))
         let calls = Calls()
         model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             return video
         }
 
@@ -105,7 +105,7 @@ import UploadCore
         let calls = Calls()
         let gate = Gate()
         model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             if calls.all.count == 1 { await gate.wait() }
             return video
         }
@@ -136,7 +136,7 @@ import UploadCore
         let calls = Calls()
         model.refresh = { [renewed] _, _ in renewed }
         model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             return video
         }
 
@@ -157,7 +157,7 @@ import UploadCore
         let calls = Calls()
         model.refresh = { _, _ in throw GoogleSignInError.signInExpired }
         model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             return video
         }
 
@@ -168,7 +168,9 @@ import UploadCore
         #expect(model.account == .disconnected)
         #expect(store.load() == nil)
         #expect(posted.all.map(\.title) == ["Couldn't upload to YouTube"])
-        #expect(posted.all.first?.body.hasPrefix("YouTube needs reconnecting in Settings.") == true)
+        #expect(
+            posted.all.first?.body.hasPrefix(
+                "YouTube needs reconnecting: the sign-in has ended. Connect again in Settings.") == true)
     }
 
     /// The refresh is a round trip to Google, long enough for a disconnect to finish inside it.
@@ -187,7 +189,7 @@ import UploadCore
         }
         let calls = Calls()
         model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             return video
         }
 
@@ -203,8 +205,9 @@ import UploadCore
         #expect(posted.all.first?.body.hasPrefix("YouTube isn't connected.") == true)
     }
 
-    /// A transfer begun on a sign-in that is being withdrawn would be cut off by the withdrawal.
-    @Test func nothingIsSentWhileADisconnectIsUnderWay() async throws {
+    /// A transfer begun on a sign-in that is being withdrawn would be cut off by the withdrawal
+    /// — so an upload that meets a disconnect waits to see how it ends, and here it succeeds.
+    @Test func nothingIsSentOnASignInThatADisconnectThenWithdraws() async throws {
         let file = try makeFile()
         defer { try? FileManager.default.removeItem(at: file) }
         let store = InMemoryTokenStore(token(expiresIn: 30))
@@ -224,7 +227,7 @@ import UploadCore
         }
         let calls = Calls()
         model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             return video
         }
 
@@ -233,14 +236,51 @@ import UploadCore
         let disconnect = Task { await model.disconnect() }
         await revoking.reached()
         answer.open()
-        await drain(model)
+        for _ in 0..<200 { await Task.yield() }
+        #expect(calls.all.isEmpty)              // nothing is sent while the outcome is open
+        #expect(posted.all.isEmpty)             // and nothing is said yet either
 
-        #expect(calls.all.isEmpty)
-        #expect(posted.all.first?.body.hasPrefix("YouTube isn't connected.") == true)
         revoked.open()
         await disconnect.value
+        await drain(model)
+        #expect(calls.all.isEmpty)
+        #expect(posted.all.first?.body.hasPrefix("YouTube isn't connected.") == true)
         #expect(store.load() == nil)
         #expect(model.account == .disconnected)
+    }
+
+    /// Google can fail to be told, and then the account is still connected: an upload that was
+    /// turned away on the guess that the disconnect would succeed was turned away for nothing.
+    @Test func anUploadThatMeetsADisconnectThatFailsGoesAhead() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let (model, posted) = makeModel(store: InMemoryTokenStore(token()))
+        let revoking = Gate()
+        let revoked = Gate()
+        model.revoke = { _ in
+            revoking.open()
+            await revoked.wait()
+            throw URLError(.notConnectedToInternet)
+        }
+        let calls = Calls()
+        model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
+            return video
+        }
+
+        let disconnect = Task { await model.disconnect() }
+        await revoking.reached()
+        #expect(model.account == .disconnecting)
+        model.upload(file, metadata: metadata)
+        for _ in 0..<200 { await Task.yield() }
+        #expect(calls.all.isEmpty)
+
+        revoked.open()
+        await disconnect.value
+        await drain(model)
+        #expect(model.account == .connected(expires: nil))
+        #expect(calls.all.count == 1)
+        #expect(posted.all.map(\.title) == ["Uploaded to YouTube"])
     }
 
     /// The sign-in Google dropped is the one the upload began under, which need not be the one
@@ -280,7 +320,7 @@ import UploadCore
         let (model, posted) = makeModel(store: InMemoryTokenStore())
         let calls = Calls()
         model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             return video
         }
         model.upload(file, metadata: metadata)
@@ -299,7 +339,10 @@ import UploadCore
         await drain(model)
 
         #expect(posted.all.map(\.title) == ["Couldn't upload to YouTube"])
-        #expect(posted.all.first?.body == "The connection dropped. The clip is saved as \(file.lastPathComponent).")
+        // Met once and not waited for: "could not reach", never "did not come back".
+        #expect(
+            posted.all.first?.body
+                == "Couldn't reach YouTube. Check the connection and upload again. The clip is saved as \(file.lastPathComponent).")
         #expect(model.account == .connected(expires: nil))
         #expect(model.uploadInProgress == nil)
     }
@@ -411,7 +454,7 @@ import UploadCore
         }
         let calls = Calls()
         state.uploads.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             return video
         }
         let source = URL(fileURLWithPath: "/tmp/Clip.mov")
@@ -439,7 +482,7 @@ import UploadCore
         state.exports.exportFunction = { _, _, _, _, _, _ in throw ExportError.writerFailed("nope") }
         let calls = Calls()
         state.uploads.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             return video
         }
 

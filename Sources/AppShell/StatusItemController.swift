@@ -104,9 +104,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         guard let fraction = state.uploads.uploadProgress, state.uploads.uploadInProgress != nil,
               let row = progressRow(.upload)
         else { return }
-        // `tag` is the count stamped at open, which is what the row draws.
-        row.title = MenuHeader.uploading(fraction: fraction, waiting: row.tag)
-        (row.view as? ProgressRowView)?.show(fraction)
+        let view = row.view as? ProgressRowView
+        // The note stamped at open, which is what the row draws.
+        row.title = MenuHeader.uploading(fraction: fraction, note: view?.note)
+        view?.show(fraction)
     }
 
     private func advanceExportRow() {

@@ -16,28 +16,26 @@
   (docs/07, 2026-11-17 — `log show` alone cannot see a clean run). A push runs the suite too.
   **Next: back to M40-T4** (below).
 
-- **⏸ M40-T5 BUILT, NOT COMMITTED (2026-11-17) — waiting on the review, then on live checks.**
-  Plan `claude.ai/artifact/STf3yH7vJ5LAHGHAY9AdjN`; Franco's go *"let's go"*, taken as the four
-  answers as recommended (5 minutes of patience; the measurement; the real dead-sign-in check
-  when it suits him; `Try Again` as **T6**, filed in docs/03). In the working tree:
-  `UploadFailure` (one list, worded by the app and the CLI); an uploader that resumes while bytes
-  arrive and for 302 s after, renews a lapsed token once, reports the session's opening and its
-  waits; a model that drops a sign-in found dead at use and waits out a disconnect in progress;
-  a notice assembled from the reason plus two sentences said only when true; `· waiting for the
-  connection` on the menu row; the title limit in **code points**. **1052 tests; 37 breaks, 37
-  red.** ⚠️ The installed app is still T4's build.
-  ✅ **Measured against YouTube** (docs/07): titles are counted in code points; `DELETE` on a
-  session closes it (`499`).
-  **Next, in this order:** (1) **Franco rules on `/code-review medium`'s ten findings** —
-  presented 2026-11-17 with a proposal each (docs/03 under M40-T5), **none applied**; three add
-  or change words he will read: opening an upload with no connection, a sign-in YouTube refuses
-  although Google renewed it, and a clip that is there but unreadable; (2) fixes, one watched
-  run, the sweep again where they touch;
-  (3) **with his OK each time:** the waiting row and three or four notices on a fake-uploader
-  build; the real dead-sign-in check (he removes ScreenRec at myaccount.google.com, I press
-  upload, he reconnects); (4) tick, commit `M40-T5`, push, deploy; (5) T6's plan artifact.
-  **Needs Franco:** a look in Studio — are the three private measurement entries (100 😀, 100
-  `a`, 14 family emoji) there? If not, `DELETE` cleans up and T6 can use it.
+- **✅ M40-T5 DONE (2026-11-17) — every failed upload says why, and what to do next.**
+  `UploadFailure`: one list, worded by the app and the CLI. The uploader resumes while bytes
+  arrive and for about 5 minutes after, renews a lapsed token once, and opens a session a second
+  time only when the first try cannot have reached YouTube. A sign-in Google refuses to renew
+  drops the account where it is found; one YouTube refuses although Google renewed it is kept.
+  The notice is the reason plus two sentences said only when true. The row says `· waiting for
+  the connection`. **1061 tests** (1027 → 1061); **48 breaks, 48 red.** The deployed app at
+  `/Users/Shared` **is** this commit's build.
+  ✅ **Measured against YouTube** (docs/07): a title's 100 is counted in **code points** — the
+  sheet now counts the same; `DELETE` on an unfinished session closes it (`499`).
+  ✅ **Live:** the waiting row and four notices on a fail-on-purpose build; and **the real dead
+  sign-in** — Franco removed ScreenRec's access at Google, the next upload said *needs
+  reconnecting*, Settings went to `Not connected`, the saved sign-in was deleted.
+  ⚠️ **He is disconnected until he presses `Connect…` in Settings** (left open on Sharing).
+  **Next: M40-T6** (docs/03) — `Try Again` on a failed upload, continuing the same one, and a
+  stopped upload cleaning up after itself **if `DELETE` really removes the entry**. **Plan
+  artifact first, then stop.** The plan turns on his look in Studio: are the three private
+  measurement entries (100 😀, 100 `a`, 14 family emoji) and *ScreenRec test 10* still there?
+  **Needs Franco:** that look in Studio; reconnect in Settings; the test videos to delete;
+  click an *Uploaded to YouTube* notice once; the audience question from T1.
 
 - **✅ M40-T4 DONE (2026-11-17) — the menu shows an upload, keeps its link, and can start one.**
   `Uploading to YouTube… n%` with `Cancel Upload`; the `Uploaded to YouTube · ‹title›` receipt

@@ -83,6 +83,31 @@ import UploadCore
         #expect(!MenuSnapshot.titles(state).contains("Cancel Upload"))
     }
 
+    /// A transfer that broke and is waiting to be picked up says so on its row, drawn and read
+    /// alike — a percentage that has stopped is otherwise a mystery (M40-T5).
+    @Test func aStalledUploadSaysItIsWaitingForTheConnection() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let state = state()
+        let finish = AsyncStream<Void>.makeStream()
+        state.uploads.uploadFunction = { [video] _, _, pass, _ in
+            pass.waiting(true)
+            for await _ in finish.stream { break }
+            return video
+        }
+
+        state.uploads.upload(file, metadata: metadata)
+        for _ in 0..<2000 where !state.uploads.uploadIsWaiting { await Task.yield() }
+        let title = "Uploading to YouTube… 0% · waiting for the connection"
+        #expect(MenuSnapshot.titles(state).contains(title))
+        let view = MenuSnapshot.item(state, titled: title)?.view as? ProgressRowView
+        #expect(view?.note == "· waiting for the connection")
+        #expect(MenuSnapshot.item(state, titled: "Cancel Upload")?.isEnabled == true)
+
+        finish.continuation.yield()
+        await drain(state.uploads)
+    }
+
     /// The export's bar and the upload's are the same view: each is told apart by its kind, so a
     /// tick meant for one is never drawn on the other.
     @Test func theExportRowKeepsItsOwnKind() {

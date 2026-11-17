@@ -7,6 +7,53 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-17 (M40-T5, the live checks — a fail-on-purpose build, then a sign-in removed for real):
+  ✅ **Access removed in the Google account is `invalid_grant` on the next refresh, at once.**
+  Franco removed ScreenRec at myaccount.google.com/permissions; about a minute later the app's
+  refresh was refused (`signInExpired`). The app had gone on reading `Connected · ‹channel›`
+  until that upload was pressed — there is no request at launch, by design — and the access
+  token had lapsed by clock, so the dead sign-in was found before any session was opened and no
+  entry was left on the channel.
+  ✅ **One uploader stand-in can fail four ways without a rebuild:** it reads a mode from a
+  scratch file at each upload (`stall`, `limit`, `signin`), so the scenarios are switched by
+  `echo limit > mode` between presses. Stalling is `progress` to 41%, `pass.waiting(true)`, a
+  sleep, then `throw UploadGaveUp(…)`.
+  ✅ **A queued upload's clip can be deleted from the shell to stage "moved or deleted"**: queue
+  it behind a stalling one, `rm` it, and its turn comes when the first gives up.
+  ⚠️ **The app re-arms Instant Replay when the audio route changes** — Zoom quitting showed up
+  in a live `replayd` stream as one new capture session, attributed to ScreenRec, in the middle
+  of a test sweep. One session in such a stream is not evidence against the tests; check the
+  app's own log for a CoreAudio device change at that second before suspecting them.
+
+- 2026-11-17 (M40-T5, what the review found in the first version of the patient uploader):
+  🔴 **Retrying the request that *creates* something is how duplicates are made.** Opening a
+  resumable session is a `POST` that creates the channel's entry. Put inside the retry loop, a
+  lost answer or a `503` after creation would have been asked for again, up to nine times. It is
+  retried now only on the `URLError`s that happen before a request leaves the Mac
+  (`notConnectedToInternet`, `cannotFindHost`, `cannotConnectToHost`, `dnsLookupFailed`…); a
+  timeout or a dropped connection on the opening is final.
+  🔴 **"Anything that isn't a refusal is an interruption" waits five minutes for a deleted file.**
+  A clip removed mid-upload fails each resume locally, which looked like the line. Only a
+  `URLError` that is about the network, and YouTube's 5xx, are interruptions; the file's size is
+  re-checked before every send, and a clip that has gone or changed ends the upload at once.
+  🔴 **A step done inside `catch` is outside the patience.** The token renewal ran in the
+  handler, so its own network error left the function. It is a step of the loop now, like the
+  status query.
+  🔴 **One error type, two truths.** A `URLError` met once (offline when the sign-in is renewed)
+  and one that outlasted every wait are different sentences — *couldn't reach* and *didn't come
+  back in 5 minutes* — so giving up throws its own type (`UploadGaveUp`) and only that is worded
+  as waited-for.
+  🔴 **A `401` after a *successful* renewal is not a dead sign-in.** Google still honours the
+  grant; deleting the local copy would strand it there, which is the one thing `Disconnect`
+  never does. Only Google's own refusal to renew (`invalid_grant`) drops the account.
+  🔴 **A value read after an `await` belongs to whoever is current then.** The reporters took
+  `uploadGeneration` inside `send`, after a refresh that can outlast the upload: a stopped
+  upload would have built reporters for its successor. The generation is handed in from `run`,
+  and `send` checks for cancellation before it starts anything.
+  ⚠️ **Not testable here, so not in the sweep:** that two `Task { @MainActor }` hops can cross.
+  The waiting state is delivered as "whatever was said last" (a lock-guarded flag read at hop
+  time), which is right by construction; a test cannot force the crossing.
+
 - 2026-11-17 (M40-T5, measured against YouTube with sessions that were opened and never sent):
   ✅ **YouTube counts a title's 100 in Unicode code points.** Opening a session with: 100 letters
   → 200; 101 letters → `400 invalidTitle`; 100 × 😀 (100 code points, 200 UTF-16 units, 400

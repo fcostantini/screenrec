@@ -211,14 +211,14 @@ struct MenuBuilder {
         }
         if let token = state.uploads.currentUploadToken {
             let fraction = state.uploads.uploadProgress ?? 0
-            let waiting = state.uploads.queuedUploadCount
-            let row = MenuRow.label(MenuHeader.uploading(fraction: fraction, waiting: waiting))
             // Stamped like every other row (M6-T10): only the bar and its number move while the
-            // menu is up, so the count is kept for the title that moves with them.
-            row.tag = waiting
+            // menu is up. The view keeps the note for the title that moves with them.
+            let note = MenuHeader.uploadNote(
+                waiting: state.uploads.queuedUploadCount,
+                reconnecting: state.uploads.uploadIsWaiting)
+            let row = MenuRow.label(MenuHeader.uploading(fraction: fraction, note: note))
             row.view = ProgressRowView(
-                .upload, lead: MenuHeader.uploadingLead, fraction: fraction,
-                trailing: MenuHeader.waitingNote(waiting))
+                .upload, lead: MenuHeader.uploadingLead, fraction: fraction, trailing: note)
             items.append(row)
             // The token, not "whatever is running when it is pressed": the upload under this
             // row can land and be replaced by the next while the menu is open.

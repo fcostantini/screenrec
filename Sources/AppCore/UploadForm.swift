@@ -10,9 +10,18 @@ public enum UploadForm {
     /// Past this, YouTube takes the video only from a channel that has verified a phone number.
     public static let longVideoSeconds: Double = 15 * 60
 
-    /// `text` as YouTube would accept it for a title: no angle brackets, at most 100 characters.
+    /// `text` as YouTube would accept it for a title: no angle brackets, and at most 100 **code
+    /// points** — how YouTube counts (07, measured: 100 single-code-point emoji pass, 15 family
+    /// emoji are refused). Cut between characters, never through one.
     public static func title(_ text: String) -> String {
-        String(withoutAngleBrackets(text).prefix(titleLimit))
+        var kept = ""
+        var codePoints = 0
+        for character in withoutAngleBrackets(text) {
+            codePoints += character.unicodeScalars.count
+            guard codePoints <= titleLimit else { break }
+            kept.append(character)
+        }
+        return kept
     }
 
     /// The limit is in bytes, so the cut falls on a character boundary at or under it — never

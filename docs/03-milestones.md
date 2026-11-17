@@ -4105,44 +4105,50 @@ uploaded. Detail in docs/07.
       untouched clipboard → the link is on it; a copy made mid-upload → the clipboard is unchanged
       and the notice names the menu.
 
-- [ ] M40-T5 **Every failure says what happened and leaves the file** (ADR-007).
+- [x] M40-T5 **Every failure says what happened and leaves the file** (ADR-007).
       Plan artifact: `claude.ai/artifact/STf3yH7vJ5LAHGHAY9AdjN` — published 2026-11-17, **awaiting
       Franco's go and four answers**: how long to wait for a dropped connection (proposed: 5 min
       without progress); one measurement upload (a 100-emoji title, then `DELETE` on the session);
       the real dead-sign-in check (he removes access, then reconnects); and a `Try Again` row that
       continues the same upload, proposed as its own task **T6** before G40. His answer,
       2026-11-17: *"let's go"*, **taken as all four as recommended.**
-      ⏸ **Built 2026-11-17; uncommitted.** `UploadFailure` (one list, worded by the app and by
+      ✅ **Done 2026-11-17. 1061 tests** (1027 → 1061); **48 breaks, 48 red.**
+      `UploadFailure` (one list, worded by the app and by
       the CLI with exhaustive switches); the uploader resumes while bytes arrive and for 302 s
       after the last one, renews a lapsed token once, and reports the session's opening and its
       waits; the model drops a sign-in found dead at use, waits out a disconnect in progress, and
       assembles the notice from the reason plus two sentences said only when true; the menu row
-      says `· waiting for the connection`. **1052 tests** (1027 → 1052); **37 breaks, 37 red**
-      (every pattern checked against the source before a test ran; one watched run first).
+      says `· waiting for the connection`.
       ✅ **Measured against YouTube** (docs/07): a title's 100 is counted in **code points** — the
       sheet's rule changed to match; `DELETE` on a session closes it (`499`).
-      ⏸ **`/code-review medium`: ten findings, presented to Franco 2026-11-17, not yet ruled on,
-      none applied.** Proposed, all in T5: (1) a clip deleted or renamed mid-upload is retried
-      for five minutes and then blamed on the connection — a local file error is not an
-      interruption; (2) a token renewal that itself hits a flaky network ends the upload at once
-      — renew inside the loop, so it is waited out like any other step; (3) opening the session
-      is now retried, and a `POST` whose answer was lost can leave **duplicate** entries — retry
-      the open only on failures that cannot have reached YouTube; (4) a `401` after a
-      *successful* renewal signs the user out and deletes a sign-in Google still honours — keep
-      the account and say YouTube did not accept the sign-in; (5) every `URLError` is worded as
-      "didn't come back in 5 minutes", including ones that failed in a second — only the
-      uploader giving up says that, the rest say Google could not be reached; (6) the progress
-      and waiting reporters read the upload's generation after `send`'s awaits, so a cancelled
-      upload can bind to its successor's — pass it in from `run`; (7) "moving again" is reported
-      before the status query proves it, and the two hops to the main actor can land out of
-      order — report it when bytes are about to flow, and deliver the latest value; (8) *moved
-      or deleted* is said of an empty file that is still there — word it by whether the file
-      exists; (9) the minutes are computed in two modules, and the CLI's fixed token "renews" to
-      itself — one definition, and no renewal where there is none to make; (10) one doc comment
-      of eight lines and one with history in it.
-      ⏳ **Then:** the live checks,
-      each with his OK — the dead sign-in for real, the waiting row and notices on a fake-uploader
-      build; his look in Studio at the three private test entries.
+      ✅ **`/code-review medium`: ten findings, ruled by Franco 2026-11-17 "as proposed", all
+      applied.** A local file error ends the upload at once and is not blamed on the line; the
+      token renewal is a step of the loop, waited out like the rest; opening the session is
+      retried only on failures that cannot have reached YouTube; a `401` after a successful
+      renewal keeps the account (*"YouTube didn't accept the sign-in…"*); *didn't come back in 5
+      minutes* is said only when the uploader gave up (`UploadGaveUp`), and a failure met once
+      says *"Couldn't reach YouTube…"*; the reporters get the upload's own generation and a
+      stopped upload starts nothing; "moving again" is reported when bytes are about to flow,
+      and the latest word wins; a clip that is there but unreadable is not called *moved or
+      deleted*; one definition of the patience in minutes, and no pretend renewal in the CLI;
+      two comments trimmed. **1061 tests** (1027 → 1061).
+      ✅ **Live, on a build whose uploader fails on purpose** (nothing sent, no upload landed):
+      the row read `31% · 1 waiting`, then `41% · waiting for the connection` with `Cancel
+      Upload` under it; giving up posted *The connection dropped and didn't come back in 5
+      minutes. The clip is saved as … YouTube keeps an unfinished entry named “Sample clip”;
+      delete it in YouTube Studio.*; the clip queued behind it, deleted meanwhile, posted *The
+      clip was moved or deleted before it could be sent.* and nothing more; the channel's limit
+      and a renewal Google refuses each posted their own words, and the second left Settings at
+      `Not connected` with *The last sign-in has ended. Connect again.*
+      ✅ **Live, for real — the check this task was filed with:** Franco removed ScreenRec's
+      access in his Google account. The app still read `Connected` (nothing asks at launch);
+      pressing `Upload to YouTube…` logged `signInExpired`, posted *YouTube needs reconnecting:
+      the sign-in has ended. Connect again in Settings. The clip is saved as …*, set Settings to
+      `Not connected`, deleted the saved sign-in and forgot the channel's name.
+      ⚠️ **Not driven:** a real dropped connection (the resume itself was proven against YouTube
+      in T1; switching his Wi-Fi off was never on the table), and the two notice sentences
+      added by the review (*Couldn't reach YouTube…*, *YouTube didn't accept the sign-in…*),
+      which are asserted in tests only.
       The dropped
       connection (resume, bounded retries, then *Couldn't upload — the clip is saved*); the sign-in
       that expired or was removed (*YouTube needs reconnecting*, account back to not connected);

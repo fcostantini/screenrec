@@ -203,7 +203,7 @@ import UploadCore
         let started = Gate()
         let finish = Gate()
         model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             if calls.all.count == 1 {
                 started.open()
                 await finish.wait()
@@ -298,7 +298,7 @@ import UploadCore
         clipboard.wire(model)
         let calls = Calls()
         model.uploadFunction = { [first = video("first"), second = video("second")] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             return calls.all.count == 1 ? first : second
         }
 
@@ -357,7 +357,7 @@ import UploadCore
         let calls = Calls()
         let started = Gate()
         model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             guard calls.all.count == 1 else { return video }
             started.open()
             try await Task.sleep(for: .seconds(60))   // a transfer; cancelling is what ends it
@@ -430,7 +430,7 @@ import UploadCore
         let secondStarted = Gate()
         let second = Gate()
         model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             if calls.all.count == 1 {
                 await first.wait()
             } else {
@@ -466,7 +466,7 @@ import UploadCore
         let started = Gate()
         let later = Gate()
         model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             if calls.all.count == 1 {
                 started.open()
                 try await Task.sleep(for: .seconds(60))
@@ -505,7 +505,7 @@ import UploadCore
         let first = Gate()
         let second = Gate()
         model.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             await (calls.all.count == 1 ? first : second).wait()
             return video
         }
@@ -745,7 +745,7 @@ import UploadCore
         let calls = Calls()
         let uploading = Gate()
         state.uploads.uploadFunction = { [video = video()] file, metadata, accessToken, progress in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             progress(0)
             uploading.open()
             try await Task.sleep(for: .seconds(60))
@@ -786,7 +786,7 @@ import UploadCore
         let state = makeState()
         let calls = Calls()
         state.uploads.uploadFunction = { [video = video()] file, metadata, accessToken, _ in
-            calls.record(file: file, metadata: metadata, accessToken: accessToken)
+            calls.record(file: file, metadata: metadata, accessToken: accessToken.token)
             return video
         }
         let exporting = Gate()

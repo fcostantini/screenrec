@@ -140,28 +140,80 @@ public enum UploadCopy {
 
     // MARK: - Why an upload didn't happen
 
-    static func uploadFailure(_ error: any Error) -> String {
-        switch error {
-        case GoogleSignInError.signInExpired, YouTubeError.notAuthorized:
-            "YouTube needs reconnecting in Settings."
-        case UploadModelError.notConnected:
+    /// The app's place for an error in the one list: `UploadFailure` reads Google's and the
+    /// network's, and this adds the one only the app can raise.
+    static func failure(for error: any Error) -> UploadFailure {
+        if case UploadModelError.notConnected = error { return .notConnected }
+        return UploadFailure(error)
+    }
+
+    /// Each failure in the user's words (M40-T5, docs/06 "Notifications"): what happened and the
+    /// next step, never a status code. Exhaustive, so a new failure cannot ship without words.
+    ///
+    /// `clipExists` because "nothing uploadable at that path" is two different stories: a clip
+    /// that has gone, and one that is there and cannot be read.
+    static func reason(
+        _ failure: UploadFailure, clipExists: Bool = true, now: Date = Date(),
+        timeZone: TimeZone = .current
+    ) -> String {
+        switch failure {
+        case .connectionLost:
+            "The connection dropped and didn't come back in "
+                + "\(YouTubeUploader.patienceMinutes) minutes."
+        case .unreachable:
+            "Couldn't reach YouTube. Check the connection and upload again."
+        case .youTubeUnavailable:
+            "YouTube isn't answering right now. Try again later."
+        case .signInEnded:
+            "YouTube needs reconnecting: the sign-in has ended. Connect again in Settings."
+        case .signInRefused:
+            "YouTube didn't accept the sign-in. Try again; if it keeps happening, disconnect "
+                + "and connect again in Settings."
+        case .notConnected:
             "YouTube isn't connected."
-        case YouTubeError.quotaExceeded:
-            "YouTube's daily upload limit for this build is used up."
-        case YouTubeError.uploadLimitExceeded:
-            "Your channel has reached YouTube's upload limit for today."
-        case YouTubeError.noChannel:
-            "This Google account has no YouTube channel."
-        case YouTubeError.unreadableFile:
-            "The exported file couldn't be read."
-        case YouTubeError.rejected:
+        case .channelLimitReached:
+            "Your channel has reached YouTube's upload limit for today. YouTube lifts it within a day."
+        case .projectQuotaSpent:
+            "This build's YouTube allowance for today is used up. It resets at "
+                + "\(quotaReset(now: now, timeZone: timeZone))."
+        case .noChannel:
+            "This Google account has no YouTube channel. Create one at youtube.com, then upload again."
+        case .clipMissing:
+            clipExists
+                ? "The clip couldn't be read."
+                : "The clip was moved or deleted before it could be sent."
+        case .refusedTitle:
+            "YouTube refused the title. Change it and upload again."
+        case .refusedDescription:
+            "YouTube refused the description. Change it and upload again."
+        case .refused:
             "YouTube refused the upload."
-        case is URLError:
-            "The connection dropped."
-        default:
+        case .sessionLost:
+            "YouTube gave up on the unfinished upload. Upload the clip again."
+        case .projectNotSetUp:
+            "This build can't upload: its Google project has the YouTube service switched off."
+        case .other:
             // Anything else may be this Mac's doing as easily as YouTube's.
             "The upload didn't finish."
         }
+    }
+
+    /// `midnight Pacific (05:00 here)`: when the project's daily allowance comes back (07), in
+    /// Google's terms and the Mac's. The second half is dropped where the two are the same time.
+    static func quotaReset(now: Date, timeZone: TimeZone) -> String {
+        let pacificMidnight = "midnight Pacific"
+        guard let pacific = TimeZone(identifier: "America/Los_Angeles") else { return pacificMidnight }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = pacific
+        guard let midnight = calendar.nextDate(
+            after: now, matching: DateComponents(hour: 0, minute: 0), matchingPolicy: .nextTime),
+            timeZone.secondsFromGMT(for: midnight) != pacific.secondsFromGMT(for: midnight)
+        else { return pacificMidnight }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "HH:mm"
+        return "\(pacificMidnight) (\(formatter.string(from: midnight)) here)"
     }
 
     /// The line under the account row: a failure if the last attempt had one, else whatever the

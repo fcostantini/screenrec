@@ -35,11 +35,22 @@ public enum MenuHeader {
     /// The upload row (M40-T4), the export row's successor and in its shape. An upload always
     /// knows its length, so there is always a percentage.
     public static func uploading(fraction: Double, waiting: Int = 0) -> String {
+        uploading(fraction: fraction, note: waitingNote(waiting))
+    }
+
+    /// The same with the note already chosen — what the row was stamped with at open.
+    public static func uploading(fraction: Double, note: String?) -> String {
         let head = "\(uploadingLead) \(exportPercent(fraction))%"
-        return waitingNote(waiting).map { "\(head) \($0)" } ?? head
+        return note.map { "\(head) \($0)" } ?? head
     }
 
     public static let uploadingLead = "Uploading to YouTube…"
+
+    /// What follows the percentage (M40-T5): that the transfer broke and is waiting to be picked
+    /// up — which is why the number has stopped — or else how many more are queued.
+    public static func uploadNote(waiting: Int, reconnecting: Bool) -> String? {
+        reconnecting ? "· waiting for the connection" : waitingNote(waiting)
+    }
 
     /// `· 2 waiting`, or nil when nothing is.
     public static func waitingNote(_ waiting: Int) -> String? {

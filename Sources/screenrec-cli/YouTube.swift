@@ -32,27 +32,53 @@ private func youTubeErrorMessage(_ error: Error) -> String {
         return "Google didn't grant the upload permission. Nothing was saved."
     case GoogleSignInError.malformedResponse:
         return "Google's answer couldn't be read. Nothing was saved."
-    case GoogleSignInError.signInExpired, YouTubeError.notAuthorized:
-        return "The sign-in has expired or was removed. Run `screenrec-cli youtube connect` again."
     case GoogleSignInError.rejected(let error, let description):
         return "Google refused the sign-in: \(description ?? error)"
-    case YouTubeError.noChannel:
-        return "This Google account has no YouTube channel. Create one at youtube.com, then try again."
-    case YouTubeError.quotaExceeded:
-        return "YouTube's daily upload limit for this project is used up. It resets at midnight Pacific."
-    case YouTubeError.uploadLimitExceeded:
-        return "This channel has reached YouTube's upload limit for now."
-    case YouTubeError.apiNotEnabled:
-        return "YouTube Data API v3 isn't enabled on the Google Cloud project."
-    case YouTubeError.sessionExpired:
-        return "YouTube dropped the upload session. Start the upload again."
     case YouTubeError.malformedResponse:
         return "YouTube's answer couldn't be read."
-    case YouTubeError.unreadableFile:
-        return "That isn't a readable, non-empty file."
-    case YouTubeError.rejected(let status, let reason, let message):
+    case YouTubeError.rejected(let status, let reason, let message) where status < 500:
+        // A developer's tool: YouTube's own reason says more here than the list's summary.
         return "YouTube refused the upload (\(reason ?? String(status))): \(message ?? "no reason given")"
     default:
+        return uploadFailureMessage(UploadFailure(error), underlying: error)
+    }
+}
+
+/// The one list of upload failures (`UploadFailure`), in a terminal's words. Exhaustive: a failure
+/// the app has words for cannot be left without any here.
+private func uploadFailureMessage(_ failure: UploadFailure, underlying error: Error) -> String {
+    switch failure {
+    case .connectionLost:
+        return "The connection dropped and didn't come back in \(YouTubeUploader.patienceMinutes) minutes."
+    case .unreachable:
+        return "Couldn't reach YouTube. Check the connection and try again."
+    case .youTubeUnavailable:
+        return "YouTube isn't answering right now. Try again later."
+    case .signInEnded:
+        return "The sign-in has expired or was removed. Run `screenrec-cli youtube connect` again."
+    case .signInRefused:
+        return "YouTube didn't accept the sign-in. If it keeps happening, run `screenrec-cli youtube connect` again."
+    case .notConnected:
+        return "Not connected. Run `screenrec-cli youtube connect` first."
+    case .channelLimitReached:
+        return "This channel has reached YouTube's upload limit for today. YouTube lifts it within a day."
+    case .projectQuotaSpent:
+        return "YouTube's daily upload limit for this project is used up. It resets at midnight Pacific."
+    case .noChannel:
+        return "This Google account has no YouTube channel. Create one at youtube.com, then try again."
+    case .clipMissing:
+        return "That isn't a readable, non-empty file."
+    case .refusedTitle:
+        return "YouTube refused the title."
+    case .refusedDescription:
+        return "YouTube refused the description."
+    case .refused:
+        return "YouTube refused the upload."
+    case .sessionLost:
+        return "YouTube dropped the upload session. Start the upload again."
+    case .projectNotSetUp:
+        return "YouTube Data API v3 isn't enabled on the Google Cloud project."
+    case .other:
         return "Couldn't finish: \(error.localizedDescription)"
     }
 }

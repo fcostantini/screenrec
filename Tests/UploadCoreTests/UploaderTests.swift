@@ -21,6 +21,11 @@ import Testing
         return url
     }
 
+    /// An uploader whose waits cost nothing, so the patience is tested without living through it.
+    private func instant(_ transport: ScriptedTransport) -> YouTubeUploader {
+        YouTubeUploader(transport: transport, settleDelay: .zero, sleep: { _ in })
+    }
+
     // MARK: - Opening a session
 
     /// 🔴 Left out, YouTube publishes as public — so no visibility may ever fail to reach the body.
@@ -215,7 +220,7 @@ import Testing
             .response(status: 308, headers: ["Range": "bytes=0-399"]),
             .response(status: 200, body: resource),
         ])
-        let video = try await YouTubeUploader(transport: transport, settleDelay: .zero)
+        let video = try await instant(transport)
             .upload(file, metadata: metadata, accessToken: "at")
         #expect(video.id == "dQw4w9WgXcQ")
         #expect(transport.uploads.map(\.offset) == [0, 400])
@@ -234,7 +239,7 @@ import Testing
             .failure(URLError(.timedOut)),
             .response(status: 200, body: resource),
         ])
-        let video = try await YouTubeUploader(transport: transport, settleDelay: .zero)
+        let video = try await instant(transport)
             .upload(file, metadata: metadata, accessToken: "at")
         #expect(video.id == "dQw4w9WgXcQ")
         #expect(transport.uploads.count == 1)
@@ -251,7 +256,7 @@ import Testing
             .response(status: 308, headers: ["Range": "bytes=0-599"]),
             .response(status: 201, body: resource),
         ])
-        let video = try await YouTubeUploader(transport: transport, settleDelay: .zero)
+        let video = try await instant(transport)
             .upload(file, metadata: metadata, accessToken: "at")
         #expect(video.id == "dQw4w9WgXcQ")
         #expect(transport.uploads.map(\.offset) == [0, 600])
@@ -268,10 +273,326 @@ import Testing
             .response(status: 308, headers: ["Range": "bytes=0-999"]),
             .response(status: 200, body: resource),
         ])
-        let video = try await YouTubeUploader(transport: transport, settleDelay: .zero)
+        let video = try await instant(transport)
             .upload(file, metadata: metadata, accessToken: "at")
         #expect(video.id == "dQw4w9WgXcQ")
         #expect(transport.uploads.count == 1)
+    }
+
+    // MARK: - Patience (M40-T5)
+
+    private let quarter = ScriptedTransport.Answer.response(status: 308, headers: ["Range": "bytes=0-249"])
+    private let half = ScriptedTransport.Answer.response(status: 308, headers: ["Range": "bytes=0-499"])
+    private let nothingHeld = ScriptedTransport.Answer.response(status: 308)
+    private let dropped = ScriptedTransport.Answer.failure(URLError(.networkConnectionLost))
+
+    private func open() -> ScriptedTransport.Answer {
+        .response(status: 200, headers: ["Location": session.url.absoluteString])
+    }
+
+    /// A flaky line is not a dead one: as long as each try gets more bytes through, it goes on.
+    @Test func aTransferKeepsBeingPickedUpWhileBytesKeepArriving() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([
+            open(), dropped, quarter, dropped, half, dropped,
+            .response(status: 308, headers: ["Range": "bytes=0-749"]),
+            .response(status: 201, body: resource),
+        ])
+        let slept = Slept()
+        let video = try await YouTubeUploader(transport: transport, sleep: { slept.record($0) })
+            .upload(file, metadata: metadata, accessToken: "at")
+        #expect(video.id == "dQw4w9WgXcQ")
+        #expect(transport.uploads.map(\.offset) == [0, 250, 500, 750])
+        // Each drop came after progress, so each wait is the first and shortest one.
+        #expect(slept.durations == [.seconds(2), .seconds(2), .seconds(2)])
+    }
+
+    /// With nothing getting through, the waits grow and then run out — about five minutes —
+    /// and what is thrown is the connection's own error, so the user is told it was the line.
+    @Test func withNoProgressTheWaitsRunOutAndTheUploadGivesUp() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([open()] + Array(repeating: dropped, count: 30))
+        let slept = Slept()
+        let error = await #expect(throws: UploadGaveUp.self) {
+            try await YouTubeUploader(transport: transport, sleep: { slept.record($0) })
+                .upload(file, metadata: self.metadata, accessToken: "at")
+        }
+        #expect(error?.underlying is URLError)
+        #expect(error.map { UploadFailure($0) } == .connectionLost)
+        #expect(slept.durations == YouTubeUploader.waits)
+        #expect(YouTubeUploader.patience == .seconds(302))
+        #expect(YouTubeUploader.patienceMinutes == 5)
+        #expect(transport.uploads.count == 1)   // nothing was re-sent blind
+    }
+
+    /// The patience is for silence, not for the whole upload: progress starts it over.
+    @Test func progressStartsThePatienceOver() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let stalled = Array(repeating: dropped, count: 8)   // eight of the nine waits used up
+        let transport = ScriptedTransport(
+            [open(), dropped] + stalled + [quarter, dropped] + stalled + [half]
+                + [.response(status: 201, body: resource)])
+        let slept = Slept()
+        let video = try await YouTubeUploader(transport: transport, sleep: { slept.record($0) })
+            .upload(file, metadata: metadata, accessToken: "at")
+        #expect(video.id == "dQw4w9WgXcQ")
+        #expect(slept.durations.count == 18)
+        #expect(slept.durations[9] == .seconds(2))          // the first wait again, after progress
+    }
+
+    /// A server that keeps saying "busy" is waited out the same way, and named differently.
+    @Test func aServerThatStaysBusyIsGivenUpOnAsYouTubesFault() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let busy = ScriptedTransport.Answer.response(status: 503, body: "busy")
+        let transport = ScriptedTransport([open()] + Array(repeating: busy, count: 30))
+        let error = await #expect(throws: UploadGaveUp.self) {
+            try await self.instant(transport).upload(file, metadata: self.metadata, accessToken: "at")
+        }
+        #expect(error.map { UploadFailure($0) } == .youTubeUnavailable)
+    }
+
+    private let offline = ScriptedTransport.Answer.failure(URLError(.notConnectedToInternet))
+
+    /// With no connection the request never leaves the Mac, so opening can be tried again.
+    @Test func aSessionIsWaitedForWhileThereIsNoConnectionAtAll() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([offline, offline, open(), .response(status: 201, body: resource)])
+        let seen = Seen()
+        let video = try await instant(transport)
+            .upload(file, metadata: metadata, accessToken: { _ in "at" }, progress: { seen.record($0) })
+        #expect(video.id == "dQw4w9WgXcQ")
+        #expect(seen.values.first == 0)   // said only once the session really opened
+    }
+
+    /// Opening is the request that creates the entry on the channel. If its answer is lost, or
+    /// YouTube says "busy", the entry may exist already — so it is not asked for a second time.
+    @Test(arguments: [URLError.Code.networkConnectionLost, .timedOut])
+    func anOpeningWhoseAnswerWasLostIsNotRepeated(code: URLError.Code) async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([.failure(URLError(code)), open(), .response(status: 201, body: resource)])
+        let error = await #expect(throws: URLError.self) {
+            try await self.instant(transport).upload(file, metadata: self.metadata, accessToken: "at")
+        }
+        #expect(transport.requests.count == 1)
+        // Nothing was waited for, so it is not said to have "not come back".
+        #expect(error.map { UploadFailure($0) } == .unreachable)
+    }
+
+    @Test func aBusyAnswerToTheOpeningIsNotRepeatedEither() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([.response(status: 503, body: "busy"), open()])
+        let error = await #expect(throws: YouTubeError.self) {
+            try await self.instant(transport).upload(file, metadata: self.metadata, accessToken: "at")
+        }
+        #expect(transport.requests.count == 1)
+        #expect(error.map { UploadFailure($0) } == .youTubeUnavailable)
+    }
+
+    /// Never having reached YouTube for the whole patience is "could not reach", not "dropped".
+    @Test func aConnectionThatNeverComesIsReportedAsUnreachable() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport(Array(repeating: offline, count: 30))
+        let slept = Slept()
+        let error = await #expect(throws: URLError.self) {
+            try await YouTubeUploader(transport: transport, sleep: { slept.record($0) })
+                .upload(file, metadata: self.metadata, accessToken: "at")
+        }
+        #expect(slept.durations == YouTubeUploader.waits)
+        #expect(error.map { UploadFailure($0) } == .unreachable)
+    }
+
+    /// A clip deleted or changed mid-upload is this Mac's problem, not the line's: waiting five
+    /// minutes for it and then blaming the connection would be wrong twice.
+    @Test func aClipThatGoesMissingMidUploadEndsItAtOnce() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([open(), dropped, quarter, .response(status: 201, body: resource)])
+        let slept = Slept()
+        let uploader = YouTubeUploader(transport: transport, sleep: {
+            slept.record($0)
+            try? FileManager.default.removeItem(at: file)   // gone while the transfer waits
+        })
+        let error = await #expect(throws: YouTubeError.unreadableFile) {
+            try await uploader.upload(file, metadata: self.metadata, accessToken: "at")
+        }
+        #expect(slept.durations.count == 1)
+        #expect(transport.uploads.count == 1)
+        #expect(error.map { UploadFailure($0) } == .clipMissing)
+    }
+
+    @Test func theCallerIsToldWhenTheTransferIsWaitingAndWhenItMovesAgain() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([open(), dropped, quarter, .response(status: 201, body: resource)])
+        let states = States()
+        _ = try await instant(transport).upload(
+            file, metadata: metadata, accessToken: { _ in "at" }, waiting: { states.record($0) })
+        // Moving (open), moving (send), waiting (the drop), moving (resume).
+        #expect(states.values == [false, false, true, false])
+    }
+
+    /// The token lasts an hour and an upload can last longer. One renewal is tried before a
+    /// lapsed token is called a dead sign-in — and it costs no wait.
+    @Test func aLapsedTokenIsRenewedOnceAndTheUploadGoesOn() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let lapsed = ScriptedTransport.Answer.response(status: 401, body: "{}")
+        let transport = ScriptedTransport([
+            open(), lapsed, quarter, .response(status: 201, body: resource),
+        ])
+        let slept = Slept()
+        let asked = States()
+        let video = try await YouTubeUploader(transport: transport, sleep: { slept.record($0) })
+            .upload(file, metadata: metadata, accessToken: { renewed in
+                asked.record(renewed)
+                return renewed ? "fresh" : "stale"
+            })
+        #expect(video.id == "dQw4w9WgXcQ")
+        #expect(asked.values == [false, true])
+        #expect(slept.durations.isEmpty)
+        #expect(
+            transport.uploads.last?.request.value(forHTTPHeaderField: "Authorization") == "Bearer fresh")
+        #expect(transport.uploads.map(\.offset) == [0, 250])
+    }
+
+    @Test func aTokenRefusedEvenWhenRenewedIsADeadSignIn() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let lapsed = ScriptedTransport.Answer.response(status: 401, body: "{}")
+        let transport = ScriptedTransport([open(), lapsed, lapsed])
+        let asked = States()
+        let error = await #expect(throws: YouTubeError.notAuthorized) {
+            try await self.instant(transport).upload(
+                file, metadata: self.metadata,
+                accessToken: { renewed in
+                    asked.record(renewed)
+                    return "at"
+                })
+        }
+        #expect(asked.values == [false, true])   // renewed once, not over and over
+        // Google renewed it and YouTube still said no: refused, not ended.
+        #expect(error.map { UploadFailure($0) } == .signInRefused)
+    }
+
+    /// The renewal is a request too, and it can meet the same flaky line as the upload: it is
+    /// waited out like any other step rather than ending the upload on the spot.
+    @Test func aRenewalThatMeetsABrokenLineIsWaitedOut() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let lapsed = ScriptedTransport.Answer.response(status: 401, body: "{}")
+        let transport = ScriptedTransport([open(), lapsed, quarter, .response(status: 201, body: resource)])
+        let slept = Slept()
+        let renewals = States()
+        let video = try await YouTubeUploader(transport: transport, sleep: { slept.record($0) })
+            .upload(file, metadata: metadata, accessToken: { renewed in
+                guard renewed else { return "stale" }
+                renewals.record(true)
+                if renewals.values.count == 1 { throw URLError(.networkConnectionLost) }
+                return "fresh"
+            })
+        #expect(video.id == "dQw4w9WgXcQ")
+        #expect(renewals.values.count == 2)
+        #expect(slept.durations == [.seconds(2)])
+    }
+
+    /// The CLI hands over a token it cannot renew. A lapsed one fails there and then, without a
+    /// pretend renewal and a second round of requests on the same dead token.
+    @Test func aTokenThatCannotBeRenewedFailsWithoutASecondRound() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let lapsed = ScriptedTransport.Answer.response(status: 401, body: "{}")
+        let transport = ScriptedTransport([open(), lapsed, lapsed])
+        await #expect(throws: YouTubeError.notAuthorized) {
+            try await self.instant(transport).upload(file, metadata: self.metadata, accessToken: "at")
+        }
+        #expect(transport.requests.count == 1)   // the opening, and no status query after
+        #expect(transport.uploads.count == 1)
+    }
+
+    /// `Cancel Upload` during a wait must not sit the wait out.
+    @Test func cancellingDuringAWaitStopsAtOnce() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([open(), dropped, quarter])
+        let waiting = AsyncStream<Void>.makeStream()
+        let uploader = YouTubeUploader(transport: transport, sleep: { _ in
+            waiting.continuation.yield()
+            try await Task.sleep(for: .seconds(60))
+        })
+        let upload = Task {
+            try await uploader.upload(file, metadata: metadata, accessToken: "at")
+        }
+        for await _ in waiting.stream { break }
+        upload.cancel()
+        await #expect(throws: CancellationError.self) { try await upload.value }
+        #expect(transport.uploads.count == 1)
+    }
+
+    /// A transfer that broke because it was cancelled is not an interruption to wait out: it
+    /// must not be asked about and sent again, whatever the wait would have done.
+    @Test func aCancelledTransferIsNotPickedUpAgain() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([
+            open(), dropped, quarter, .response(status: 201, body: resource),
+        ])
+        let uploader = instant(transport)
+        let handle = TaskHandle()
+        let ready = AsyncStream<Void>.makeStream()
+        let upload = Task {
+            for await _ in ready.stream { break }   // not before the handle below is set
+            return try await uploader.upload(
+                file, metadata: metadata, accessToken: { _ in "at" },
+                // The session has just opened: cancel before the send that is about to break.
+                progress: { if $0 == 0 { handle.cancel() } })
+        }
+        handle.set(upload)
+        ready.continuation.yield()
+        await #expect(throws: CancellationError.self) { try await upload.value }
+        #expect(transport.uploads.count <= 1)
+        #expect(transport.requests.count == 1)   // the session's opening, and no status query
+    }
+
+    // MARK: - The one list of failures
+
+    @Test func everyFailureHasItsPlaceInTheList() {
+        #expect(UploadFailure(GoogleSignInError.signInExpired) == .signInEnded)
+        #expect(UploadFailure(YouTubeError.notAuthorized) == .signInRefused)
+        // "It did not come back" is only true of something that was waited for.
+        #expect(UploadFailure(UploadGaveUp(underlying: URLError(.timedOut))) == .connectionLost)
+        #expect(
+            UploadFailure(
+                UploadGaveUp(underlying: YouTubeError.rejected(status: 502, reason: nil, message: nil)))
+                == .youTubeUnavailable)
+        #expect(UploadFailure(YouTubeError.uploadLimitExceeded) == .channelLimitReached)
+        #expect(UploadFailure(YouTubeError.quotaExceeded) == .projectQuotaSpent)
+        #expect(UploadFailure(YouTubeError.noChannel) == .noChannel)
+        #expect(UploadFailure(YouTubeError.unreadableFile) == .clipMissing)
+        #expect(UploadFailure(YouTubeError.sessionExpired) == .sessionLost)
+        #expect(UploadFailure(YouTubeError.apiNotEnabled) == .projectNotSetUp)
+        #expect(UploadFailure(URLError(.notConnectedToInternet)) == .unreachable)
+        #expect(
+            UploadFailure(YouTubeError.rejected(status: 400, reason: "invalidTitle", message: nil))
+                == .refusedTitle)
+        #expect(
+            UploadFailure(YouTubeError.rejected(status: 400, reason: "invalidDescription", message: nil))
+                == .refusedDescription)
+        #expect(
+            UploadFailure(YouTubeError.rejected(status: 400, reason: "invalidTags", message: nil))
+                == .refused)
+        #expect(
+            UploadFailure(YouTubeError.rejected(status: 503, reason: nil, message: nil))
+                == .youTubeUnavailable)
+        #expect(UploadFailure(YouTubeError.malformedResponse) == .other)
+        #expect(UploadFailure(CocoaError(.fileReadNoPermission)) == .other)
     }
 
     @Test func anOffsetPastTheEndOfTheFileIsNotTrusted() async {
@@ -336,4 +657,31 @@ private final class Seen: @unchecked Sendable {
 
     func record(_ value: Int64) { lock.withLock { recorded.append(value) } }
     var values: [Int64] { lock.withLock { recorded } }
+}
+
+/// Collects the waits an uploader asked for.
+private final class Slept: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [Duration] = []
+
+    func record(_ value: Duration) { lock.withLock { recorded.append(value) } }
+    var durations: [Duration] { lock.withLock { recorded } }
+}
+
+/// Collects the flags a `@Sendable` closure was handed.
+private final class States: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [Bool] = []
+
+    func record(_ value: Bool) { lock.withLock { recorded.append(value) } }
+    var values: [Bool] { lock.withLock { recorded } }
+}
+
+/// Lets a closure cancel the task it runs in, once the test has the handle to give it.
+private final class TaskHandle: @unchecked Sendable {
+    private let lock = NSLock()
+    private var task: Task<UploadedVideo, any Error>?
+
+    func set(_ task: Task<UploadedVideo, any Error>) { lock.withLock { self.task = task } }
+    func cancel() { lock.withLock { task?.cancel() } }
 }

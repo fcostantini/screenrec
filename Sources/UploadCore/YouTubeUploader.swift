@@ -59,15 +59,31 @@ public struct YouTubeUploader: Sendable {
     /// answers "nothing held", two seconds on it names the real byte (07, measured).
     public static let settleDelay = Duration.seconds(2)
 
+    /// How long `upload` waits before each try at picking a broken transfer up again, counted
+    /// from the last byte that got through: two seconds — what YouTube needs anyway — doubling to
+    /// a minute, about five minutes in all. When they run out it gives up.
+    public static let waits: [Duration] = [2, 4, 8, 16, 32, 60, 60, 60, 60].map(Duration.seconds)
+
+    /// The sum of `waits`, for whoever has to say how long that was.
+    public static var patience: Duration { waits.reduce(.zero, +) }
+    public static var patienceMinutes: Int { Int((patience / .seconds(60)).rounded()) }
+
     private let transport: any HTTPTransport
     private let settleDelay: Duration
+    private let waits: [Duration]
+    private let sleep: @Sendable (Duration) async throws -> Void
 
+    /// `waits` and `sleep` are injected so the patience is tested without living through it.
     public init(
         transport: any HTTPTransport = URLSessionTransport(),
-        settleDelay: Duration = YouTubeUploader.settleDelay
+        settleDelay: Duration = YouTubeUploader.settleDelay,
+        waits: [Duration] = YouTubeUploader.waits,
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.transport = transport
         self.settleDelay = settleDelay
+        self.waits = waits
+        self.sleep = sleep
     }
 
     public enum Status: Equatable, Sendable {
@@ -156,35 +172,128 @@ public struct YouTubeUploader: Sendable {
         }
     }
 
-    /// Opens a session and sends the file. A transfer that breaks is resumed **once**, from
-    /// wherever YouTube says it got to.
-    ///
-    /// `progress` is first called, with `0`, the moment the session is open: from then on YouTube
-    /// holds an entry for the video, finished or not (07), and a caller that stops has that to say.
+    /// Opens a session and sends the file with a token that cannot be renewed: the CLI's way,
+    /// and enough for anything shorter than the token's hour.
     public func upload(
         _ file: URL, metadata: VideoMetadata, accessToken: String,
         progress: @escaping @Sendable (Int64) -> Void = { _ in }
     ) async throws -> UploadedVideo {
-        let session = try await openSession(
-            for: file, metadata: metadata, accessToken: accessToken)
-        progress(0)
-        do {
-            return try await send(
-                file, to: session, accessToken: accessToken, progress: progress)
-        } catch {
-            guard Self.isInterruption(error), !Task.isCancelled else { throw error }
-            let status = try await statusAfterBreak(of: session, accessToken: accessToken)
-            return try await resume(
-                file, in: session, from: status, accessToken: accessToken, progress: progress)
+        try await upload(
+            file, metadata: metadata,
+            accessToken: { renewed in
+                guard !renewed else { throw YouTubeError.notAuthorized }
+                return accessToken
+            },
+            progress: progress)
+    }
+
+    /// Opens a session and sends the file, picking a broken transfer up while bytes keep arriving
+    /// and for `waits` after the last one (M40-T5). `accessToken(true)` is asked for once when
+    /// YouTube says the token lapsed. `progress(0)` marks the session opening — from then on
+    /// YouTube holds an entry (07) — and `waiting` says when the transfer is between tries.
+    public func upload(
+        _ file: URL, metadata: VideoMetadata,
+        accessToken: @escaping @Sendable (_ renewed: Bool) async throws -> String,
+        progress: @escaping @Sendable (Int64) -> Void = { _ in },
+        waiting: @escaping @Sendable (Bool) -> Void = { _ in }
+    ) async throws -> UploadedVideo {
+        var token = try await accessToken(false)
+        var renewal = Renewal.notTried
+        var waitsLeft = waits[...]
+        var session: UploadSession?
+        // The next byte YouTube needs, or nil before anything has been sent.
+        var held: Int64?
+
+        while true {
+            do {
+                // In here, so a renewal that meets the same flaky network is waited out too.
+                if renewal == .wanted {
+                    token = try await accessToken(true)
+                    renewal = .done
+                }
+                guard let open = session else {
+                    session = try await openSession(
+                        for: file, metadata: metadata, accessToken: token)
+                    waiting(false)
+                    progress(0)
+                    continue
+                }
+                var from: Int64 = 0
+                if let known = held {
+                    switch try await status(of: open, accessToken: token) {
+                    case .complete(let video):
+                        return video
+                    case .incomplete(let next):
+                        if next > known {
+                            // Bytes got through since the last look: the patience starts over.
+                            waitsLeft = waits[...]
+                            renewal = .notTried
+                            held = next
+                        }
+                        // Every byte held and still unfinished: asking again is what completes it.
+                        guard next < open.fileSize else { throw Unfinished() }
+                        from = next
+                    }
+                }
+                held = held ?? 0
+                // The clip can have gone, or changed, since the session was opened for it.
+                guard try Self.fileSize(of: file) == open.fileSize else {
+                    throw YouTubeError.unreadableFile
+                }
+                waiting(false)   // only now: the status query has shown the line is back
+                return try await send(
+                    file, to: open, from: from, accessToken: token, progress: progress)
+            } catch {
+                try Task.checkCancellation()
+                if case YouTubeError.notAuthorized = error, renewal == .notTried {
+                    renewal = .wanted
+                    continue
+                }
+                // Opening is a `POST` that creates the entry: it is tried again only when the
+                // first try cannot have reached YouTube, or a lost answer would leave two.
+                let worthAnotherTry = session == nil
+                    ? Self.neverReachedYouTube(error) : Self.isInterruption(error)
+                guard worthAnotherTry else { throw error }
+                guard let wait = waitsLeft.popFirst() else {
+                    if error is Unfinished { throw YouTubeError.malformedResponse }
+                    throw session == nil ? error : UploadGaveUp(underlying: error)
+                }
+                waiting(true)
+                try await sleep(wait)
+            }
         }
     }
 
-    /// Whether a failed send left a transfer worth picking up: the connection broke, or YouTube
-    /// answered with a status its protocol says to resume from. Any other answer is a refusal, and
-    /// the same bytes would get it again.
+    private enum Renewal {
+        case notTried, wanted, done
+    }
+
+    /// YouTube holds the whole file and has not said the video exists yet.
+    private struct Unfinished: Error {}
+
+    /// Whether a failed step left a transfer worth picking up: the connection broke, or YouTube
+    /// answered with a status its protocol says to resume from. A refusal would only be repeated,
+    /// and a clip that can no longer be read is this Mac's problem, not the line's.
     static func isInterruption(_ error: any Error) -> Bool {
-        guard let answer = error as? YouTubeError else { return true }
-        return answer.isInterruption
+        switch error {
+        case is Unfinished: true
+        case let answer as YouTubeError: answer.isInterruption
+        case let failure as URLError: !Self.notTheLine.contains(failure.code)
+        default: false
+        }
+    }
+
+    private static let notTheLine: Set<URLError.Code> = [
+        .cancelled, .fileDoesNotExist, .cannotOpenFile, .noPermissionsToReadFile, .fileIsDirectory,
+    ]
+
+    /// The failures that happen before a request leaves this Mac.
+    static func neverReachedYouTube(_ error: any Error) -> Bool {
+        guard let failure = error as? URLError else { return false }
+        return [
+            .notConnectedToInternet, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed,
+            .internationalRoamingOff, .dataNotAllowed,
+        ].contains(failure.code)
     }
 
     // MARK: - Requests

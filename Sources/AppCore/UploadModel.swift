@@ -58,6 +58,8 @@ public final class UploadModel {
     public private(set) var uploadInProgress: String?
     /// How far it has got, 0…1.
     public private(set) var uploadProgress: Double?
+    /// The transfer broke and is between tries at picking it up (M40-T5).
+    public private(set) var uploadIsWaiting = false
     public var queuedUploadCount: Int { pendingUploads.count }
 
     /// The channel uploads land on, as YouTube named it with the last one (07) — the upload-only
@@ -81,13 +83,25 @@ public final class UploadModel {
     public var clipboardChangeCount: (@MainActor () -> Int)?
     public var copyToClipboard: (@MainActor (String) -> Void)?
 
+    /// What a transfer is sent with (M40-T5): the access token, a way to renew it when YouTube
+    /// says it has lapsed mid-upload, and where to say the transfer is waiting to be picked up.
+    public struct UploadAccess: Sendable {
+        public let token: String
+        public let renew: @Sendable () async throws -> String
+        public let waiting: @Sendable (Bool) -> Void
+    }
+
     /// The transfer and the token refresh, injected for the same reason as `signIn`.
     public var uploadFunction: @Sendable (
-        _ file: URL, _ metadata: VideoMetadata, _ accessToken: String,
+        _ file: URL, _ metadata: VideoMetadata, _ pass: UploadAccess,
         _ progress: @escaping @Sendable (Int64) -> Void
-    ) async throws -> UploadedVideo = { file, metadata, accessToken, progress in
+    ) async throws -> UploadedVideo = { file, metadata, pass, progress in
+        // Not named `access`: the Observation macro expands this initializer beside a function
+        // of that name.
         try await YouTubeUploader().upload(
-            file, metadata: metadata, accessToken: accessToken, progress: progress)
+            file, metadata: metadata,
+            accessToken: { renewed in renewed ? try await pass.renew() : pass.token },
+            progress: progress, waiting: pass.waiting)
     }
     public var refresh: @Sendable (
         GoogleToken, GoogleClientCredentials
@@ -252,6 +266,11 @@ public final class UploadModel {
         guard case .connected(let expires) = account else { return }
         account = .disconnecting
         lastFailure = nil
+        defer {
+            let waiters = disconnectWaiters
+            disconnectWaiters = []
+            for waiter in waiters { waiter.resume() }
+        }
 
         let saved: GoogleToken?
         do {
@@ -292,26 +311,31 @@ public final class UploadModel {
         let clipboardMark: Int?
     }
 
-    /// The upload in flight: what was asked for, and whether YouTube has heard of it.
+    /// The upload in flight: what was asked for, and whether YouTube has heard of it — raised
+    /// at the uploader's first report, which comes as the session opens. From then on YouTube
+    /// holds an unfinished entry that this app's permission cannot delete (07).
     private struct Running {
         var request: Request
-        let reached = ReachedYouTube()
+        let reached = Flag()
     }
 
-    /// Raised from the uploader's queue at its first report, which comes as the session opens.
-    /// From then on YouTube holds an unfinished entry that this app's permission cannot delete
-    /// (07), so an upload stopped after it has something to tell the user.
-    private final class ReachedYouTube: @unchecked Sendable {
+    /// A flag written from the uploader's queue and read here, with no hop in between: a hop
+    /// can arrive late or out of order, and what was said last is what has to be known.
+    private final class Flag: @unchecked Sendable {
         private let lock = NSLock()
-        private var reached = false
+        private var raised = false
 
-        var isRaised: Bool { lock.withLock { reached } }
-        func raise() { lock.withLock { reached = true } }
+        var isRaised: Bool {
+            get { lock.withLock { raised } }
+            set { lock.withLock { raised = newValue } }
+        }
     }
 
     private var running: Running?
     /// The app is quitting: nothing more is taken.
     private var isShutDown = false
+    /// Uploads that met a disconnect in progress and are waiting to learn how it ended.
+    private var disconnectWaiters: [CheckedContinuation<Void, Never>] = []
 
     /// Sends `file` to the connected channel (M40-T3). Returns at once: uploads run one at a time
     /// in the order asked for, and `notify` carries each outcome. The file is only read.
@@ -361,6 +385,7 @@ public final class UploadModel {
         uploadTask = nil
         uploadInProgress = nil
         uploadProgress = nil
+        uploadIsWaiting = false
         running = nil
         return announced
     }
@@ -409,7 +434,8 @@ public final class UploadModel {
         let request = started.request
         let signIn = signInsEnded
         do {
-            let video = try await send(request, signIn: signIn, reached: started.reached)
+            let video = try await send(
+                request, signIn: signIn, generation: generation, reached: started.reached)
             // YouTube can leave the name out, and the account can have changed by now: neither
             // is a reason to drop or replace a name that is right.
             if let channel = video.channelTitle, isCurrent(signIn) {
@@ -431,20 +457,30 @@ public final class UploadModel {
             Self.log.info("upload cancelled")
         } catch {
             Self.log.error("upload failed: \(String(describing: error), privacy: .public)")
-            if case GoogleSignInError.signInExpired = error, isCurrent(signIn) {
-                // Google no longer honours it, so calling the account connected would be untrue.
+            let failure = UploadCopy.failure(for: error)
+            // Only what Google itself refuses to renew: a token YouTube alone turned down still
+            // stands at Google, and dropping it here would leave a grant nothing local can end.
+            if failure == .signInEnded, isCurrent(signIn) {
+                // Google no longer honours it — found out here, at its next use, since nothing
+                // asks at launch — so calling the account connected would be untrue.
                 signOut()
                 lastFailure = UploadCopy.signInEnded
                 try? store.delete()
             }
+            let file = (generation == uploadGeneration ? running?.request.file : nil) ?? request.file
+            let clipExists = FileManager.default.fileExists(atPath: file.path)
             notify?(
                 RecordingNotifications.uploadFailed(
-                    reason: UploadCopy.uploadFailure(error), file: request.file))
+                    reason: UploadCopy.reason(failure, clipExists: clipExists),
+                    title: request.metadata.title, file: file, clipExists: clipExists,
+                    // An expired session is YouTube letting go of the entry, not keeping it.
+                    leavesEntry: started.reached.isRaised && failure != .sessionLost))
         }
         // An abandoned queue has already been cleared, and a later upload may own these by now.
         guard generation == uploadGeneration, uploadInProgress != nil else { return }
         uploadInProgress = nil
         uploadProgress = nil
+        uploadIsWaiting = false
         running = nil
         startNextUploadIfIdle()
     }
@@ -488,32 +524,77 @@ public final class UploadModel {
     }
 
     private func send(
-        _ request: Request, signIn: Int, reached: ReachedYouTube
+        _ request: Request, signIn: Int, generation: Int, reached: Flag
     ) async throws -> UploadedVideo {
         expireEndedSignIn()
+        await disconnectOutcome()
         guard case .connected = account, let credentials, var token = try store.load() else {
             throw UploadModelError.notConnected
         }
         if token.needsRefresh() {
             token = try await refresh(token, credentials)
             // A disconnect can finish while Google answers; saving now would undo it.
+            await disconnectOutcome()
             guard isCurrent(signIn) else { throw UploadModelError.notConnected }
             try store.save(token)
         }
+        // The awaits above can outlast a cancel; nothing may start for an upload already stopped.
+        try Task.checkCancellation()
         let total = try YouTubeUploader.fileSize(of: request.file)
+        let pass = UploadAccess(
+            token: token.accessToken,
+            renew: { [weak self] in
+                guard let self else { throw CancellationError() }
+                return try await self.renewedAccessToken(signIn: signIn)
+            },
+            waiting: waitingReporter(generation: generation))
         return try await uploadFunction(
-            request.file, request.metadata, token.accessToken,
-            progressReporter(total: total, reached: reached))
+            request.file, request.metadata, pass,
+            progressReporter(total: total, generation: generation, reached: reached))
+    }
+
+    /// A disconnect under way may yet fail and leave the account connected, so an upload that
+    /// meets one waits for its outcome instead of being turned away on a guess.
+    private func disconnectOutcome() async {
+        guard account == .disconnecting else { return }
+        await withCheckedContinuation { disconnectWaiters.append($0) }
+    }
+
+    /// The token renewed mid-upload: an upload can outlive the hour the first one lasts. A
+    /// renewal Google refuses throws `signInExpired`, which is how a dead sign-in is found.
+    private func renewedAccessToken(signIn: Int) async throws -> String {
+        guard let credentials, let token = try store.load() else {
+            throw UploadModelError.notConnected
+        }
+        let renewed = try await refresh(token, credentials)
+        await disconnectOutcome()
+        guard isCurrent(signIn) else { throw UploadModelError.notConnected }
+        try store.save(renewed)
+        return renewed.accessToken
+    }
+
+    /// Where the uploader says it is between tries. `generation` is the upload's own, handed in:
+    /// read here it could already be a successor's, since `send` awaits before this is built.
+    private func waitingReporter(generation: Int) -> @Sendable (Bool) -> Void {
+        let latest = Flag()
+        return { [weak self] waiting in
+            latest.isRaised = waiting
+            Task { @MainActor in
+                guard let self, generation == self.uploadGeneration, self.uploadInProgress != nil
+                else { return }
+                // Whatever was said last, not what this hop was sent with: hops can cross.
+                self.uploadIsWaiting = latest.isRaised
+            }
+        }
     }
 
     /// The sink handed to the uploader, which reports from URLSession's queue. A report from an
     /// upload that has since ended must not move its successor's bar.
     private func progressReporter(
-        total: Int64, reached: ReachedYouTube
+        total: Int64, generation: Int, reached: Flag
     ) -> @Sendable (Int64) -> Void {
-        let generation = uploadGeneration
         return { [weak self] sent in
-            reached.raise()
+            reached.isRaised = true
             Task { @MainActor in
                 guard let self, generation == self.uploadGeneration, self.uploadInProgress != nil
                 else { return }

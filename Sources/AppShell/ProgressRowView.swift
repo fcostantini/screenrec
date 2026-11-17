@@ -23,7 +23,9 @@ final class ProgressRowView: NSView {
     let kind: Kind
     private let lead: NSAttributedString
     private let leadSize: NSSize
-    /// Drawn after the percentage: `· 1 waiting`.
+    /// Drawn after the percentage: `· 1 waiting`. Stamped when the row is built, like every
+    /// other row's words, and kept so the title that moves with the bar can repeat it.
+    let note: String?
     private let trailing: NSAttributedString?
     private var fraction: Double
 
@@ -35,6 +37,7 @@ final class ProgressRowView: NSView {
         ]
         self.lead = NSAttributedString(string: lead, attributes: attributes)
         leadSize = self.lead.size()
+        note = trailing
         self.trailing = trailing.map { NSAttributedString(string: $0, attributes: attributes) }
         let trailingWidth = self.trailing.map { Self.gap + ceil($0.size().width) } ?? 0
         super.init(frame: NSRect(
