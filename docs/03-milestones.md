@@ -4110,7 +4110,21 @@ uploaded. Detail in docs/07.
       Franco's go and four answers**: how long to wait for a dropped connection (proposed: 5 min
       without progress); one measurement upload (a 100-emoji title, then `DELETE` on the session);
       the real dead-sign-in check (he removes access, then reconnects); and a `Try Again` row that
-      continues the same upload, proposed as its own task **T6** before G40. The dropped
+      continues the same upload, proposed as its own task **T6** before G40. His answer,
+      2026-11-17: *"let's go"*, **taken as all four as recommended.**
+      ⏸ **Built 2026-11-17; uncommitted.** `UploadFailure` (one list, worded by the app and by
+      the CLI with exhaustive switches); the uploader resumes while bytes arrive and for 302 s
+      after the last one, renews a lapsed token once, and reports the session's opening and its
+      waits; the model drops a sign-in found dead at use, waits out a disconnect in progress, and
+      assembles the notice from the reason plus two sentences said only when true; the menu row
+      says `· waiting for the connection`. **1052 tests** (1027 → 1052); **37 breaks, 37 red**
+      (every pattern checked against the source before a test ran; one watched run first).
+      ✅ **Measured against YouTube** (docs/07): a title's 100 is counted in **code points** — the
+      sheet's rule changed to match; `DELETE` on a session closes it (`499`).
+      ⏳ **Still to do:** `/code-review`'s findings to Franco, before any is applied; the live checks,
+      each with his OK — the dead sign-in for real, the waiting row and notices on a fake-uploader
+      build; his look in Studio at the three private test entries.
+      The dropped
       connection (resume, bounded retries, then *Couldn't upload — the clip is saved*); the sign-in
       that expired or was removed (*YouTube needs reconnecting*, account back to not connected);
       the day's quota (*resets at midnight Pacific*); an account with no channel; a rejected length;
@@ -4141,6 +4155,15 @@ uploaded. Detail in docs/07.
       responses (`URLProtocol`); the export is on disk and in Recent Exports after every one. Live:
       **(human)** remove ScreenRec's access in the Google account, press upload, read *needs
       reconnecting*.
+
+- [ ] M40-T6 **A failed upload can be tried again, and a stopped one cleans up** (AppCore +
+      AppShell; from T5's plan, ruling 4, and T5's measurement). **Plan artifact first.** After a
+      failure the menu shows `Couldn't upload · ‹title›` with `Try Again`, which continues the
+      **same** upload from where it stopped — no retyping, no second entry — while YouTube still
+      has the session, and starts over when it does not. And, **if Franco's look in Studio shows
+      that `DELETE` removes the entry**: an upload that is cancelled, abandoned by a quit, or
+      given up on sends it, and the *delete it in Studio* sentences are said only when that
+      request itself failed. Not across a relaunch (M40's "left out" list stands).
 
 **Gate G40** — on the deployed build, with the consent screen **published** (✅ done by Franco
 2026-11-16 — it first needed a home page and a privacy link on the Branding page; docs/07):

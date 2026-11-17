@@ -7,6 +7,33 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-17 (M40-T5, measured against YouTube with sessions that were opened and never sent):
+  ✅ **YouTube counts a title's 100 in Unicode code points.** Opening a session with: 100 letters
+  → 200; 101 letters → `400 invalidTitle`; 100 × 😀 (100 code points, 200 UTF-16 units, 400
+  bytes) → 200; 14 × 👨‍👩‍👧‍👦 (98 code points) → 200; 15 × (105 code points, **15 Swift
+  `Character`s**) → `400 invalidTitle`. Not UTF-16 units, not bytes, not grapheme clusters. The
+  sheet counted `Character`s and would have let a 15-emoji title through to a refusal; it counts
+  `unicodeScalars` now and keeps a multi-code-point character whole or not at all.
+  ✅ **The title is judged when the session opens**, before any byte — so a refused title costs
+  no transfer and leaves no entry.
+  ✅ **`DELETE` on the session URL is honoured, undocumented:** it answers `499` (reason
+  `backendError`), and a status query on the session then answers `499` too, where before it
+  answered `308`. The session is closed. ⚠️ **Whether the channel's unfinished entry goes with
+  it is not known yet** — that is Franco's look in Studio at three private test entries (100 😀,
+  100 `a`, 14 family emoji). If they are gone, a stopped or failed upload can clean up after
+  itself and most of the *delete it in Studio* wording becomes unnecessary (filed as T6).
+  ✅ **A measurement needs no video.** A session opens with only the metadata and a declared
+  length (`X-Upload-Content-Length`); nothing is sent, and the answer to "would YouTube take
+  this title" comes back in one request.
+  ⚠️ **A property named `access`, or a closure parameter named `access`, collides with
+  `@Observable`:** the macro expands each tracked property beside a function of that name, and
+  the errors point into the expansion (`cannot call value of non-function type`), not at the
+  name. The uploader's parameter is `pass` for that reason.
+  ⚠️ **Patience is counted in waits, not on a clock.** `YouTubeUploader.waits` (2 s doubling to
+  60 s, 302 s in all) is consumed one wait per failed try and refilled whenever YouTube reports
+  more bytes than last time. No wall clock, so tests inject `sleep` and assert the exact waits;
+  the time a dying request takes to time out is on top of it.
+
 - 2026-11-17 (M40-T4, the fixes on screen — a second fake-uploader build):
   ✅ **A notice posted in the same turn as a quit does arrive.** Posted from the cancel itself,
   with the exit held 0.3 s: delivered after `Quit Anyway`, and after a terminate request from
