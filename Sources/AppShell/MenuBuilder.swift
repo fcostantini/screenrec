@@ -209,6 +209,10 @@ struct MenuBuilder {
             items.append(MenuRow.submenu(last.menuTitle, uploadActions(last)))
             items.append(MenuRow.separator())
         }
+        if let failed = state.uploads.failedUpload {
+            items.append(MenuRow.submenu(failed.menuTitle, failedUploadActions(failed)))
+            items.append(MenuRow.separator())
+        }
         if let token = state.uploads.currentUploadToken {
             let fraction = state.uploads.uploadProgress ?? 0
             // Stamped like every other row (M6-T10): only the bar and its number move while the
@@ -429,6 +433,33 @@ struct MenuBuilder {
             items.append(fileAction("Reveal File in Finder", upload.file, Finder.reveal))
         }
         return items
+    }
+
+    /// What a failed upload's row offers (M40-T6): why, then `Try Again` when the same upload
+    /// could go through, the clip while it exists, Studio when YouTube holds an unfinished entry.
+    private func failedUploadActions(_ failed: FailedUpload) -> [NSMenuItem] {
+        let clipExists = FileManager.default.fileExists(atPath: failed.file.path)
+        var actions: [NSMenuItem] = []
+        if failed.canTryAgain {
+            let account = UploadCopy.trimAction(
+                state.uploads.account, canSignIn: state.uploads.canSignIn)
+            // Live with no account too: the press is how one gets connected, as on the file row.
+            actions.append(
+                MenuRow.action("Try Again", enabled: account == .upload || account == .connect) {
+                    ShareActions.tryAgain(failed, state: state)
+                })
+        }
+        if clipExists {
+            actions.append(fileAction("Reveal File in Finder", failed.file, Finder.reveal))
+        }
+        if failed.leavesEntry {
+            actions.append(MenuRow.link("Open YouTube Studio", url: UploadCopy.studioURL))
+        }
+        let reason = MenuRow.label(UploadCopy.menuReason(failed, clipExists: clipExists))
+        let dismiss = MenuRow.action("Dismiss") { state.uploads.dismissFailedUpload() }
+        // A failure with nothing to act on is the reason and the way to clear it.
+        return [reason, MenuRow.separator()]
+            + (actions.isEmpty ? [] : actions + [MenuRow.separator()]) + [dismiss]
     }
 
     /// The per-file submenu shared by recents and every receipt: act on this file (M12-T1), then

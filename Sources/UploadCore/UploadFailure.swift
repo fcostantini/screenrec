@@ -44,6 +44,20 @@ public enum UploadFailure: Equatable, Sendable {
     case projectNotSetUp
     case other
 
+    /// Whether the same upload, with nothing changed, could go through another time (M40-T6).
+    /// Not when what stopped it is still there: a clip that has gone, words YouTube refused, a
+    /// build that cannot upload at all.
+    public var canRetry: Bool {
+        switch self {
+        case .clipMissing, .refusedTitle, .refusedDescription, .refused, .projectNotSetUp:
+            false
+        case .connectionLost, .unreachable, .youTubeUnavailable, .signInEnded, .signInRefused,
+            .notConnected, .channelLimitReached, .projectQuotaSpent, .noChannel, .sessionLost,
+            .other:
+            true
+        }
+    }
+
     public init(_ error: any Error) {
         switch error {
         case let gaveUp as UploadGaveUp:

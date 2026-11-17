@@ -19,6 +19,16 @@ public struct RecordingNotification: Sendable, Equatable {
     }
 }
 
+/// What `Try Again` would do for a failed upload (M40-T6).
+public enum UploadRetry: Equatable, Sendable {
+    /// Nothing: trying again could only fail the same way.
+    case none
+    /// Pick the same upload up where it stopped, finishing the entry YouTube already holds.
+    case continues
+    /// Start a new upload with what the sheet held.
+    case startsFresh
+}
+
 /// Turns engine events into notification copy.
 ///
 /// Pure, so docs/06's copy rules are assertions rather than good intentions — and because
@@ -271,21 +281,24 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
-    /// A clip landed on YouTube (M40-T3), in the two forms ADR-024's clipboard rule leaves
-    /// (M40-T4): the link was copied, or the clipboard had changed and the link is in the menu.
-    /// A click opens the video.
+    /// A clip landed on YouTube, in the two forms ADR-024's clipboard rule leaves: the link was
+    /// copied, or the clipboard had changed and the link is in the menu. A click opens the video.
+    /// `earlierEntryMayRemain`: an attempt before this one left an entry it did not finish.
     public static func uploaded(
-        title: String, visibility: String, link: String, file: URL, linkCopied: Bool
+        title: String, visibility: String, link: String, file: URL, linkCopied: Bool,
+        earlierEntryMayRemain: Bool = false
     ) -> RecordingNotification {
         let shown = link.replacingOccurrences(of: "https://", with: "")
+        // The link is spelled out when it could not be copied: the menu's receipt is replaced
+        // by the next upload, and this notice is then the only place it is kept.
+        let landed = linkCopied
+            ? "“\(title)” is \(visibility). ⌘V pastes \(shown)."
+            : "“\(title)” is \(visibility) · \(shown). Your clipboard changed meanwhile, so "
+                + "the link wasn't copied; it is in the menu under Copy Link."
+        let earlier = earlierEntryMayRemain ? earlierEntrySentence : nil
         return RecordingNotification(
             title: linkCopied ? "Uploaded to YouTube · link copied" : "Uploaded to YouTube",
-            // The link is spelled out when it could not be copied: the menu's receipt is
-            // replaced by the next upload, and this notice is then the only place it is kept.
-            body: linkCopied
-                ? "“\(title)” is \(visibility). ⌘V pastes \(shown)."
-                : "“\(title)” is \(visibility) · \(shown). Your clipboard changed meanwhile, so "
-                    + "the link wasn't copied; it is in the menu under Copy Link.",
+            body: [landed, earlier].compactMap { $0 }.joined(separator: " "),
             fileURL: file, link: URL(string: link))
     }
 
@@ -300,21 +313,32 @@ public enum RecordingNotifications {
             fileURL: file, link: UploadCopy.studioURL)
     }
 
-    /// An upload failed (M40-T5). `reason` first, then two sentences said only when true: that
-    /// the clip is still on disk — the export always finishes first (ADR-007), but a clip gone
-    /// missing can be the failure itself — and that YouTube keeps an unfinished entry (07).
+    /// An upload failed. `reason`, then what `Try Again` would do, then two sentences said only
+    /// when true: that the clip is still on disk (a clip gone missing can be the failure), and
+    /// which entry is left on YouTube — this attempt's, unless the retry would finish it, or
+    /// an earlier one's when this attempt holds none to confuse it with.
     public static func uploadFailed(
-        reason: String, title: String, file: URL, clipExists: Bool, leavesEntry: Bool
+        reason: String, title: String, file: URL, clipExists: Bool, leavesEntry: Bool,
+        retry: UploadRetry = .none, earlierEntryMayRemain: Bool = false
     ) -> RecordingNotification {
+        let again: String? = switch retry {
+        case .none: nil
+        case .continues: "Try Again in the menu continues where it stopped."
+        case .startsFresh: "Try Again is in the menu."
+        }
         let saved = clipExists ? "The clip is saved as \(file.lastPathComponent)." : nil
-        let entry = leavesEntry
+        let own = leavesEntry && retry != .continues
             ? "YouTube keeps an unfinished entry named “\(title)”; delete it in YouTube Studio."
             : nil
+        let earlier = earlierEntryMayRemain && !leavesEntry ? earlierEntrySentence : nil
         return RecordingNotification(
             title: "Couldn't upload to YouTube",
-            body: [reason, saved, entry].compactMap { $0 }.joined(separator: " "),
+            body: [reason, again, saved, own ?? earlier].compactMap { $0 }.joined(separator: " "),
             fileURL: clipExists ? file : nil)
     }
+
+    private static let earlierEntrySentence =
+        "An earlier unfinished entry may still be on your channel; delete it in YouTube Studio."
 
     /// The lossless trim (M10-T4) finished — reveal the clipped copy.
     public static func trimmed(url: URL) -> RecordingNotification {

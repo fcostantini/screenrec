@@ -62,7 +62,7 @@ import UploadCore
 
         #expect(
             posted.all.first?.body
-                == "The connection dropped and didn't come back in 5 minutes. The clip is saved as \(file.lastPathComponent). \(entry)")
+                == "The connection dropped and didn't come back in 5 minutes. Try Again is in the menu. The clip is saved as \(file.lastPathComponent). \(entry)")
         #expect(model.account == .connected(expires: nil))
     }
 
@@ -78,7 +78,7 @@ import UploadCore
 
         #expect(
             posted.all.first?.body
-                == "Your channel has reached YouTube's upload limit for today. YouTube lifts it within a day. The clip is saved as \(file.lastPathComponent).")
+                == "Your channel has reached YouTube's upload limit for today. YouTube lifts it within a day. Try Again is in the menu. The clip is saved as \(file.lastPathComponent).")
     }
 
     /// An expired session is YouTube letting go of the entry, not keeping it.
@@ -96,7 +96,7 @@ import UploadCore
 
         #expect(
             posted.all.first?.body
-                == "YouTube gave up on the unfinished upload. Upload the clip again. The clip is saved as \(file.lastPathComponent).")
+                == "YouTube gave up on the unfinished upload. Upload the clip again. Try Again is in the menu. The clip is saved as \(file.lastPathComponent).")
     }
 
     /// "The clip is saved as…" is untrue when the clip going missing is the failure.
@@ -165,7 +165,7 @@ import UploadCore
         #expect(model.lastFailure == "The last sign-in has ended. Connect again.")
         #expect(
             posted.all.first?.body
-                == "YouTube needs reconnecting: the sign-in has ended. Connect again in Settings. The clip is saved as \(file.lastPathComponent). \(entry)")
+                == "YouTube needs reconnecting: the sign-in has ended. Connect again in Settings. Try Again is in the menu. The clip is saved as \(file.lastPathComponent). \(entry)")
     }
 
     /// A token Google has just renewed and YouTube still turns down is not a dead sign-in: the
@@ -186,7 +186,7 @@ import UploadCore
         #expect(model.lastFailure == nil)
         #expect(
             posted.all.first?.body
-                == "YouTube didn't accept the sign-in. Try again; if it keeps happening, disconnect and connect again in Settings. The clip is saved as \(file.lastPathComponent).")
+                == "YouTube didn't accept the sign-in. Try again; if it keeps happening, disconnect and connect again in Settings. Try Again is in the menu. The clip is saved as \(file.lastPathComponent).")
     }
 
     /// An empty file is still there: it is not "moved or deleted", and it is still "saved".

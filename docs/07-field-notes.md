@@ -7,6 +7,66 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-17 (M40-T6, one real upload cut on purpose and finished by `Try Again`):
+  ✅ **Continuing the same session finishes the same entry: one video, no leftover.** A 64 MB
+  clip's first transfer was cancelled client-side as its progress crossed 40%; seventeen
+  seconds later `Try Again` asked the session what it held and sent the rest. Franco's look in
+  Studio: exactly one video of that name, nothing left "Processing will begin shortly". This
+  is the measurement the whole task rested on.
+  ✅ **YouTube holds what arrived, not what the client last reported:** the retry's first
+  reading was 46%, past the 40% at which the transfer was cut. Never resume from the client's
+  own count — ask.
+  ✅ **How the cut was staged, without touching the uploader:** an `HTTPTransport` wrapper that
+  runs the real transfer in a child task, cancels it from the progress callback at 40%, and
+  rethrows `URLError(.networkConnectionLost)`; the uploader built with `waits: []` gives up at
+  once. Cut from the **progress callback, not a timer** — this line sent all 64 MB in about
+  fifteen seconds. The notice then says "didn't come back in 5 minutes", which is the
+  stand-in's lie (no waits), not a bug.
+  ✅ **A temporary build can wait for a human without living in the tree:** build and bundle
+  it, `ditto` the bundle aside, take the scaffold out, and deploy the kept bundle when he is
+  back. Two modes read from a scratch file at launch (`fake`, `real`) made one build serve
+  both checks.
+
+- 2026-11-17 (M40-T6, what the review and the quality pass found in the first `Try Again`):
+  🔴 **A session is only a URL, so it must be remembered with the sign-in it was opened
+  under.** The first version dropped a failed upload's session at sign-out, and missed the one
+  that was still *running* or *queued* at the disconnect: its failure arrived afterwards and
+  stored the session again, ready to be continued with the next account's token. Whether
+  YouTube would honour account A's session with account B's token was **not** measured — the
+  app never asks. The model keeps `(session, sign-in)` and continues only while that sign-in
+  stands.
+  🔴 **"Start over" may be decided only on an answer about the upload itself**: `404`, or a
+  final `4xx` to the first status question (which of them a stale session really gives was
+  not measured; the tests script `400`, `403`, `410` and `499`). A `401`, a spent quota or a
+  `5xx` says nothing about the session, and
+  starting over on one forgets an upload YouTube still holds. The sharp one is a **`200` whose
+  body can't be read**: that is "done", and starting over on it publishes the clip twice.
+  ⚠️ **Only until YouTube has answered once.** After the first status answer a continued
+  upload is this call's own; a session that vanishes later is a failure to report, exactly as
+  for an upload that was never continued.
+  ⚠️ **Two unfinished entries of one clip share a name in Studio.** So a notice never says
+  "delete the earlier entry" while `Try Again` could still finish a live one — the user could
+  delete the wrong one. The earlier entry is named when the attempt holds none of its own, and
+  when the upload lands.
+  ⚠️ **Left as designed, and worth knowing:** `Dismiss`, or the row's day running out, drops a
+  kept session — the only thing that could finish that entry — and no notice says so. The row
+  offers `Open YouTube Studio` until then.
+  ✅ **A mutation sweep's dry check earns its keep after every review round:** 4 + 3 + 2 of
+  the quoted lines had changed under it across three rounds, and a stale pattern is a break
+  that silently tests nothing.
+
+- 2026-11-17 (M40-T6, the live check that met a locked screen):
+  🔴 **A locked screen makes UI driving lie quietly.** Franco locked the Mac a minute into an
+  approved check. `menudriver dump` and `press` went on "working" — the menu's AX tree is
+  still served — but **no window can be reached**: `kAXWindows` returns the application
+  element itself, so a pressed `Upload to YouTube…` reported `pressed` and then nothing could
+  be read or clicked. The app's replay counter read `0:00` throughout, which looked like a
+  regression and was the display asleep.
+  ✅ **Check before and during a driving leg:** `ioreg -n Root -d1 -a` has
+  `CGSSessionScreenIsLocked` = true while locked, and WindowServer logs `Display:Power …
+  Broadcast: Will Sleep` at the second it happened. A lock mid-run is a pause in the sense of
+  the standing rule: stop everything visible and resume on his word.
+
 - 2026-11-17 (M40-T5's measurement, closed by Franco's look in Studio):
   🔴 **`DELETE` on the session URL closes the session and leaves the channel's entry.** The
   three private entries it was sent to (100 😀, 100 `a`, 14 family emoji) were all still listed

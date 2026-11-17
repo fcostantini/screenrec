@@ -561,6 +561,201 @@ import Testing
         #expect(transport.requests.count == 1)   // the session's opening, and no status query
     }
 
+    // MARK: - Continuing an upload left unfinished (M40-T6)
+
+    private let gone = ScriptedTransport.Answer.response(status: 404, body: "{}")
+
+    /// The session an upload opens is the address it can be continued at later, so it is
+    /// handed out the moment it exists.
+    @Test func aFreshUploadSaysWhichSessionItOpened() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([open(), .response(status: 201, body: resource)])
+        let opened = Sessions()
+        _ = try await instant(transport).upload(
+            file, metadata: metadata, accessToken: { _ in "at" }, continuing: nil,
+            events: .init(opened: { opened.record($0) }))
+        #expect(opened.all.map(\.url) == [session.url])
+        #expect(opened.all.first?.fileSize == 1000)
+    }
+
+    /// Continuing asks first and sends only what is missing: no second session, so no second
+    /// entry on the channel — the one the earlier attempt left becomes the video.
+    @Test func aContinuedUploadAsksWhatYouTubeHoldsAndSendsTheRest() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([quarter, .response(status: 201, body: resource)])
+        let opened = Sessions()
+        let startedOver = States()
+        let video = try await instant(transport).upload(
+            file, metadata: metadata, accessToken: { _ in "at" }, continuing: session,
+            events: .init(opened: { opened.record($0) }, startedOver: { startedOver.record(true) }))
+        #expect(video.id == "dQw4w9WgXcQ")
+        #expect(transport.requests.count == 1)                        // the question, and no opening
+        #expect(transport.requests.first?.httpMethod == "PUT")
+        #expect(transport.uploads.map(\.offset) == [250])
+        #expect(opened.all.isEmpty)
+        #expect(startedOver.values.isEmpty)
+    }
+
+    @Test func aContinuedUploadYouTubeAlreadyFinishedSendsNothing() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([.response(status: 200, body: resource)])
+        let video = try await instant(transport).upload(
+            file, metadata: metadata, accessToken: { _ in "at" }, continuing: session, events: .init())
+        #expect(video.id == "dQw4w9WgXcQ")
+        #expect(transport.uploads.isEmpty)
+    }
+
+    /// A session has a finite life. When the one to continue is gone, the upload begins again
+    /// from nothing — and says so, because the earlier entry may still be on the channel.
+    @Test func aContinuedUploadWhoseSessionIsGoneStartsOver() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([gone, open(), .response(status: 201, body: resource)])
+        let opened = Sessions()
+        let startedOver = States()
+        let video = try await instant(transport).upload(
+            file, metadata: metadata, accessToken: { _ in "at" }, continuing: session,
+            events: .init(opened: { opened.record($0) }, startedOver: { startedOver.record(true) }))
+        #expect(video.id == "dQw4w9WgXcQ")
+        #expect(startedOver.values == [true])
+        #expect(opened.all.count == 1)
+        #expect(transport.uploads.map(\.offset) == [0])
+    }
+
+    /// Only a continued upload starts over. One whose own session vanishes mid-way has lost
+    /// bytes it thought were safe, and that is a failure to report, not to paper over.
+    @Test func anUploadWhoseOwnSessionVanishesIsNotQuietlyRestarted() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([open(), dropped, gone, open()])
+        let error = await #expect(throws: YouTubeError.sessionExpired) {
+            try await self.instant(transport).upload(file, metadata: self.metadata, accessToken: "at")
+        }
+        #expect(transport.uploads.count == 1)
+        #expect(error.map { UploadFailure($0) } == .sessionLost)
+    }
+
+    /// A clip that changed since the session was opened for it cannot go into that session —
+    /// but it is a perfectly good clip, so it goes up from nothing instead of being refused.
+    @Test func aContinuedUploadOfAClipThatChangedStartsOver() async throws {
+        let file = try makeFile(bytes: 800)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([open(), .response(status: 201, body: resource)])
+        let startedOver = States()
+        let video = try await instant(transport).upload(
+            file, metadata: metadata, accessToken: { _ in "at" }, continuing: session,
+            events: .init(startedOver: { startedOver.record(true) }))
+        #expect(video.id == "dQw4w9WgXcQ")
+        #expect(startedOver.values == [true])
+        #expect(transport.requests.count == 1)                 // the opening; the old session is not asked
+        #expect(transport.requests.first?.httpMethod == "POST")
+        #expect(transport.uploads.map(\.offset) == [0])
+    }
+
+    /// "That upload is gone" has more than one spelling: a stale or cancelled session answers
+    /// with whatever it likes. Any final word to the first question means begin again.
+    @Test(arguments: [400, 403, 410, 499])
+    func anyFinalAnswerAboutTheUploadToContinueStartsItOver(status: Int) async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([
+            .response(status: status, body: "{}"), open(), .response(status: 201, body: resource),
+        ])
+        let startedOver = States()
+        let video = try await instant(transport).upload(
+            file, metadata: metadata, accessToken: { _ in "at" }, continuing: session,
+            events: .init(startedOver: { startedOver.record(true) }))
+        #expect(video.id == "dQw4w9WgXcQ")
+        #expect(startedOver.values == [true])
+    }
+
+    /// An answer about the token, the quota or the server, or one that can't be read, is not
+    /// an answer about the upload. Starting over on one would forget an upload YouTube may
+    /// still hold — or, for a reply that was really "done", publish the clip twice.
+    @Test(arguments: [
+        [#"{"error":{"code":403,"errors":[{"reason":"quotaExceeded"}]}}"#: 403],
+        [#"{"error":{"code":403,"errors":[{"reason":"uploadLimitExceeded"}]}}"#: 403],
+        ["{}": 507],
+        ["not a video": 200],
+    ])
+    func anAnswerAboutSomethingElseDoesNotStartAContinuedUploadOver(answer: [String: Int]) async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let (body, status) = try #require(answer.first)
+        let transport = ScriptedTransport([
+            .response(status: status, body: body), open(), .response(status: 201, body: resource),
+        ])
+        let startedOver = States()
+        await #expect(throws: (any Error).self) {
+            try await self.instant(transport).upload(
+                file, metadata: self.metadata, accessToken: { _ in "at" }, continuing: self.session,
+                events: .init(startedOver: { startedOver.record(true) }))
+        }
+        #expect(startedOver.values.isEmpty)
+        #expect(transport.requests.count == 1)                 // the question, and no new opening
+    }
+
+    /// A token refused even after it was renewed is the sign-in's trouble, not the upload's.
+    @Test func aRefusedTokenDoesNotStartAContinuedUploadOver() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let lapsed = ScriptedTransport.Answer.response(status: 401, body: "{}")
+        let transport = ScriptedTransport([lapsed, lapsed, open()])
+        let startedOver = States()
+        await #expect(throws: YouTubeError.notAuthorized) {
+            try await self.instant(transport).upload(
+                file, metadata: self.metadata, accessToken: { _ in "at" }, continuing: self.session,
+                events: .init(startedOver: { startedOver.record(true) }))
+        }
+        #expect(startedOver.values.isEmpty)
+        #expect(transport.requests.count == 2)
+    }
+
+    /// A busy server or a broken line is not an answer about the upload: it is waited out.
+    @Test func aContinuedUploadWaitsOutABrokenLineBeforeItsFirstAnswer() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([dropped, quarter, .response(status: 201, body: resource)])
+        let startedOver = States()
+        let video = try await instant(transport).upload(
+            file, metadata: metadata, accessToken: { _ in "at" }, continuing: session,
+            events: .init(startedOver: { startedOver.record(true) }))
+        #expect(video.id == "dQw4w9WgXcQ")
+        #expect(startedOver.values.isEmpty)
+        #expect(transport.uploads.map(\.offset) == [250])
+    }
+
+    /// Once YouTube has answered for the upload being continued, it is this call's own: losing
+    /// it later is a failure to report, as it is for an upload that was never continued.
+    @Test func aContinuedUploadThatVanishesAfterAnsweringIsNotRestarted() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([quarter, dropped, gone, open()])
+        let startedOver = States()
+        await #expect(throws: YouTubeError.sessionExpired) {
+            try await self.instant(transport).upload(
+                file, metadata: self.metadata, accessToken: { _ in "at" }, continuing: self.session,
+                events: .init(startedOver: { startedOver.record(true) }))
+        }
+        #expect(startedOver.values.isEmpty)
+        #expect(transport.uploads.count == 1)
+    }
+
+    @Test func aFailureCanBeRetriedUnlessWhatStoppedItIsStillThere() {
+        let again: [UploadFailure] = [
+            .connectionLost, .unreachable, .youTubeUnavailable, .signInEnded, .signInRefused,
+            .notConnected, .channelLimitReached, .projectQuotaSpent, .noChannel, .sessionLost, .other,
+        ]
+        let never: [UploadFailure] = [
+            .clipMissing, .refusedTitle, .refusedDescription, .refused, .projectNotSetUp,
+        ]
+        for failure in again { #expect(failure.canRetry) }
+        for failure in never { #expect(!failure.canRetry) }
+    }
+
     // MARK: - The one list of failures
 
     @Test func everyFailureHasItsPlaceInTheList() {
@@ -684,4 +879,13 @@ private final class TaskHandle: @unchecked Sendable {
 
     func set(_ task: Task<UploadedVideo, any Error>) { lock.withLock { self.task = task } }
     func cancel() { lock.withLock { task?.cancel() } }
+}
+
+/// Collects the sessions an uploader said it opened.
+private final class Sessions: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [UploadSession] = []
+
+    func record(_ value: UploadSession) { lock.withLock { recorded.append(value) } }
+    var all: [UploadSession] { lock.withLock { recorded } }
 }

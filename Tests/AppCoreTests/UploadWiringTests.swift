@@ -342,7 +342,7 @@ import UploadCore
         // Met once and not waited for: "could not reach", never "did not come back".
         #expect(
             posted.all.first?.body
-                == "Couldn't reach YouTube. Check the connection and upload again. The clip is saved as \(file.lastPathComponent).")
+                == "Couldn't reach YouTube. Check the connection and upload again. Try Again is in the menu. The clip is saved as \(file.lastPathComponent).")
         #expect(model.account == .connected(expires: nil))
         #expect(model.uploadInProgress == nil)
     }

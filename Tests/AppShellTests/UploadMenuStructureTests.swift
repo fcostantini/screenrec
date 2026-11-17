@@ -177,6 +177,127 @@ import UploadCore
         #expect(landed.count == 2)   // the second went up: the stale row did not stop it
     }
 
+    // MARK: - A failed upload (M40-T6)
+
+    private let session = UploadSession(
+        url: URL(string: "https://upload.example/session-1")!, fileSize: 1000, contentType: "video/mp4")
+
+    @Test func aFailedUploadStaysInTheMenuWithAWayToTryAgain() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let state = state()
+        let attempts = Started()
+        state.uploads.uploadFunction = { [video, session] _, _, pass, _ in
+            guard attempts.next() == 1 else { return video }
+            pass.opened(session)
+            throw UploadGaveUp(underlying: URLError(.networkConnectionLost))
+        }
+        state.uploads.upload(file, metadata: metadata)
+        await drain(state.uploads)
+
+        let row = "Couldn't upload · My clip"
+        #expect(MenuSnapshot.titles(state).contains(row))
+        #expect(submenu(state, of: row) == [
+            "The connection dropped and didn't come back in 5 minutes.", "---",
+            "Try Again", "Reveal File in Finder", "Open YouTube Studio", "---",
+            "Dismiss",
+        ])
+        let items = MenuSnapshot.item(state, titled: row)?.submenu?.items ?? []
+        #expect(items.first?.isEnabled == false)             // the reason states; it does nothing
+        #expect(
+            MenuSnapshot.item(state, titled: "Open YouTube Studio")?.representedObject as? URL
+                == URL(string: "https://studio.youtube.com"))
+
+        let tryAgain = try #require(MenuSnapshot.item(state, titled: "Try Again"))
+        #expect(tryAgain.isEnabled)
+        _ = tryAgain.target?.perform(tryAgain.action)
+        await drain(state.uploads)
+        #expect(!MenuSnapshot.titles(state).contains(row))
+        #expect(MenuSnapshot.titles(state).contains("Uploaded to YouTube · My clip"))
+        #expect(attempts.count == 2)
+    }
+
+    /// The row is the upload, not a snapshot of it: a clip renamed after the menu was built
+    /// must not turn its `Try Again` into a press that does nothing.
+    @Test func tryAgainStillWorksOnARowBuiltBeforeItsClipWasRenamed() async throws {
+        let file = try makeFile()
+        let renamed = file.deletingLastPathComponent()
+            .appendingPathComponent("renamed-\(UUID().uuidString).mp4")
+        defer {
+            try? FileManager.default.removeItem(at: file)
+            try? FileManager.default.removeItem(at: renamed)
+        }
+        let state = state()
+        let attempts = Started()
+        state.uploads.uploadFunction = { [video] _, _, _, _ in
+            guard attempts.next() == 1 else { return video }
+            throw YouTubeError.uploadLimitExceeded
+        }
+        state.uploads.upload(file, metadata: metadata)
+        await drain(state.uploads)
+        let tryAgain = try #require(MenuSnapshot.item(state, titled: "Try Again"))
+
+        try FileManager.default.moveItem(at: file, to: renamed)
+        state.uploads.fileRenamed(from: file, to: renamed)
+        _ = tryAgain.target?.perform(tryAgain.action)
+        await drain(state.uploads)
+
+        #expect(attempts.count == 2)
+        #expect(state.uploads.lastUpload?.file == renamed)
+    }
+
+    /// Nothing to try and nothing to open: the reason, and the way to clear it.
+    @Test func aFailureWithNothingToRetryOffersOnlyItsReasonAndDismiss() async throws {
+        let missing = FileManager.default.temporaryDirectory
+            .appendingPathComponent("gone-\(UUID().uuidString).mp4")
+        let state = state()
+        state.uploads.upload(missing, metadata: metadata)
+        await drain(state.uploads)
+
+        let row = "Couldn't upload · My clip"
+        #expect(submenu(state, of: row) == [
+            "The clip was moved or deleted before it could be sent.", "---", "Dismiss",
+        ])
+        let dismiss = try #require(MenuSnapshot.item(state, titled: "Dismiss"))
+        _ = dismiss.target?.perform(dismiss.action)
+        #expect(!MenuSnapshot.titles(state).contains(row))
+    }
+
+    /// Between the receipt and the upload running now: landed, failed, in flight.
+    @Test func theFailedRowSitsBetweenTheReceiptAndTheRunningUpload() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let state = state()
+        state.uploads.uploadFunction = { [video] _, _, _, _ in video }
+        state.uploads.upload(file, metadata: metadata)
+        await drain(state.uploads)
+        state.uploads.uploadFunction = { _, _, _, _ in throw YouTubeError.uploadLimitExceeded }
+        state.uploads.upload(file, metadata: VideoMetadata(title: "Second", privacy: .unlisted))
+        await drain(state.uploads)
+        let finish = AsyncStream<Void>.makeStream()
+        state.uploads.uploadFunction = { [video] _, _, _, _ in
+            for await _ in finish.stream { break }
+            return video
+        }
+        state.uploads.upload(file, metadata: VideoMetadata(title: "Third", privacy: .unlisted))
+
+        let titles = MenuSnapshot.titles(state)
+        let receipt = try #require(titles.firstIndex(of: "Uploaded to YouTube · My clip"))
+        #expect(Array(titles[receipt...(receipt + 6)]) == [
+            "Uploaded to YouTube · My clip", "---",
+            "Couldn't upload · Second", "---",
+            "Uploading to YouTube… 0%", "Cancel Upload", "---",
+        ])
+        // No account trouble, nothing opened: the retry is offered, and there is no entry to open.
+        #expect(submenu(state, of: "Couldn't upload · Second") == [
+            "Your channel has reached YouTube's upload limit for today.", "---",
+            "Try Again", "Reveal File in Finder", "---", "Dismiss",
+        ])
+
+        finish.continuation.yield()
+        await drain(state.uploads)
+    }
+
     // MARK: - The receipt
 
     @Test func aLandedUploadLeavesAReceiptWithItsLinkThreeWays() async throws {

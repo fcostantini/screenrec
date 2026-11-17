@@ -17,15 +17,7 @@ public struct LastUpload: Equatable, Sendable {
         self.date = date
     }
 
-    /// A menu is as wide as its widest row and cannot truncate one, and a title runs to 100
-    /// characters — so the row carries the start of it.
-    public var menuTitle: String {
-        let shown = title.count > Self.titleLength
-            ? title.prefix(Self.titleLength - 1) + "…" : Substring(title)
-        return "Uploaded to YouTube · \(shown)"
-    }
-
-    private static let titleLength = 40
+    public var menuTitle: String { "Uploaded to YouTube · \(UploadCopy.shortened(title))" }
 
     public var link: String { UploadedVideo.link(forID: videoID) }
     public var watchURL: URL? { URL(string: link) }

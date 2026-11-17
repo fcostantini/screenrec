@@ -16,23 +16,22 @@
   (docs/07, 2026-11-17 — `log show` alone cannot see a clean run). A push runs the suite too.
   **Next: back to M40-T4** (below).
 
-- **⏸ M40-T6 BUILT AND REVIEWED, NOT COMMITTED (2026-11-17) — waiting on Franco's desktop.**
-  Plan `claude.ai/artifact/AuVodjvViyFqv38r8pJEpZ`. `/code-review medium`'s nine findings were
-  ruled *"as proposed"* and applied; the quality pass tightened two (docs/03 under M40-T6).
-  Working tree: clean of scaffold, dev loop green, **1097 tests; T6's sweep 48 / 48 red.**
-  docs/06 and docs/07 carry T6's changes and go in its commit.
-  ⚠️ **The installed app is a TEMPORARY fail-on-purpose build with a stand-in account** (not
-  his sign-in, which is untouched and connected). It must be replaced before the session ends.
-  **Live check 1 is half done** (row, reason, `Try Again` continuing at 41%, `Cancel Upload`,
-  both notices — all as specified); **Franco locked his screen mid-run, so driving stopped.**
-  **Next, in this order, each only on his word:** (1) finish check 1: fail a second fake
-  upload, press `Dismiss`; (2) check 2, already approved once: the two-mode build kept at
-  `<scratchpad>/t6/scaffold/ScreenRec.app` with `echo real > <scratchpad>/t6/mode` cuts the
-  first transfer of `~/Movies/ScreenRec test 13 trimmed.mp4` (61 MB) at 40% and gives up at
-  once; `Try Again` must finish the same upload; he then looks in Studio for one video and no
-  leftover; (3) deploy the clean build, check `strings` for no scaffold, delete the three
-  sample clips; (4) tick, commit `M40-T6`, push; (5) **G40**: the README's "arriving in 1.23"
-  note, `CHANGELOG.md`, `VERSION` 1.23.0, the gate's own checks in docs/03.
+- **✅ M40-T6 DONE (2026-11-17) — a failed upload can be tried again, and finishes the same one.**
+  The menu keeps `Couldn't upload · ‹title›` for a day, with the reason, `Try Again`, the clip,
+  Studio and `Dismiss`. `Try Again` continues the **same** upload while YouTube still has it
+  and the sign-in it began under still stands, and starts over when not; the notices say which,
+  and name an entry only when it will not be finished. Plan
+  `claude.ai/artifact/AuVodjvViyFqv38r8pJEpZ`; `/code-review medium`'s nine findings ruled *"as
+  proposed"* and applied (docs/03). **1097 tests** (1061 → 1097); **96 breaks, 96 red.**
+  **Live:** the row, `Try Again`, `Cancel Upload` and `Dismiss` on a fail-on-purpose build; then
+  for real — a 64 MB clip cut at 40%, `Try Again` picking up at 46% and landing one unlisted
+  video nine seconds later, link copied, no "earlier entry" sentence. **(human) Franco, in
+  Studio: one video, no leftover.** Installed: the clean T6 build (no scaffold in `strings`).
+  ⚠️ **Left as designed:** `Dismiss`, or the row's day running out, drops a kept session and no
+  notice says so (docs/07) — put to Franco in the session's report.
+  **Next: gate G40** (docs/03): the gate's own checks on the deployed build, the README's
+  "arriving in 1.23" note, `CHANGELOG.md` 1.23.0, `VERSION` 1.23.0, tag. **Not started — a
+  checkpoint with Franco comes first.**
 
 - **✅ M40-T5 DONE (2026-11-17) — every failed upload says why, and what to do next.**
   `UploadFailure`: one list, worded by the app and the CLI. The uploader resumes while bytes
@@ -278,7 +277,8 @@
 - [x] **M40-T2 — where the sign-in is stored** (Franco, 2026-11-16): a private file; ADR-024 amended.
 - [ ] **M40 — confirm ScreenRec is gone from your Google account's access page** after T2's
       Disconnect (`security.google.com/settings/security/permissions`).
-- [ ] **M40 — delete the seven test videos** in YouTube Studio ("ScreenRec test …"), and say whether
+- [ ] **M40 — delete the test videos** in YouTube Studio ("ScreenRec test …", now including
+      *test 13* from T6's live check, and the three unfinished measurement entries), and say whether
       Studio flags any about audience. Also still owed: the Keychain dialog's wording, whether a
       firewall dialog ever appeared, and whether the console lists the scope as sensitive or
       restricted.

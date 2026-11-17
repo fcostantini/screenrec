@@ -75,6 +75,12 @@ public final class UploadModel {
         }
     }
 
+    /// The upload that failed last, for the menu's row and its `Try Again` (M40-T6). In memory
+    /// only; replaced by a newer failure, gone when it is tried again or dismissed.
+    public private(set) var failedUpload: FailedUpload?
+    /// What that upload was asked with, and the session to continue if YouTube opened one.
+    private var failedRequest: Request?
+
     /// Posts an upload's outcome. Wired by AppState from its notifier; nil in tests.
     public var notify: (@MainActor (RecordingNotification) -> Void)?
 
@@ -89,6 +95,11 @@ public final class UploadModel {
         public let token: String
         public let renew: @Sendable () async throws -> String
         public let waiting: @Sendable (Bool) -> Void
+        /// The unfinished upload to pick up, when this is `Try Again` (M40-T6), and where the
+        /// uploader says which session it opened and that the one to continue was gone.
+        public let continuing: UploadSession?
+        public let opened: @Sendable (UploadSession) -> Void
+        public let startedOver: @Sendable () -> Void
     }
 
     /// The transfer and the token refresh, injected for the same reason as `signIn`.
@@ -101,7 +112,10 @@ public final class UploadModel {
         try await YouTubeUploader().upload(
             file, metadata: metadata,
             accessToken: { renewed in renewed ? try await pass.renew() : pass.token },
-            progress: progress, waiting: pass.waiting)
+            continuing: pass.continuing,
+            events: .init(
+                progress: progress, waiting: pass.waiting, opened: pass.opened,
+                startedOver: pass.startedOver))
     }
     public var refresh: @Sendable (
         GoogleToken, GoogleClientCredentials
@@ -308,26 +322,48 @@ public final class UploadModel {
     private struct Request {
         var file: URL
         let metadata: VideoMetadata
-        let clipboardMark: Int?
+        var clipboardMark: Int?
+        /// The unfinished upload this one picks up, when it is a retry (M40-T6).
+        var continuing: OpenUpload?
+        /// An earlier attempt left an entry on YouTube that this one will not finish.
+        var earlierEntryMayRemain = false
     }
 
-    /// The upload in flight: what was asked for, and whether YouTube has heard of it — raised
-    /// at the uploader's first report, which comes as the session opens. From then on YouTube
-    /// holds an unfinished entry that this app's permission cannot delete (07).
+    /// A session YouTube opened, and the sign-in it was opened under. It is continued only
+    /// while that sign-in stands: the next one may be another account's, and an upload
+    /// continued then could land on a channel the user has disconnected from.
+    private struct OpenUpload: Sendable {
+        let session: UploadSession
+        let signIn: Int
+    }
+
+    /// The upload in flight: what was asked for; whether YouTube has heard of it — raised at the
+    /// uploader's first report, from when YouTube holds an unfinished entry this app cannot
+    /// delete (07); the session a retry would continue; and whether an earlier attempt's entry
+    /// may still be there.
     private struct Running {
         var request: Request
-        let reached = Flag()
+        let reached = Locked(false)
+        let open = Locked<OpenUpload?>(nil)
+        let earlierEntry: Locked<Bool>
+
+        init(request: Request) {
+            self.request = request
+            earlierEntry = Locked(request.earlierEntryMayRemain)
+        }
     }
 
-    /// A flag written from the uploader's queue and read here, with no hop in between: a hop
+    /// A value written from the uploader's queue and read here, with no hop in between: a hop
     /// can arrive late or out of order, and what was said last is what has to be known.
-    private final class Flag: @unchecked Sendable {
+    private final class Locked<Value: Sendable>: @unchecked Sendable {
         private let lock = NSLock()
-        private var raised = false
+        private var stored: Value
 
-        var isRaised: Bool {
-            get { lock.withLock { raised } }
-            set { lock.withLock { raised = newValue } }
+        init(_ value: Value) { stored = value }
+
+        var value: Value {
+            get { lock.withLock { stored } }
+            set { lock.withLock { stored = newValue } }
         }
     }
 
@@ -361,7 +397,7 @@ public final class UploadModel {
     public var currentUploadToken: Int? { uploadInProgress == nil ? nil : uploadGeneration }
 
     /// Whether stopping now would leave an unfinished entry on the channel.
-    public var stoppedUploadLeavesEntry: Bool { running?.reached.isRaised == true }
+    public var stoppedUploadLeavesEntry: Bool { running?.reached.value == true }
 
     /// Stops the upload `token` names (M40-T4), if it is still the one running. The clip stays
     /// where it is and the next one waiting starts.
@@ -402,7 +438,7 @@ public final class UploadModel {
     /// got that far leaves nothing, and nothing is said: the press is its own explanation.
     @discardableResult
     private func announceStopped() -> Bool {
-        guard let running, running.reached.isRaised else { return false }
+        guard let running, running.reached.value else { return false }
         notify?(
             RecordingNotifications.uploadStopped(
                 title: running.request.metadata.title, file: running.request.file))
@@ -421,6 +457,11 @@ public final class UploadModel {
     private func startNextUploadIfIdle() {
         guard uploadInProgress == nil, !pendingUploads.isEmpty else { return }
         let started = Running(request: pendingUploads.removeFirst())
+        if let continuing = started.request.continuing {
+            // YouTube already holds an entry for it, whatever happens next.
+            started.open.value = continuing
+            started.reached.value = true
+        }
         running = started
         uploadGeneration += 1
         uploadInProgress = started.request.metadata.title
@@ -434,8 +475,7 @@ public final class UploadModel {
         let request = started.request
         let signIn = signInsEnded
         do {
-            let video = try await send(
-                request, signIn: signIn, generation: generation, reached: started.reached)
+            let video = try await send(started, signIn: signIn, generation: generation)
             // YouTube can leave the name out, and the account can have changed by now: neither
             // is a reason to drop or replace a name that is right.
             if let channel = video.channelTitle, isCurrent(signIn) {
@@ -447,12 +487,20 @@ public final class UploadModel {
             // Where the clip is now: it can have been renamed while it went up.
             let file = (generation == uploadGeneration ? running?.request.file : nil) ?? request.file
             lastUpload = LastUpload(videoID: video.id, title: title, file: file, date: Date())
+            var earlierEntry = started.earlierEntry.value
+            // The same clip had failed before and has now gone up another way: its row would
+            // only offer to publish it twice. What that attempt left on YouTube is still there.
+            if let failed = failedUpload, failed.file.isSameFile(as: file) {
+                earlierEntry = earlierEntry || failed.leavesEntry
+                dismissFailedUpload()
+            }
             notify?(
                 RecordingNotifications.uploaded(
                     title: title,
                     visibility: video.privacyStatus ?? request.metadata.privacy.rawValue,
                     link: video.link, file: file,
-                    linkCopied: copyIfClipboardUntouched(video.link, since: request.clipboardMark)))
+                    linkCopied: copyIfClipboardUntouched(video.link, since: request.clipboardMark),
+                    earlierEntryMayRemain: earlierEntry))
         } catch where cancelledGeneration == generation {
             Self.log.info("upload cancelled")
         } catch {
@@ -469,12 +517,29 @@ public final class UploadModel {
             }
             let file = (generation == uploadGeneration ? running?.request.file : nil) ?? request.file
             let clipExists = FileManager.default.fileExists(atPath: file.path)
+            let reached = started.reached.value
+            // An expired session is YouTube letting go of the entry, not keeping it.
+            let leavesEntry = reached && failure != .sessionLost
+            // What a retry could continue: the session, unless YouTube has let go of it or the
+            // sign-in it was opened under no longer stands.
+            let open = failure == .sessionLost ? nil : started.open.value
+            let continuing = open.flatMap { isCurrent($0.signIn) ? $0 : nil }
+            // Whatever a retry will not finish stays behind, and the upload that finally lands
+            // has to say so.
+            let earlierEntry = started.earlierEntry.value || (reached && continuing == nil)
+            failedRequest = Request(
+                file: file, metadata: request.metadata, clipboardMark: nil,
+                continuing: continuing, earlierEntryMayRemain: earlierEntry)
+            failedUpload = FailedUpload(
+                title: request.metadata.title, file: file, failure: failure, date: Date(),
+                leavesEntry: leavesEntry || started.earlierEntry.value)
             notify?(
                 RecordingNotifications.uploadFailed(
                     reason: UploadCopy.reason(failure, clipExists: clipExists),
                     title: request.metadata.title, file: file, clipExists: clipExists,
-                    // An expired session is YouTube letting go of the entry, not keeping it.
-                    leavesEntry: started.reached.isRaised && failure != .sessionLost))
+                    leavesEntry: leavesEntry,
+                    retry: !failure.canRetry ? .none : continuing == nil ? .startsFresh : .continues,
+                    earlierEntryMayRemain: started.earlierEntry.value))
         }
         // An abandoned queue has already been cleared, and a later upload may own these by now.
         guard generation == uploadGeneration, uploadInProgress != nil else { return }
@@ -483,6 +548,26 @@ public final class UploadModel {
         uploadIsWaiting = false
         running = nil
         startNextUploadIfIdle()
+    }
+
+    // MARK: - Trying again
+
+    /// Sends the failed upload again with what the sheet held (M40-T6) — continuing the same
+    /// upload when YouTube opened one, so the entry it left becomes the video instead of a
+    /// second one being made. The clipboard rule counts from here, as it does from the sheet.
+    public func tryAgain() {
+        guard !isShutDown, failedUpload?.canTryAgain == true, var request = failedRequest else {
+            return
+        }
+        dismissFailedUpload()
+        request.clipboardMark = clipboardChangeCount?()
+        pendingUploads.append(request)
+        startNextUploadIfIdle()
+    }
+
+    public func dismissFailedUpload() {
+        failedUpload = nil
+        failedRequest = nil
     }
 
     /// ADR-024's clipboard rule: the link goes on the clipboard only if nothing else has since
@@ -508,6 +593,7 @@ public final class UploadModel {
     public func prepareForMenu(now: Date = Date()) {
         expireEndedSignIn(now: now)
         expireStaleReceipt(now: now)
+        if failedUpload?.isStale(now: now) == true { dismissFailedUpload() }
     }
 
     /// A clip was renamed: everything that names it follows — the receipt, keeping its date, and
@@ -521,11 +607,16 @@ public final class UploadModel {
         for index in pendingUploads.indices where pendingUploads[index].file.isSameFile(as: oldURL) {
             pendingUploads[index].file = newURL
         }
+        if failedRequest?.file.isSameFile(as: oldURL) == true {
+            failedRequest?.file = newURL
+            failedUpload?.file = newURL
+        }
     }
 
     private func send(
-        _ request: Request, signIn: Int, generation: Int, reached: Flag
+        _ started: Running, signIn: Int, generation: Int
     ) async throws -> UploadedVideo {
+        let request = started.request
         expireEndedSignIn()
         await disconnectOutcome()
         guard case .connected = account, let credentials, var token = try store.load() else {
@@ -547,10 +638,35 @@ public final class UploadModel {
                 guard let self else { throw CancellationError() }
                 return try await self.renewedAccessToken(signIn: signIn)
             },
-            waiting: waitingReporter(generation: generation))
+            waiting: waitingReporter(generation: generation),
+            continuing: usableSession(of: started),
+            opened: { [open = started.open, reached = started.reached] in
+                open.value = OpenUpload(session: $0, signIn: signIn)
+                reached.value = true
+            },
+            startedOver: { [started] in Self.forgetSession(of: started) })
         return try await uploadFunction(
             request.file, request.metadata, pass,
-            progressReporter(total: total, generation: generation, reached: reached))
+            progressReporter(total: total, generation: generation, reached: started.reached))
+    }
+
+    /// The session to continue, if its sign-in still stands. If not, the upload starts from
+    /// nothing — and what the earlier attempt left on YouTube stays there.
+    private func usableSession(of started: Running) -> UploadSession? {
+        guard let open = started.open.value else { return nil }
+        guard isCurrent(open.signIn) else {
+            Self.forgetSession(of: started)
+            return nil
+        }
+        return open.session
+    }
+
+    /// The upload is beginning again from nothing: YouTube holds nothing for *this* attempt
+    /// yet, and the entry the earlier one left may still be there.
+    private nonisolated static func forgetSession(of started: Running) {
+        started.open.value = nil
+        started.reached.value = false
+        started.earlierEntry.value = true
     }
 
     /// A disconnect under way may yet fail and leave the account connected, so an upload that
@@ -576,14 +692,14 @@ public final class UploadModel {
     /// Where the uploader says it is between tries. `generation` is the upload's own, handed in:
     /// read here it could already be a successor's, since `send` awaits before this is built.
     private func waitingReporter(generation: Int) -> @Sendable (Bool) -> Void {
-        let latest = Flag()
+        let latest = Locked(false)
         return { [weak self] waiting in
-            latest.isRaised = waiting
+            latest.value = waiting
             Task { @MainActor in
                 guard let self, generation == self.uploadGeneration, self.uploadInProgress != nil
                 else { return }
                 // Whatever was said last, not what this hop was sent with: hops can cross.
-                self.uploadIsWaiting = latest.isRaised
+                self.uploadIsWaiting = latest.value
             }
         }
     }
@@ -591,10 +707,10 @@ public final class UploadModel {
     /// The sink handed to the uploader, which reports from URLSession's queue. A report from an
     /// upload that has since ended must not move its successor's bar.
     private func progressReporter(
-        total: Int64, generation: Int, reached: Flag
+        total: Int64, generation: Int, reached: Locked<Bool>
     ) -> @Sendable (Int64) -> Void {
         return { [weak self] sent in
-            reached.isRaised = true
+            reached.value = true
             Task { @MainActor in
                 guard let self, generation == self.uploadGeneration, self.uploadInProgress != nil
                 else { return }

@@ -113,6 +113,17 @@ enum ShareActions {
         }
     }
 
+    /// `Try Again` on the failed upload's row (M40-T6): the account step first when there is no
+    /// account, then the retry — if this is still the failure the row was built for.
+    @MainActor static func tryAgain(_ failed: FailedUpload, state: AppState) {
+        let stillThis: @MainActor () -> Bool = { state.uploads.failedUpload?.id == failed.id }
+        guard stillThis() else { return }
+        beginUpload(state.uploads, stillWanted: stillThis) {
+            guard stillThis() else { return }
+            state.uploads.tryAgain()
+        }
+    }
+
     /// Raised from a press on the menu's row until its sheet has been answered. The menu stays
     /// usable while the clip's length is read and while the sheet is up, and a second press must
     /// not stack a second sheet — two confirmed sheets are the same clip uploaded twice.

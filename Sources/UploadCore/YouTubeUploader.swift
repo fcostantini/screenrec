@@ -21,6 +21,13 @@ public struct UploadSession: Equatable, Sendable {
     public let url: URL
     public let fileSize: Int64
     let contentType: String
+
+    /// Public so whoever keeps a session to continue it later can also stand one in.
+    public init(url: URL, fileSize: Int64, contentType: String) {
+        self.url = url
+        self.fileSize = fileSize
+        self.contentType = contentType
+    }
 }
 
 public struct UploadedVideo: Equatable, Sendable {
@@ -197,12 +204,51 @@ public struct YouTubeUploader: Sendable {
         progress: @escaping @Sendable (Int64) -> Void = { _ in },
         waiting: @escaping @Sendable (Bool) -> Void = { _ in }
     ) async throws -> UploadedVideo {
+        try await upload(
+            file, metadata: metadata, accessToken: accessToken, continuing: nil,
+            events: Events(progress: progress, waiting: waiting))
+    }
+
+    /// What `upload` says along the way, beyond the bytes: the session it opened — the address
+    /// an unfinished upload can be continued at later — and that one it was asked to continue
+    /// was gone, so it began again from nothing.
+    public struct Events: Sendable {
+        public var progress: @Sendable (Int64) -> Void
+        public var waiting: @Sendable (Bool) -> Void
+        public var opened: @Sendable (UploadSession) -> Void
+        public var startedOver: @Sendable () -> Void
+
+        public init(
+            progress: @escaping @Sendable (Int64) -> Void = { _ in },
+            waiting: @escaping @Sendable (Bool) -> Void = { _ in },
+            opened: @escaping @Sendable (UploadSession) -> Void = { _ in },
+            startedOver: @escaping @Sendable () -> Void = {}
+        ) {
+            self.progress = progress
+            self.waiting = waiting
+            self.opened = opened
+            self.startedOver = startedOver
+        }
+    }
+
+    /// The same, able to **continue** an upload an earlier call left unfinished (M40-T6): given
+    /// its session, it asks YouTube how much it holds and sends the rest, so the entry that
+    /// attempt left becomes the video. A session YouTube has let go of is started over.
+    public func upload(
+        _ file: URL, metadata: VideoMetadata,
+        accessToken: @escaping @Sendable (_ renewed: Bool) async throws -> String,
+        continuing: UploadSession?, events: Events
+    ) async throws -> UploadedVideo {
+        let progress = events.progress
+        let waiting = events.waiting
         var token = try await accessToken(false)
         var renewal = Renewal.notTried
         var waitsLeft = waits[...]
-        var session: UploadSession?
-        // The next byte YouTube needs, or nil before anything has been sent.
-        var held: Int64?
+        var session = continuing
+        var continued = continuing != nil
+        // The next byte YouTube needs, or nil before anything has been sent. A continued upload
+        // starts by asking, so it begins as "nothing known to be held".
+        var held: Int64? = continuing == nil ? nil : 0
 
         while true {
             do {
@@ -211,16 +257,27 @@ public struct YouTubeUploader: Sendable {
                     token = try await accessToken(true)
                     renewal = .done
                 }
+                // A clip that changed since the session to continue was opened for it cannot go
+                // into that session, but it can still go up: from nothing.
+                if continued, let open = session, try Self.fileSize(of: file) != open.fileSize {
+                    throw NothingToContinue()
+                }
                 guard let open = session else {
-                    session = try await openSession(
+                    let opened = try await openSession(
                         for: file, metadata: metadata, accessToken: token)
+                    session = opened
                     waiting(false)
+                    events.opened(opened)
                     progress(0)
                     continue
                 }
                 var from: Int64 = 0
                 if let known = held {
-                    switch try await status(of: open, accessToken: token) {
+                    let answer = try await status(of: open, accessToken: token)
+                    // YouTube still knows the upload being continued: from here it is this
+                    // call's own, and losing it later is a failure, not a reason to begin again.
+                    continued = false
+                    switch answer {
                     case .complete(let video):
                         return video
                     case .incomplete(let next):
@@ -249,6 +306,16 @@ public struct YouTubeUploader: Sendable {
                     renewal = .wanted
                     continue
                 }
+                if continued, Self.meansNothingToContinue(error) {
+                    // YouTube has let go of the upload being continued, or the clip is no
+                    // longer the one it was opened for: begin again from nothing.
+                    continued = false
+                    session = nil
+                    held = nil
+                    waitsLeft = waits[...]
+                    events.startedOver()
+                    continue
+                }
                 // Opening is a `POST` that creates the entry: it is tried again only when the
                 // first try cannot have reached YouTube, or a lost answer would leave two.
                 let worthAnotherTry = session == nil
@@ -270,6 +337,21 @@ public struct YouTubeUploader: Sendable {
 
     /// YouTube holds the whole file and has not said the video exists yet.
     private struct Unfinished: Error {}
+
+    /// The clip is not the one the session to continue was opened for.
+    private struct NothingToContinue: Error {}
+
+    /// Whether a continued upload's first question was answered that the upload is no more:
+    /// gone, or refused outright. A refused token, a spent quota, a busy server or a reply that
+    /// can't be read says nothing about it — and starting over on one could publish it twice.
+    static func meansNothingToContinue(_ error: any Error) -> Bool {
+        if error is NothingToContinue { return true }
+        switch error as? YouTubeError {
+        case .sessionExpired: return true
+        case .rejected(let status, _, _): return (400...499).contains(status)
+        default: return false
+        }
+    }
 
     /// Whether a failed step left a transfer worth picking up: the connection broke, or YouTube
     /// answered with a status its protocol says to resume from. A refusal would only be repeated,

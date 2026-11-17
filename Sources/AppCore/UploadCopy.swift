@@ -71,6 +71,24 @@ public enum UploadCopy {
         }
     }
 
+    // MARK: - The upload's own rows in the menu (docs/06 "Menu")
+
+    /// A menu is as wide as its widest row and cannot truncate one, and a title runs to 100
+    /// code points — so a row carries the start of it.
+    static func shortened(_ title: String) -> String {
+        title.count > menuTitleLength ? title.prefix(menuTitleLength - 1) + "…" : title
+    }
+
+    private static let menuTitleLength = 40
+
+    /// The failed upload's first line in its submenu (M40-T6): the notice's reason, cut to its
+    /// first sentence so the submenu stays a menu's width. The next step is the rows below it.
+    public static func menuReason(_ failed: FailedUpload, clipExists: Bool) -> String {
+        let whole = reason(failed.failure, clipExists: clipExists)
+        guard let end = whole.firstIndex(where: { $0 == "." || $0 == ":" }) else { return whole }
+        return String(whole[...end]).replacingOccurrences(of: ":", with: ".")
+    }
+
     // MARK: - The per-file row in the menu (docs/06 "Menu")
 
     public enum MenuUpload: Equatable, Sendable {
