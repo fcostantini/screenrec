@@ -7,6 +7,53 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-17 (M40-T4, the sweep over the review's fixes):
+  🔴 **A fake that ignores cancellation makes every cancel test pass.** `for await _ in stream
+  { break }; return video` ends its wait when the task is cancelled — and then *returns the
+  video*. Two tests of "Cancel stops only the upload its row showed" stayed green with the token
+  check deleted, because the wrongly-cancelled upload landed anyway. A real transfer throws when
+  cancelled; a fake has to (`try Task.checkCancellation()` before it answers). The mutation
+  sweep is what found it.
+  🔴 **A mutation that changes nothing is a line that does nothing.** `leavesEntry && uploads >
+  0` survived being cut to `leavesEntry`: the only branch where `uploads` is zero never read the
+  value. The condition was removed rather than tested.
+  🔴 **`#expect` before a wait that depends on it turns a failure into a hang.** With the queue
+  wrongly left full, the test went on to wait for an upload nobody opens, and the sweep sat at
+  its 110 s limit. `try #require` there, and the same break fails in 6 s.
+  ⚠️ **A sweep script is code: check it before trusting its silence.** The first version of this
+  one had a quoting error and ran nothing; 14 patterns of the older one no longer matched the
+  rewritten code and were skipped. Both said so only because the script prints `SKIP` and the
+  traceback was read. The script now refuses nothing silently, and a dry pass checks that every
+  pattern matches the source exactly once before any test runs.
+  ⚠️ **`nice -n 15` for a sweep while the user is on a call** — the Mac was at load 12–18.
+
+- 2026-11-17 (M40-T4, what YouTube keeps of an upload that stops — Franco's Studio):
+  🔴 **YouTube creates the video's entry when the upload session opens, not when the last byte
+  lands.** A 161 MB upload cancelled at 31% left *"ScreenRec test 10 (cancelled on purpose)" ·
+  Processing will begin shortly* on the channel. The expectation written into the plan — "nothing
+  appears, the video only exists once the last byte arrives" — was **wrong**; the quit wording
+  had been stripped of that claim only because it could not be checked.
+  🔴 **Nothing this app is allowed to do removes it.** Google's resumable-upload guide documents
+  no cancel (only `POST` to open, `PUT` to send, ask and resume), and `youtube.upload` cannot
+  delete. The user deletes it in Studio. So the app's job is to **say so**: a stop after the
+  session opened posts a notice naming the entry and opening Studio, and the quit question says it
+  before the choice.
+  ✅ **"Has YouTube heard of this upload?" is one bit, and the uploader can give it for free:**
+  `YouTubeUploader.upload` now reports `progress(0)` the moment the session opens. The model
+  raises a lock-guarded flag from that first report — synchronously, on the uploader's queue, not
+  through a main-actor hop, so a cancel a millisecond later still knows.
+  🔴 **A notice posted on the way out of a quit has to be posted synchronously, and the exit has
+  to wait for it.** `Quit Anyway` and a logout clear the queue and terminate; a notice left to
+  the cancelled task's `catch` would never be posted. It is posted from the cancel itself, and
+  the exit is held 0.3 s (`QuitFlow.noticeGrace`) — **reasoned, not yet seen arrive**: driving a
+  quit needs Franco's desktop.
+  ⚠️ **Unmeasured, and T5's:** whether a *failed* upload leaves the same entry (it must — the
+  entry predates the bytes), whether `DELETE` on the session URL drops it, whether it expires by
+  itself, and whether it counts against the channel's daily limit.
+  ⚠️ **Noticed, not fixed (not this task's):** `MovieRecorderTests.writesThreeTrackHEVCMovie`
+  asserts `abs(duration - seconds) < 0.1` and failed once, under load, on
+  `0.10000000000000009` — a tolerance that sits exactly on a three-frame rounding.
+
 - 2026-11-17 (M40-T4, the push that the gate refused):
   🔴 **A test that gives up after 5 s fails on a busy Mac, every time.** With a Zoom call running
   (load average 18) the suite took 10–18 s instead of 5, every async test finishing together at

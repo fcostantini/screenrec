@@ -16,27 +16,30 @@
   (docs/07, 2026-11-17 — `log show` alone cannot see a clean run). A push runs the suite too.
   **Next: back to M40-T4** (below).
 
-- **⏸ M40-T4 BUILT AND VERIFIED LIVE, NOT COMMITTED (2026-11-17) — waiting on the review.**
-  Franco's go: *"let's go"*, taken as all four rulings as recommended (`Cancel Upload` in; a click
-  on the notice opens the video; `.mp4` only; one-hour receipt) — **he has not contradicted that
-  reading, nor confirmed it in words.** In the working tree: the menu's `Uploading to YouTube… n%`
-  row and `Cancel Upload`, the `Uploaded to YouTube · ‹title›` receipt, the clipboard rule,
-  `QuitQuestion`, `Upload to YouTube…` on `.mp4` rows, docs/06 amended. **1014 tests; 47 breaks,
-  47 red.** The deployed app at `/Users/Shared` **is** this uncommitted build, connected.
-  ✅ **Live:** six scenarios on a fake-uploader build, then on the real build one unlisted upload
-  from a Recent Exports row (link copied, answers as unlisted) and one 161 MB upload cancelled at
-  31% — evidence listed in docs/03 under M40-T4.
-  **Next, in this order:** (1) **Franco rules on `/code-review medium`'s ten findings** —
-  presented 2026-11-17 with a proposal each (docs/03 under M40-T4), **none applied**; two are his
-  call: what a system quit does with an upload, and whether the "link is in the menu" notice
-  carries the link; (2) apply what he approves, one test run under the live `replayd` stream,
-  re-verify what a fix touches; (3) tick, commit `M40-T4`, push; (4) T5's plan.
-  ⚠️ **He was on a Zoom call from about 11:00 on 2026-11-17 with the Mac under heavy load: no
-  desktop driving without asking again, whatever was approved earlier.**
-  **Needs Franco:** look in YouTube Studio for anything left by *ScreenRec test 10 (cancelled on
-  purpose)* — nothing is expected; click an *Uploaded to YouTube* notice once to see the video
-  open; delete the nine `ScreenRec test …` videos; the audience question from T1.
-  ⚠️ **Test uploads today: two landed** (T3's and T4's) **and one cancelled.**
+- **⏸ M40-T4 BUILT, REVIEWED AND FIXED; NOT COMMITTED (2026-11-17) — one short live check left.**
+  In the working tree: the menu's `Uploading to YouTube… n%` row and `Cancel Upload`, the
+  `Uploaded to YouTube · ‹title›` receipt, the clipboard rule, `QuitQuestion`, `Upload to
+  YouTube…` on `.mp4` rows, docs/06 amended. **1027 tests** (985 → 1027); **72 breaks, 72 red.**
+  ✅ **Rulings, all Franco's, 2026-11-17:** *"let's go"* (taken as the four plan rulings as
+  recommended — not contradicted since); the review's ten findings *"as proposed"*, including
+  that a quit nobody chose to wait through **abandons uploads**, and that the *link is in the
+  menu* notice **spells the link out**; and *"Tell me each time"* for the leftover entry.
+  🔴 **What the human check found:** YouTube keeps an unfinished entry (*Processing will begin
+  shortly*) for any upload it had opened and that then stops; the app cannot delete it. A stop
+  after that point now posts *Upload to YouTube stopped* (click → Studio), and the quit question
+  says so first.
+  ✅ **Live before the fixes** (docs/03): six fake-uploader scenarios, one real unlisted upload
+  from a Recent Exports row, one real upload cancelled at 31%.
+  ⚠️ **The installed app at `/Users/Shared` is the build from *before* the review's fixes.**
+  **Next:** (1) **with Franco's OK — he was on a Zoom call from ~11:00, so ask** — a three-minute
+  fake-uploader check of what the fixes changed on screen: the stopped notice after `Cancel
+  Upload`, after `Quit Anyway` and after a quit sent from outside (the 0.3 s grace is reasoned,
+  not seen), and the receipt staying above a running upload; (2) tick, commit `M40-T4`, push,
+  deploy; (3) T5's plan artifact.
+  **Needs Franco:** delete *ScreenRec test 10 (cancelled on purpose)* and the nine other
+  `ScreenRec test …` videos in Studio; say tomorrow whether the test-10 entry went by itself;
+  click an *Uploaded to YouTube* notice once to see the video open; the audience question (T1).
+  ⚠️ **Test uploads today: two landed and one cancelled.**
 
 - **✅ M40-T3 DONE (2026-11-17) — the Trim window uploads the range to YouTube, after a sheet
   for the title, description and visibility.** `Upload to YouTube…` under `Export Audio & Copy`;

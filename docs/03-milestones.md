@@ -4032,8 +4032,10 @@ uploaded. Detail in docs/07.
       Franco's go and four rulings** (`Cancel Upload`; what a click on the notice does; whole
       recordings; the receipt's lifetime) — his answer, 2026-11-17: *"let's go"*, **taken as all
       four as recommended** (`Cancel Upload` in; a click opens the video; `.mp4` only; one hour).
-      ⏸ **Built and verified live 2026-11-17; uncommitted, waiting on `/code-review`'s findings
-      and Franco's ruling on them.** **1014 tests** (985 → 1014); **47 breaks, 47 red.**
+      ⏸ **Built, verified live, reviewed and fixed 2026-11-17; uncommitted, waiting on one short
+      live check of what the fixes changed on screen.** **1027 tests** (985 → 1027); **72 breaks,
+      72 red** — after two tests were found blind to a wrong cancel (their fake upload ignored
+      cancellation) and fixed.
       ✅ **Live, on a temporary build with a fake uploader** (30 s, reporting progress, nothing
       sent): the `.mp4` row's `Upload to YouTube…` after `Copy`, and the sheet reading `0:24 ·
       11,4 MB`; the row `Uploading to YouTube… 13%` with `Cancel Upload` under it, moving
@@ -4054,23 +4056,24 @@ uploaded. Detail in docs/07.
       Studio; a click on the notice opening the video — **(human)**; the drawn `· 1 waiting` after
       the percentage (its text is asserted, its pixels are not). No screenshots were taken: the
       evidence is Accessibility text, after the morning's dialogs.
-      ⏸ **`/code-review medium`: ten findings, presented to Franco 2026-11-17, not yet ruled on,
-      none applied.** Proposed — *fix in T4:* the receipt is hidden while another upload runs
-      (show it under the progress row); the menu row never expires an ended sign-in (do it at menu
-      open, as Settings and Trim do); an export abandoned by `Quit Anyway` can still finish and
-      start its upload (check for cancellation before handing the file on); `Cancel Upload`
-      cancels whatever is running at the click, not the upload its row showed (carry the upload's
-      token in the row); `defaultTitle(forExport:)` cuts names that merely contain ` trimmed`
-      (cut only the exporter's own suffix, never to nothing); the drawn `· n waiting` goes stale
-      under an open menu while the title moves (update both, width reserved); the quit question's
-      mixed form is wrong for uneven counts (compose it per kind); two sheets can stack from the
-      menu, and three names and one comment still say "export" for a row that is now both.
-      *His call:* (a) a system quit — logout, shutdown — and `Stop & Quit` now **wait silently**
-      for an upload of any length; proposed: they abandon uploads (the clip stays) and keep
-      waiting for exports. (b) a link the notice sends you to the menu for is lost when the next
-      upload replaces the receipt; proposed: the second notice form carries the link too.
-      *To T5:* a queued upload whose clip is renamed or trashed fails with a message naming a file
-      that is gone — the rename half (re-point the queue) proposed for T4, the message for T5.
+      ✅ **`/code-review medium`: ten findings, ruled by Franco 2026-11-17 "as proposed", all
+      applied.** The receipt stays up while another upload runs; the menu drops a sign-in past
+      its end at open; an export abandoned by a quit hands nothing on; `Cancel Upload` stops the
+      upload its row showed (a token, not "whatever is running"); the exported clip's default
+      title loses only the export's own ending; the drawn `· n waiting` and the title are both
+      stamped at open; the mixed quit question counts each kind on its own; one sheet at a time
+      from the menu; `ExportProgressRowView` is `ProgressRowView`. A renamed clip takes its queued
+      and running uploads with it. **His two calls, as recommended:** a quit nobody chose to wait
+      through — `Stop & Quit`, logout, shutdown — **abandons uploads** and finishes the rest; and
+      the *link is in the menu* notice **spells the link out**.
+      🔴 **The human check changed the design.** Franco's Studio, 2026-11-17: the upload cancelled
+      at 31% left an entry — *"ScreenRec test 10 (cancelled on purpose)" · Processing will begin
+      shortly*. YouTube makes the entry when the session opens; Google's guide documents no way
+      to cancel one, and the upload-only permission cannot delete it. **Ruled by Franco: "Tell me
+      each time."** A stop after YouTube has opened the upload posts *Upload to YouTube stopped*
+      — it names the entry, and a click opens Studio — and the quit question says the same before
+      the choice. A stop before that point still says nothing.
+      ⚠️ **To T5, from this:** see that task.
       While it runs, the export
       row's successor: `Uploading to YouTube… 37%` with the same bar. When it lands: a receipt row,
       `Uploaded to YouTube · <title>`, whose submenu is `Copy Link`, `Open on YouTube`, `Edit in
@@ -4108,6 +4111,15 @@ uploaded. Detail in docs/07.
       ⚠️ **Owed from T2's review:** a sign-in Google has revoked whose saved copy could not be
       deleted reads as `Connected` again at the next launch — there is no request at launch to
       learn otherwise. Finding a dead sign-in at its next use, and dropping it then, is this task.
+      ⚠️ **Owed from T4 (2026-11-17):** (1) **an upload that *fails* after YouTube opened it
+      leaves the same unfinished entry** as one that is stopped, and its notice does not say so
+      yet — every failure past the session's opening has to. (2) **An experiment:** `DELETE` on
+      the session URL may make YouTube drop the entry (other Google upload APIs honour it; the
+      YouTube guide is silent). One abandoned session, then Franco's look in Studio. (3) Whether
+      the entry goes by itself when the session expires, and whether an abandoned upload counts
+      against the channel's daily limit — both **unmeasured**. (4) A queued upload whose clip is
+      *trashed* before its turn fails with *"The upload didn't finish. The clip is saved as…"*,
+      naming a file that is gone (a rename is followed since T4; a trash is not).
       ⚠️ **Owed from T3's review:** (1) the failure reasons are a first cut — one list, shared
       with the CLI, and the notice's closing *"The clip is saved as…"* must follow the failure: it
       is untrue when the exported file is what went missing. (2) Whether YouTube counts a title's
