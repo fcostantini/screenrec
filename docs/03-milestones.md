@@ -4121,7 +4121,26 @@ uploaded. Detail in docs/07.
       (every pattern checked against the source before a test ran; one watched run first).
       ✅ **Measured against YouTube** (docs/07): a title's 100 is counted in **code points** — the
       sheet's rule changed to match; `DELETE` on a session closes it (`499`).
-      ⏳ **Still to do:** `/code-review`'s findings to Franco, before any is applied; the live checks,
+      ⏸ **`/code-review medium`: ten findings, presented to Franco 2026-11-17, not yet ruled on,
+      none applied.** Proposed, all in T5: (1) a clip deleted or renamed mid-upload is retried
+      for five minutes and then blamed on the connection — a local file error is not an
+      interruption; (2) a token renewal that itself hits a flaky network ends the upload at once
+      — renew inside the loop, so it is waited out like any other step; (3) opening the session
+      is now retried, and a `POST` whose answer was lost can leave **duplicate** entries — retry
+      the open only on failures that cannot have reached YouTube; (4) a `401` after a
+      *successful* renewal signs the user out and deletes a sign-in Google still honours — keep
+      the account and say YouTube did not accept the sign-in; (5) every `URLError` is worded as
+      "didn't come back in 5 minutes", including ones that failed in a second — only the
+      uploader giving up says that, the rest say Google could not be reached; (6) the progress
+      and waiting reporters read the upload's generation after `send`'s awaits, so a cancelled
+      upload can bind to its successor's — pass it in from `run`; (7) "moving again" is reported
+      before the status query proves it, and the two hops to the main actor can land out of
+      order — report it when bytes are about to flow, and deliver the latest value; (8) *moved
+      or deleted* is said of an empty file that is still there — word it by whether the file
+      exists; (9) the minutes are computed in two modules, and the CLI's fixed token "renews" to
+      itself — one definition, and no renewal where there is none to make; (10) one doc comment
+      of eight lines and one with history in it.
+      ⏳ **Then:** the live checks,
       each with his OK — the dead sign-in for real, the waiting row and notices on a fake-uploader
       build; his look in Studio at the three private test entries.
       The dropped

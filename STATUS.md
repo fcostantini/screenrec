@@ -28,8 +28,11 @@
   red.** ⚠️ The installed app is still T4's build.
   ✅ **Measured against YouTube** (docs/07): titles are counted in code points; `DELETE` on a
   session closes it (`499`).
-  **Next, in this order:** (1) `/code-review medium`'s findings → **to Franco with a proposal
-  each, before any is applied**; (2) fixes, one watched run, the sweep again where they touch;
+  **Next, in this order:** (1) **Franco rules on `/code-review medium`'s ten findings** —
+  presented 2026-11-17 with a proposal each (docs/03 under M40-T5), **none applied**; three add
+  or change words he will read: opening an upload with no connection, a sign-in YouTube refuses
+  although Google renewed it, and a clip that is there but unreadable; (2) fixes, one watched
+  run, the sweep again where they touch;
   (3) **with his OK each time:** the waiting row and three or four notices on a fake-uploader
   build; the real dead-sign-in check (he removes ScreenRec at myaccount.google.com, I press
   upload, he reconnects); (4) tick, commit `M40-T5`, push, deploy; (5) T6's plan artifact.
