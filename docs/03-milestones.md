@@ -4181,14 +4181,14 @@ uploaded. Detail in docs/07.
       **(human)** remove ScreenRec's access in the Google account, press upload, read *needs
       reconnecting*.
 
-- [ ] M40-T6 **A failed upload can be tried again, and a stopped one cleans up** (AppCore +
-      AppShell; from T5's plan, ruling 4, and T5's measurement). **Plan artifact first.** After a
-      failure the menu shows `Couldn't upload · ‹title›` with `Try Again`, which continues the
-      **same** upload from where it stopped — no retyping, no second entry — while YouTube still
-      has the session, and starts over when it does not. And, **if Franco's look in Studio shows
-      that `DELETE` removes the entry**: an upload that is cancelled, abandoned by a quit, or
-      given up on sends it, and the *delete it in Studio* sentences are said only when that
-      request itself failed. Not across a relaunch (M40's "left out" list stands).
+- [ ] M40-T6 **A failed upload can be tried again** (AppCore + AppShell; from T5's plan,
+      ruling 4). **Plan artifact first.** After a failure the menu shows `Couldn't upload ·
+      ‹title›` with `Try Again`, which continues the **same** upload from where it stopped — no
+      retyping, no second entry — while YouTube still has the session, and starts over when it
+      does not. Not across a relaunch (M40's "left out" list stands).
+      ⚠️ **The clean-up half was dropped on evidence (2026-11-17):** `DELETE` on a session closes
+      it and leaves the entry — Franco saw all three measurement entries still listed — so
+      finishing the upload is the only way to avoid a leftover, and the app never sends `DELETE`.
 
 **Gate G40** — on the deployed build, with the consent screen **published** (✅ done by Franco
 2026-11-16 — it first needed a home page and a privacy link on the Branding page; docs/07):

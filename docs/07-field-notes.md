@@ -7,6 +7,18 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-17 (M40-T5's measurement, closed by Franco's look in Studio):
+  🔴 **`DELETE` on the session URL closes the session and leaves the channel's entry.** The
+  three private entries it was sent to (100 😀, 100 `a`, 14 family emoji) were all still listed
+  about an hour later. So the `499` means "this upload can no longer be resumed", not "this
+  video is gone": sending it would only throw away the one thing that could still finish the
+  entry. **The app must not send it.**
+  ⚠️ **Nothing shows that an unfinished entry clears by itself.** *ScreenRec test 10 (cancelled
+  on purpose)* was gone from the list — because Franco had deleted it. The *delete it in
+  YouTube Studio* wording stands.
+  ✅ **What this leaves as the only way to avoid a leftover:** finish the upload that left it.
+  That is `Try Again` continuing the same session (T6).
+
 - 2026-11-17 (M40-T5, the live checks — a fail-on-purpose build, then a sign-in removed for real):
   ✅ **Access removed in the Google account is `invalid_grant` on the next refresh, at once.**
   Franco removed ScreenRec at myaccount.google.com/permissions; about a minute later the app's

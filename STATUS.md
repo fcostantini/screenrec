@@ -30,12 +30,14 @@
   sign-in** — Franco removed ScreenRec's access at Google, the next upload said *needs
   reconnecting*, Settings went to `Not connected`, the saved sign-in was deleted.
   ⚠️ **He is disconnected until he presses `Connect…` in Settings** (left open on Sharing).
-  **Next: M40-T6** (docs/03) — `Try Again` on a failed upload, continuing the same one, and a
-  stopped upload cleaning up after itself **if `DELETE` really removes the entry**. **Plan
-  artifact first, then stop.** The plan turns on his look in Studio: are the three private
-  measurement entries (100 😀, 100 `a`, 14 family emoji) and *ScreenRec test 10* still there?
-  **Needs Franco:** that look in Studio; reconnect in Settings; the test videos to delete;
-  click an *Uploaded to YouTube* notice once; the audience question from T1.
+  ✅ **His look in Studio (2026-11-17):** the three measurement entries are **still listed**, so
+  `DELETE` does not remove an entry; *test 10* was gone because he deleted it. The *delete it in
+  Studio* wording stands, and T6 is `Try Again` only.
+  **Next: M40-T6** (docs/03) — `Try Again` on a failed upload, continuing the same one. **Plan
+  artifact first, then stop.**
+  **Needs Franco:** reconnect in Settings (`Connect…`); delete the test videos, the three
+  measurement entries among them; click an *Uploaded to YouTube* notice once; the audience
+  question from T1.
 
 - **✅ M40-T4 DONE (2026-11-17) — the menu shows an upload, keeps its link, and can start one.**
   `Uploading to YouTube… n%` with `Cancel Upload`; the `Uploaded to YouTube · ‹title›` receipt
