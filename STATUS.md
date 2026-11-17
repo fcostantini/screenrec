@@ -32,10 +32,14 @@
   ✅ **Live:** six fake-uploader scenarios, one real unlisted upload from a Recent Exports row,
   one real upload cancelled at 31%; then, after the fixes, the stopped notice on `Cancel Upload`,
   on `Quit Anyway`, and on a quit sent from outside (gone in 0.4 s).
-  **Next: M40-T5** — every failure says what happened and leaves the file. **Plan artifact
-  first, then stop.** It inherits (docs/03): a *failed* upload leaves the same entry and must say
-  so; the `DELETE`-the-session experiment; the title's 100-character counting; refreshing a
-  sign-in that lapses mid-transfer; a trashed clip's message.
+  **Next: M40-T5** — every failure says what happened and leaves the file. ⏸ **Plan artifact
+  published 2026-11-17, awaiting Franco's go:** `claude.ai/artifact/STf3yH7vJ5LAHGHAY9AdjN`.
+  **Do not implement before he answers.** Four answers asked, each with a recommendation: wait 5
+  minutes without progress before giving up on a connection; run one measurement upload (emoji
+  title + `DELETE` on the session); do the real dead-sign-in check with him; file a `Try Again`
+  row that continues the same upload as **T6**, before G40. The plan has **no screenshots** by
+  choice (the morning's dialogs): today's state is quoted from Accessibility and Notification
+  Center instead, and the page says so.
   **Needs Franco:** delete *ScreenRec test 10 (cancelled on purpose)* and the nine other
   `ScreenRec test …` videos in Studio; say whether the test-10 entry went by itself; click an
   *Uploaded to YouTube* notice once to see the video open; the audience question (T1).

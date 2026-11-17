@@ -4105,7 +4105,12 @@ uploaded. Detail in docs/07.
       untouched clipboard → the link is on it; a copy made mid-upload → the clipboard is unchanged
       and the notice names the menu.
 
-- [ ] M40-T5 **Every failure says what happened and leaves the file** (ADR-007). The dropped
+- [ ] M40-T5 **Every failure says what happened and leaves the file** (ADR-007).
+      Plan artifact: `claude.ai/artifact/STf3yH7vJ5LAHGHAY9AdjN` — published 2026-11-17, **awaiting
+      Franco's go and four answers**: how long to wait for a dropped connection (proposed: 5 min
+      without progress); one measurement upload (a 100-emoji title, then `DELETE` on the session);
+      the real dead-sign-in check (he removes access, then reconnects); and a `Try Again` row that
+      continues the same upload, proposed as its own task **T6** before G40. The dropped
       connection (resume, bounded retries, then *Couldn't upload — the clip is saved*); the sign-in
       that expired or was removed (*YouTube needs reconnecting*, account back to not connected);
       the day's quota (*resets at midnight Pacific*); an account with no channel; a rejected length;
