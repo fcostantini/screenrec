@@ -7,6 +7,16 @@ public struct RecordingNotification: Sendable, Equatable {
     public let body: String
     /// The file to reveal on click; nil when there is nothing to reveal.
     public let fileURL: URL?
+    /// What a click opens instead of revealing the file (M40-T4): an upload's product is the
+    /// video, not the clip it was made from.
+    public let link: URL?
+
+    init(title: String, body: String, fileURL: URL?, link: URL? = nil) {
+        self.title = title
+        self.body = body
+        self.fileURL = fileURL
+        self.link = link
+    }
 }
 
 /// Turns engine events into notification copy.
@@ -261,16 +271,33 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
-    /// A clip landed on YouTube (M40-T3). `link` is shown, not just kept: until the menu carries
-    /// it, this is the only place the user can read it.
+    /// A clip landed on YouTube (M40-T3), in the two forms ADR-024's clipboard rule leaves
+    /// (M40-T4): the link was copied, or the clipboard had changed and the link is in the menu.
+    /// A click opens the video.
     public static func uploaded(
-        title: String, visibility: String, link: String, file: URL
+        title: String, visibility: String, link: String, file: URL, linkCopied: Bool
     ) -> RecordingNotification {
         let shown = link.replacingOccurrences(of: "https://", with: "")
         return RecordingNotification(
-            title: "Uploaded to YouTube",
-            body: "“\(title)” is \(visibility) · \(shown). Click to reveal the file.",
-            fileURL: file)
+            title: linkCopied ? "Uploaded to YouTube · link copied" : "Uploaded to YouTube",
+            // The link is spelled out when it could not be copied: the menu's receipt is
+            // replaced by the next upload, and this notice is then the only place it is kept.
+            body: linkCopied
+                ? "“\(title)” is \(visibility). ⌘V pastes \(shown)."
+                : "“\(title)” is \(visibility) · \(shown). Your clipboard changed meanwhile, so "
+                    + "the link wasn't copied; it is in the menu under Copy Link.",
+            fileURL: file, link: URL(string: link))
+    }
+
+    /// An upload was stopped after YouTube had opened it (M40-T4): cancelled, or abandoned by a
+    /// quit. YouTube keeps an unfinished entry that this app's permission cannot delete (07), so
+    /// the user is told, and a click opens Studio, where it can be.
+    public static func uploadStopped(title: String, file: URL) -> RecordingNotification {
+        RecordingNotification(
+            title: "Upload to YouTube stopped",
+            body: "YouTube keeps an unfinished entry named “\(title)”. Delete it in YouTube "
+                + "Studio. The clip is saved as \(file.lastPathComponent).",
+            fileURL: file, link: UploadCopy.studioURL)
     }
 
     /// The export always finishes before the upload starts, so there is a file to name (ADR-007).

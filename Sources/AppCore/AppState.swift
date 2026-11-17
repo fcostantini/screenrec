@@ -733,15 +733,21 @@ public final class AppState {
         exports.exportAndCopy(source, configuration: exportConfiguration, range: range, crop: crop)
     }
     /// Exports `range` of `source` at the Settings size and uploads the result to YouTube with
-    /// what the sheet held (M40-T3). The clipboard is not touched.
+    /// what the sheet held (M40-T3). The export leaves the clipboard alone, so the counter read
+    /// here — as the sheet is confirmed — still stands when the upload lands (ADR-024).
     public func uploadClip(
         _ source: URL, range: ExportRange? = nil, crop: CropRect? = nil, metadata: VideoMetadata
     ) {
+        let clipboardMark = uploads.clipboardChangeCount?()
         exports.export(
             source, configuration: exportConfiguration, range: range, crop: crop
         ) { [uploads] file in
-            uploads.upload(file, metadata: metadata)
+            uploads.upload(file, metadata: metadata, clipboardMark: clipboardMark)
         }
+    }
+    /// Uploads a clip that already exists, as it is (M40-T4).
+    public func uploadFile(_ file: URL, metadata: VideoMetadata) {
+        uploads.upload(file, metadata: metadata)
     }
     public func exportToGIF(_ source: URL) { exports.exportToGIF(source, configuration: gifConfiguration) }
     public func exportAudio(_ source: URL, range: ExportRange? = nil, copiesToPasteboard: Bool = false) {
@@ -1124,12 +1130,55 @@ public final class AppState {
         RecentRecordings.rowTitle(for: url, detail: recentDetails[url])
     }
 
-    /// Settles everything a quit must not kill: a recording finalizes (ADR-007), then an export
-    /// finishes (M23-T2). One definition, so the menu's Quit and `applicationShouldTerminate`
+    /// Settles everything a quit must not kill: a recording finalizes (ADR-007), then the exports
+    /// finish (M23-T2), then the uploads (M40-T4) — in that order, because an export can start an
+    /// upload as it ends. One definition, so the menu's Quit and `applicationShouldTerminate`
     /// can't drift on what "safe to exit" means. Returns at once when nothing is in flight.
     public func finishWorkInFlight() async {
         if session.isActive { await stopAndWaitForFinalize() }
         await exports.waitForExportToFinish()
+        await uploads.waitForUploadsToFinish()
+    }
+
+    /// For a quit nobody chose to wait through — `Stop & Quit`, a logout, a shutdown (M40-T4):
+    /// the recording is finalized and the exports finish, as before, but **uploads are abandoned**
+    /// first, and none is started by an export on its way out. A transfer can outlast any quit;
+    /// the clip stays on disk. True when a notice about a stopped upload was posted.
+    @discardableResult
+    public func finishWorkBeforeQuitting() async -> Bool {
+        let announced = uploads.shutDown()
+        if session.isActive { await stopAndWaitForFinalize() }
+        await exports.waitForExportToFinish()
+        return announced
+    }
+
+    /// Whether a quit now would lose an export or an upload.
+    public var hasExportOrUploadInFlight: Bool {
+        exports.exportInProgress != nil || uploads.outstandingUploadCount > 0
+    }
+
+    /// Uploads a quit would stop: running, waiting, and the ones an export has yet to start.
+    private var uploadsOutstanding: Int { uploads.outstandingUploadCount + exports.followUpCount }
+
+    /// What to ask before quitting through exports and uploads, or nil when there are none.
+    public var quitQuestion: QuitQuestion? {
+        QuitQuestion(
+            exports: exports.exportInProgress == nil ? 0 : 1 + exports.queuedExportCount,
+            uploads: uploadsOutstanding, leavesEntry: uploads.stoppedUploadLeavesEntry)
+    }
+
+    /// The second line of `Stop recording and quit?`, which says when uploads will be stopped too.
+    public var stopRecordingQuitBody: String {
+        QuitQuestion.stopRecordingBody(
+            uploads: uploadsOutstanding, leavesEntry: uploads.stoppedUploadLeavesEntry)
+    }
+
+    /// Throws away every export and upload outstanding: the answer to that question was to quit.
+    /// True when a notice about a stopped upload was posted.
+    @discardableResult
+    public func abandonExportsAndUploads() -> Bool {
+        exports.cancelExport()
+        return uploads.cancelAllUploads()
     }
 
     /// True when `url` is still on disk. The menu's rows are stamped at open, so a file can go
@@ -1184,6 +1233,7 @@ public final class AppState {
             }
         }
         exports.renameReceipt(from: url, to: target)   // re-points the export receipt if it named this
+        uploads.fileRenamed(from: url, to: target)
         if let replay = lastReplay, replay.url.isSameFile(as: url) {
             lastReplay = LastReplay(url: target, seconds: replay.seconds)
         }

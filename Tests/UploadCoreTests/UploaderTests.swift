@@ -139,6 +139,30 @@ import Testing
         #expect(seen.values == [650])
     }
 
+    /// The session's opening is the moment YouTube starts holding an entry for the video, and a
+    /// caller has to be told before it can be told anything else. A refused session reports nothing.
+    @Test func theFirstReportComesAsTheSessionOpens() async throws {
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let transport = ScriptedTransport([
+            .response(status: 200, headers: ["Location": session.url.absoluteString]),
+            .response(status: 201, body: resource),
+        ])
+        transport.bytesReported = 1000
+        let seen = Seen()
+        _ = try await YouTubeUploader(transport: transport)
+            .upload(file, metadata: metadata, accessToken: "at") { seen.record($0) }
+        #expect(seen.values == [0, 1000])
+
+        let refused = ScriptedTransport([.response(status: 403, body: "{}")])
+        let unseen = Seen()
+        await #expect(throws: YouTubeError.self) {
+            _ = try await YouTubeUploader(transport: refused)
+                .upload(file, metadata: metadata, accessToken: "at") { unseen.record($0) }
+        }
+        #expect(unseen.values.isEmpty)
+    }
+
     // MARK: - Asking how far it got
 
     @Test func theStatusRequestIsAnEmptyPutNamingTheWholeFile() {

@@ -7,6 +7,17 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-17 (M40-T4, the fixes on screen — a second fake-uploader build):
+  ✅ **A notice posted in the same turn as a quit does arrive.** Posted from the cancel itself,
+  with the exit held 0.3 s: delivered after `Quit Anyway`, and after a terminate request from
+  outside the app. The grace is no longer only reasoned.
+  ✅ **`NSRunningApplication.terminate()` from a script is a logout's quit in miniature:** it
+  reaches `applicationShouldTerminate` with no menu and no question, and needs no Automation
+  grant (`osascript … to quit` would raise one). The app was gone 0.4 s later with 34 s of
+  upload left — abandoned, not waited for.
+  ✅ **A live check that must not touch the clipboard never lets an upload land.** Cancel, quit
+  and outside-quit all stop the fake before it finishes, so the clipboard rule never fires.
+
 - 2026-11-17 (M40-T4, the sweep over the review's fixes):
   🔴 **A fake that ignores cancellation makes every cancel test pass.** `for await _ in stream
   { break }; return video` ends its wait when the task is cancelled — and then *returns the

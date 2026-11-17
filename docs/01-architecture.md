@@ -42,7 +42,7 @@ screenrec-app/
 │   │   │                     #   not the executable, because SPM can't link one into a test target).
 │   │   │                     #   AppMain (ScreenRec.run + AppDelegate), StatusItemController +
 │   │   │                     #   MenuBuilder + MenuRow (the NSMenu, M28), StatusIconImage,
-│   │   │                     #   RecentRowView + ExportProgressRowView (M28-T3/T4),
+│   │   │                     #   RecentRowView + ProgressRowView (M28-T3/T4),
 │   │   │                     #   WindowPresenter (Settings/Onboarding/Trim, M28), Notifier,
 │   │   │                     #   Relaunch, HotkeyCenter (Carbon), RegionSelectionOverlay (M11),
 │   │   │                     #   CountInOverlay (M12), NotificationSettings, LoginItem

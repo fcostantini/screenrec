@@ -233,6 +233,34 @@ Order and grouping (separators between groups):
     **not persisted** — a recording already lives in `Recordings ▸`, so the row is prominence, not access —
     and expires at menu open on the export receipt's own one-hour clock, or when its file goes, or when the
     next take starts. A rename re-points it keeping its original date; a trash clears it.
+    **M40-T4 gave an upload the export's two rows**, after the export's own — the order things
+    happened in: the receipt of the one that landed last, then the one running. **The receipt
+    stays up while another upload runs**, because its notice may have sent the user here for the
+    link. While one runs: **`Uploading to YouTube… 37%`** with the export's bar (the percentage
+    in the title for the same VoiceOver reason; `· 1 waiting` drawn after it, **stamped at open**
+    like every other row — only the bar and its number move), and under it **`Cancel Upload`**.
+    It stops **the upload its row showed**, not whatever is running when it is pressed: the one
+    under an open menu can land and be replaced. The clip stays and the next one waiting starts.
+    🔴 **YouTube keeps an unfinished entry for any upload it had opened** — *"Processing will
+    begin shortly"*, seen on Franco's channel 2026-11-17 — and the upload-only permission cannot
+    delete it. So a stop after that point posts the *Upload stopped* notice (below); one before
+    it posts nothing, the press being its own explanation. When it lands:
+    **`Uploaded to YouTube · ‹title›`** — the video's title, cut at 40 characters because a menu is
+    as wide as its widest row — whose submenu is `Copy Link` · `Open on YouTube` · `Edit in YouTube
+    Studio` (the upload-only permission can neither edit nor delete; Studio can), then `Reveal File
+    in Finder`, left out once the clip has been moved or trashed. The receipt survives relaunch
+    (`lastUpload…`), is replaced by the next upload, and expires on the export receipt's one-hour
+    clock — **not** when its clip goes, because the link still works.
+    **The per-file submenu gains `Upload to YouTube…`** after `Copy`, on **`.mp4` only** (Recent
+    Exports and the export receipt): the Trim window's sheet, and the file sent as it is, with no
+    second export. Its title starts as the file's name without the ending the export added —
+    ` trimmed`, or ` trimmed 2`…`99` — and nothing looser: `Budget trimmed 2024` keeps its name,
+    and no name is cut to nothing. The sheet quotes the file's real length and size. One sheet at
+    a time: a second press while one is being prepared or is up does nothing. **Absent** in a build without credentials —
+    a menu row has no room for the reason, which Settings and the Trim window give — and disabled
+    while a sign-in or a disconnect is under way. With no account it raises the Trim window's
+    connect alert and opens the sheet after the sign-in. **Whole recordings are not offered it:**
+    they need an export first, which is `Trim…` with the whole range.
     ⚠️ **"Dimmed but clickable" is still not offered**, though the reason changed: M4-T2 recorded it
     as unreachable without a hand-built `NSMenu`, and M28-T2 built one — so it is now a choice
     nobody has asked for rather than a limit. `NSMenuItem.indentationLevel` is likewise available
@@ -320,12 +348,27 @@ the in-flight state *synchronously*: every quit route ends in `NSApplication.ter
 delegate waits for an export, so an abandon the delegate can't observe becomes a wait (docs/07).
 Logout and shutdown reach `applicationShouldTerminate` directly, where a modal could stall the
 system — that route waits silently, and asks nothing.
+**An upload is asked about the same way (M40-T4):** `An upload to YouTube is still running.` /
+`Quitting now stops it. The clip stays on this Mac.` / **`Wait for Upload`**. With both kinds
+outstanding, each in its own number: `An export and 2 uploads are still running.` / `Quitting now
+throws the export away and stops the uploads. The recording is untouched.` / **`Wait for Both`**.
+An export that will be uploaded counts as both, since a quit loses the upload it had yet to start,
+and every wait lasts through the uploads the exports begin. When an upload has got as far as
+YouTube the body ends: *"YouTube keeps an unfinished entry for the upload already under way; you
+can delete it in YouTube Studio."* — said before the choice, because the app cannot clean it up
+afterwards. The words are `QuitQuestion`'s.
+🔴 **An upload is waited for only by the button that says so.** Every other quit — `Stop & Quit`,
+a logout, a shutdown, a software update — finishes the recording and the exports as before and
+**abandons uploads**, taking no new one from an export on its way out: a transfer can outlast any
+quit, and the clip stays on disk. `Stop recording and quit?` then reads *"Your recording will be
+saved first. The upload to YouTube is stopped."* (with the entry sentence when it applies); the
+silent routes post the *Upload stopped* notice and hold the exit 0.3 s so it can leave the process.
 
 The plain string still reaches Accessibility as the row's title, so `menudriver` finds and clicks
 it. Same family of limitation as the header's frozen clock (item 1) and the un-two-toned folder
 path (item 10): for a `.menu` MenuBarExtra, style through AppKit, not SwiftUI modifiers.
 
-## Notifications (UserNotifications; click always reveals the file in Finder)
+## Notifications (UserNotifications; a click reveals the file in Finder, or opens an upload's video)
 
 Copy pattern — **outcome first, cause second, always a playable file** (ADR-007 in UI
 form). Never the word "error" for a fail-stop.
@@ -347,7 +390,8 @@ form). Never the word "error" for a fail-stop.
 | Export won't fit — **M23-T2** | `Not enough room to export` | `This needs about 1,8 GB and Macintosh HD has 900 MB free. The recording is untouched.` | — |
 | Export failed — **M10-T2** | `Couldn't export to MP4` | `The original recording is untouched. Try again, or check the output folder is writable.` | — |
 | Saved as GIF — **M10-T3** | `Saved as GIF` | `<name>.gif — ready to share. Click to reveal.` | reveal |
-| Uploaded — **M40-T3** | `Uploaded to YouTube` | `“<title>” is unlisted · youtu.be/<id>. Click to reveal the file.` The link is shown because until M40-T4 this is the only place to read it | reveal |
+| Uploaded — **M40-T3/T4** | `Uploaded to YouTube · link copied` — or `Uploaded to YouTube` | `“<title>” is unlisted. ⌘V pastes youtu.be/<id>.` — or `“<title>” is unlisted · youtu.be/<id>. Your clipboard changed meanwhile, so the link wasn't copied; it is in the menu under Copy Link.` The second form spells the link out because the menu's receipt is replaced by the next upload, and the notice is then the only place it is kept. **The clipboard rule (ADR-024):** the pasteboard's change counter is read when the sheet is confirmed and again when the upload lands, and the link is written only if they match — so a copy made during the export or the transfer is never overwritten, and a second upload's link never replaces the first's | **opens the video** |
+| Upload stopped — **M40-T4** | `Upload to YouTube stopped` | `YouTube keeps an unfinished entry named “<title>”. Delete it in YouTube Studio. The clip is saved as <name>.mp4.` Posted when an upload **YouTube had already opened** is stopped — `Cancel Upload`, `Quit Anyway`, or a quit that abandons it — and never for one that had not got that far | **opens YouTube Studio** |
 | Upload failed — **M40-T3** | `Couldn't upload to YouTube` | `<why>. The clip is saved as <name>.mp4.` — `<why>` names the fix: `YouTube needs reconnecting in Settings.` · `The connection dropped.` · `YouTube's daily upload limit for this build is used up.` It names YouTube only when the failure is YouTube's; anything else is `The upload didn't finish.` The export always finishes first, so the file exists (ADR-007) | reveal |
 | GIF failed — **M10-T3** | `Couldn't save GIF` | `The original recording is untouched. Try again, or check the output folder is writable.` | — |
 | Recording file moved — **M6-T7** | `Still recording · file moved back` | `The recording file was moved while recording, so it was moved back.` | — |
@@ -659,6 +703,7 @@ moved):
 | `youtubeVisibility` | String `unlisted`\|`private`\|`public`; absent or anything else ⇒ `unlisted`. What a new YouTube upload starts as (M40-T2) | M40-T2 |
 | `youtubeChannel` | String; **absent ⇒ unknown**. The channel YouTube named with the last upload, for the Settings row and the sheet. Not a preference: it belongs to the sign-in and is cleared with it (M40-T3) | M40-T3 |
 | `mp4Width` | Int; snaps to its nearest picker choice on load, absent ⇒ 1920. The `Export as MP4` width cap; 4096 means "largest the source allows inside Level 5.2" (M18-T2) | M18-T2 |
+| `lastUploadID` · `lastUploadTitle` · `lastUploadFile` · `lastUploadDate` | Strings + Date (M40-T4); **absent ⇒ no receipt**. The last upload, so its menu receipt — the one place the link can be read once the notice has gone — survives relaunch. The clip's path is **not** validated: the link outlives the file. Expired at menu open after one hour | M40-T4 |
 | `lastExportPath` · `lastExportDate` | String path + Date (M12-T2/T3); **absent ⇒ no receipt**. The last export, so its menu receipt survives relaunch — dropped on load if the file is gone (moved/trashed) **or has no date** (a pre-T3 entry), and expired at menu open once the date is **older than one hour** (M12-T3). Not part of `Settings` — a transient pointer, not user config; its own load/save | M12-T2/T3 |
 
 ⚠️ **`launchAtLogin` is NOT a UserDefaults key (amended M6-T5).** The spec originally listed
@@ -769,8 +814,8 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   leaves the insertion point where the typing was, and waits for an input method's composition —
   a dead key's accent included — to commit before it applies.
   **No "made for kids" control:** the app declares nothing, so the channel's own default applies.
-  **Uploads run one at a time, in the order asked for.** ⚠️ Until M40-T4 nothing shows the upload
-  while it runs and no link can be copied: the outcome is one notice (below).
+  **Uploads run one at a time, in the order asked for.** The menu shows the one running and keeps
+  the link afterwards (Menu, the receipt group); the notice says whether the link was copied.
 - **Crop** (M26-T2, unchecked by default — the window is unchanged until it's asked for): ticking it
   puts a band over the preview; drag to draw, drag again to redraw, `Reset` clears it, and unticking
   discards it — a crop that survived out of sight would crop an export with nothing on screen saying

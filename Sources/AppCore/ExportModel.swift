@@ -143,7 +143,14 @@ public final class ExportModel {
             success: nil,
             failure: { _ in RecordingNotifications.exportFailed() },
             reportsProgress: true,
+            handsFileOn: true,
             completion: completion)
+    }
+
+    /// How many exports, running or waiting, hand their file on once it is written (M40-T4):
+    /// work that has not started yet, which a quit has to count with the exports themselves.
+    public var followUpCount: Int {
+        (runningHandsFileOn ? 1 : 0) + pending.filter(\.handsFileOn).count
     }
 
     /// Saves a recording or clip as a looping GIF (M10-T3), the same off-main, one-at-a-time path.
@@ -212,6 +219,7 @@ public final class ExportModel {
         let success: ((URL) -> RecordingNotification)?
         let failure: (Error) -> RecordingNotification
         let reportsProgress: Bool
+        let handsFileOn: Bool
         let completion: (@MainActor (URL) -> Void)?
     }
 
@@ -219,6 +227,7 @@ public final class ExportModel {
     /// a time or nothing". Not persisted: a queued job is an intention with nothing on disk, and the
     /// `.partial` discipline is not a job store, so quitting says what it drops (`cancelExport`).
     private var pending: [PendingExport] = []
+    private var runningHandsFileOn = false
 
     /// How many exports are waiting behind the running one, for the menu's single row.
     public var queuedExportCount: Int { pending.count }
@@ -240,13 +249,14 @@ public final class ExportModel {
         success: ((URL) -> RecordingNotification)?,
         failure: @escaping (Error) -> RecordingNotification,
         reportsProgress: Bool = false,
+        handsFileOn: Bool = false,
         completion: (@MainActor (URL) -> Void)? = nil
     ) {
         pending.append(
             PendingExport(
                 source: source, output: output, estimate: estimate, export: export,
                 success: success, failure: failure, reportsProgress: reportsProgress,
-                completion: completion))
+                handsFileOn: handsFileOn, completion: completion))
         startNextIfIdle()
     }
 
@@ -261,6 +271,7 @@ public final class ExportModel {
         exportGeneration += 1
         exportInProgress = job.source.lastPathComponent
         exportProgress = job.reportsProgress ? 0 : nil
+        runningHandsFileOn = job.handsFileOn
         let availableBytes = self.availableBytes
         // Built here, after the generation moves, so the sink belongs to this run and no other.
         let report = progressReporter()
@@ -282,6 +293,9 @@ public final class ExportModel {
             }
             do {
                 let url = try await job.export(job.source, job.output, report)
+                // Abandoned while it ran — a quit. The transcode can still come back with a
+                // file, and nothing may follow from it: no receipt, no notice, no hand-on.
+                guard !Task.isCancelled else { return }
                 lastExport = LastExport(url: url, date: Date())
                 job.completion?(url)  // before the notice, so "Copied" is true when it is read
                 if let success = job.success { notify?(success(url)) }
@@ -298,6 +312,7 @@ public final class ExportModel {
     private func finish() {
         exportInProgress = nil
         exportProgress = nil
+        runningHandsFileOn = false
         startNextIfIdle()
     }
 
@@ -406,6 +421,7 @@ public final class ExportModel {
         pending.removeAll()
         exportInProgress = nil
         exportProgress = nil
+        runningHandsFileOn = false
     }
 
     // MARK: - The receipt

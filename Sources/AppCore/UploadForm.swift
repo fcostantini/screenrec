@@ -45,6 +45,15 @@ public enum UploadForm {
         title(source.deletingPathExtension().lastPathComponent)
     }
 
+    /// The same for a clip already exported: its name without the ending the export added to
+    /// tell it from its source — ` trimmed`, or ` trimmed 2`…`99` once a copy existed. Nothing
+    /// looser: a take that merely has the word in its name keeps it, and no name is cut to nothing.
+    public static func defaultTitle(forExport file: URL) -> String {
+        let name = file.deletingPathExtension().lastPathComponent
+        let stem = name.replacing(#/ trimmed( [0-9]{1,2})?$/#, with: "")
+        return title(stem.isEmpty ? name : stem)
+    }
+
     public static func isLong(seconds: Double) -> Bool {
         seconds > longVideoSeconds
     }

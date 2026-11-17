@@ -68,7 +68,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     func menuWillOpen(_ menu: NSMenu) {
         menuIsOpen = true
-        observeExportProgress()
+        observeProgress()
     }
 
     func menuDidClose(_ menu: NSMenu) { menuIsOpen = false }
@@ -78,30 +78,45 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     ///
     /// At most one registration exists at a time: tracking is one-shot and only *re-arms* while the
     /// menu is open, so without the flag every open would stack another one that outlives it.
-    private func observeExportProgress() {
+    private func observeProgress() {
         guard StatusItemPolicy.registersObservation(
             menuIsOpen: menuIsOpen, alreadyObserving: observingProgress) else { return }
         observingProgress = true
         withObservationTracking {
             _ = state.exports.exportProgress
+            _ = state.uploads.uploadProgress
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
                 self.observingProgress = false
                 self.advanceExportRow()
-                self.observeExportProgress()
+                self.advanceUploadRow()
+                self.observeProgress()
             }
         }
+    }
+
+    private func progressRow(_ kind: ProgressRowView.Kind) -> NSMenuItem? {
+        menu.items.first { ($0.view as? ProgressRowView)?.kind == kind }
+    }
+
+    private func advanceUploadRow() {
+        guard let fraction = state.uploads.uploadProgress, state.uploads.uploadInProgress != nil,
+              let row = progressRow(.upload)
+        else { return }
+        // `tag` is the count stamped at open, which is what the row draws.
+        row.title = MenuHeader.uploading(fraction: fraction, waiting: row.tag)
+        (row.view as? ProgressRowView)?.show(fraction)
     }
 
     private func advanceExportRow() {
         guard let fraction = state.exports.exportProgress,
               let name = state.exports.exportInProgress,
-              let row = menu.items.first(where: { $0.view is ExportProgressRowView })
+              let row = progressRow(.export)
         else { return }
         // The title as well as the bar: it is what VoiceOver reads.
         row.title = MenuHeader.exporting(name, fraction: fraction)
-        (row.view as? ExportProgressRowView)?.show(fraction)
+        (row.view as? ProgressRowView)?.show(fraction)
     }
 
     /// Hands a just-decoded frame to the row showing that file, wherever it currently sits.
@@ -125,6 +140,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         state.refreshRecordingRoom()
         Task { await state.refreshRecentDetails() }
         state.exports.expireStaleReceipt()   // drop a receipt aged out since a prior session (M12-T3)
+        state.uploads.prepareForMenu()       // …the upload's too, and an ended sign-in (M40-T4)
         state.expireStaleRecordingReceipt()  // …and the take receipt, on the same clock (M24-T3)
         if !state.session.isActive {
             state.refreshSources(displays: DisplayOption.liveScreens())

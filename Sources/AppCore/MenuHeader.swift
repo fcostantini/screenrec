@@ -32,6 +32,20 @@ public enum MenuHeader {
         return "\(head) · \(waiting) waiting"
     }
 
+    /// The upload row (M40-T4), the export row's successor and in its shape. An upload always
+    /// knows its length, so there is always a percentage.
+    public static func uploading(fraction: Double, waiting: Int = 0) -> String {
+        let head = "\(uploadingLead) \(exportPercent(fraction))%"
+        return waitingNote(waiting).map { "\(head) \($0)" } ?? head
+    }
+
+    public static let uploadingLead = "Uploading to YouTube…"
+
+    /// `· 2 waiting`, or nil when nothing is.
+    public static func waitingNote(_ waiting: Int) -> String? {
+        waiting > 0 ? "· \(waiting) waiting" : nil
+    }
+
     /// One rounding rule, so the drawn bar and the number it sits beside can never disagree.
     public static func exportPercent(_ fraction: Double) -> Int {
         Int((min(1, max(0, fraction)) * 100).rounded())

@@ -488,14 +488,6 @@ private final class BrokenStore: TokenStore, @unchecked Sendable {
     }
 }
 
-/// Holds a fake sign-in or revocation open until the test lets it through.
-private final class Gate: @unchecked Sendable {
-    private let (stream, continuation) = AsyncStream<Void>.makeStream()
-
-    func wait() async { for await _ in stream { return } }
-    func open() { continuation.yield() }
-}
-
 private final class Counter: @unchecked Sendable {
     private let lock = NSLock()
     private var count = 0

@@ -85,6 +85,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Settings — so the app opens the one and comes back in front of it for the other.
         state.uploads.openURL = { NSWorkspace.shared.open($0) }
         state.uploads.bringToFront = { NSApplication.shared.activate(ignoringOtherApps: true) }
+        // The clipboard rule (ADR-024, M40-T4) needs the pasteboard's counter and a write to it.
+        state.uploads.clipboardChangeCount = { NSPasteboard.general.changeCount }
+        state.uploads.copyToClipboard = { ShareActions.copy(text: $0) }
         // Naming a take as it stops (M21-T3): the same `NSAlert` the Rename… row uses.
         state.promptForTakeName = { ShareActions.nameTake($0, duration: $1) }
         // Global shortcuts (M9-T4): map each intent to a Carbon hotkey id + the action it fires.
@@ -169,15 +172,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// (M23-T2) — on every quit route, including logout, shutdown, a software update, and `⌘Q`
     /// while a window is key. Idle / armed-replay have nothing on disk to save.
     ///
+    /// **An upload is abandoned, not finished (M40-T4):** a transfer can outlast any logout, and
+    /// its clip stays on disk. A notice says what that leaves on YouTube.
+    ///
     /// Silent by design: a modal during logout can stall it. The menu's Quit does the asking, and
-    /// arrives here with its answer already applied — a take finalized, or an abandoned export
-    /// already cleared — so this sees nothing left to wait for.
+    /// arrives here with its answer already applied — a take finalized, uploads waited for, or
+    /// work abandoned and already cleared — so this sees nothing left to do.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard state.session.isActive || state.exports.exportInProgress != nil else {
+        guard state.session.isActive || state.hasExportOrUploadInFlight else {
             return .terminateNow
         }
         Task { @MainActor in
-            await state.finishWorkInFlight()
+            if await state.finishWorkBeforeQuitting() { try? await Task.sleep(for: QuitFlow.noticeGrace) }
             NSApp.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater

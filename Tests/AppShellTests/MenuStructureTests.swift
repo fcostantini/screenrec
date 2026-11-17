@@ -158,7 +158,7 @@ import Testing
         let row = MenuSnapshot.item(state, titled: "Exporting… 42%")
         #expect(row != nil)
         #expect(row?.isEnabled == false)
-        #expect(row?.view is ExportProgressRowView)   // the bar, not just the words
+        #expect(row?.view is ProgressRowView)   // the bar, not just the words
 
         release.value = true
         while state.exports.exportInProgress != nil { await Task.yield() }

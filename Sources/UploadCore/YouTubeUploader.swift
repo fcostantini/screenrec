@@ -42,7 +42,10 @@ public struct UploadedVideo: Equatable, Sendable {
         self.channelTitle = channelTitle
     }
 
-    public var link: String { "https://youtu.be/\(id)" }
+    public var link: String { Self.link(forID: id) }
+
+    /// One definition of the address a video is shared by.
+    public static func link(forID id: String) -> String { "https://youtu.be/\(id)" }
 }
 
 /// YouTube's resumable upload (developers.google.com/youtube/v3/guides/using_resumable_upload_protocol):
@@ -155,12 +158,16 @@ public struct YouTubeUploader: Sendable {
 
     /// Opens a session and sends the file. A transfer that breaks is resumed **once**, from
     /// wherever YouTube says it got to.
+    ///
+    /// `progress` is first called, with `0`, the moment the session is open: from then on YouTube
+    /// holds an entry for the video, finished or not (07), and a caller that stops has that to say.
     public func upload(
         _ file: URL, metadata: VideoMetadata, accessToken: String,
         progress: @escaping @Sendable (Int64) -> Void = { _ in }
     ) async throws -> UploadedVideo {
         let session = try await openSession(
             for: file, metadata: metadata, accessToken: accessToken)
+        progress(0)
         do {
             return try await send(
                 file, to: session, accessToken: accessToken, progress: progress)

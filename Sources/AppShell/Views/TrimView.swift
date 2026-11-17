@@ -309,7 +309,7 @@ struct TrimView: View {
         let uploads = state.uploads
         let action = UploadCopy.trimAction(uploads.account, canSignIn: uploads.canSignIn)
         HStack(spacing: 8) {
-            Button(UploadCopy.trimButton(uploads.account)) { perform(action, on: url) }
+            Button(UploadCopy.trimButton(uploads.account)) { beginUpload(of: url) }
                 // Giving up a sign-in needs no range; starting an upload does.
                 .disabled(action == .none || (action != .cancelSignIn && !hasRange))
             HStack(spacing: 4) {
@@ -327,30 +327,14 @@ struct TrimView: View {
         }
     }
 
-    private func perform(_ action: UploadCopy.TrimAction, on url: URL) {
-        switch action {
-        case .upload:
+    /// After a sign-in the sheet is the press again, so it opens only if the button would still
+    /// take one: this window open on this clip, with a range.
+    private func beginUpload(of url: URL) {
+        ShareActions.beginUpload(state.uploads) {
+            loadedURL == url && state.exports.trimTarget == url && hasRange
+        } present: {
             presentUploadSheet(for: url)
-        case .connect:
-            guard ShareActions.confirmConnect() else { return }
-            Task { @MainActor in await signInThenUpload(url) }
-        case .cancelSignIn:
-            state.uploads.cancelConnect()
-        case .none:
-            break
         }
-    }
-
-    /// The press again once the sign-in it needed has its outcome — and only if the button would
-    /// still take it. The browser trip is long enough for the window to close, the clip to change
-    /// or the range to go; a sign-in that failed or was given up leaves the row saying why.
-    private func signInThenUpload(_ url: URL) async {
-        let uploads = state.uploads
-        await uploads.connectAndWait()
-        guard loadedURL == url, state.exports.trimTarget == url, hasRange,
-              UploadCopy.trimAction(uploads.account, canSignIn: uploads.canSignIn) == .upload
-        else { return }
-        presentUploadSheet(for: url)
     }
 
     private func presentUploadSheet(for url: URL) {

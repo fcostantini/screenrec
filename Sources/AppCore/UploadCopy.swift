@@ -71,6 +71,31 @@ public enum UploadCopy {
         }
     }
 
+    // MARK: - The per-file row in the menu (docs/06 "Menu")
+
+    public enum MenuUpload: Equatable, Sendable {
+        /// Not a file YouTube is sent from here, or a build that can't sign in: no row. A menu
+        /// row has no room to say why; Settings and the Trim window do.
+        case absent
+        /// A sign-in or a disconnect is under way.
+        case disabled
+        case enabled
+    }
+
+    /// `Upload to YouTube…` on a file the menu lists (M40-T4): the `.mp4`s this app exports, sent
+    /// as they are. A recording needs an export first, which is the Trim window's job.
+    public static func menuUpload(
+        for file: URL, account: UploadModel.Account, canSignIn: Bool
+    ) -> MenuUpload {
+        guard canSignIn, file.pathExtension.lowercased() == "mp4" else { return .absent }
+        switch trimAction(account, canSignIn: canSignIn) {
+        case .upload, .connect: return .enabled
+        case .cancelSignIn, .none: return .disabled
+        }
+    }
+
+    public static let menuUploadTitle = "Upload to YouTube…"
+
     // MARK: - The connect alert and the sheet
 
     public static let connectTitle = "Connect YouTube to upload"
@@ -99,6 +124,17 @@ public enum UploadCopy {
         var parts = [Timecode.cutPoint(seconds)]
         if let bytes { parts.append("up to \(ApproximateBytes.formatted(bytes))") }
         if let profile { parts.append(profile) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// The same line for a clip that already exists: its real length and weight, each left out
+    /// if it couldn't be read.
+    public static func fileSummary(seconds: Double?, bytes: Int64?) -> String {
+        var parts: [String] = []
+        if let seconds { parts.append(Timecode.cutPoint(seconds)) }
+        if let bytes {
+            parts.append(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
+        }
         return parts.joined(separator: " · ")
     }
 
@@ -219,6 +255,7 @@ public enum UploadCopy {
 
     /// Where the links under the section go. Literals: a constant that parses once parses always.
     public static let termsURL = URL(string: "https://www.youtube.com/t/terms")!
+    public static let studioURL = URL(string: "https://studio.youtube.com")!
     public static let googlePrivacyURL = URL(string: "https://policies.google.com/privacy")!
     public static let whatIsSentURL = URL(
         string: "https://github.com/fcostantini/screenrec#what-screenrec-sends")!

@@ -9,8 +9,9 @@ import UserNotifications
 /// docs/06 specifies. Hence `NSApplicationDelegateAdaptor`, not a view's `.task`.
 final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
-    /// Where the click handler finds the file to reveal.
+    /// Where the click handler finds the file to reveal, or the link to open instead.
     private static let fileURLKey = "fileURL"
+    private static let linkKey = "link"
 
     func install() {
         UNUserNotificationCenter.current().delegate = self
@@ -42,24 +43,30 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         // suppresses ordinary banners whenever the display is captured, and replay saves fire
         // exactly then. Needs the matching entitlement (Scripts/entitlements.plist).
         content.interruptionLevel = .timeSensitive
-        if let url = notification.fileURL {
-            content.userInfo = [Self.fileURLKey: url.path]
-        }
+        var userInfo: [String: String] = [:]
+        if let url = notification.fileURL { userInfo[Self.fileURLKey] = url.path }
+        if let link = notification.link { userInfo[Self.linkKey] = link.absoluteString }
+        content.userInfo = userInfo
         // nil trigger = deliver now.
         let request = UNNotificationRequest(
             identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
 
-    /// docs/06: click always reveals the file in Finder.
+    /// docs/06: a click reveals the file in Finder — or opens the notice's link, when it has
+    /// one (an upload's video, M40-T4).
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         defer { completionHandler() }
-        guard let path = response.notification.request.content
-            .userInfo[Self.fileURLKey] as? String else { return }
+        let userInfo = response.notification.request.content.userInfo
+        if let link = (userInfo[Self.linkKey] as? String).flatMap(URL.init(string:)) {
+            NSWorkspace.shared.open(link)
+            return
+        }
+        guard let path = userInfo[Self.fileURLKey] as? String else { return }
         Finder.reveal(URL(fileURLWithPath: path))
     }
 

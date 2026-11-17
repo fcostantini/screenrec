@@ -17,6 +17,12 @@ enum ShareActions {
         pasteboard.writeObjects([url as NSURL])
     }
 
+    static func copy(text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
+
     /// Opens the OS share sheet (AirDrop/Messages/Mail) for the file. The menu that launched this has
     /// already closed, so the picker anchors to an invisible 1×1 window at the pointer.
     @MainActor static func share(_ url: URL) {
@@ -78,6 +84,64 @@ enum ShareActions {
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return nil }
         return form.metadata(fallbackTitle: draft.title)
+    }
+
+    /// The account step every upload starts with (M40-T3/T4), then `present`: at once when an
+    /// account is connected; after the connect alert and the sign-in when none is — and then
+    /// only if `stillWanted`, since the browser trip is long enough for its reason to go. A
+    /// sign-in that failed or was given up leaves the account saying why.
+    @MainActor static func beginUpload(
+        _ uploads: UploadModel, stillWanted: @escaping @MainActor () -> Bool,
+        present: @escaping @MainActor () -> Void
+    ) {
+        switch UploadCopy.trimAction(uploads.account, canSignIn: uploads.canSignIn) {
+        case .upload:
+            present()
+        case .connect:
+            guard confirmConnect() else { return }
+            Task { @MainActor in
+                await uploads.connectAndWait()
+                guard UploadCopy.trimAction(uploads.account, canSignIn: uploads.canSignIn) == .upload,
+                      stillWanted()
+                else { return }
+                present()
+            }
+        case .cancelSignIn:
+            uploads.cancelConnect()
+        case .none:
+            break
+        }
+    }
+
+    /// Raised from a press on the menu's row until its sheet has been answered. The menu stays
+    /// usable while the clip's length is read and while the sheet is up, and a second press must
+    /// not stack a second sheet — two confirmed sheets are the same clip uploaded twice.
+    @MainActor private static var isAskingForUpload = false
+
+    /// `Upload to YouTube…` on a clip the menu lists (M40-T4): the sheet, then the file as it is.
+    @MainActor static func upload(_ file: URL, state: AppState) {
+        guard !isAskingForUpload else { return }
+        let exists: @MainActor () -> Bool = { FileManager.default.fileExists(atPath: file.path) }
+        beginUpload(state.uploads, stillWanted: exists) {
+            guard !isAskingForUpload else { return }
+            isAskingForUpload = true
+            Task { @MainActor in
+                defer { isAskingForUpload = false }
+                // The length is a header read; the sheet waits for it rather than quote nothing.
+                let seconds = await MediaFile.duration(of: file)
+                guard exists() else { return }
+                let bytes = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize)
+                    .map(Int64.init)
+                let draft = UploadDraft(
+                    title: UploadForm.defaultTitle(forExport: file),
+                    privacy: state.uploadVisibility,
+                    summary: UploadCopy.fileSummary(seconds: seconds, bytes: bytes),
+                    channel: state.uploads.channelTitle,
+                    isLong: seconds.map(UploadForm.isLong) ?? false)
+                guard let metadata = askForUpload(draft) else { return }
+                state.uploadFile(file, metadata: metadata)
+            }
+        }
     }
 
     /// The modal both prompts are: a text field pre-filled with `url`'s base name, confirm and

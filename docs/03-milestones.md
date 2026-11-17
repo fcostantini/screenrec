@@ -4027,15 +4027,21 @@ uploaded. Detail in docs/07.
       floor with the button unwrapped; the sheet's three controls read through AX; `Upload` leaves
       0 windows; one real **unlisted** upload of a synthetic clip.
 
-- [ ] M40-T4 **The menu and the notices carry it** (AppCore + AppShell).
+- [x] M40-T4 **The menu and the notices carry it** (AppCore + AppShell).
       Plan artifact: `claude.ai/artifact/QKHR2hWzjpYGJTCiDPwXxA` — published 2026-11-17, **awaiting
       Franco's go and four rulings** (`Cancel Upload`; what a click on the notice does; whole
       recordings; the receipt's lifetime) — his answer, 2026-11-17: *"let's go"*, **taken as all
       four as recommended** (`Cancel Upload` in; a click opens the video; `.mp4` only; one hour).
-      ⏸ **Built, verified live, reviewed and fixed 2026-11-17; uncommitted, waiting on one short
-      live check of what the fixes changed on screen.** **1027 tests** (985 → 1027); **72 breaks,
-      72 red** — after two tests were found blind to a wrong cancel (their fake upload ignored
-      cancellation) and fixed.
+      ✅ **Done 2026-11-17. 1027 tests** (985 → 1027); **72 breaks, 72 red** — after two tests
+      were found blind to a wrong cancel (their fake upload ignored cancellation) and fixed.
+      ✅ **The fixes, live on a fake-uploader build:** `Cancel Upload` on an upload the fake had
+      "opened" → *Upload to YouTube stopped*, naming the entry; quitting → the question ends *"YouTube
+      keeps an unfinished entry for the upload already under way; you can delete it in YouTube
+      Studio."*, and `Quit Anyway` → the notice delivered before the exit; a terminate request sent
+      from outside, as a logout sends one → **gone in 0.4 s** with 34 s of upload left, and the
+      notice delivered. No upload was allowed to land, so the clipboard was never written.
+      ⚠️ **Not driven:** the receipt above a running upload and the stale `Cancel Upload` row (both
+      asserted against the real menu built in-process); `Stop & Quit`'s second line (pure, asserted).
       ✅ **Live, on a temporary build with a fake uploader** (30 s, reporting progress, nothing
       sent): the `.mp4` row's `Upload to YouTube…` after `Copy`, and the sheet reading `0:24 ·
       11,4 MB`; the row `Uploading to YouTube… 13%` with `Cancel Upload` under it, moving

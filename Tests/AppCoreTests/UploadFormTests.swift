@@ -173,12 +173,37 @@ import UploadCore
 
     // MARK: - The notices
 
-    @Test func aLandedUploadIsAnnouncedWithItsLink() {
+    /// One notice in two forms (ADR-024's clipboard rule), and a click opens the video either way.
+    @Test func aLandedUploadSaysWhetherTheLinkWasCopied() {
         let file = URL(fileURLWithPath: "/tmp/Clip trimmed.mp4")
+        let link = "https://youtu.be/abc123XYZ_-"
+        let copied = RecordingNotifications.uploaded(
+            title: "My clip", visibility: "unlisted", link: link, file: file, linkCopied: true)
+        #expect(copied.title == "Uploaded to YouTube · link copied")
+        #expect(copied.body == "“My clip” is unlisted. ⌘V pastes youtu.be/abc123XYZ_-.")
+        #expect(copied.link == URL(string: link))
+        #expect(copied.fileURL == file)
+
         let notice = RecordingNotifications.uploaded(
-            title: "My clip", visibility: "unlisted", link: "https://youtu.be/abc123XYZ_-", file: file)
+            title: "My clip", visibility: "unlisted", link: link, file: file, linkCopied: false)
         #expect(notice.title == "Uploaded to YouTube")
-        #expect(notice.body == "“My clip” is unlisted · youtu.be/abc123XYZ_-. Click to reveal the file.")
+        // Spelled out here: the menu's receipt is replaced by the next upload.
+        #expect(
+            notice.body
+                == "“My clip” is unlisted · youtu.be/abc123XYZ_-. Your clipboard changed meanwhile, so the link wasn't copied; it is in the menu under Copy Link.")
+        #expect(notice.link == URL(string: link))
+        #expect(notice.fileURL == file)
+    }
+
+    /// YouTube keeps an entry for an upload it had opened, and this app cannot delete it.
+    @Test func aStoppedUploadSaysWhatYouTubeKeepsAndWhereToDeleteIt() {
+        let file = URL(fileURLWithPath: "/tmp/Clip trimmed.mp4")
+        let notice = RecordingNotifications.uploadStopped(title: "My clip", file: file)
+        #expect(notice.title == "Upload to YouTube stopped")
+        #expect(
+            notice.body
+                == "YouTube keeps an unfinished entry named “My clip”. Delete it in YouTube Studio. The clip is saved as Clip trimmed.mp4.")
+        #expect(notice.link == URL(string: "https://studio.youtube.com"))
         #expect(notice.fileURL == file)
     }
 

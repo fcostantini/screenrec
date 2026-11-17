@@ -414,6 +414,12 @@ public enum SettingsStore {
         /// The channel YouTube named with the last upload (M40-T3). Not part of `Settings`: it
         /// belongs to the sign-in, which `UploadModel` owns, and goes when that does.
         public static let youtubeChannel = "youtubeChannel"
+        /// The last upload, for its receipt (M40-T4): the video's id and title, the clip that was
+        /// sent and when it landed. Absent ⇒ no receipt. Like the export's, not part of `Settings`.
+        public static let lastUploadID = "lastUploadID"
+        public static let lastUploadTitle = "lastUploadTitle"
+        public static let lastUploadFile = "lastUploadFile"
+        public static let lastUploadDate = "lastUploadDate"
         /// The last export's path, for the receipt that survives relaunch (M12-T2). Absent ⇒ no
         /// receipt. Not part of `Settings` (it's a transient pointer, not user config) — its own
         /// load/save below. Dropped on load if the file is gone (moved/trashed).
@@ -431,6 +437,29 @@ public enum SettingsStore {
               let date = defaults.object(forKey: Key.lastExportDate) as? Date
         else { return nil }
         return LastExport(url: URL(fileURLWithPath: path), date: date)
+    }
+
+    /// The persisted upload receipt (M40-T4). The clip is **not** checked: the link outlives it.
+    public static func loadLastUpload(from defaults: UserDefaults) -> LastUpload? {
+        guard let id = defaults.string(forKey: Key.lastUploadID), !id.isEmpty,
+              let title = defaults.string(forKey: Key.lastUploadTitle),
+              let path = defaults.string(forKey: Key.lastUploadFile),
+              let date = defaults.object(forKey: Key.lastUploadDate) as? Date
+        else { return nil }
+        return LastUpload(videoID: id, title: title, file: URL(fileURLWithPath: path), date: date)
+    }
+
+    public static func saveLastUpload(_ upload: LastUpload?, to defaults: UserDefaults) {
+        if let upload {
+            defaults.set(upload.videoID, forKey: Key.lastUploadID)
+            defaults.set(upload.title, forKey: Key.lastUploadTitle)
+            defaults.set(upload.file.path, forKey: Key.lastUploadFile)
+            defaults.set(upload.date, forKey: Key.lastUploadDate)
+        } else {
+            for key in [Key.lastUploadID, Key.lastUploadTitle, Key.lastUploadFile, Key.lastUploadDate] {
+                defaults.removeObject(forKey: key)
+            }
+        }
     }
 
     public static func saveLastExport(_ export: LastExport?, to defaults: UserDefaults) {

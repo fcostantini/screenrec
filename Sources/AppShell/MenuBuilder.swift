@@ -195,11 +195,34 @@ struct MenuBuilder {
                     name, fraction: fraction, waiting: state.exports.queuedExportCount))
             // Only the path that can report gets a bar; GIF and trim say what they are doing and
             // nothing they cannot know (M28-T4).
-            if let fraction { row.view = ExportProgressRowView(fraction: fraction) }
+            if let fraction { row.view = ProgressRowView(fraction: fraction) }
             items.append(row)
             items.append(MenuRow.separator())
         } else if let last = state.exports.lastExport {
             items.append(MenuRow.submenu(last.menuTitle, fileActions(last.url)))
+            items.append(MenuRow.separator())
+        }
+        // After the export, in the order things happened (M40-T4): the upload that landed
+        // last, then the one running. The receipt stays up while another upload runs — its
+        // notice may have sent the user here for the link.
+        if let last = state.uploads.lastUpload {
+            items.append(MenuRow.submenu(last.menuTitle, uploadActions(last)))
+            items.append(MenuRow.separator())
+        }
+        if let token = state.uploads.currentUploadToken {
+            let fraction = state.uploads.uploadProgress ?? 0
+            let waiting = state.uploads.queuedUploadCount
+            let row = MenuRow.label(MenuHeader.uploading(fraction: fraction, waiting: waiting))
+            // Stamped like every other row (M6-T10): only the bar and its number move while the
+            // menu is up, so the count is kept for the title that moves with them.
+            row.tag = waiting
+            row.view = ProgressRowView(
+                .upload, lead: MenuHeader.uploadingLead, fraction: fraction,
+                trailing: MenuHeader.waitingNote(waiting))
+            items.append(row)
+            // The token, not "whatever is running when it is pressed": the upload under this
+            // row can land and be replaced by the next while the menu is open.
+            items.append(MenuRow.action("Cancel Upload") { state.uploads.cancelUpload(token) })
             items.append(MenuRow.separator())
         }
         if let last = state.lastReplay {
@@ -393,6 +416,21 @@ struct MenuBuilder {
         }
     }
 
+    /// What an upload's receipt offers (M40-T4): the link three ways, then the clip it came from
+    /// — left out once that has been moved or trashed, which the link does not mind.
+    private func uploadActions(_ upload: LastUpload) -> [NSMenuItem] {
+        var items = [MenuRow.action("Copy Link") { ShareActions.copy(text: upload.link) }]
+        if let url = upload.watchURL { items.append(MenuRow.link("Open on YouTube", url: url)) }
+        if let url = upload.studioURL {
+            items.append(MenuRow.link("Edit in YouTube Studio", url: url))
+        }
+        if FileManager.default.fileExists(atPath: upload.file.path) {
+            items.append(MenuRow.separator())
+            items.append(fileAction("Reveal File in Finder", upload.file, Finder.reveal))
+        }
+        return items
+    }
+
     /// The per-file submenu shared by recents and every receipt: act on this file (M12-T1), then
     /// derive a new one — and only the derives this file can actually take (M24-T5).
     private func fileActions(_ url: URL) -> [NSMenuItem] {
@@ -402,6 +440,14 @@ struct MenuBuilder {
             fileAction("Share…", url, ShareActions.share),
             fileAction("Copy", url, ShareActions.copy),
         ]
+        let upload = UploadCopy.menuUpload(
+            for: url, account: state.uploads.account, canSignIn: state.uploads.canSignIn)
+        if upload != .absent {
+            items.append(
+                fileAction(UploadCopy.menuUploadTitle, url, enabled: upload == .enabled) {
+                    ShareActions.upload($0, state: state)
+                })
+        }
 
         let derives = DeriveOptions(for: url)
         if derives.hasAny {
