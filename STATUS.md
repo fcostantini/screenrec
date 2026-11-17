@@ -33,53 +33,8 @@
   "arriving in 1.23" note, `CHANGELOG.md` 1.23.0, `VERSION` 1.23.0, tag. **Not started — a
   checkpoint with Franco comes first.**
 
-- **✅ M40-T5 DONE (2026-11-17) — every failed upload says why, and what to do next.**
-  `UploadFailure`: one list, worded by the app and the CLI. The uploader resumes while bytes
-  arrive and for about 5 minutes after, renews a lapsed token once, and opens a session a second
-  time only when the first try cannot have reached YouTube. A sign-in Google refuses to renew
-  drops the account where it is found; one YouTube refuses although Google renewed it is kept.
-  The notice is the reason plus two sentences said only when true. The row says `· waiting for
-  the connection`. **1061 tests** (1027 → 1061); **48 breaks, 48 red.** The deployed app at
-  `/Users/Shared` **is** this commit's build.
-  ✅ **Measured against YouTube** (docs/07): a title's 100 is counted in **code points** — the
-  sheet now counts the same; `DELETE` on an unfinished session closes it (`499`).
-  ✅ **Live:** the waiting row and four notices on a fail-on-purpose build; and **the real dead
-  sign-in** — Franco removed ScreenRec's access at Google, the next upload said *needs
-  reconnecting*, Settings went to `Not connected`, the saved sign-in was deleted.
-  ✅ He reconnected the same afternoon (the saved sign-in is back; Settings reads `Connected`).
-  ✅ **His look in Studio (2026-11-17):** the three measurement entries are **still listed**, so
-  `DELETE` does not remove an entry; *test 10* was gone because he deleted it. The *delete it in
-  Studio* wording stands, and T6 is `Try Again` only.
-  **Next: M40-T6 — see the entry above this one.**
-  **Needs Franco:** reconnect in Settings (`Connect…`); delete the test videos, the three
-  measurement entries among them; click an *Uploaded to YouTube* notice once; the audience
-  question from T1.
-
-- **✅ M40-T4 DONE (2026-11-17) — the menu shows an upload, keeps its link, and can start one.**
-  `Uploading to YouTube… n%` with `Cancel Upload`; the `Uploaded to YouTube · ‹title›` receipt
-  (`Copy Link` · `Open on YouTube` · `Edit in YouTube Studio` · `Reveal File in Finder`); the
-  clipboard rule; `Upload to YouTube…` on `.mp4` rows; a quit question that counts uploads.
-  **1027 tests** (985 → 1027); **72 breaks, 72 red.** The deployed app at `/Users/Shared` **is**
-  this commit's build, connected to his channel.
-  ✅ **Rulings, all Franco's:** *"let's go"* (taken as the four plan rulings as recommended); the
-  review's ten findings *"as proposed"* — a quit nobody chose to wait through **abandons
-  uploads**, the *link is in the menu* notice **spells the link out**; *"Tell me each time"*.
-  🔴 **What his Studio showed:** YouTube keeps an unfinished entry (*Processing will begin
-  shortly*) for any upload it had opened and that then stops, and the app cannot delete it. A
-  stop after that point posts *Upload to YouTube stopped* (click → Studio); the quit question
-  says so first.
-  ✅ **Live:** six fake-uploader scenarios, one real unlisted upload from a Recent Exports row,
-  one real upload cancelled at 31%; then, after the fixes, the stopped notice on `Cancel Upload`,
-  on `Quit Anyway`, and on a quit sent from outside (gone in 0.4 s).
-  **Next: M40-T5 — see the entry above this one.**
-  **Needs Franco:** delete *ScreenRec test 10 (cancelled on purpose)* and the nine other
-  `ScreenRec test …` videos in Studio; say whether the test-10 entry went by itself; click an
-  *Uploaded to YouTube* notice once to see the video open; the audience question (T1).
-  ⚠️ **Test uploads on 2026-11-17: two landed, one cancelled.** He was on a Zoom call from
-  ~11:00: ask before any desktop driving.
-
-- **M40-T1…T3's per-task detail, M40's filing and the 2026-11-11 install note are in
-  `docs/history/2026-11-sessions.md`** (rotated 2026-11-17, when "Now" reached 305 lines). The
+- **M40-T1…T5's per-task detail, M40's filing and the 2026-11-11 install note are in
+  `docs/history/2026-11-sessions.md`** (rotated 2026-11-17, at 305 lines and again at 263). The
   milestone's specs, ticks and evidence are in docs/03; what was measured is in docs/07.
 
 - **✅ M39 COMPLETE and G39 PASSED (2026-09-23) — the Trim window's audio export also leaves the
