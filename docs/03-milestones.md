@@ -4194,8 +4194,8 @@ uploaded. Detail in docs/07.
       with its submenu; the notice's retry sentences. **1087 tests** (1061 → 1087); **80 breaks,
       80 red** across T6's sweep and T5's re-run, after one gap was closed (stopping a retry
       must still mention the entry).
-      ⏸ **`/code-review medium`: nine findings, presented to Franco 2026-11-17, not yet ruled on,
-      none applied.** Proposed, all in T6: (1) a session outlives the account it was opened
+      ✅ **`/code-review medium`: nine findings; Franco, 2026-11-17: *"as proposed"*; all nine
+      applied.** As proposed, all in T6: (1) a session outlives the account it was opened
       under when the upload was running or queued at the disconnect — `Try Again` could then
       continue account A's upload with account B's token; tie each session to the sign-in it
       was opened under and use it only while that sign-in stands; (2) the failed row stays after
@@ -4211,8 +4211,22 @@ uploaded. Detail in docs/07.
       later sign-out with nobody told — a retry that can no longer continue says the earlier
       entry may remain; (8) `Flag` and `SessionBox` are two hand-rolled locked boxes — one
       generic one; (9) two doc comments past the four-line ceiling.
+      ✅ **The quality pass on the fixes tightened two of them:** a retry starts over only on
+      an answer about the upload itself (`404`, a final `4xx`) — never on a refused token, a spent
+      quota, a `5xx` or a `200` that can't be read, which would forget an upload YouTube still
+      holds or publish it twice; and a failure notice names an earlier attempt's leftover entry
+      when this attempt holds none of its own (the sentence already approved), since otherwise a
+      retry that is never finished would never say so. **1097 tests; T6's sweep 48 breaks, 48
+      red; T5's 48 / 48 before the quality pass, patterns re-checked after it.**
+      ⏸ **Live check 1 (fail-on-purpose build), 2026-11-17 — half done, then Franco's screen
+      locked:** the row `Couldn't upload · Sample clip`, its reason line, `Try Again`, `Reveal
+      File in Finder`, `Open YouTube Studio`, `Dismiss`; the notice ending *Try Again in the menu
+      continues where it stopped. The clip is saved as …*; `Try Again` showing `Uploading to
+      YouTube… 41%` at once (continued, not from 0); `Cancel Upload` → *Upload to YouTube
+      stopped · YouTube keeps an unfinished entry named “Sample clip”…*; clipboard untouched.
+      **Not yet seen on screen: `Dismiss`.**
       ⏳ **Then:** with his
-      OK each time, the row and `Try Again` on a fail-on-purpose build, and one real upload broken
+      OK each time (asked again after the lock — a lock mid-run is a pause), the row and `Try Again` on a fail-on-purpose build, and one real upload broken
       on purpose and finished by `Try Again` (he reconnected 2026-11-17 — confirmed).
       After a failure the menu shows `Couldn't upload ·
       ‹title›` with `Try Again`, which continues the **same** upload from where it stopped — no

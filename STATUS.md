@@ -16,22 +16,23 @@
   (docs/07, 2026-11-17 — `log show` alone cannot see a clean run). A push runs the suite too.
   **Next: back to M40-T4** (below).
 
-- **⏸ M40-T6 BUILT, NOT COMMITTED (2026-11-17) — waiting on the review, then on live checks.**
-  Plan `claude.ai/artifact/AuVodjvViyFqv38r8pJEpZ`; Franco's go *"let's go"*, taken as the three
-  answers as recommended (the row stays a day; the notice's two sentences; one real upload broken
-  on purpose and finished by `Try Again`). In the working tree: an uploader that hands out and
-  continues a session; `canRetry`; the failed upload kept with `tryAgain` / `dismiss`; the row
-  `Couldn't upload · ‹title›`; the notice's retry sentences; docs/06 amended. **1087 tests; 80
-  breaks, 80 red.** ⚠️ The installed app is still T5's build.
-  **Next, in this order:** (1) **Franco rules on `/code-review medium`'s nine findings** —
-  presented 2026-11-17 with a proposal each (docs/03 under M40-T6), **none applied**; the one
-  that matters most: a session can outlive the account it was opened under; (2) fixes, one
-  watched run, the sweeps where they touch;
-  (3) **with his OK each time:** the row and `Try Again` on a fail-on-purpose build; then one
-  real upload cut at ~40% on a temporary build and finished by `Try Again`, and his look in
-  Studio that there is one video and no leftover; (4) tick, commit `M40-T6`, push, deploy;
-  (5) **G40**: the README's "arriving in 1.23" note, `CHANGELOG.md`, `VERSION` 1.23.0, the gate's
-  own checks in docs/03.
+- **⏸ M40-T6 BUILT AND REVIEWED, NOT COMMITTED (2026-11-17) — waiting on Franco's desktop.**
+  Plan `claude.ai/artifact/AuVodjvViyFqv38r8pJEpZ`. `/code-review medium`'s nine findings were
+  ruled *"as proposed"* and applied; the quality pass tightened two (docs/03 under M40-T6).
+  Working tree: clean of scaffold, dev loop green, **1097 tests; T6's sweep 48 / 48 red.**
+  docs/06 and docs/07 carry T6's changes and go in its commit.
+  ⚠️ **The installed app is a TEMPORARY fail-on-purpose build with a stand-in account** (not
+  his sign-in, which is untouched and connected). It must be replaced before the session ends.
+  **Live check 1 is half done** (row, reason, `Try Again` continuing at 41%, `Cancel Upload`,
+  both notices — all as specified); **Franco locked his screen mid-run, so driving stopped.**
+  **Next, in this order, each only on his word:** (1) finish check 1: fail a second fake
+  upload, press `Dismiss`; (2) check 2, already approved once: the two-mode build kept at
+  `<scratchpad>/t6/scaffold/ScreenRec.app` with `echo real > <scratchpad>/t6/mode` cuts the
+  first transfer of `~/Movies/ScreenRec test 13 trimmed.mp4` (61 MB) at 40% and gives up at
+  once; `Try Again` must finish the same upload; he then looks in Studio for one video and no
+  leftover; (3) deploy the clean build, check `strings` for no scaffold, delete the three
+  sample clips; (4) tick, commit `M40-T6`, push; (5) **G40**: the README's "arriving in 1.23"
+  note, `CHANGELOG.md`, `VERSION` 1.23.0, the gate's own checks in docs/03.
 
 - **✅ M40-T5 DONE (2026-11-17) — every failed upload says why, and what to do next.**
   `UploadFailure`: one list, worded by the app and the CLI. The uploader resumes while bytes
