@@ -23,8 +23,10 @@
   continues a session; `canRetry`; the failed upload kept with `tryAgain` / `dismiss`; the row
   `Couldn't upload · ‹title›`; the notice's retry sentences; docs/06 amended. **1087 tests; 80
   breaks, 80 red.** ⚠️ The installed app is still T5's build.
-  **Next, in this order:** (1) `/code-review medium`'s findings → **to Franco with a proposal
-  each, before any is applied**; (2) fixes, one watched run, the sweeps where they touch;
+  **Next, in this order:** (1) **Franco rules on `/code-review medium`'s nine findings** —
+  presented 2026-11-17 with a proposal each (docs/03 under M40-T6), **none applied**; the one
+  that matters most: a session can outlive the account it was opened under; (2) fixes, one
+  watched run, the sweeps where they touch;
   (3) **with his OK each time:** the row and `Try Again` on a fail-on-purpose build; then one
   real upload cut at ~40% on a temporary build and finished by `Try Again`, and his look in
   Studio that there is one video and no leftover; (4) tick, commit `M40-T6`, push, deploy;

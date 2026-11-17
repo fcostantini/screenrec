@@ -4194,7 +4194,24 @@ uploaded. Detail in docs/07.
       with its submenu; the notice's retry sentences. **1087 tests** (1061 → 1087); **80 breaks,
       80 red** across T6's sweep and T5's re-run, after one gap was closed (stopping a retry
       must still mention the entry).
-      ⏳ **Still to do:** `/code-review`'s findings to Franco before any is applied; then, with his
+      ⏸ **`/code-review medium`: nine findings, presented to Franco 2026-11-17, not yet ruled on,
+      none applied.** Proposed, all in T6: (1) a session outlives the account it was opened
+      under when the upload was running or queued at the disconnect — `Try Again` could then
+      continue account A's upload with account B's token; tie each session to the sign-in it
+      was opened under and use it only while that sign-in stands; (2) the failed row stays after
+      the same clip is uploaded successfully another way, and `Try Again` would then publish a
+      duplicate — a landed upload of that clip clears it; (3) after a retry starts over, the
+      "YouTube holds an entry" flag stays raised and the "started over" fact is lost before the
+      next attempt — reset the one, carry the other; (4) a clip whose size changed since the
+      session opened fails as unreadable instead of starting over; (5) only `404` counts as
+      "session gone" — any final answer to a continued upload's first question should start it
+      over; (6) the row's identity is compared by value, which a rename changes, so `Try Again`
+      after a sign-in can silently do nothing — give it an id; (7) the notice says *continues
+      where it stopped* and drops the *delete it* sentence, and that promise can be undone by a
+      later sign-out with nobody told — a retry that can no longer continue says the earlier
+      entry may remain; (8) `Flag` and `SessionBox` are two hand-rolled locked boxes — one
+      generic one; (9) two doc comments past the four-line ceiling.
+      ⏳ **Then:** with his
       OK each time, the row and `Try Again` on a fail-on-purpose build, and one real upload broken
       on purpose and finished by `Try Again` (he reconnected 2026-11-17 — confirmed).
       After a failure the menu shows `Couldn't upload ·
