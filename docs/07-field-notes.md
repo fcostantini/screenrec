@@ -7,6 +7,16 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-17 (M40-T4, the push that the gate refused):
+  🔴 **A test that gives up after 5 s fails on a busy Mac, every time.** With a Zoom call running
+  (load average 18) the suite took 10–18 s instead of 5, every async test finishing together at
+  the end because they share the main actor. `Gate.reached()`'s five-second limit expired before
+  an export → upload chain got its turns, and one test failed in 4 runs of 4 — while passing in
+  0.1 s alone. The limit exists to turn a hang into a failure, not to time anything: it is 30 s
+  now. **Check `uptime` before blaming a test that only fails in the full run.**
+  ⚠️ **The pre-push gate tests the working tree, not the commit.** A doc-only commit was refused
+  because of an uncommitted test beside it.
+
 - 2026-11-17 (M40-T4, the live check — a fake-uploader build, then the real one):
   ✅ **Every menu state of an upload was driven without sending a byte.** Temporarily hand
   `AppState` an `UploadModel` on `InMemoryTokenStore(token)` whose `uploadFunction` sleeps a

@@ -4054,6 +4054,23 @@ uploaded. Detail in docs/07.
       Studio; a click on the notice opening the video — **(human)**; the drawn `· 1 waiting` after
       the percentage (its text is asserted, its pixels are not). No screenshots were taken: the
       evidence is Accessibility text, after the morning's dialogs.
+      ⏸ **`/code-review medium`: ten findings, presented to Franco 2026-11-17, not yet ruled on,
+      none applied.** Proposed — *fix in T4:* the receipt is hidden while another upload runs
+      (show it under the progress row); the menu row never expires an ended sign-in (do it at menu
+      open, as Settings and Trim do); an export abandoned by `Quit Anyway` can still finish and
+      start its upload (check for cancellation before handing the file on); `Cancel Upload`
+      cancels whatever is running at the click, not the upload its row showed (carry the upload's
+      token in the row); `defaultTitle(forExport:)` cuts names that merely contain ` trimmed`
+      (cut only the exporter's own suffix, never to nothing); the drawn `· n waiting` goes stale
+      under an open menu while the title moves (update both, width reserved); the quit question's
+      mixed form is wrong for uneven counts (compose it per kind); two sheets can stack from the
+      menu, and three names and one comment still say "export" for a row that is now both.
+      *His call:* (a) a system quit — logout, shutdown — and `Stop & Quit` now **wait silently**
+      for an upload of any length; proposed: they abandon uploads (the clip stays) and keep
+      waiting for exports. (b) a link the notice sends you to the menu for is lost when the next
+      upload replaces the receipt; proposed: the second notice form carries the link too.
+      *To T5:* a queued upload whose clip is renamed or trashed fails with a message naming a file
+      that is gone — the rename half (re-point the queue) proposed for T4, the message for T5.
       While it runs, the export
       row's successor: `Uploading to YouTube… 37%` with the same bar. When it lands: a receipt row,
       `Uploaded to YouTube · <title>`, whose submenu is `Copy Link`, `Open on YouTube`, `Edit in

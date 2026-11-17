@@ -26,9 +26,13 @@
   ✅ **Live:** six scenarios on a fake-uploader build, then on the real build one unlisted upload
   from a Recent Exports row (link copied, answers as unlisted) and one 161 MB upload cancelled at
   31% — evidence listed in docs/03 under M40-T4.
-  **Next, in this order:** (1) `/code-review medium`'s findings → **present them to Franco with a
-  proposal each, before applying any**; (2) apply what he approves, one test run under the live
-  `replayd` stream, re-verify what a fix touches; (3) tick, commit `M40-T4`, push; (4) T5's plan.
+  **Next, in this order:** (1) **Franco rules on `/code-review medium`'s ten findings** —
+  presented 2026-11-17 with a proposal each (docs/03 under M40-T4), **none applied**; two are his
+  call: what a system quit does with an upload, and whether the "link is in the menu" notice
+  carries the link; (2) apply what he approves, one test run under the live `replayd` stream,
+  re-verify what a fix touches; (3) tick, commit `M40-T4`, push; (4) T5's plan.
+  ⚠️ **He was on a Zoom call from about 11:00 on 2026-11-17 with the Mac under heavy load: no
+  desktop driving without asking again, whatever was approved earlier.**
   **Needs Franco:** look in YouTube Studio for anything left by *ScreenRec test 10 (cancelled on
   purpose)* — nothing is expected; click an *Uploaded to YouTube* notice once to see the video
   open; delete the nine `ScreenRec test …` videos; the audience question from T1.
