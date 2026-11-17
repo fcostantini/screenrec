@@ -180,6 +180,42 @@ import RecorderCore
         #expect(spy.calls.isEmpty)                              // buffer untouched
     }
 
+    // MARK: - What a state captures when nobody hands it a controller (M41-T1)
+
+    /// The real controller starts a ScreenCaptureKit stream, and a test process that exits with
+    /// one open leaves macOS's screen-recording dialog on the desktop. So the default is inert,
+    /// and only the app asks for the real one.
+    @Test func aStateNobodyHandedAControllerCapturesNothing() {
+        let state = AppState(defaults: TestDefaults.make())
+        #expect(state.replay is InertReplayController)
+
+        state.isReplayArmed = true
+        #expect(state.isReplayArmed)                     // the intent is kept, as the menu shows it
+        #expect(state.replay.heldSeconds() == nil)       // and nothing is being held
+        #expect(state.replay.microphoneLevelSource == nil)
+    }
+
+    @Test func aStateUsesTheControllerItIsHanded() {
+        let spy = ReplaySpy()
+        let state = AppState(defaults: TestDefaults.make(), replayController: spy)
+        #expect(state.replay === spy)
+    }
+
+    /// Saving from it answers as the real controller does with no pipeline: accepted, nothing
+    /// buffered — so the app says so instead of waiting on a save that will never report.
+    @Test func theInertControllerAnswersASaveWithNothingBuffered() {
+        let inert = InertReplayController()
+        inert.arm(
+            configuration: CaptureConfiguration(microphone: .none), seconds: 30,
+            outputDirectory: FileManager.default.temporaryDirectory)
+        let outcome = Box<Bool>()
+        let accepted = inert.requestSave { result in
+            if case .failure(ReplayMuxerError.nothingBuffered) = result { outcome.value = true }
+        }
+        #expect(accepted)
+        #expect(outcome.value == true)
+    }
+
     @Test func recordingStartedArmsADisarmedController() {
         // The mid-recording toggle's path: callers gate on the user's armed intent, so a
         // disarmed controller must treat recordingStarted as the arming act itself.

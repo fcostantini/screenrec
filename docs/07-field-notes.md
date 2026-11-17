@@ -7,6 +7,56 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-17 (M41-T1, verifying that the tests no longer capture):
+  🔴 **`log show` cannot prove a capture did *not* start.** `replayd`'s `[INFO]` lines —
+  `SCScreenCaptureSession initWithConfiguration`, `SCAlert showAlertWithTitle` — are info-level:
+  kept in memory, and written to the store only when an error is logged near them. The sweep's
+  lines were all there an hour later because each dialog came with an error; a clean run leaves
+  **nothing**, and so did the installed app's own re-arm. The first "three clean runs" were judged
+  by a detector that would have said *clean* either way.
+  ✅ **The sound check is two halves.** *Sessions:* a live `/usr/bin/log stream --level info
+  --predicate 'process == "replayd" AND eventMessage CONTAINS "SCScreenCaptureSession
+  initWithConfiguration:]:70"'` running across the test run, **after a positive control** — toggle
+  Instant Replay in the installed app and see the stream print one session. *Dialogs:* `log show`
+  for `Error resolving binary path and audit token`, which is error-level and persists, and
+  matches a dialog one for one.
+  ⚠️ **The stream prints its own predicate as its first line**, so `grep -c` over the file counts
+  one hit for every pattern before anything has happened; and it prints `Messages dropped during
+  live streaming` by the hundred under load. Filter both out, and treat the stream as best-effort.
+  🔴 **`x=$(grep -c …) && next` stops the chain when the count is zero** — `grep -c` exits 1 on no
+  match. A verification script built that way printed "0 sessions, 0 dialogs" without having run a
+  single test. Assign with `|| true`, and make the script print what it ran.
+
+- 2026-11-17 (M40-T4's test runs — the dialog flood that became M41):
+  🔴 **`swift test` records the screen, and macOS answers with a dialog per stream.** Tests that
+  arm Instant Replay on `AppState(defaults:)` get the real `ReplayController`; `arm` starts a real
+  `SCStream` in the test process. When that process exits with the stream open, `replayd` logs
+  `-[SCAlertStatsManager requireAlertWithCanonicalBundleID:auditToken:]:191 Error resolving binary
+  path and audit token` and then `+[SCAlert showAlertWithTitle:…]` — the *"Terminal" is requesting
+  to bypass the system private window picker* confirmation, attributed to Terminal because it is
+  the responsible process. **Every dialog matched one such error: 137 of 137.** It is a race with
+  process exit, so a run shows anything from none to all of them: 159 capture sessions between
+  09:34 and 10:34, 137 dialogs, the first at 09:41 — an hour before Franco said anything.
+  🔴 **Clicking `Allow` does not stop the next one.** The dialog is not (only) the periodic
+  re-approval: it is `replayd` failing to identify a caller that has already gone. Whether an
+  expired approval also played a part is **unknown** — `~/Library/Group Containers/
+  group.com.apple.replayd/ScreenCaptureApprovals.plist` is unreadable from Terminal (`Operation
+  not permitted`), and that protection was left alone.
+  🔴 **A mutation sweep multiplies it.** 47 runs × the two arming tests in `MenuStructureTests`
+  ≈ 97 sessions in ten minutes; a red run exits abruptly, which is the losing side of the race.
+  **A push counts as a run** — the pre-push hook is `swift test`.
+  ✅ **The log tells sessions from dialogs, minute by minute, with no screen access:**
+  `/usr/bin/log show --last 75m --predicate 'process == "replayd" AND (eventMessage CONTAINS
+  "SCScreenCaptureSession initWithConfiguration:]:70" OR eventMessage CONTAINS "SCAlert
+  showAlertWithTitle")'`. Run it after a single test run, before ever looping the suite.
+  ⚠️ **Twelve arming sites passed no spy:** `MenuStructureTests` (2, through
+  `MenuSnapshot.state()`), `AppStateTests` (2), `MicrophoneLevelTests` (2),
+  `BannerVisibilityTests` (6). `ReplayWiringTests`, `MenuTruthTests` and one `FileManagementTests`
+  case pass a `ReplaySpy` and are clean.
+  ⚠️ **A system permission dialog is not found by walking Accessibility windows of system
+  processes** — the scan came back empty with a hundred on screen (or just after). Count them in
+  the log instead.
+
 - 2026-11-17 (M40-T4, the plan's screenshots):
   🔴 **`AXPress` on a menu row fills its submenu's children without drawing the submenu.** Its
   `AXPosition`/`AXSize` then read `(0, 1285, 0, 0)`, and a capture rectangle built from them took

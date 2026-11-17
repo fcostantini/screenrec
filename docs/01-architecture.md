@@ -68,6 +68,13 @@ through `@testable`. `AppShell`'s only `public` symbol is `ScreenRec.run()`; kee
 headless verification surface (ADR-011) — most gate evidence is easier to get through it than
 through the menu.
 
+**Rule for agents: a unit test never starts a capture (M41-T1).** An `AppState` built without a
+`replayController` gets `InertReplayController`, and without `uploads` an account that is
+unavailable; only `AppMain` hands in the real `ReplayController()` and `UploadModel.bundled()`.
+Anything new that reaches ScreenCaptureKit, the network or the user's files from `AppState` takes
+the same shape: **inert unless the app asks.** A test process that exits with a stream open leaves
+macOS's screen-recording dialog on the desktop, once per stream (07, 2026-11-17).
+
 ## Runtime dataflow
 
 ```

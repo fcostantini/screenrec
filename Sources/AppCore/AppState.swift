@@ -363,7 +363,7 @@ public final class AppState {
         }
     }
 
-    private let replay: any ReplayControlling
+    let replay: any ReplayControlling
 
     // MARK: - Header row
 
@@ -530,8 +530,9 @@ public final class AppState {
     public var notifier: (@MainActor (RecordingNotification) -> Void)?
 
     /// `defaults` is injected so the persistence round-trip is testable without touching the
-    /// real user's preferences; `replayController` so transition wiring is testable without
-    /// live capture engines.
+    /// real user's preferences. `replayController` is the app's to hand in — `ReplayController()`
+    /// — and left out it is inert, so arming captures nothing (M41-T1): the `uploads` rule, for
+    /// the same reason. A test that wants to see the transitions passes a spy.
     public init(
         defaults: UserDefaults = .standard,
         replayController: (any ReplayControlling)? = nil,
@@ -574,7 +575,7 @@ public final class AppState {
         hasSeenReplayBannerWarning = settings.seenReplayBannerWarning
         // The export cluster (M14-T1): it seeds its own persisted receipt from `defaults`.
         exports = ExportModel(defaults: defaults)
-        replay = replayController ?? ReplayController()
+        replay = replayController ?? InertReplayController()
         // `screenWasGrantedAtLaunch` is captured by PermissionsModel's own init. Populate the rows
         // before the first render, or the window flickers.
         refreshOnboarding()

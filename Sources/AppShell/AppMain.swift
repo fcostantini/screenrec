@@ -26,7 +26,8 @@ public enum ScreenRec {
 /// Owns the one `AppState` and everything AppKit that hangs off it.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let state = AppState(uploads: .bundled())
+    /// The one place a real `ReplayController` is asked for: left out, replay is inert (M41-T1).
+    private let state = AppState(replayController: ReplayController(), uploads: .bundled())
     private let notifier = Notifier()
     private let hotkeys = HotkeyCenter()
     /// One overlay controller, reused per region pick (M11-T2).

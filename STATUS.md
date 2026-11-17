@@ -6,6 +6,29 @@
 
 ## Now
 
+- **✅ M41-T1 DONE (2026-11-17) — the tests no longer record the screen.** On 2026-11-17 the
+  suite's own captures (tests arming Instant Replay on a real `ReplayController`) left **137**
+  macOS confirmation dialogs on Franco's desktop; he clicked through about a hundred. Now an
+  `AppState` nobody handed a controller gets `InertReplayController`, and only `AppMain` asks for
+  the real one. **985 tests** (982 → 985). Three full runs under a live `replayd` log stream: 0
+  capture sessions, 0 dialogs; the installed build still arms (`0:06` → `0:13 of 5 min held`).
+  ⚠️ **Standing rule:** before running the suite in a loop, watch one run with the live stream
+  (docs/07, 2026-11-17 — `log show` alone cannot see a clean run). A push runs the suite too.
+  **Next: back to M40-T4** (below).
+
+- **⏸ M40-T4 BUILT, NOT COMMITTED, NOT VERIFIED LIVE (2026-11-17) — stashed while M41-T1 landed.**
+  Franco's go: *"let's go"*, taken as all four rulings as recommended (`Cancel Upload` in; a click
+  on the notice opens the video; `.mp4` only; one-hour receipt) — **he has not confirmed that
+  reading.** In the working tree: the menu's `Uploading to YouTube… n%` row and `Cancel Upload`,
+  the `Uploaded to YouTube · ‹title›` receipt, the clipboard rule, `QuitQuestion`, `Upload to
+  YouTube…` on `.mp4` rows, docs/06 amended. **1011 tests; 47 breaks, 47 red** (last run before the
+  stop). ✅ He approved the live check (*"Yes, all of it"*: fake-uploader scenarios, then one real
+  unlisted upload and one real upload cancelled halfway) — **not started.**
+  ⚠️ The quit and cancel wording makes **no** claim about what YouTube keeps of a stopped upload:
+  unmeasured until the cancelled real upload and Franco's look in Studio.
+  ✅ Answered without him: the *Uploaded to YouTube* notice **was** delivered at 09:24:48 on
+  2026-11-17 (`ScreenRec --print-delivered-notifications`).
+
 - **✅ M40-T3 DONE (2026-11-17) — the Trim window uploads the range to YouTube, after a sheet
   for the title, description and visibility.** `Upload to YouTube…` under `Export Audio & Copy`;
   a connect alert when there is no account, then the sheet by itself; the upload chained to

@@ -4093,6 +4093,49 @@ first); resuming an upload after a relaunch; thumbnails, tags, playlists, schedu
 account; any other destination (ADR-024); waiting for YouTube's processing; Google's app
 verification, which is only worth it if this outgrows personal use.
 
+## M41 — The tests never record the screen (from Franco, 2026-11-17)
+
+**Why.** On 2026-11-17 about **137** macOS dialogs — *"Terminal" is requesting to bypass the system
+private window picker and directly access your screen and audio* — stacked on Franco's desktop
+during M40-T4's test runs, and he clicked through roughly a hundred. *"it's annoying. can we avoid
+spawning that confirmation somehow?"* The cause is ours (docs/07, 2026-11-17): unit tests that arm
+Instant Replay on an `AppState` built without a `replayController` get the **real**
+`ReplayController`, which starts a real ScreenCaptureKit stream inside the test process; when the
+process exits with it open, `replayd` cannot tell who asked and shows the confirmation. Twelve
+arming sites in four suites did this, on every `swift test` — and the pre-push hook runs it.
+- [x] M41-T1 **An `AppState` nobody handed a replay controller captures nothing** (AppCore +
+      AppShell). Plan artifact: `claude.ai/artifact/XBbwa21FXYzSbJWqs4xCMM` — approved by Franco
+      2026-11-17 (*"go ahead"*).
+      ✅ **Done 2026-11-17. 985 tests** (982 → 985). `InertReplayController` is the default;
+      `AppMain` passes `ReplayController()`. No existing test changed.
+      ✅ **Measured, with a live `log stream --level info` on `replayd`:** three consecutive full
+      runs started **0** capture sessions and showed **0** dialogs, and the persisted log holds no
+      `Error resolving binary path and audit token` for them. **Positive control:** the same
+      stream saw the installed app's own session when Instant Replay was toggled off and on.
+      ✅ **The app still captures:** on the deployed build the menu read `0:06 of 5 min held`, then
+      `0:13` seven seconds later.
+      ⚠️ **No negative control was run** — putting the real controller back to watch the stream
+      catch it would have put dialogs back on Franco's desktop. And `log stream` drops messages
+      under load, so the stream alone is best-effort; the persisted error line is the reliable
+      half (docs/07).
+      ⚠️ No `VERSION` bump: nothing a user of the app can see changed. The `uploads:` rule from M40-T2, applied to replay: left out, the controller is an
+      inert stand-in; the app passes the real `ReplayController()` in `AppMain`. The safe thing
+      becomes the default, so a new test cannot start a capture by forgetting a spy — which is how
+      twelve sites came to. No test changes what it asserts: the rows, banner rules and meters
+      under test never needed a stream.
+      **Verify:** with the system log watched, one full `swift test` creates **no**
+      `SCScreenCaptureSession` from AppCore or AppShell tests (7–9 before) and shows **no**
+      `SCAlert showAlertWithTitle`; RecorderCore's own capture tests are measured the same way, and
+      any that leaves a stream open at exit is made to close it. On the deployed build, arming
+      still captures: the menu's `… of 5 min held` rises, read through Accessibility.
+
+**Gate G41** — three consecutive full runs and one push, with zero dialogs for all of them: no
+`Error resolving binary path and audit token` from `replayd` in `log show`, and no
+`SCScreenCaptureSession initWithConfiguration` in a live `log stream --level info`.
+
+**Left out, on purpose:** macOS's own periodic re-confirmation of Terminal's screen-recording
+grant. Where it keeps those dates is protected from Terminal, and it is one dialog, not a stack.
+
 ## Dependency graph
 
 ```

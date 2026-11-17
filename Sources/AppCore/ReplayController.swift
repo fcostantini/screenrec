@@ -44,6 +44,43 @@ public protocol ReplayControlling: AnyObject {
     func requestSave(completion: @escaping @Sendable (Result<ReplayMuxer.SavedReplay, Error>) -> Void) -> Bool
 }
 
+/// The controller an `AppState` gets when nobody hands it one (M41-T1): arming it captures
+/// nothing. The real one starts a ScreenCaptureKit stream, which a unit test must never do — a
+/// test process that exits with one open leaves macOS's screen-recording dialog on the desktop
+/// (07). Only the app asks for `ReplayController`.
+@MainActor
+final class InertReplayController: ReplayControlling {
+    var onMicrophoneLost: (@MainActor () -> Void)?
+    var onMicrophoneRecovered: (@MainActor () -> Void)?
+    var onMicrophoneSilent: (@MainActor () -> Void)?
+    var onMicrophoneAudible: (@MainActor () -> Void)?
+    var onPipelineFailure: (@MainActor (String) -> Void)?
+    var microphoneLevelSource: MicrophoneLevelSource? { nil }
+
+    func arm(configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL) {}
+    func disarm() {}
+    func heldSeconds() -> Double? { nil }
+    func recordingStarted(
+        router: SampleRouter, configuration: CaptureConfiguration, seconds: Double,
+        outputDirectory: URL
+    ) {}
+    func recordingEnded(configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL) {}
+    func configurationChanged(
+        configuration: CaptureConfiguration, seconds: Double, outputDirectory: URL
+    ) {}
+    func windowChanged(seconds: Double) {}
+    func setOutputDirectory(_ url: URL) {}
+
+    /// What the real controller answers with no pipeline: accepted, and nothing was buffered.
+    @discardableResult
+    func requestSave(
+        completion: @escaping @Sendable (Result<ReplayMuxer.SavedReplay, Error>) -> Void
+    ) -> Bool {
+        completion(.failure(ReplayMuxerError.nothingBuffered))
+        return true
+    }
+}
+
 /// Owns the armed instant-replay pipeline (docs/01, 02 §9): a capture stream feeding
 /// `ReplayEncoder` + two `ReplayAudioRing`s + a `ReplayMuxer`. Idle-armed it runs its own
 /// `CaptureEngine`; while a recording runs it rides that stream instead. Each attach builds a
