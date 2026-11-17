@@ -33,8 +33,12 @@
   ✅ **His look in Studio (2026-11-17):** the three measurement entries are **still listed**, so
   `DELETE` does not remove an entry; *test 10* was gone because he deleted it. The *delete it in
   Studio* wording stands, and T6 is `Try Again` only.
-  **Next: M40-T6** (docs/03) — `Try Again` on a failed upload, continuing the same one. **Plan
-  artifact first, then stop.**
+  **Next: M40-T6** (docs/03) — `Try Again` on a failed upload, continuing the same one. ⏸ **Plan
+  artifact published 2026-11-17, awaiting Franco's go:**
+  `claude.ai/artifact/AuVodjvViyFqv38r8pJEpZ`. **Do not implement before he answers.** Three
+  answers asked, each with a recommendation: the row stays a day; the notice says *Try Again in
+  the menu continues where it stopped*; one real upload is broken on purpose and finished by
+  `Try Again` (he must have reconnected first).
   **Needs Franco:** reconnect in Settings (`Connect…`); delete the test videos, the three
   measurement entries among them; click an *Uploaded to YouTube* notice once; the audience
   question from T1.

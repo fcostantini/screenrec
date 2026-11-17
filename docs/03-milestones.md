@@ -4182,7 +4182,10 @@ uploaded. Detail in docs/07.
       reconnecting*.
 
 - [ ] M40-T6 **A failed upload can be tried again** (AppCore + AppShell; from T5's plan,
-      ruling 4). **Plan artifact first.** After a failure the menu shows `Couldn't upload ·
+      ruling 4). Plan artifact: `claude.ai/artifact/AuVodjvViyFqv38r8pJEpZ` — published
+      2026-11-17, **awaiting Franco's go and three answers**: how long the failure row stays
+      (proposed: a day, or until tried again, replaced or dismissed); the notice's two new
+      sentences; and one real upload broken on purpose and finished by `Try Again`. After a failure the menu shows `Couldn't upload ·
       ‹title›` with `Try Again`, which continues the **same** upload from where it stopped — no
       retyping, no second entry — while YouTube still has the session, and starts over when it
       does not. Not across a relaunch (M40's "left out" list stands).
