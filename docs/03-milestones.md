@@ -4185,7 +4185,19 @@ uploaded. Detail in docs/07.
       ruling 4). Plan artifact: `claude.ai/artifact/AuVodjvViyFqv38r8pJEpZ` — published
       2026-11-17, **awaiting Franco's go and three answers**: how long the failure row stays
       (proposed: a day, or until tried again, replaced or dismissed); the notice's two new
-      sentences; and one real upload broken on purpose and finished by `Try Again`. After a failure the menu shows `Couldn't upload ·
+      sentences; and one real upload broken on purpose and finished by `Try Again`. His answer,
+      2026-11-17: *"let's go"*, **taken as all three as recommended.**
+      ⏸ **Built 2026-11-17; uncommitted.** The uploader hands out the session it opens and can
+      continue one (asking first, sending the rest, starting over when YouTube has let go);
+      `UploadFailure.canRetry`; the model keeps the last failed upload with its session, and
+      `tryAgain`, `dismissFailedUpload` and the one-day rule; the row `Couldn't upload · ‹title›`
+      with its submenu; the notice's retry sentences. **1087 tests** (1061 → 1087); **80 breaks,
+      80 red** across T6's sweep and T5's re-run, after one gap was closed (stopping a retry
+      must still mention the entry).
+      ⏳ **Still to do:** `/code-review`'s findings to Franco before any is applied; then, with his
+      OK each time, the row and `Try Again` on a fail-on-purpose build, and one real upload broken
+      on purpose and finished by `Try Again` (he reconnected 2026-11-17 — confirmed).
+      After a failure the menu shows `Couldn't upload ·
       ‹title›` with `Try Again`, which continues the **same** upload from where it stopped — no
       retyping, no second entry — while YouTube still has the session, and starts over when it
       does not. Not across a relaunch (M40's "left out" list stands).

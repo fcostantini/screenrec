@@ -16,6 +16,21 @@
   (docs/07, 2026-11-17 — `log show` alone cannot see a clean run). A push runs the suite too.
   **Next: back to M40-T4** (below).
 
+- **⏸ M40-T6 BUILT, NOT COMMITTED (2026-11-17) — waiting on the review, then on live checks.**
+  Plan `claude.ai/artifact/AuVodjvViyFqv38r8pJEpZ`; Franco's go *"let's go"*, taken as the three
+  answers as recommended (the row stays a day; the notice's two sentences; one real upload broken
+  on purpose and finished by `Try Again`). In the working tree: an uploader that hands out and
+  continues a session; `canRetry`; the failed upload kept with `tryAgain` / `dismiss`; the row
+  `Couldn't upload · ‹title›`; the notice's retry sentences; docs/06 amended. **1087 tests; 80
+  breaks, 80 red.** ⚠️ The installed app is still T5's build.
+  **Next, in this order:** (1) `/code-review medium`'s findings → **to Franco with a proposal
+  each, before any is applied**; (2) fixes, one watched run, the sweeps where they touch;
+  (3) **with his OK each time:** the row and `Try Again` on a fail-on-purpose build; then one
+  real upload cut at ~40% on a temporary build and finished by `Try Again`, and his look in
+  Studio that there is one video and no leftover; (4) tick, commit `M40-T6`, push, deploy;
+  (5) **G40**: the README's "arriving in 1.23" note, `CHANGELOG.md`, `VERSION` 1.23.0, the gate's
+  own checks in docs/03.
+
 - **✅ M40-T5 DONE (2026-11-17) — every failed upload says why, and what to do next.**
   `UploadFailure`: one list, worded by the app and the CLI. The uploader resumes while bytes
   arrive and for about 5 minutes after, renews a lapsed token once, and opens a session a second
@@ -29,16 +44,11 @@
   ✅ **Live:** the waiting row and four notices on a fail-on-purpose build; and **the real dead
   sign-in** — Franco removed ScreenRec's access at Google, the next upload said *needs
   reconnecting*, Settings went to `Not connected`, the saved sign-in was deleted.
-  ⚠️ **He is disconnected until he presses `Connect…` in Settings** (left open on Sharing).
+  ✅ He reconnected the same afternoon (the saved sign-in is back; Settings reads `Connected`).
   ✅ **His look in Studio (2026-11-17):** the three measurement entries are **still listed**, so
   `DELETE` does not remove an entry; *test 10* was gone because he deleted it. The *delete it in
   Studio* wording stands, and T6 is `Try Again` only.
-  **Next: M40-T6** (docs/03) — `Try Again` on a failed upload, continuing the same one. ⏸ **Plan
-  artifact published 2026-11-17, awaiting Franco's go:**
-  `claude.ai/artifact/AuVodjvViyFqv38r8pJEpZ`. **Do not implement before he answers.** Three
-  answers asked, each with a recommendation: the row stays a day; the notice says *Try Again in
-  the menu continues where it stopped*; one real upload is broken on purpose and finished by
-  `Try Again` (he must have reconnected first).
+  **Next: M40-T6 — see the entry above this one.**
   **Needs Franco:** reconnect in Settings (`Connect…`); delete the test videos, the three
   measurement entries among them; click an *Uploaded to YouTube* notice once; the audience
   question from T1.
