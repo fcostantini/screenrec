@@ -7,6 +7,41 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-17 (M40-T3, the review's fixes — unit tests, then live on a temporary build):
+  ✅ **A first-time sign-in can be driven with no browser and no account at risk.** Temporarily
+  hand `AppState` an `UploadModel` built on `InMemoryTokenStore()` with `signIn` replaced by a
+  closure that sleeps six seconds and returns a made-up token (or throws when a flag file
+  exists) and `revoke` by a no-op. The real sign-in file is never read; five "what if the user
+  does X during the browser step" scenarios ran in three minutes. Revert with `git checkout`,
+  and `strings` the rebuilt binary for the flag path before deploying.
+  ✅ **Accessibility can type into the middle of a text field, which a keystroke cannot.** Set
+  `kAXSelectedTextRangeAttribute` to a zero-length range, then set `kAXSelectedTextAttribute` to
+  the text: it goes through the field editor, the delegate's `controlTextDidChange` fires, and
+  the range reads back as the insertion point. Setting `kAXValueAttribute` (what
+  `alertdriver type` does) replaces the whole text and says nothing about the insertion point.
+  ⚠️ **Assigning `NSTextField.stringValue` while it is being edited sends the insertion point to
+  the end**, and discards an input method's marked text — a dead key's pending accent included.
+  A field that rewrites itself as the user types has to put the selection back through
+  `currentEditor()` and leave the text alone while `hasMarkedText()`. The second half is
+  **reasoned, not measured**: Accessibility cannot compose.
+  🔴 **A view that waits for a state change with a flag and `.onChange` can be left holding the
+  flag.** The account going `disconnected → connecting → disconnected` between two view updates
+  is no change to `.onChange`, so the flag outlives the attempt and fires on the next sign-in,
+  whoever started it. Await the operation itself and re-check the view's state afterwards
+  (`loadedURL == url`, which `unload()` clears when the window closes — the idiom `load` already
+  uses). Reasoned from the code by the review; the fixed build was driven, the old one was not.
+  🔴 **A test that awaits a signal from the code under test hangs the suite when the code never
+  gets there** — and `swift test` has no timeout, so the pre-push gate would hang with it. The
+  mutation sweep hit its own 150 s limit on exactly this. The test's side of a gate now gives up
+  after five seconds and lets the expectations fail (`Gate.reached()`); the fake's side still
+  waits for as long as it is held.
+  ⚠️ **`python3 - <<EOF … > file` buffers its prints until it exits**: a ten-minute sweep run in
+  the background shows an empty output file the whole time. `python3 -u`.
+  ⚠️ **An upload's failure and the sign-in can belong to different accounts.** A transfer takes
+  minutes; a disconnect and a new sign-in fit inside one. Whatever the upload learns at its end
+  — the channel's name, "Google dropped this sign-in" — is only applied if the sign-in it began
+  under is still the one in use (`signInsEnded`, compared at each `await`'s far side).
+
 - 2026-11-17 (M40-T3, the upload that landed — live on the deployed build): **one unlisted
   upload from the Trim window, the morning after the limit was hit.**
   ✅ **The channel's daily upload limit had lifted 16 h 41 min after the last refusal** (refused

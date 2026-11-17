@@ -1,6 +1,8 @@
+import AppCore
 import AppKit
 import Quartz
 import RecorderCore
+import UploadCore
 
 /// The AppKit share/preview edges for the per-file submenu (M12-T1). Siblings of `Finder`: they live
 /// here because AppCore may not import AppKit (docs/01), and the menu view — already in this layer —
@@ -49,6 +51,35 @@ enum ShareActions {
             confirm: "Name")
     }
 
+    /// Says what the browser step is before any browser opens (M40-T3). True only on the confirm.
+    @MainActor static func confirmConnect() -> Bool {
+        let alert = NSAlert()
+        alert.messageText = UploadCopy.connectTitle
+        alert.informativeText = UploadCopy.connectMessage
+        alert.addButton(withTitle: UploadCopy.connectConfirm)
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    /// The upload sheet (M40-T3, docs/06): title, description and visibility — the three things
+    /// YouTube's terms say an upload client must let the user set. Nil unless `Upload` was pressed.
+    @MainActor static func askForUpload(_ draft: UploadDraft) -> VideoMetadata? {
+        let alert = NSAlert()
+        alert.messageText = UploadCopy.sheetTitle
+        alert.informativeText = draft.summary
+        let confirm = alert.addButton(withTitle: UploadCopy.sheetConfirm)
+        alert.addButton(withTitle: "Cancel")
+
+        let form = UploadFormView(draft: draft, confirm: confirm)
+        alert.accessoryView = form
+        alert.window.initialFirstResponder = form.titleField
+
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return form.metadata(fallbackTitle: draft.title)
+    }
+
     /// The modal both prompts are: a text field pre-filled with `url`'s base name, confirm and
     /// Cancel. Nil unless the confirm button was the one pressed.
     @MainActor private static func askForBaseName(
@@ -71,6 +102,143 @@ enum ShareActions {
     }
 
     @MainActor private static let anchor = AnchorWindow()
+}
+
+/// The upload sheet's fields, as an alert's accessory view. It only *applies* `UploadForm`'s rules
+/// — as the user types, so a title YouTube would refuse can't be sent — and holds none of its own.
+@MainActor
+private final class UploadFormView: NSView, NSTextFieldDelegate {
+    let titleField = NSTextField()
+    private let descriptionField = NSTextField()
+    private let visibility = NSPopUpButton()
+    private let visibilityCaption = NSTextField(wrappingLabelWithString: "")
+    private let confirm: NSButton
+
+    private static let width: CGFloat = 300
+
+    init(draft: UploadDraft, confirm: NSButton) {
+        self.confirm = confirm
+        super.init(frame: .zero)
+
+        titleField.stringValue = draft.title
+        titleField.delegate = self
+        titleField.setAccessibilityLabel("Title")
+
+        descriptionField.placeholderString = "Optional"
+        descriptionField.usesSingleLineMode = false
+        descriptionField.lineBreakMode = .byWordWrapping
+        descriptionField.cell?.wraps = true
+        descriptionField.cell?.isScrollable = false
+        descriptionField.delegate = self
+        descriptionField.setAccessibilityLabel("Description")
+
+        visibility.addItems(withTitles: UploadCopy.visibilityChoices.map(UploadCopy.visibilityLabel))
+        visibility.selectItem(at: UploadCopy.visibilityChoices.firstIndex(of: draft.privacy) ?? 0)
+        visibility.target = self
+        visibility.action = #selector(visibilityChanged)
+        visibility.setAccessibilityLabel("Visibility")
+
+        var rows: [NSView] = [
+            Self.label("Title"), titleField,
+            Self.label("Description"), descriptionField,
+            Self.label("Visibility"), visibility, visibilityCaption,
+            Self.caption(UploadCopy.sheetDestination(channel: draft.channel)),
+        ]
+        if draft.isLong { rows.append(Self.caption(UploadCopy.longVideoWarning)) }
+        Self.style(visibilityCaption)
+
+        let stack = NSStackView(views: rows)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            widthAnchor.constraint(equalToConstant: Self.width),
+            titleField.widthAnchor.constraint(equalToConstant: Self.width),
+            descriptionField.widthAnchor.constraint(equalToConstant: Self.width),
+            descriptionField.heightAnchor.constraint(equalToConstant: 54),
+        ])
+        // An accessory view is placed by its frame, so the layout has to be settled into one —
+        // after the captions have their text, or the frame comes out a line short and clips the
+        // top row.
+        refresh()
+        layoutSubtreeIfNeeded()
+        frame.size = NSSize(width: Self.width, height: stack.fittingSize.height)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("UploadFormView is built in code")
+    }
+
+    func metadata(fallbackTitle: String) -> VideoMetadata {
+        UploadForm.metadata(
+            title: titleField.stringValue, description: descriptionField.stringValue,
+            privacy: privacy, fallbackTitle: fallbackTitle)
+    }
+
+    private var privacy: VideoMetadata.Privacy {
+        let choices = UploadCopy.visibilityChoices
+        let index = visibility.indexOfSelectedItem
+        return choices.indices.contains(index) ? choices[index] : choices[0]
+    }
+
+    func controlTextDidChange(_ notification: Notification) {
+        refresh()
+    }
+
+    @objc private func visibilityChanged() {
+        refresh()
+    }
+
+    private func refresh() {
+        apply(UploadForm.title, to: titleField)
+        apply(UploadForm.description, to: descriptionField)
+        confirm.isEnabled = UploadForm.canUpload(title: UploadForm.title(titleField.stringValue))
+        visibilityCaption.stringValue = UploadCopy.visibilityCaption(privacy)
+    }
+
+    /// Rewrites `field` only where `rule` changes it, and puts the insertion point back: assigning
+    /// `stringValue` sends it to the end.
+    private func apply(_ rule: (String) -> String, to field: NSTextField) {
+        let editor = field.currentEditor() as? NSTextView
+        // An input method's composition isn't text yet, and assigning over it would discard it.
+        // The rules meet it when it commits.
+        guard editor?.hasMarkedText() != true else { return }
+        let text = field.stringValue
+        let ruled = rule(text)
+        guard ruled != text else { return }
+        let caret = editor.map {
+            UploadForm.caret($0.selectedRange().location, in: text, after: rule)
+        }
+        field.stringValue = ruled
+        if let caret {
+            field.currentEditor()?.selectedRange = NSRange(location: caret, length: 0)
+        }
+    }
+
+    private static func label(_ text: String) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        style(label)
+        return label
+    }
+
+    private static func caption(_ text: String) -> NSTextField {
+        let caption = NSTextField(wrappingLabelWithString: text)
+        style(caption)
+        return caption
+    }
+
+    private static func style(_ field: NSTextField) {
+        field.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        field.textColor = .secondaryLabelColor
+        field.preferredMaxLayoutWidth = width
+    }
 }
 
 /// A reused, invisible 1×1 window that anchors a popover/picker which needs a view-in-window but fires

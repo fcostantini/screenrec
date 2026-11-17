@@ -6,26 +6,25 @@
 
 ## Now
 
-- **⏸ M40-T3 BUILT AND VERIFIED, NOT COMMITTED (2026-11-17) — it waits for Franco's ruling on
-  the review.** The Trim window's `Upload to YouTube…` row, the connect alert and the sheet are in
-  the **working tree on Franco's Mac, uncommitted**. **974 tests** (944 → 974); **17 breaks, 17
-  red**. The deployed app at `/Users/Shared` **is** this uncommitted build, connected to his channel.
-  ✅ **The upload landed (2026-11-17, 09:24):** one unlisted upload of a 24 s synthetic clip from
-  the Trim window — sheet `Unlisted` through AX, `Upload` left 0 windows, 14 s from the press to
-  `uploaded`, oEmbed 200 with the typed title, watch page `"isUnlisted":true`. Settings and the
-  sheet name the channel now. Test files removed from `~/Movies`.
-  ✅ **Live the day before:** the row at the 500 pt floor; the sheet; limits applied as typed;
-  `Cancel` back to an intact range; the first-time path, driven by Franco — the sheet opened by
-  itself after his sign-in, and a notice explained YouTube's refusal (`uploadLimitExceeded`).
-  **Next, in this order:** (1) Franco rules on `/code-review medium`'s ten findings — presented
-  2026-11-16, listed with a proposal each in docs/03 under M40-T3; (2) apply what he approves,
-  dev loop + sweep, re-verify **without** another upload unless a fix touches the transfer;
-  (3) tick, commit `M40-T3`, push; (4) T4's plan artifact.
-  ⚠️ **Test uploads are a budget:** one or two a day. One spent today. Eight test videos are on
-  his channel for him to delete (seven from T1, one from T3).
-  ❓ **Asked by Franco 2026-11-17:** `Upload to YouTube…` on files already in the menu. T4 already
-  carries it for `.mp4` rows under Recent Exports; whether full recordings get it too is his call
-  and belongs in T4's plan.
+- **✅ M40-T3 DONE (2026-11-17) — the Trim window uploads the range to YouTube, after a sheet
+  for the title, description and visibility.** `Upload to YouTube…` under `Export Audio & Copy`;
+  a connect alert when there is no account, then the sheet by itself; the upload chained to
+  `Export & Copy`'s own export; one notice with the link. **982 tests** (944 → 982); **30 breaks,
+  30 red.** The deployed app at `/Users/Shared` is this commit's build, connected to his channel.
+  ✅ **Live:** one unlisted upload of a 24 s synthetic clip — 14 s from the press to `uploaded`,
+  oEmbed 200 with the typed title, watch page `"isUnlisted":true`.
+  ✅ **Review:** ten findings, ruled "as proposed" — seven fixed and re-verified live on a
+  temporary build with a fake sign-in (his real one untouched), one moved to T4, three to T5.
+  **Next: M40-T4** — the menu row, the receipt with `Copy Link`, the clipboard rule, quitting
+  mid-upload. **Plan artifact first, then stop.** The plan must re-raise what was never ruled:
+  `Cancel Upload`, a notice click opening the video, and Franco's question of 2026-11-17 —
+  `Upload to YouTube…` on files already in the menu (T4 carries it for `.mp4` rows under Recent
+  Exports; whole recordings are in M40's "left out, on purpose" list and are his call).
+  ⚠️ **Test uploads are a budget:** one or two a day; one spent 2026-11-17.
+  **Needs Franco:** delete the eight `ScreenRec test …` videos in Studio (seven from T1, one from
+  T3), and say whether Studio flags them about audience ("made for kids"); whether the *Uploaded
+  to YouTube* notice appeared at 09:24 on 2026-11-17; by eye, a dead-key accent (`´` then `a`)
+  typed into the sheet's title lands as one letter.
 
 - **✅ M40-T2 DONE (2026-11-16) — Settings connects a YouTube account, and a build carries the
   credentials to do it.** `UploadModel` + a **YouTube** section in Settings › Sharing; `bundle.sh`

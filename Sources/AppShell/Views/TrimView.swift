@@ -74,7 +74,6 @@ struct TrimView: View {
     /// What the bar search had to say — only when it found nothing, or couldn't look (M26-T3).
     @State private var barsMessage: String?
     @State private var findingBars = false
-
     /// The preview's floor, and the window's with it — the size this window shipped at before it
     /// could be resized.
     private static let previewSize = CGSize(width: 480, height: 300)
@@ -103,17 +102,26 @@ struct TrimView: View {
     /// it is left out until the geometry loads rather than quoting a figure that can't be computed
     /// yet (M16-T2).
     private var exportNote: String {
-        var profile = "H.264"
-        if let sourceSize {
-            let fitted = Exporter.fittedSize(
-                width: crop?.width ?? Int(sourceSize.width.rounded()),
-                height: crop?.height ?? Int(sourceSize.height.rounded()),
-                configuration: state.exportConfiguration)
-            profile += " \(fitted.width) × \(fitted.height)"
-        }
         let written = crop == nil ? "only the range" : "only the range, cropped"
-        return "Export & Copy writes \(written) — \(profile) — and puts it on the clipboard. "
+        return "Export & Copy writes \(written) — \(exportProfile) — and puts it on the clipboard. "
             + "⌘V pastes it."
+    }
+
+    /// What will really be encoded, in source pixels: the crop when there is one, else the frame.
+    private var encodedSize: (width: Int, height: Int)? {
+        sourceSize.map {
+            (crop?.width ?? Int($0.width.rounded()), crop?.height ?? Int($0.height.rounded()))
+        }
+    }
+
+    /// `H.264 1920 × 1200` — one definition, so `Export & Copy` and `Upload to YouTube…` describe
+    /// the same file. The size is left off until the geometry loads (M16-T2).
+    private var exportProfile: String {
+        guard let encodedSize else { return "H.264" }
+        let fitted = Exporter.fittedSize(
+            width: encodedSize.width, height: encodedSize.height,
+            configuration: state.exportConfiguration)
+        return "H.264 \(fitted.width) × \(fitted.height)"
     }
 
     /// What `Export Audio & Copy` will produce (M38-T3; copies since M39-T1). The rate is the one
@@ -134,7 +142,10 @@ struct TrimView: View {
                     .frame(width: 420, height: 120)
             }
         }
-        .onAppear { load(state.exports.trimTarget) }
+        .onAppear {
+            load(state.exports.trimTarget)
+            state.uploads.expireEndedSignIn()
+        }
         .onChange(of: state.exports.trimTarget) { load(state.exports.trimTarget) }
         // Unticking is how a crop is discarded: leaving one set but undrawn would crop an export
         // with nothing on screen saying so.
@@ -240,6 +251,8 @@ struct TrimView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            uploadRow(url)
+
             HStack(spacing: 8) {
                 Toggle("Crop — drag on the preview", isOn: $cropping)
                 if let crop {
@@ -287,6 +300,78 @@ struct TrimView: View {
         // The window resizes now (M37-T2), so the column follows it rather than sitting at a fixed
         // 500 pt with the extra width stranded either side of it.
         .frame(minWidth: 500, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// `Upload to YouTube…` (M40-T3), in the audio row's shape and for its reason: the action row
+    /// has no room for another button. The words and what the button does both follow the account,
+    /// through `UploadCopy`, so this row and Settings cannot tell different stories.
+    @ViewBuilder private func uploadRow(_ url: URL) -> some View {
+        let uploads = state.uploads
+        let action = UploadCopy.trimAction(uploads.account, canSignIn: uploads.canSignIn)
+        HStack(spacing: 8) {
+            Button(UploadCopy.trimButton(uploads.account)) { perform(action, on: url) }
+                // Giving up a sign-in needs no range; starting an upload does.
+                .disabled(action == .none || (action != .cancelSignIn && !hasRange))
+            HStack(spacing: 4) {
+                Text(
+                    UploadCopy.trimCaption(
+                        for: uploads.account, failure: uploads.lastFailure,
+                        canSignIn: uploads.canSignIn, profile: exportProfile, cropped: crop != nil))
+                    .foregroundStyle(uploads.lastFailure == nil ? Color.secondary : Color.orange)
+                if !uploads.canSignIn, uploads.lastFailure == nil {
+                    Link("How to add them", destination: UploadCopy.credentialsHelpURL)
+                }
+            }
+            .font(.caption)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func perform(_ action: UploadCopy.TrimAction, on url: URL) {
+        switch action {
+        case .upload:
+            presentUploadSheet(for: url)
+        case .connect:
+            guard ShareActions.confirmConnect() else { return }
+            Task { @MainActor in await signInThenUpload(url) }
+        case .cancelSignIn:
+            state.uploads.cancelConnect()
+        case .none:
+            break
+        }
+    }
+
+    /// The press again once the sign-in it needed has its outcome — and only if the button would
+    /// still take it. The browser trip is long enough for the window to close, the clip to change
+    /// or the range to go; a sign-in that failed or was given up leaves the row saying why.
+    private func signInThenUpload(_ url: URL) async {
+        let uploads = state.uploads
+        await uploads.connectAndWait()
+        guard loadedURL == url, state.exports.trimTarget == url, hasRange,
+              UploadCopy.trimAction(uploads.account, canSignIn: uploads.canSignIn) == .upload
+        else { return }
+        presentUploadSheet(for: url)
+    }
+
+    private func presentUploadSheet(for url: URL) {
+        let seconds = max(0, outSeconds - inSeconds)
+        let draft = UploadDraft(
+            title: UploadForm.defaultTitle(for: url),
+            privacy: state.uploadVisibility,
+            summary: UploadCopy.sheetSummary(
+                seconds: seconds,
+                bytes: encodedSize.map {
+                    state.exportConfiguration.projectedBytes(
+                        sourceWidth: $0.width, sourceHeight: $0.height, seconds: seconds)
+                },
+                profile: sourceSize == nil ? nil : exportProfile),
+            channel: state.uploads.channelTitle,
+            isLong: UploadForm.isLong(seconds: seconds))
+        guard let metadata = ShareActions.askForUpload(draft) else { return }
+        state.uploadClip(
+            url, range: ExportRange(start: inSeconds, end: outSeconds), crop: crop,
+            metadata: metadata)
+        onFinish()
     }
 
     /// The crop band over the preview (M26-T2): drag to draw, drag again to redraw. The dim is

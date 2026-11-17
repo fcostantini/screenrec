@@ -53,22 +53,66 @@ public final class UploadModel {
         try await GoogleSignIn.revoke($0, transport: URLSessionTransport())
     }
 
+    /// The title of the upload running now, or nil. Uploads run **one at a time**, in the order
+    /// asked for; the rest wait in `pendingUploads`.
+    public private(set) var uploadInProgress: String?
+    /// How far it has got, 0…1.
+    public private(set) var uploadProgress: Double?
+    public var queuedUploadCount: Int { pendingUploads.count }
+
+    /// The channel uploads land on, as YouTube named it with the last one (07) — the upload-only
+    /// permission gives no way to ask before there has been one. Kept across launches.
+    public private(set) var channelTitle: String?
+
+    /// Posts an upload's outcome. Wired by AppState from its notifier; nil in tests.
+    public var notify: (@MainActor (RecordingNotification) -> Void)?
+
+    /// The transfer and the token refresh, injected for the same reason as `signIn`.
+    public var uploadFunction: @Sendable (
+        _ file: URL, _ metadata: VideoMetadata, _ accessToken: String,
+        _ progress: @escaping @Sendable (Int64) -> Void
+    ) async throws -> UploadedVideo = { file, metadata, accessToken, progress in
+        try await YouTubeUploader().upload(
+            file, metadata: metadata, accessToken: accessToken, progress: progress)
+    }
+    public var refresh: @Sendable (
+        GoogleToken, GoogleClientCredentials
+    ) async throws -> GoogleToken = { token, credentials in
+        try await GoogleSignIn.refresh(
+            token, credentials: credentials, transport: URLSessionTransport())
+    }
+
     private let credentials: GoogleClientCredentials?
     private let store: any TokenStore
+    private let defaults: UserDefaults?
+    private var pendingUploads: [Request] = []
+    /// Goes up each time a sign-in ends, so an upload can tell the one it began under has gone.
+    private var signInsEnded = 0
+    /// Tells one upload's progress reports from the next one's.
+    private var uploadGeneration = 0
+    /// The upload in flight, readable so a test can wait for the queue to drain.
+    private(set) var uploadTask: Task<Void, Never>?
     /// The sign-in in flight, readable so a test can wait for its outcome.
     private(set) var connectTask: Task<Void, Never>?
     /// Set by `cancelConnect`: whatever the sign-in in flight comes back with is no longer wanted.
     private var cancelRequested = false
     private static let log = Logger(subsystem: "dev.fcostantini.screenrec", category: "upload")
 
+    /// `defaults` is where the channel's name is kept; left out, it lasts only as long as the
+    /// process.
     public init(
-        credentials: GoogleClientCredentials?, store: any TokenStore, now: Date = Date()
+        credentials: GoogleClientCredentials?, store: any TokenStore,
+        defaults: UserDefaults? = nil, now: Date = Date()
     ) {
         self.credentials = credentials
         self.store = store
+        self.defaults = defaults
         account = credentials == nil ? .unavailable : .disconnected
         do {
-            if let saved = try store.load() { account = .connected(expires: saved.refreshTokenExpiry) }
+            if let saved = try store.load() {
+                account = .connected(expires: saved.refreshTokenExpiry)
+                channelTitle = defaults?.string(forKey: SettingsStore.Key.youtubeChannel)
+            }
         } catch {
             // Unreadable is not connected, and saying so beats a launch that fails over it.
             Self.log.error("sign-in unreadable: \(error.localizedDescription, privacy: .public)")
@@ -81,18 +125,31 @@ public final class UploadModel {
     public static func bundled() -> UploadModel {
         UploadModel(
             credentials: .bundled(),
-            store: FileTokenStore(url: FileTokenStore.standardURL(named: "youtube-sign-in")))
+            store: FileTokenStore(url: FileTokenStore.standardURL(named: "youtube-sign-in")),
+            defaults: .standard)
     }
 
-    /// Where the account lands when nothing is saved.
-    private var signedOut: Account { canSignIn ? .disconnected : .unavailable }
+    /// Ends the sign-in as far as this model goes; the saved copy is the caller's to remove. The
+    /// channel belongs to the sign-in, so its name goes too.
+    private func signOut() {
+        account = canSignIn ? .disconnected : .unavailable
+        signInsEnded += 1
+        channelTitle = nil
+        defaults?.removeObject(forKey: SettingsStore.Key.youtubeChannel)
+    }
+
+    /// Whether the sign-in that was in use when `signInsEnded` read `count` still is.
+    private func isCurrent(_ count: Int) -> Bool {
+        guard case .connected = account else { return false }
+        return count == signInsEnded
+    }
 
     /// Drops a sign-in that has passed the end Google announced for it. Called at launch and each
     /// time the account is about to be shown or used: this app runs for days, and "connected, ends
     /// on a date already gone" is a claim it can check for itself.
     public func expireEndedSignIn(now: Date = Date()) {
         guard case .connected(let end?) = account, end <= now else { return }
-        account = signedOut
+        signOut()
         if canSignIn { lastFailure = UploadCopy.signInEnded }
         // Best effort: a copy left behind is judged the same way next time.
         try? store.delete()
@@ -121,6 +178,12 @@ public final class UploadModel {
             }
             self?.finishConnecting(outcome)
         }
+    }
+
+    /// `connect()`, returning once the sign-in has its outcome. `account` says which it was.
+    public func connectAndWait() async {
+        connect()
+        await connectTask?.value
     }
 
     /// Gives up on a sign-in in flight. The browser tab is left as it is; its redirect, if it ever
@@ -181,7 +244,7 @@ public final class UploadModel {
             // that can't be read helps nobody.
             Self.log.error("sign-in unreadable: \(error.localizedDescription, privacy: .public)")
             try? store.delete()
-            account = signedOut
+            signOut()
             lastFailure = UploadCopy.notWithdrawn
             return
         }
@@ -195,7 +258,7 @@ public final class UploadModel {
                 return
             }
         }
-        account = signedOut
+        signOut()
         do {
             try store.delete()
         } catch {
@@ -203,9 +266,96 @@ public final class UploadModel {
             lastFailure = UploadCopy.savedCopyNotRemoved
         }
     }
+
+    // MARK: - Uploading
+
+    private struct Request {
+        let file: URL
+        let metadata: VideoMetadata
+    }
+
+    /// Sends `file` to the connected channel (M40-T3). Returns at once: uploads run one at a time
+    /// in the order asked for, and `notify` carries each outcome. The file is only read.
+    public func upload(_ file: URL, metadata: VideoMetadata) {
+        pendingUploads.append(Request(file: file, metadata: metadata))
+        startNextUploadIfIdle()
+    }
+
+    private func startNextUploadIfIdle() {
+        guard uploadInProgress == nil, !pendingUploads.isEmpty else { return }
+        let request = pendingUploads.removeFirst()
+        uploadGeneration += 1
+        uploadInProgress = request.metadata.title
+        uploadProgress = 0
+        uploadTask = Task { [weak self] in await self?.run(request) }
+    }
+
+    private func run(_ request: Request) async {
+        let signIn = signInsEnded
+        do {
+            let video = try await send(request, signIn: signIn)
+            // YouTube can leave the name out, and the account can have changed by now: neither
+            // is a reason to drop or replace a name that is right.
+            if let channel = video.channelTitle, isCurrent(signIn) {
+                channelTitle = channel
+                defaults?.set(channel, forKey: SettingsStore.Key.youtubeChannel)
+            }
+            Self.log.info("uploaded \(video.id, privacy: .public)")
+            notify?(
+                RecordingNotifications.uploaded(
+                    title: video.title ?? request.metadata.title,
+                    visibility: video.privacyStatus ?? request.metadata.privacy.rawValue,
+                    link: video.link, file: request.file))
+        } catch {
+            Self.log.error("upload failed: \(String(describing: error), privacy: .public)")
+            if case GoogleSignInError.signInExpired = error, isCurrent(signIn) {
+                // Google no longer honours it, so calling the account connected would be untrue.
+                signOut()
+                lastFailure = UploadCopy.signInEnded
+                try? store.delete()
+            }
+            notify?(
+                RecordingNotifications.uploadFailed(
+                    reason: UploadCopy.uploadFailure(error), file: request.file))
+        }
+        uploadInProgress = nil
+        uploadProgress = nil
+        startNextUploadIfIdle()
+    }
+
+    private func send(_ request: Request, signIn: Int) async throws -> UploadedVideo {
+        expireEndedSignIn()
+        guard case .connected = account, let credentials, var token = try store.load() else {
+            throw UploadModelError.notConnected
+        }
+        if token.needsRefresh() {
+            token = try await refresh(token, credentials)
+            // A disconnect can finish while Google answers; saving now would undo it.
+            guard isCurrent(signIn) else { throw UploadModelError.notConnected }
+            try store.save(token)
+        }
+        let total = try YouTubeUploader.fileSize(of: request.file)
+        return try await uploadFunction(
+            request.file, request.metadata, token.accessToken, progressReporter(total: total))
+    }
+
+    /// The sink handed to the uploader, which reports from URLSession's queue. A report from an
+    /// upload that has since ended must not move its successor's bar.
+    private func progressReporter(total: Int64) -> @Sendable (Int64) -> Void {
+        let generation = uploadGeneration
+        return { [weak self] sent in
+            Task { @MainActor in
+                guard let self, generation == self.uploadGeneration, self.uploadInProgress != nil
+                else { return }
+                self.uploadProgress = min(1, max(0, Double(sent) / Double(total)))
+            }
+        }
+    }
 }
 
 enum UploadModelError: Error {
     /// The system opened nothing for the sign-in URL, so no redirect will ever come.
     case browserDidNotOpen
+    /// An upload was asked for with no usable sign-in.
+    case notConnected
 }

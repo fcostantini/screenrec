@@ -30,6 +30,18 @@ public struct UploadedVideo: Equatable, Sendable {
     public let uploadStatus: String?
     public let channelTitle: String?
 
+    /// Public so another module's stand-in for the uploader can answer with one.
+    public init(
+        id: String, title: String?, privacyStatus: String?, uploadStatus: String?,
+        channelTitle: String?
+    ) {
+        self.id = id
+        self.title = title
+        self.privacyStatus = privacyStatus
+        self.uploadStatus = uploadStatus
+        self.channelTitle = channelTitle
+    }
+
     public var link: String { "https://youtu.be/\(id)" }
 }
 

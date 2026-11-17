@@ -320,7 +320,7 @@ struct SettingsView: View {
         return Section("YouTube") {
             LabeledContent("Account") {
                 HStack(spacing: 8) {
-                    Text(UploadCopy.status(account))
+                    Text(UploadCopy.status(account, channel: uploads.channelTitle))
                         .foregroundStyle(account == .disconnected ? .secondary : .primary)
                     switch account {
                     case .unavailable:

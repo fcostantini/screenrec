@@ -347,6 +347,8 @@ form). Never the word "error" for a fail-stop.
 | Export won't fit — **M23-T2** | `Not enough room to export` | `This needs about 1,8 GB and Macintosh HD has 900 MB free. The recording is untouched.` | — |
 | Export failed — **M10-T2** | `Couldn't export to MP4` | `The original recording is untouched. Try again, or check the output folder is writable.` | — |
 | Saved as GIF — **M10-T3** | `Saved as GIF` | `<name>.gif — ready to share. Click to reveal.` | reveal |
+| Uploaded — **M40-T3** | `Uploaded to YouTube` | `“<title>” is unlisted · youtu.be/<id>. Click to reveal the file.` The link is shown because until M40-T4 this is the only place to read it | reveal |
+| Upload failed — **M40-T3** | `Couldn't upload to YouTube` | `<why>. The clip is saved as <name>.mp4.` — `<why>` names the fix: `YouTube needs reconnecting in Settings.` · `The connection dropped.` · `YouTube's daily upload limit for this build is used up.` It names YouTube only when the failure is YouTube's; anything else is `The upload didn't finish.` The export always finishes first, so the file exists (ADR-007) | reveal |
 | GIF failed — **M10-T3** | `Couldn't save GIF` | `The original recording is untouched. Try again, or check the output folder is writable.` | — |
 | Recording file moved — **M6-T7** | `Still recording · file moved back` | `The recording file was moved while recording, so it was moved back.` | — |
 | Recording file deleted — **M6-T7** | via `failed`: | `The recording file was deleted while recording, so the video couldn't be saved.` | — |
@@ -587,7 +589,9 @@ collapses toolbar tabs into a `»` overflow menu, hiding three of the four pages
     a build made without credentials, `Not available in this build` with `Connect…` disabled.
     `Connect…` opens Google's sign-in in the default browser, waits five minutes for it, and brings
     the app back to the front when it has an outcome. **`Cancel` explains nothing** — it was pressed
-    here — and a sign-in that arrives after it is revoked, not kept.
+    here — and a sign-in that arrives after it is revoked, not kept. Once an upload has told the
+    app the channel's name the status reads **`Connected · ‹channel›`** (M40-T3) — the upload-only
+    permission gives no way to ask sooner.
   - **One line under the row, only when there is something to say:**
     - why the last attempt failed (orange) — *"Sign-in was cancelled in the browser."*, *"Couldn't
       open the browser."*, *"Couldn't reach Google, so you are still connected."* — cleared by the
@@ -653,6 +657,7 @@ moved):
 | `gifFPS` · `gifWidth` · `gifMaxSeconds` | Int; each snaps to its nearest picker choice on load, absent ⇒ 15 / 480 / 30. The `Save as GIF` caps (M10-T3 follow-up) | M10-T3 follow-up |
 | `stopAfterMinutes` | Int; snaps to its nearest picker choice on load, absent ⇒ 0 (Off). Bounds a take (M18-T4) | M18-T4 |
 | `youtubeVisibility` | String `unlisted`\|`private`\|`public`; absent or anything else ⇒ `unlisted`. What a new YouTube upload starts as (M40-T2) | M40-T2 |
+| `youtubeChannel` | String; **absent ⇒ unknown**. The channel YouTube named with the last upload, for the Settings row and the sheet. Not a preference: it belongs to the sign-in and is cleared with it (M40-T3) | M40-T3 |
 | `mp4Width` | Int; snaps to its nearest picker choice on load, absent ⇒ 1920. The `Export as MP4` width cap; 4096 means "largest the source allows inside Level 5.2" (M18-T2) | M18-T2 |
 | `lastExportPath` · `lastExportDate` | String path + Date (M12-T2/T3); **absent ⇒ no receipt**. The last export, so its menu receipt survives relaunch — dropped on load if the file is gone (moved/trashed) **or has no date** (a pre-T3 entry), and expired at menu open once the date is **older than one hour** (M12-T3). Not part of `Settings` — a transient pointer, not user config; its own load/save | M12-T2/T3 |
 
@@ -720,6 +725,52 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   taken. A crop is irrelevant to it and goes unmentioned — sound has no rectangle. The rate is read
   from the export profile, not written into the string. The recents submenu's `Export Audio` row
   stays save-only, like its `Export as MP4` neighbour.
+- **Upload to YouTube…** (M40-T3, ADR-024) exports the **range** as `Export & Copy` does — same
+  encoder call, range and crop — and uploads the result to the connected channel. **Its own row,
+  under `Export Audio & Copy`**, in that row's shape and for its reason: a button with the fact
+  beside it. Disabled for a <0.1 s range like its neighbours; no shortcut. It does **not** touch
+  the clipboard. Every word, and what the button does, comes from `UploadCopy`, which reads the
+  same account state Settings shows:
+  - **Connected** — *"Uploads only the range — H.264 1920 × 1200 — to your YouTube channel. Asks
+    for a title first."* (*"…only the range, cropped…"* with a crop drawn; the size is the line
+    `Export & Copy` quotes, from one definition). The button opens the sheet.
+  - **Not connected** — *"Uploads only the range to YouTube. You'll connect an account first."*
+    The button raises the **connect alert**: *"Connect YouTube to upload"* — ScreenRec opens Google
+    in the browser and asks for one permission, adding videos; it can't edit or delete what is
+    there; Google hasn't verified ScreenRec, so it warns first, and the warning can be continued
+    past — **`Continue in Browser`** / `Cancel`. 🔴 The alert **describes** Google's warning and
+    never quotes its buttons: Google translates those pages and words them differently for a
+    project in testing and a published one (docs/07). Nothing is exported until an account exists.
+  - **Signing in** — *"Waiting for Google in your browser…"*, and the button reads **`Cancel`**, as
+    it does in Settings; a sign-in abandoned in the browser would otherwise leave the row dead for
+    five minutes. When the sign-in lands, the app comes forward and **the sheet opens by itself**
+    — the press again, so only if the button would still take it: the window open on the same
+    clip, a range set, the account connected. A sign-in made anywhere else opens nothing here.
+  - **A failed attempt** — the reason, in orange, until the next one.
+  - **No credentials in this build** — the button disabled, *"This build has no YouTube
+    credentials."* and `How to add them`.
+- **The upload sheet** — an alert with an accessory view, the `Rename…` pattern grown to three
+  fields, and **the first multi-field prompt in this spec**. YouTube's API terms say an upload
+  client must let the user set all three:
+  - under the title *"Upload to YouTube"*, what will go: *"0:24 · up to 18 MB · H.264 1920 × 1200"*
+    (the weight and size are left off until the source's geometry has loaded);
+  - **Title** — the recording's own name, **selected**, so Return uploads as is and typing replaces
+    it; **Description** — optional; **Visibility** — `Unlisted` / `Private` / `Public`, starting
+    from the Settings default, with the caption that follows the pick;
+  - *"Goes to “‹channel›”. YouTube's Terms of Service apply."* — or *"Goes to the channel you
+    connected."* before a first upload has told the app its name;
+  - past 15 minutes: *"Longer than 15 minutes. YouTube only accepts this from a verified channel."*
+  - **`Upload`** / `Cancel`. `Upload` dismisses the Trim window, as its neighbours do; `Cancel`
+    returns to it with the range intact.
+  **The fields hold YouTube's limits as you type** (`UploadForm`): 100 characters for the title —
+  its terms forbid a shorter cap — 5,000 bytes for the description, cut on a character boundary,
+  and no `<` or `>` in either. `Upload` is disabled while the title is blank. A refusal from
+  YouTube would otherwise arrive after the export and the transfer. A rule that rewrites a field
+  leaves the insertion point where the typing was, and waits for an input method's composition —
+  a dead key's accent included — to commit before it applies.
+  **No "made for kids" control:** the app declares nothing, so the channel's own default applies.
+  **Uploads run one at a time, in the order asked for.** ⚠️ Until M40-T4 nothing shows the upload
+  while it runs and no link can be copied: the outcome is one notice (below).
 - **Crop** (M26-T2, unchecked by default — the window is unchanged until it's asked for): ticking it
   puts a band over the preview; drag to draw, drag again to redraw, `Reset` clears it, and unticking
   discards it — a crop that survived out of sight would crop an export with nothing on screen saying

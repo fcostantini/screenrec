@@ -132,6 +132,19 @@ import UploadCore
         #expect(model.lastFailure == nil)
     }
 
+    /// What the Trim window waits on before it opens the sheet: the outcome, not the start.
+    @Test func waitingForASignInReturnsOnceItHasItsOutcome() async {
+        let model = makeModel()
+        model.signIn = { _, _ in throw GoogleSignInError.denied }
+        await model.connectAndWait()
+        #expect(model.account == .disconnected)
+        #expect(model.lastFailure == "Sign-in was cancelled in the browser.")
+
+        model.signIn = { [granted = token()] _, _ in granted }
+        await model.connectAndWait()
+        #expect(model.account == .connected(expires: nil))
+    }
+
     @Test func aDeclinedSignInGoesBackWithTheReason() async {
         let store = InMemoryTokenStore()
         let model = makeModel(store: store)

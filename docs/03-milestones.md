@@ -3979,28 +3979,32 @@ uploaded. Detail in docs/07.
       **Owed by Franco:** that ScreenRec is gone from his Google account's access page; and
       `Publish app`, which is what ends the 7-day sign-ins.
 
-- [ ] M40-T3 **The Trim window: the row, the connect alert, the sheet** (AppShell + AppCore).
+- [x] M40-T3 **The Trim window: the row, the connect alert, the sheet** (AppShell + AppCore).
       Plan artifact: `claude.ai/artifact/9ked9JDke2DStc8yGn8kL7` — approved by Franco 2026-11-16.
-      ⏸ **Built and uncommitted (2026-11-16); one thing stands between it and its tick.**
-      ✅ **A real upload landed (2026-11-17).** One unlisted upload of a 24 s synthetic clip from
-      the Trim window on the deployed build: sheet read `Unlisted` through AX, `Upload` left 0
-      windows, the video answered oEmbed 200 with the typed title, and its watch page carries
-      `"isUnlisted":true`. The two attempts the day before were refused `uploadLimitExceeded` —
-      T1's seven test uploads had spent the channel's daily limit — and Franco confirmed by eye
-      that **the sheet opened by itself** after his sign-in and that **a notice explained the
-      limit**. The Verify is complete on the build as it stood before the review's fixes.
-      **`/code-review medium`'s ten findings, presented to Franco and not yet ruled on.**
-      Proposed — *fix in T3:* a disconnect during the token refresh rewrites the sign-in file
-      (re-check the account after the `await`); the channel's name is saved after a disconnect and
-      erased when YouTube returns none; the sheet opened after a sign-in doesn't re-check the range,
-      the account or the recording; the "open the sheet once connected" flag can stay armed when a
-      sign-in fails before the view sees it (drop the flag: await the sign-in instead); the default
-      failure reason blames YouTube for local failures; a doc comment landed on the wrong function
-      in `RecordingNotification.swift`; and the sheet's live rules move the caret to the end and
-      drop IME composition. *To T4:* quitting ignores an upload in flight, and "Wait for Export"
-      then drops the upload it was chained to. *To T5:* a `401` mid-transfer (already owed), the
-      fuller failure taxonomy shared with the CLI, and whether YouTube counts a title's 100 in
-      characters or in something smaller — unmeasured, and worth one upload when there is budget.
+      ✅ **Done 2026-11-17. 982 tests** (944 → 982); **30 breaks, 30 red.**
+      ✅ **A real upload landed:** one unlisted upload of a 24 s synthetic clip from the Trim
+      window on the deployed build — sheet read `Unlisted` through AX, `Upload` left 0 windows, the
+      video answered oEmbed 200 with the typed title, and its watch page carries
+      `"isUnlisted":true`. The day before, two attempts were refused `uploadLimitExceeded` (T1's
+      seven test uploads had spent the channel's daily limit); Franco saw the sheet open by itself
+      after his sign-in and a notice explain the refusal.
+      ✅ **`/code-review medium`: ten findings, ruled by Franco "as proposed".** *Fixed here
+      (seven):* a disconnect during the token refresh no longer rewrites the sign-in file, and a
+      sign-in Google drops ends only the sign-in the upload began under; the channel's name is
+      kept when YouTube names none and not learned once its sign-in has gone; the sheet that
+      follows a sign-in is the press again — same clip, a range, the window open — and waits on
+      that sign-in instead of on a flag a failed one could leave set; a failure names YouTube only
+      when it is YouTube's; a misplaced doc comment; the sheet's rules leave the insertion point
+      where the typing was and wait for an input method to commit. *Moved:* one to T4, three to
+      T5 — listed in those tasks.
+      ✅ **Re-verified live after the fixes**, on a temporary build with a fake in-memory sign-in
+      (no browser, Franco's sign-in file untouched, nothing uploaded): the sheet opens by itself
+      after a sign-in; it does **not** when the range was cleared meanwhile, when the window was
+      closed, when the sign-in was given up from the row, or when a sign-in failed at once and the
+      account was later connected from Settings. On the real build: a `<` typed after the third
+      character leaves the insertion point at 3; a letter typed at 50 in a full title leaves it at
+      51 and the title at 100. ⚠️ **Not driven:** an input method's composition — Accessibility
+      cannot compose. **(human)** a dead-key accent typed in the title.
       A row
       under `Export Audio & Copy` in the same shape — a button with the fact beside it:
       `Upload to YouTube…`. Its caption has three states: connected, not connected yet, and no
@@ -4032,6 +4036,9 @@ uploaded. Detail in docs/07.
       mid-upload asks, as it does for an export. `.mp4` rows under Recent Exports, and the export
       receipt, gain `Upload to YouTube…` — the same sheet — so a failed upload is retried without
       re-trimming.
+      ⚠️ **Owed from T3's review:** quitting takes no account of an upload — one in flight is
+      dropped without a word, and `Wait for Export` quits before the upload chained to that export
+      has started. `QuitFlow` has to count both.
       **Seams:** `MenuHeader` for the row's words, `ExportProgressRowView` for the bar,
       `RecordingNotifications` for the copy, `QuitFlow` for the question, `LastExport`'s shape for
       the receipt. `changeCount` reaches AppCore as an injected closure.
@@ -4057,6 +4064,12 @@ uploaded. Detail in docs/07.
       ⚠️ **Owed from T2's review:** a sign-in Google has revoked whose saved copy could not be
       deleted reads as `Connected` again at the next launch — there is no request at launch to
       learn otherwise. Finding a dead sign-in at its next use, and dropping it then, is this task.
+      ⚠️ **Owed from T3's review:** (1) the failure reasons are a first cut — one list, shared
+      with the CLI, and the notice's closing *"The clip is saved as…"* must follow the failure: it
+      is untrue when the exported file is what went missing. (2) Whether YouTube counts a title's
+      100 in characters or in something smaller is **unmeasured**; a title of 100 emoji may be
+      refused after the export. Worth one upload from the day's budget. (3) An upload begun while
+      a disconnect is under way is refused as *not connected* even if the disconnect then fails.
       **Verify:** each row of the artifact's failure table reached by a unit test against stubbed
       responses (`URLProtocol`); the export is on disk and in Recent Exports after every one. Live:
       **(human)** remove ScreenRec's access in the Google account, press upload, read *needs

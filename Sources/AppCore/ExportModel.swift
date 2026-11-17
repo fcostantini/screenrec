@@ -125,6 +125,27 @@ public final class ExportModel {
             completion: copy)
     }
 
+    /// Exports as `exportAndCopy` does and hands the written file on instead of copying it
+    /// (M40-T3). A success posts no notice here: whoever takes the file reports the outcome. A
+    /// failure is still an export's, and `completion` never runs.
+    public func export(
+        _ source: URL, configuration: ExportConfiguration, range: ExportRange? = nil,
+        crop: CropRect? = nil, then completion: @escaping @MainActor (URL) -> Void
+    ) {
+        let export = exportFunction  // snapshot; the closure captures no `self`
+        performExport(
+            source, to: Exporter.availableURL(basedOn: Exporter.mp4Sibling(of: source, range: range)),
+            estimate: {
+                await Self.mp4Bytes(
+                    of: source, configuration: configuration, range: range, crop: crop)
+            },
+            using: { try await export($0, $1, configuration, range, crop, $2) },
+            success: nil,
+            failure: { _ in RecordingNotifications.exportFailed() },
+            reportsProgress: true,
+            completion: completion)
+    }
+
     /// Saves a recording or clip as a looping GIF (M10-T3), the same off-main, one-at-a-time path.
     /// The caps come from Settings — AppState builds the `configuration` and passes it in.
     ///
@@ -188,7 +209,7 @@ public final class ExportModel {
         let output: URL
         let estimate: (@Sendable () async -> Int64?)?
         let export: @Sendable (URL, URL, @escaping @Sendable (Double) -> Void) async throws -> URL
-        let success: (URL) -> RecordingNotification
+        let success: ((URL) -> RecordingNotification)?
         let failure: (Error) -> RecordingNotification
         let reportsProgress: Bool
         let completion: (@MainActor (URL) -> Void)?
@@ -216,7 +237,7 @@ public final class ExportModel {
         to output: URL,
         estimate: (@Sendable () async -> Int64?)? = nil,
         using export: @escaping @Sendable (URL, URL, @escaping @Sendable (Double) -> Void) async throws -> URL,
-        success: @escaping (URL) -> RecordingNotification,
+        success: ((URL) -> RecordingNotification)?,
         failure: @escaping (Error) -> RecordingNotification,
         reportsProgress: Bool = false,
         completion: (@MainActor (URL) -> Void)? = nil
@@ -263,7 +284,7 @@ public final class ExportModel {
                 let url = try await job.export(job.source, job.output, report)
                 lastExport = LastExport(url: url, date: Date())
                 job.completion?(url)  // before the notice, so "Copied" is true when it is read
-                notify?(job.success(url))
+                if let success = job.success { notify?(success(url)) }
             } catch {
                 Self.log.error("export failed: \(error.localizedDescription, privacy: .public)")
                 notify?(job.failure(error))

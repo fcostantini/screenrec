@@ -411,6 +411,9 @@ public enum SettingsStore {
         public static let stopAfterMinutes = "stopAfterMinutes"
         /// `unlisted`|`private`|`public` (M40-T2); absent or anything else ⇒ unlisted.
         public static let youtubeVisibility = "youtubeVisibility"
+        /// The channel YouTube named with the last upload (M40-T3). Not part of `Settings`: it
+        /// belongs to the sign-in, which `UploadModel` owns, and goes when that does.
+        public static let youtubeChannel = "youtubeChannel"
         /// The last export's path, for the receipt that survives relaunch (M12-T2). Absent ⇒ no
         /// receipt. Not part of `Settings` (it's a transient pointer, not user config) — its own
         /// load/save below. Dropped on load if the file is gone (moved/trashed).

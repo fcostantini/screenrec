@@ -261,6 +261,26 @@ public enum RecordingNotifications {
             fileURL: nil)
     }
 
+    /// A clip landed on YouTube (M40-T3). `link` is shown, not just kept: until the menu carries
+    /// it, this is the only place the user can read it.
+    public static func uploaded(
+        title: String, visibility: String, link: String, file: URL
+    ) -> RecordingNotification {
+        let shown = link.replacingOccurrences(of: "https://", with: "")
+        return RecordingNotification(
+            title: "Uploaded to YouTube",
+            body: "“\(title)” is \(visibility) · \(shown). Click to reveal the file.",
+            fileURL: file)
+    }
+
+    /// The export always finishes before the upload starts, so there is a file to name (ADR-007).
+    public static func uploadFailed(reason: String, file: URL) -> RecordingNotification {
+        RecordingNotification(
+            title: "Couldn't upload to YouTube",
+            body: "\(reason) The clip is saved as \(file.lastPathComponent).",
+            fileURL: file)
+    }
+
     /// The lossless trim (M10-T4) finished — reveal the clipped copy.
     public static func trimmed(url: URL) -> RecordingNotification {
         RecordingNotification(

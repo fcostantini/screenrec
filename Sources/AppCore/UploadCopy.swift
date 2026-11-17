@@ -1,17 +1,130 @@
 import Foundation
+import RecorderCore
 import UploadCore
 
 /// The words the YouTube account is described in (M40-T2, docs/06 "Settings › Sharing"). Pure, so
 /// every state's copy is asserted without rendering a view.
 public enum UploadCopy {
 
-    public static func status(_ account: UploadModel.Account) -> String {
+    /// `channel` is the name YouTube returned with the last upload; until there has been one, the
+    /// upload-only permission gives no way to ask.
+    public static func status(_ account: UploadModel.Account, channel: String? = nil) -> String {
         switch account {
         case .unavailable: "Not available in this build"
         case .disconnected: "Not connected"
-        case .connecting: "Waiting for Google in your browser…"
-        case .connected: "Connected"
+        case .connecting: waiting
+        case .connected: channel.map { "Connected · \($0)" } ?? "Connected"
         case .disconnecting: "Disconnecting…"
+        }
+    }
+
+    private static let waiting = "Waiting for Google in your browser…"
+
+    // MARK: - The Trim window's row (docs/06 "Trim window")
+
+    public enum TrimAction: Equatable, Sendable {
+        /// Connected: the sheet.
+        case upload
+        /// Not connected: the alert that explains the browser step, then the sign-in.
+        case connect
+        /// A sign-in is in the browser: the button gives it up.
+        case cancelSignIn
+        /// Nothing this build or this moment can do.
+        case none
+    }
+
+    public static func trimAction(_ account: UploadModel.Account, canSignIn: Bool) -> TrimAction {
+        switch account {
+        case .connected: canSignIn ? .upload : .none
+        case .disconnected: .connect
+        case .connecting: .cancelSignIn
+        case .unavailable, .disconnecting: .none
+        }
+    }
+
+    public static func trimButton(_ account: UploadModel.Account) -> String {
+        account == .connecting ? "Cancel" : "Upload to YouTube…"
+    }
+
+    /// `profile` is the size `Export & Copy` quotes — `H.264 1920 × 1200` — and `cropped` whether a
+    /// crop is drawn, so the two rows describe the same file.
+    public static func trimCaption(
+        for account: UploadModel.Account, failure: String?, canSignIn: Bool,
+        profile: String, cropped: Bool
+    ) -> String {
+        if let failure { return failure }
+        switch account {
+        case .unavailable:
+            return "This build has no YouTube credentials."
+        case .connected where !canSignIn:
+            return "This build has no YouTube credentials, so it can't use the saved sign-in."
+        case .connected:
+            let written = cropped ? "only the range, cropped" : "only the range"
+            return "Uploads \(written) — \(profile) — to your YouTube channel. "
+                + "Asks for a title first."
+        case .disconnected:
+            return "Uploads only the range to YouTube. You'll connect an account first."
+        case .connecting:
+            return waiting
+        case .disconnecting:
+            return "Disconnecting…"
+        }
+    }
+
+    // MARK: - The connect alert and the sheet
+
+    public static let connectTitle = "Connect YouTube to upload"
+    /// Describes Google's warning rather than quoting it: its pages are translated, and worded
+    /// differently for a project in testing and a published one (07).
+    public static let connectMessage =
+        "ScreenRec opens Google in your browser and asks for one permission: adding videos to "
+        + "your channel. It can't edit or delete what is already there.\n\n"
+        + "Google hasn't verified ScreenRec, so it warns you first. You can continue past the "
+        + "warning. Disconnect at any time in Settings."
+    public static let connectConfirm = "Continue in Browser"
+
+    public static let sheetTitle = "Upload to YouTube"
+    public static let sheetConfirm = "Upload"
+    public static let longVideoWarning =
+        "Longer than 15 minutes. YouTube only accepts this from a verified channel."
+
+    public static func sheetDestination(channel: String?) -> String {
+        let goes = channel.map { "Goes to “\($0)”." } ?? "Goes to the channel you connected."
+        return "\(goes) YouTube's Terms of Service apply."
+    }
+
+    /// `0:24 · up to 18 MB · H.264 1920 × 1200`. The weight and the size are left out until the
+    /// source's geometry has loaded rather than quoted from nothing.
+    public static func sheetSummary(seconds: Double, bytes: Int64?, profile: String?) -> String {
+        var parts = [Timecode.cutPoint(seconds)]
+        if let bytes { parts.append("up to \(ApproximateBytes.formatted(bytes))") }
+        if let profile { parts.append(profile) }
+        return parts.joined(separator: " · ")
+    }
+
+    // MARK: - Why an upload didn't happen
+
+    static func uploadFailure(_ error: any Error) -> String {
+        switch error {
+        case GoogleSignInError.signInExpired, YouTubeError.notAuthorized:
+            "YouTube needs reconnecting in Settings."
+        case UploadModelError.notConnected:
+            "YouTube isn't connected."
+        case YouTubeError.quotaExceeded:
+            "YouTube's daily upload limit for this build is used up."
+        case YouTubeError.uploadLimitExceeded:
+            "Your channel has reached YouTube's upload limit for today."
+        case YouTubeError.noChannel:
+            "This Google account has no YouTube channel."
+        case YouTubeError.unreadableFile:
+            "The exported file couldn't be read."
+        case YouTubeError.rejected:
+            "YouTube refused the upload."
+        case is URLError:
+            "The connection dropped."
+        default:
+            // Anything else may be this Mac's doing as easily as YouTube's.
+            "The upload didn't finish."
         }
     }
 

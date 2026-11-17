@@ -582,6 +582,7 @@ public final class AppState {
         // Export notifications forward to whatever `notifier` the app wires (M14-T1) — read at call
         // time, so it tracks the notifier set after init.
         exports.notify = { [weak self] in self?.notifier?($0) }
+        self.uploads.notify = { [weak self] in self?.notifier?($0) }
 
         // The source picks live in their own model (M22-T1) but persistence and the armed stream
         // are AppState's, so it wires both back. The display pick is deliberately not persisted —
@@ -729,6 +730,17 @@ public final class AppState {
     }
     public func exportAndCopy(_ source: URL, range: ExportRange? = nil, crop: CropRect? = nil) {
         exports.exportAndCopy(source, configuration: exportConfiguration, range: range, crop: crop)
+    }
+    /// Exports `range` of `source` at the Settings size and uploads the result to YouTube with
+    /// what the sheet held (M40-T3). The clipboard is not touched.
+    public func uploadClip(
+        _ source: URL, range: ExportRange? = nil, crop: CropRect? = nil, metadata: VideoMetadata
+    ) {
+        exports.export(
+            source, configuration: exportConfiguration, range: range, crop: crop
+        ) { [uploads] file in
+            uploads.upload(file, metadata: metadata)
+        }
     }
     public func exportToGIF(_ source: URL) { exports.exportToGIF(source, configuration: gifConfiguration) }
     public func exportAudio(_ source: URL, range: ExportRange? = nil, copiesToPasteboard: Bool = false) {
