@@ -16,18 +16,23 @@
   (docs/07, 2026-11-17 — `log show` alone cannot see a clean run). A push runs the suite too.
   **Next: back to M40-T4** (below).
 
-- **⏸ M40-T4 BUILT, NOT COMMITTED, NOT VERIFIED LIVE (2026-11-17) — stashed while M41-T1 landed.**
+- **⏸ M40-T4 BUILT AND VERIFIED LIVE, NOT COMMITTED (2026-11-17) — waiting on the review.**
   Franco's go: *"let's go"*, taken as all four rulings as recommended (`Cancel Upload` in; a click
-  on the notice opens the video; `.mp4` only; one-hour receipt) — **he has not confirmed that
-  reading.** In the working tree: the menu's `Uploading to YouTube… n%` row and `Cancel Upload`,
-  the `Uploaded to YouTube · ‹title›` receipt, the clipboard rule, `QuitQuestion`, `Upload to
-  YouTube…` on `.mp4` rows, docs/06 amended. **1011 tests; 47 breaks, 47 red** (last run before the
-  stop). ✅ He approved the live check (*"Yes, all of it"*: fake-uploader scenarios, then one real
-  unlisted upload and one real upload cancelled halfway) — **not started.**
-  ⚠️ The quit and cancel wording makes **no** claim about what YouTube keeps of a stopped upload:
-  unmeasured until the cancelled real upload and Franco's look in Studio.
-  ✅ Answered without him: the *Uploaded to YouTube* notice **was** delivered at 09:24:48 on
-  2026-11-17 (`ScreenRec --print-delivered-notifications`).
+  on the notice opens the video; `.mp4` only; one-hour receipt) — **he has not contradicted that
+  reading, nor confirmed it in words.** In the working tree: the menu's `Uploading to YouTube… n%`
+  row and `Cancel Upload`, the `Uploaded to YouTube · ‹title›` receipt, the clipboard rule,
+  `QuitQuestion`, `Upload to YouTube…` on `.mp4` rows, docs/06 amended. **1014 tests; 47 breaks,
+  47 red.** The deployed app at `/Users/Shared` **is** this uncommitted build, connected.
+  ✅ **Live:** six scenarios on a fake-uploader build, then on the real build one unlisted upload
+  from a Recent Exports row (link copied, answers as unlisted) and one 161 MB upload cancelled at
+  31% — evidence listed in docs/03 under M40-T4.
+  **Next, in this order:** (1) `/code-review medium`'s findings → **present them to Franco with a
+  proposal each, before applying any**; (2) apply what he approves, one test run under the live
+  `replayd` stream, re-verify what a fix touches; (3) tick, commit `M40-T4`, push; (4) T5's plan.
+  **Needs Franco:** look in YouTube Studio for anything left by *ScreenRec test 10 (cancelled on
+  purpose)* — nothing is expected; click an *Uploaded to YouTube* notice once to see the video
+  open; delete the nine `ScreenRec test …` videos; the audience question from T1.
+  ⚠️ **Test uploads today: two landed** (T3's and T4's) **and one cancelled.**
 
 - **✅ M40-T3 DONE (2026-11-17) — the Trim window uploads the range to YouTube, after a sheet
   for the title, description and visibility.** `Upload to YouTube…` under `Export Audio & Copy`;

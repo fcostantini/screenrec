@@ -4030,7 +4030,31 @@ uploaded. Detail in docs/07.
 - [ ] M40-T4 **The menu and the notices carry it** (AppCore + AppShell).
       Plan artifact: `claude.ai/artifact/QKHR2hWzjpYGJTCiDPwXxA` — published 2026-11-17, **awaiting
       Franco's go and four rulings** (`Cancel Upload`; what a click on the notice does; whole
-      recordings; the receipt's lifetime). While it runs, the export
+      recordings; the receipt's lifetime) — his answer, 2026-11-17: *"let's go"*, **taken as all
+      four as recommended** (`Cancel Upload` in; a click opens the video; `.mp4` only; one hour).
+      ⏸ **Built and verified live 2026-11-17; uncommitted, waiting on `/code-review`'s findings
+      and Franco's ruling on them.** **1014 tests** (985 → 1014); **47 breaks, 47 red.**
+      ✅ **Live, on a temporary build with a fake uploader** (30 s, reporting progress, nothing
+      sent): the `.mp4` row's `Upload to YouTube…` after `Copy`, and the sheet reading `0:24 ·
+      11,4 MB`; the row `Uploading to YouTube… 13%` with `Cancel Upload` under it, moving
+      `17% → 30%` **while the menu stayed open**; landed with the clipboard untouched → clipboard
+      holds the link, notice *Uploaded to YouTube · link copied*; landed after something else was
+      copied → clipboard kept, notice *…the link is in the menu under Copy Link*, and `Copy Link`
+      then copies it; `Cancel Upload` at 27% → no rows, no notice 30 s on, the clip still there;
+      quitting mid-upload → *An upload to YouTube is still running.* / `Wait for Upload` / `Quit
+      Anyway`, gone in under 2 s; quitting mid-export from the Trim window → *An export and an
+      upload are still running.* / `Wait for Both`, and the app quit **71 s later, the second
+      the upload landed**; with no account, the row raised the connect alert, sat disabled while
+      signing in, and the sheet opened by itself 7 s later.
+      ✅ **Live, on the real build:** one unlisted upload from a Recent Exports row — 11.4 MB in
+      6 s, the clipboard held its link, oEmbed 200 with the typed title, watch page
+      `"isUnlisted":true`, the receipt named it. Then a 161 MB upload **cancelled at 31%**: log
+      `upload cancelled`, no notice, the earlier receipt untouched.
+      ⚠️ **Not checked:** what YouTube keeps of the cancelled upload — **(human)** Franco's look in
+      Studio; a click on the notice opening the video — **(human)**; the drawn `· 1 waiting` after
+      the percentage (its text is asserted, its pixels are not). No screenshots were taken: the
+      evidence is Accessibility text, after the morning's dialogs.
+      While it runs, the export
       row's successor: `Uploading to YouTube… 37%` with the same bar. When it lands: a receipt row,
       `Uploaded to YouTube · <title>`, whose submenu is `Copy Link`, `Open on YouTube`, `Edit in
       YouTube Studio`, `Reveal File in Finder`; and one notice in two forms — *link copied*, or *the
@@ -4129,7 +4153,7 @@ arming sites in four suites did this, on every `swift test` — and the pre-push
       any that leaves a stream open at exit is made to close it. On the deployed build, arming
       still captures: the menu's `… of 5 min held` rises, read through Accessibility.
 
-**Gate G41** — three consecutive full runs and one push, with zero dialogs for all of them: no
+**Gate G41 ✅ 2026-11-17** — three consecutive full runs and one push, with zero dialogs for all of them: no
 `Error resolving binary path and audit token` from `replayd` in `log show`, and no
 `SCScreenCaptureSession initWithConfiguration` in a live `log stream --level info`.
 

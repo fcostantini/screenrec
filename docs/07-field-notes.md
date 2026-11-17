@@ -7,6 +7,32 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-17 (M40-T4, the live check — a fake-uploader build, then the real one):
+  ✅ **Every menu state of an upload was driven without sending a byte.** Temporarily hand
+  `AppState` an `UploadModel` on `InMemoryTokenStore(token)` whose `uploadFunction` sleeps a
+  second thirty times, calls `progress(total × step / 30)` each time and returns a made-up
+  `UploadedVideo`. `Task.sleep` throws on cancellation, so `Cancel Upload` and `Quit Anyway` are
+  honest too. Six scenarios, zero uploads; one real upload at the end proved the link.
+  ✅ **`ScreenRec --print-delivered-notifications` asserts a notice's real words — and its
+  absence.** Count the list before and after: `(7 delivered)` twice, thirty seconds apart, is
+  what "a cancel posts nothing" looks like.
+  ✅ **`pbcopy` / `pbpaste` drive and read the clipboard rule from the shell:** put a marker on
+  the clipboard, confirm the sheet, and after the upload either the marker has become the link
+  or — when something else was copied meanwhile — it has not.
+  ✅ **A row with a custom view still advances for Accessibility while the menu is open:** its
+  title read `17%`, then `30%` four seconds later, with no rebuild.
+  ⚠️ **An alert's buttons come back from Accessibility in no fixed order** (`Wait for Upload,
+  Quit Anyway` for one question, `Quit Anyway, Wait for Both` for the next). Press by title;
+  never assert the order.
+  ⚠️ **Measured on this uplink:** 11.4 MB landed 6 s after the press; a 161 MB upload was at 31%
+  after 10 s — about 5 MB/s, faster than T1's 2.6–3.8.
+  ⚠️ **Unmeasured:** what YouTube keeps of an upload cancelled part-way. The app stops sending and
+  tells YouTube nothing; whether Studio shows a remnant needs a look. The quit and cancel wording
+  claims nothing about it for that reason.
+  ⚠️ **Noticed, not fixed (not this task's):** the export row's `· n waiting` is in its title and
+  never drawn — `ExportProgressRowView` paints the lead, the bar and the percentage only. The
+  upload row draws its own; the export row would take one argument to match.
+
 - 2026-11-17 (M41-T1, verifying that the tests no longer capture):
   🔴 **`log show` cannot prove a capture did *not* start.** `replayd`'s `[INFO]` lines —
   `SCScreenCaptureSession initWithConfiguration`, `SCAlert showAlertWithTitle` — are info-level:
