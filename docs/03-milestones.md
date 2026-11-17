@@ -4027,7 +4027,10 @@ uploaded. Detail in docs/07.
       floor with the button unwrapped; the sheet's three controls read through AX; `Upload` leaves
       0 windows; one real **unlisted** upload of a synthetic clip.
 
-- [ ] M40-T4 **The menu and the notices carry it** (AppCore + AppShell). While it runs, the export
+- [ ] M40-T4 **The menu and the notices carry it** (AppCore + AppShell).
+      Plan artifact: `claude.ai/artifact/QKHR2hWzjpYGJTCiDPwXxA` — published 2026-11-17, **awaiting
+      Franco's go and four rulings** (`Cancel Upload`; what a click on the notice does; whole
+      recordings; the receipt's lifetime). While it runs, the export
       row's successor: `Uploading to YouTube… 37%` with the same bar. When it lands: a receipt row,
       `Uploaded to YouTube · <title>`, whose submenu is `Copy Link`, `Open on YouTube`, `Edit in
       YouTube Studio`, `Reveal File in Finder`; and one notice in two forms — *link copied*, or *the

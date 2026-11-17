@@ -7,6 +7,18 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-17 (M40-T4, the plan's screenshots):
+  🔴 **`AXPress` on a menu row fills its submenu's children without drawing the submenu.** Its
+  `AXPosition`/`AXSize` then read `(0, 1285, 0, 0)`, and a capture rectangle built from them took
+  in a large part of the desktop. A submenu is on screen only after a real hover: post
+  `mouseMoved` onto the row, wait ~0.9 s, and its frame is then true. Put the cursor back
+  **after** the capture — a `defer` in the block that hovered closes the submenu first.
+  ⚠️ **A menu screenshot is a screenshot of whatever is behind it too.** `screencapture -R` over
+  the union of a menu and its submenu includes the desktop in the corner between them. Mask the
+  capture to the menus' own frames before it goes anywhere (rounded clip, the rest transparent).
+  ⚠️ **Today's quit question has no way back.** `Wait for Export` and `Quit Anyway` both end in a
+  quit, so photographing it costs a relaunch.
+
 - 2026-11-17 (M40-T3, the review's fixes — unit tests, then live on a temporary build):
   ✅ **A first-time sign-in can be driven with no browser and no account at risk.** Temporarily
   hand `AppState` an `UploadModel` built on `InMemoryTokenStore()` with `signIn` replaced by a

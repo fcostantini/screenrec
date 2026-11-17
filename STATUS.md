@@ -16,10 +16,11 @@
   ✅ **Review:** ten findings, ruled "as proposed" — seven fixed and re-verified live on a
   temporary build with a fake sign-in (his real one untouched), one moved to T4, three to T5.
   **Next: M40-T4** — the menu row, the receipt with `Copy Link`, the clipboard rule, quitting
-  mid-upload. **Plan artifact first, then stop.** The plan must re-raise what was never ruled:
-  `Cancel Upload`, a notice click opening the video, and Franco's question of 2026-11-17 —
-  `Upload to YouTube…` on files already in the menu (T4 carries it for `.mp4` rows under Recent
-  Exports; whole recordings are in M40's "left out, on purpose" list and are his call).
+  mid-upload, `Upload to YouTube…` on exported `.mp4`s. ⏸ **Plan artifact published 2026-11-17,
+  awaiting Franco's go:** `claude.ai/artifact/QKHR2hWzjpYGJTCiDPwXxA`. **Do not implement before
+  he answers.** It asks four rulings, each with a recommendation: (1) a `Cancel Upload` row —
+  include; (2) a click on the notice — open the video; (3) whole recordings — keep out, `.mp4`
+  only; (4) the receipt's lifetime — one hour, like the others.
   ⚠️ **Test uploads are a budget:** one or two a day; one spent 2026-11-17.
   **Needs Franco:** delete the eight `ScreenRec test …` videos in Studio (seven from T1, one from
   T3), and say whether Studio flags them about audience ("made for kids"); whether the *Uploaded
