@@ -7,6 +7,24 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-17 (M40-T3, the upload that landed — live on the deployed build): **one unlisted
+  upload from the Trim window, the morning after the limit was hit.**
+  ✅ **The channel's daily upload limit had lifted 16 h 41 min after the last refusal** (refused
+  16:43, accepted 09:24 the next day, local time). That is an upper bound on the wait, not the
+  rule: whether it is a rolling window or a fixed reset is unmeasured.
+  ✅ **Sheet to video in 14 s** for a 24 s, 1920 × 1200 synthetic clip: export, then a 17.6 MB
+  `.mp4`. The sheet had said *"up to 18 MB"*.
+  ⚠️ **oEmbed cannot tell unlisted from public — both answer 200.** It only rules out private
+  (403). The public watch page can: its embedded player data carries `"isUnlisted":true` and
+  `"isPrivate":false`. Fetch `https://www.youtube.com/watch?v=<id>` and count those two strings;
+  no sign-in, no API quota.
+  ✅ **The channel's name arrives with the first upload that lands**, not with the sign-in: the
+  sheet's last line read *"Goes to the channel you connected."* before it and named the channel
+  after, and Settings went from `Connected` to `Connected · <channel>`.
+  ⚠️ **Info-level log lines are gone by the next day.** `log show --last 36h --info` returned
+  nothing for the `upload` category; a `log stream` to a file, started before the press, is the
+  only record of the video's id.
+
 - 2026-11-16 (M40-T3, the Trim window's upload — live on the deployed build): **the app's first
   real upload was refused by YouTube, and that was the test bench's doing.**
   🔴 **`uploadLimitExceeded` after seven uploads in a day.** T1's legs put seven test videos on

@@ -6,24 +6,26 @@
 
 ## Now
 
-- **⏸ M40-T3 BUILT, NOT COMMITTED (2026-11-16) — it waits for YouTube's daily upload limit to
-  reset.** The Trim window's `Upload to YouTube…` row, the connect alert and the sheet are in the
-  **working tree on Franco's Mac, uncommitted by his call** (*"let's wait until tomorrow"*).
-  **974 tests** (944 → 974); **17 breaks, 17 red**. The deployed app at `/Users/Shared` **is** this
-  uncommitted build, connected to his channel.
-  ✅ **Live, on the deployed build:** the row at the 500 pt floor; the sheet (after a clipped
-  `Title` label was fixed); limits applied as typed; `Cancel` back to an intact range; `Upload`
-  closes the window and the export runs; the first-time path, which Franco drove himself.
-  🔴 **The one leg missing: a real upload landing.** Both attempts from the app were refused
-  `uploadLimitExceeded` — T1's seven test uploads spent the channel's daily limit. The refusal was
-  handled correctly, but the task's Verify asks for an upload that lands.
-  **Next, in this order:** (1) when the limit has reset, **one** unlisted upload from the Trim
-  window, confirmed by oEmbed; (2) present `/code-review medium`'s findings to Franco — the review
-  ran on 2026-11-16 and its findings are **not yet ruled on**; (3) fix, re-verify, tick, commit
-  `M40-T3`.
-  ⚠️ **Test uploads are a budget now:** one or two a day. Verify with oEmbed, not with more uploads.
-  ✅ **Franco, by eye:** the sheet opened by itself after his sign-in, and a notice explained the
-  limit. The review's ten findings and what is proposed for each are in docs/03 under M40-T3.
+- **⏸ M40-T3 BUILT AND VERIFIED, NOT COMMITTED (2026-11-17) — it waits for Franco's ruling on
+  the review.** The Trim window's `Upload to YouTube…` row, the connect alert and the sheet are in
+  the **working tree on Franco's Mac, uncommitted**. **974 tests** (944 → 974); **17 breaks, 17
+  red**. The deployed app at `/Users/Shared` **is** this uncommitted build, connected to his channel.
+  ✅ **The upload landed (2026-11-17, 09:24):** one unlisted upload of a 24 s synthetic clip from
+  the Trim window — sheet `Unlisted` through AX, `Upload` left 0 windows, 14 s from the press to
+  `uploaded`, oEmbed 200 with the typed title, watch page `"isUnlisted":true`. Settings and the
+  sheet name the channel now. Test files removed from `~/Movies`.
+  ✅ **Live the day before:** the row at the 500 pt floor; the sheet; limits applied as typed;
+  `Cancel` back to an intact range; the first-time path, driven by Franco — the sheet opened by
+  itself after his sign-in, and a notice explained YouTube's refusal (`uploadLimitExceeded`).
+  **Next, in this order:** (1) Franco rules on `/code-review medium`'s ten findings — presented
+  2026-11-16, listed with a proposal each in docs/03 under M40-T3; (2) apply what he approves,
+  dev loop + sweep, re-verify **without** another upload unless a fix touches the transfer;
+  (3) tick, commit `M40-T3`, push; (4) T4's plan artifact.
+  ⚠️ **Test uploads are a budget:** one or two a day. One spent today. Eight test videos are on
+  his channel for him to delete (seven from T1, one from T3).
+  ❓ **Asked by Franco 2026-11-17:** `Upload to YouTube…` on files already in the menu. T4 already
+  carries it for `.mp4` rows under Recent Exports; whether full recordings get it too is his call
+  and belongs in T4's plan.
 
 - **✅ M40-T2 DONE (2026-11-16) — Settings connects a YouTube account, and a build carries the
   credentials to do it.** `UploadModel` + a **YouTube** section in Settings › Sharing; `bundle.sh`

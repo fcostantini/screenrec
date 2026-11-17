@@ -3981,12 +3981,15 @@ uploaded. Detail in docs/07.
 
 - [ ] M40-T3 **The Trim window: the row, the connect alert, the sheet** (AppShell + AppCore).
       Plan artifact: `claude.ai/artifact/9ked9JDke2DStc8yGn8kL7` — approved by Franco 2026-11-16.
-      ⏸ **Built and uncommitted (2026-11-16); two things stand between it and its tick.**
-      **(1) A real upload landing.** Both attempts from the deployed build were refused
-      `uploadLimitExceeded` — T1's seven test uploads spent the channel's daily limit. Everything
-      else in the Verify passed live, and Franco confirmed by eye that **the sheet opened by itself**
-      after his sign-in and that **a notice explained the limit**.
-      **(2) `/code-review medium`'s ten findings, presented to Franco and not yet ruled on.**
+      ⏸ **Built and uncommitted (2026-11-16); one thing stands between it and its tick.**
+      ✅ **A real upload landed (2026-11-17).** One unlisted upload of a 24 s synthetic clip from
+      the Trim window on the deployed build: sheet read `Unlisted` through AX, `Upload` left 0
+      windows, the video answered oEmbed 200 with the typed title, and its watch page carries
+      `"isUnlisted":true`. The two attempts the day before were refused `uploadLimitExceeded` —
+      T1's seven test uploads had spent the channel's daily limit — and Franco confirmed by eye
+      that **the sheet opened by itself** after his sign-in and that **a notice explained the
+      limit**. The Verify is complete on the build as it stood before the review's fixes.
+      **`/code-review medium`'s ten findings, presented to Franco and not yet ruled on.**
       Proposed — *fix in T3:* a disconnect during the token refresh rewrites the sign-in file
       (re-check the account after the `await`); the channel's name is saved after a disconnect and
       erased when YouTube returns none; the sheet opened after a sign-in doesn't re-check the range,
