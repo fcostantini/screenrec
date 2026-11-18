@@ -7,6 +7,12 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-18 (M40, closed by Franco's look in Studio after the release):
+  ✅ **An upload that says nothing about audience is not flagged for it.** The app sends no
+  "made for kids" declaration; across the test uploads of 2026-11-16 to 2026-11-18, finished
+  and unfinished, Studio showed him no audience flag. The channel's own default applies and
+  nothing asks the uploader to choose.
+
 - 2026-11-18 (G40, the gate's live run and what it found):
   🔴 **A new network feature can falsify a sentence written before it.** Settings › General
   had said since ADR-020 that with the update check off *"the app makes no network requests at

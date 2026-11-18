@@ -228,14 +228,18 @@
       client JSON is at `~/.config/screenrec/youtube-client.json`, and a live check passed — sign-in,
       upload scope, an upload session opened and cancelled, sign-in revoked. Detail in docs/07.
 - [x] **M40-T2 — where the sign-in is stored** (Franco, 2026-11-16): a private file; ADR-024 amended.
-- [ ] **M40 — confirm ScreenRec is gone from your Google account's access page** after T2's
-      Disconnect (`security.google.com/settings/security/permissions`).
-- [ ] **M40 — delete the test videos** in YouTube Studio ("ScreenRec test …", now including
-      *13* from T6's check and *14*, *15* and the unfinished *16 (cancelled on purpose)* from the
-      gate, and the three unfinished measurement entries), and say whether
-      Studio flags any about audience. Also still owed: the Keychain dialog's wording, whether a
-      firewall dialog ever appeared, and whether the console lists the scope as sensitive or
-      restricted.
+- [x] **M40 — ScreenRec on your Google account's access page**: overtaken. On 2026-11-17 Franco
+      removed it there himself for T5's dead-sign-in check, and he is connected again since the
+      gate, so it is meant to be listed.
+- [x] **M40 — does Studio flag the test videos about audience?** (Franco, 2026-11-18): *"no
+      flags that i can see"*. The app sends no "made for kids" declaration, and the channel's own
+      default applies without Studio asking for anything.
+- [ ] **M40 — delete the test videos** in YouTube Studio ("ScreenRec test …", including *13*
+      from T6's check and *14*, *15* and the unfinished *16 (cancelled on purpose)* from the
+      gate, and the three unfinished measurement entries). Only he can: the app's permission
+      cannot delete. Still unanswered, and minor: whether a firewall dialog ever appeared. (The
+      Keychain wording is moot — the sign-in is a file, by his T2 ruling — and Google's own
+      page calls the upload scope "sensitive", docs/07.)
 - [x] **M40 — the sign-in clicks for T1** (Franco, 2026-11-16, with screenshots of Google's pages).
 - [x] **M40 — `Publish app`** (Franco, 2026-11-16): the Google project is **In production**, after
       the Branding page was given a home page and a privacy link. He sent the warning page a
