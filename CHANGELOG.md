@@ -7,6 +7,32 @@ one file in the repo whose audience is not us.
 Only versions published as releases appear here; several were tagged during development and never
 published. The commit history is in the repository, where it belongs.
 
+## 1.23.0
+
+**A trimmed clip can go straight to YouTube.** The Trim window has a new button, **Upload to
+YouTube…**, and so does every exported `.mp4` in the menu. It asks for a title, a description and who
+can watch — unlisted unless you choose otherwise — then exports the range, uploads it, and leaves the
+link on the clipboard, so the next keystroke is ⌘V. If you copied something else while it was
+uploading, your clipboard is left alone and the link waits in the menu under **Copy Link**.
+
+**Connect once, in Settings › Sharing.** Your browser opens on Google's sign-in. Google will warn that
+it hasn't verified ScreenRec — expected for a personal tool that hasn't been through Google's review —
+and you continue past it. **Disconnect** in the same place withdraws the sign-in.
+
+**You can watch it go, and stop it.** The menu shows the export and then the upload with a
+percentage, and **Cancel Upload** stops it. Quitting while one is under way asks first.
+
+**A failed upload says why, and can be finished.** A dropped connection is waited out for five
+minutes before ScreenRec gives up. When it does, the notice says what happened in plain words and what
+to do next, and the menu keeps a **Couldn't upload** row for a day with **Try Again**, which picks the
+same upload up where it stopped instead of starting a second one.
+
+**What it can't do, on purpose.** ScreenRec asks Google for one permission: adding videos. It cannot
+see, edit or delete anything on your channel. That also means an upload you cancel, or one that fails
+for good, can leave an unfinished entry that only you can remove, in YouTube Studio — ScreenRec tells
+you each time. Nothing is uploaded unless you press the button, one clip at a time, and only that clip
+and what you typed go to Google. The README's *What ScreenRec sends* has the whole list.
+
 ## 1.22.0
 
 **Audio from the Trim window lands on the clipboard.** The Trim window's audio button is now
