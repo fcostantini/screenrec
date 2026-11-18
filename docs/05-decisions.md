@@ -328,6 +328,12 @@ exception (fewer than 100 users), so each person clicks through one warning page
 posture applied again: the friction is accepted, not paid for. Revisit only if the audience outgrows
 that exception — the lifetime cap is 100 users, and the upload quota is 100 a day per project.
 
+**Amended at G40 (Franco, 2026-11-18): the update check's caption names the exception.** ADR-020's
+Settings caption ended *"turn this off and the app makes no network requests at all"*, which stopped
+being true for anyone who connects. In a build that can upload it now ends *"…no network requests
+unless you ask for one: connecting to YouTube, or uploading a clip."*; a build without credentials
+keeps the old sentence, where it is still true.
+
 ⚠️ **The cost, stated rather than buried:** an upload tells Google the machine's IP address and hands
 it the clip — which is the point of the feature, and is exactly what the non-goal existed to prevent
 happening by accident. The feature also depends on a third party's policy, which changed twice in

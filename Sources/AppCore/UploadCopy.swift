@@ -71,6 +71,19 @@ public enum UploadCopy {
         }
     }
 
+    // MARK: - What the app says about the network (Settings › General)
+
+    /// The caption under `Check for new versions`. Its last clause is a promise about the
+    /// network (ADR-020), so a build that can upload names that exception (ADR-024).
+    public static func updateCheckCaption(canUpload: Bool) -> String {
+        "Once a day, ScreenRec asks GitHub whether a newer release exists and says so in the menu. "
+            + "It never downloads anything. The request tells GitHub your IP address — turn this "
+            + "off and the app makes no network requests "
+            + (canUpload
+                ? "unless you ask for one: connecting to YouTube, or uploading a clip."
+                : "at all.")
+    }
+
     // MARK: - The upload's own rows in the menu (docs/06 "Menu")
 
     /// A menu is as wide as its widest row and cannot truncate one, and a title runs to 100

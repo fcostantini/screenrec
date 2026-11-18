@@ -96,7 +96,7 @@ struct SettingsView: View {
 
             Toggle("Check for new versions", isOn: $state.checksForUpdates)
 
-            Text("Once a day, ScreenRec asks GitHub whether a newer release exists and says so in the menu. It never downloads anything. The request tells GitHub your IP address — turn this off and the app makes no network requests at all.")
+            Text(UploadCopy.updateCheckCaption(canUpload: state.uploads.canSignIn))
 
                 .font(.caption)
 

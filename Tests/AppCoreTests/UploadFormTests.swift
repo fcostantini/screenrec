@@ -299,4 +299,14 @@ import UploadCore
         // A failure on this Mac does not blame YouTube.
         #expect(UploadCopy.reason(UploadCopy.failure(for: CocoaError(.fileReadNoPermission))) == "The upload didn't finish.")
     }
+
+    /// "No network requests at all" was true until a build could upload. The caption keeps its
+    /// promise by naming the exception, and only where there is one.
+    @Test func theUpdateCheckCaptionPromisesOnlyWhatTheBuildKeeps() {
+        let lead = "Once a day, ScreenRec asks GitHub whether a newer release exists and says so in the menu. It never downloads anything. The request tells GitHub your IP address — turn this off and the app makes no network requests "
+        #expect(UploadCopy.updateCheckCaption(canUpload: false) == lead + "at all.")
+        #expect(
+            UploadCopy.updateCheckCaption(canUpload: true)
+                == lead + "unless you ask for one: connecting to YouTube, or uploading a clip.")
+    }
 }

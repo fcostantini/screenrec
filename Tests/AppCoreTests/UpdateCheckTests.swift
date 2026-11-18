@@ -126,7 +126,7 @@ import Testing
     }
 
     /// Off must mean **no request**, not a request whose answer is thrown away — the whole point of
-    /// the switch is that the app then makes no network requests at all (ADR-020's privacy cost).
+    /// the switch is that the app then makes no network requests of its own (ADR-020's privacy cost).
     @MainActor
     @Test func turningTheCheckOffMakesNoRequestAtAll() async {
         let state = AppState(defaults: TestDefaults.make())
