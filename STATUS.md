@@ -17,7 +17,11 @@
   **Next: back to M40-T4** (below).
 
 - **✅ M40 COMPLETE and G40 PASSED (2026-11-18) — a trimmed clip can go to YouTube.
-  🚢 v1.23.0 is cut in `VERSION`; Franco said to publish it — see the release line below.**
+  🚢 v1.23.0 RELEASED** — `github.com/fcostantini/screenrec/releases/tag/v1.23.0`, signed
+  bundle attached (1.5 MB), published on Franco's word after he read the notes. The release
+  gate ran clean (suite, four hardware-encode suites, release build, signed bundle with the
+  credentials stamped; no capture session, no dialog). **The installed app is the released
+  build, byte for byte** (same cdhash).
   Every gate leg ran on a deployed 1.23.0 build (gate table). **1098 tests.** T6 (2026-11-17)
   added `Try Again`, which finishes the same upload; T7 (2026-11-18, found at the gate) made
   the update check's caption stop promising "no network requests at all" where the build can

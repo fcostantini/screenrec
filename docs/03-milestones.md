@@ -4233,7 +4233,7 @@ uploaded. Detail in docs/07.
       build's Settings, and the old ending from the credential-less build's.
 
 **Gate G40 — ✅ PASSED 2026-11-18**, every leg on a deployed 1.23.0 build (evidence in
-STATUS.md's gate table). As filed — on the deployed build, with the consent screen **published**
+STATUS.md's gate table). 🚢 **MINOR as filed (ADR-013): v1.23.0, published the same day.** As filed — on the deployed build, with the consent screen **published**
 (✅ done by Franco 2026-11-16 — it first needed a home page and a privacy link on the Branding
 page; docs/07):
 - ✅ Trim → `Upload to YouTube…` → Return → the menu shows the export and then the upload moving → the
