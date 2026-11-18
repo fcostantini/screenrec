@@ -4222,14 +4222,26 @@ uploaded. Detail in docs/07.
       `"isUnlisted":true`. **(human) Franco, in Studio: one video, no leftover.**
       Installed afterwards: the clean build, `strings` finds no scaffold; sample clips deleted.
 
-**Gate G40** — on the deployed build, with the consent screen **published** (✅ done by Franco
-2026-11-16 — it first needed a home page and a privacy link on the Branding page; docs/07):
-- Trim → `Upload to YouTube…` → Return → the menu shows the export and then the upload moving → the
+- [x] M40-T7 **The update check's caption stops promising what uploads break** (AppCore +
+      AppShell; found at G40, 2026-11-18). Settings › General ended *"turn this off and the app
+      makes no network requests at all"* (ADR-020) — untrue in 1.23.0 for anyone who connects.
+      Put to Franco with the three endings side by side; his ruling: **name the exception** —
+      *"…no network requests unless you ask for one: connecting to YouTube, or uploading a
+      clip."* in a build that can upload, the old sentence in one that cannot (still true
+      there). `UploadCopy.updateCheckCaption(canUpload:)`, one test for both endings, ADR-024
+      amended. **Verify:** dev loop green, 1098 tests; read live from the deployed 1.23.0
+      build's Settings, and the old ending from the credential-less build's.
+
+**Gate G40 — ✅ PASSED 2026-11-18**, every leg on a deployed 1.23.0 build (evidence in
+STATUS.md's gate table). As filed — on the deployed build, with the consent screen **published**
+(✅ done by Franco 2026-11-16 — it first needed a home page and a privacy link on the Branding
+page; docs/07):
+- ✅ Trim → `Upload to YouTube…` → Return → the menu shows the export and then the upload moving → the
   notice → ⌘V pastes a link, and **(human)** the video plays for Franco as unlisted.
-- The clipboard rule both ways; `Cancel Upload` if ruled in; `Disconnect` and reconnect.
-- A bundle built **without** the credentials file shows the feature as unavailable and makes no
+- ✅ The clipboard rule both ways; `Cancel Upload` (ruled in at T4); `Disconnect` and reconnect.
+- ✅ A bundle built **without** the credentials file shows the feature as unavailable and makes no
   request; `git grep` over the tree and the history finds no client secret.
-- The README's *What ScreenRec sends* section exists and has lost its "arriving in 1.23" note;
+- ✅ The README's *What ScreenRec sends* section exists and has lost its "arriving in 1.23" note;
   `CHANGELOG.md` has 1.23.0; `VERSION` bumped.
 
 **Left out, on purpose:** uploading a whole `.mov` straight from Recordings (it needs an export

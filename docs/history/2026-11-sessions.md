@@ -4,8 +4,25 @@ Rotated out of `STATUS.md` on 2026-11-17, when its "Now" section had reached 305
 ~250-line bound the working contract sets. These are the per-task logs of M40-T1 to M40-T3
 (2026-11-16 and 2026-11-17), M40's filing, and the note about the live install of 2026-11-11, moved
 verbatim. M40-T4's and M40-T5's logs followed the same day, when "Now" was back at 263 lines.
-M40-T6 and the gate stay in STATUS.md until the milestone closes; per-task specs and their tick
-boxes are in `docs/03-milestones.md`.
+M40-T6's followed on 2026-11-18, when the gate passed and the milestone closed; per-task specs and
+their tick boxes are in `docs/03-milestones.md`.
+
+- **✅ M40-T6 DONE (2026-11-17) — a failed upload can be tried again, and finishes the same one.**
+  The menu keeps `Couldn't upload · ‹title›` for a day, with the reason, `Try Again`, the clip,
+  Studio and `Dismiss`. `Try Again` continues the **same** upload while YouTube still has it
+  and the sign-in it began under still stands, and starts over when not; the notices say which,
+  and name an entry only when it will not be finished. Plan
+  `claude.ai/artifact/AuVodjvViyFqv38r8pJEpZ`; `/code-review medium`'s nine findings ruled *"as
+  proposed"* and applied (docs/03). **1097 tests** (1061 → 1097); **96 breaks, 96 red.**
+  **Live:** the row, `Try Again`, `Cancel Upload` and `Dismiss` on a fail-on-purpose build; then
+  for real — a 64 MB clip cut at 40%, `Try Again` picking up at 46% and landing one unlisted
+  video nine seconds later, link copied, no "earlier entry" sentence. **(human) Franco, in
+  Studio: one video, no leftover.** Installed: the clean T6 build (no scaffold in `strings`).
+  ⚠️ **Left as designed:** `Dismiss`, or the row's day running out, drops a kept session and no
+  notice says so (docs/07) — put to Franco in the session's report.
+  **Next: gate G40** (docs/03): the gate's own checks on the deployed build, the README's
+  "arriving in 1.23" note, `CHANGELOG.md` 1.23.0, `VERSION` 1.23.0, tag. **Not started — a
+  checkpoint with Franco comes first.**
 
 - **✅ M40-T5 DONE (2026-11-17) — every failed upload says why, and what to do next.**
   `UploadFailure`: one list, worded by the app and the CLI. The uploader resumes while bytes

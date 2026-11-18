@@ -91,6 +91,10 @@ Everything is in the menu-bar menu:
 - **Recent recordings** — from each: **export a shareable MP4 or GIF**, **trim** it (losslessly, or
   re-encoded to hold only the kept range), rename, reveal, Quick Look. The original is never touched,
   and the Trim window can write the shareable `.mp4` of a range directly.
+- **Upload to YouTube…** — in the Trim window and on every exported `.mp4`: a title, a description
+  and who can watch (unlisted unless you choose otherwise), then the link is on the clipboard. Connect
+  an account once in **Settings › Sharing**; [What ScreenRec sends](#what-screenrec-sends) says
+  exactly what leaves your Mac.
 - **Settings (⌘,)** — output folder, quality (Efficient / Balanced / High), frame-rate cap,
   microphone (None / Automatic / a device), replay buffer length and shortcut, MP4/GIF export sizes,
   a 3-2-1 count-in, a name prompt when a take stops, an automatic **Stop After** bound, and
@@ -121,7 +125,7 @@ somewhere yourself. It talks to the network in two cases:
 - **Checking for a newer version.** At launch and once a day it reads the public list of releases
   from GitHub, which tells GitHub your IP address and nothing else. Turn it off in
   **Settings › General › Check for new versions**.
-- **YouTube** *(arriving in 1.23; development builds already have the sign-in)*. Only if you connect
+- **YouTube**. Only if you connect
   an account in **Settings › Sharing**, and then only when you ask for an upload, one clip at a time:
   - **What goes to Google:** the clip you chose, and the title, description and visibility you gave it.
   - **What ScreenRec may do with your account:** add videos. It asks Google for that one permission

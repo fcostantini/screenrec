@@ -7,6 +7,29 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-18 (G40, the gate's live run and what it found):
+  🔴 **A new network feature can falsify a sentence written before it.** Settings › General
+  had said since ADR-020 that with the update check off *"the app makes no network requests at
+  all"*. Six tasks of M40 went by it. Before shipping anything that talks to the network,
+  grep the UI and the README for absolutes — `at all`, `never`, `nothing leaves` — and read
+  each one against the new feature.
+  ✅ **A credential-less build on a Mac that has a saved sign-in** does not read "unavailable":
+  Settings says `Connected · ‹channel›` over *"This build has no YouTube credentials, so it
+  can't use this sign-in. Disconnect removes it."*, the Trim button is disabled with the same
+  reason, and `.mp4` rows lose `Upload to YouTube…`. It leaves the sign-in file byte-identical,
+  so the next credentialed build is still connected.
+  ✅ **Compile the drivers once to see a short upload move.** `swift tools/menudriver.swift
+  dump` costs about 3 s a call, all of it compiling; `swiftc -O` once and the binary answers in
+  about 0.3 s. That is the difference between seeing `Exporting… 4% → 89%` then `Uploading… 0%
+  → 100%` and seeing only the receipt, on a clip that exports and uploads in ten seconds.
+  ✅ **AX details that saved guesses:** the Settings tabs are `AXRadioButton`s found by
+  `AXDescription` (not buttons, not titled); a sheet's `AXDefaultButton` names the button
+  Return presses, which checks a "→ Return" step without sending a keystroke to whatever is
+  frontmost.
+  ⚠️ **"Makes no request" was shown weakly, and said so:** no socket in `lsof -a -i -p` at
+  three moments, no upload log line, an untouched sign-in file. The strong evidence is that
+  the code cannot build a request without credentials, which the unit tests hold.
+
 - 2026-11-17 (M40-T6, one real upload cut on purpose and finished by `Try Again`):
   ✅ **Continuing the same session finishes the same entry: one video, no leftover.** A 64 MB
   clip's first transfer was cancelled client-side as its progress crossed 40%; seventeen
