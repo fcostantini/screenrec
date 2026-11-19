@@ -234,12 +234,11 @@
 - [x] **M40 — does Studio flag the test videos about audience?** (Franco, 2026-11-18): *"no
       flags that i can see"*. The app sends no "made for kids" declaration, and the channel's own
       default applies without Studio asking for anything.
-- [ ] **M40 — delete the test videos** in YouTube Studio ("ScreenRec test …", including *13*
-      from T6's check and *14*, *15* and the unfinished *16 (cancelled on purpose)* from the
-      gate, and the three unfinished measurement entries). Only he can: the app's permission
-      cannot delete. Still unanswered, and minor: whether a firewall dialog ever appeared. (The
-      Keychain wording is moot — the sign-in is a file, by his T2 ruling — and Google's own
-      page calls the upload scope "sensitive", docs/07.)
+- [x] **M40 — the test videos are deleted** (Franco, 2026-11-19: *"done"*): "ScreenRec test …"
+      *13* to *15*, the unfinished *16 (cancelled on purpose)* and the three unfinished
+      measurement entries. Never answered, and not worth asking again: whether a firewall
+      dialog ever appeared. (The Keychain wording is moot — the sign-in is a file, by his T2
+      ruling — and Google's own page calls the upload scope "sensitive", docs/07.)
 - [x] **M40 — the sign-in clicks for T1** (Franco, 2026-11-16, with screenshots of Google's pages).
 - [x] **M40 — `Publish app`** (Franco, 2026-11-16): the Google project is **In production**, after
       the Branding page was given a home page and a privacy link. He sent the warning page a
