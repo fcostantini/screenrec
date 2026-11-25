@@ -10,6 +10,16 @@ import Testing
         DeriveOptions(for: URL(fileURLWithPath: "/tmp/\(name)"))
     }
 
+    /// M43-T1: the menu plays a movie in the app's own window, and nothing else.
+    @Test func onlyAFileWithAPictureIsAMovie() {
+        for name in ["Recording.mov", "Clip.mp4", "Clip.m4v", "Clip.MOV"] {
+            #expect(options(name).isMovie, "\(name)")
+        }
+        for name in ["Loop.gif", "Sound.m4a", "Sound.MP3"] {
+            #expect(!options(name).isMovie, "\(name)")
+        }
+    }
+
     @Test func aRecordingTakesEveryDerive() {
         let mov = options("Recording.mov")
         #expect(mov.canExportToMP4)

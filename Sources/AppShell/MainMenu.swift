@@ -86,7 +86,7 @@ enum MainMenu {
         menu.addItem(responderRow("Minimize", #selector(NSWindow.performMiniaturize(_:)), "m"))
         menu.addItem(responderRow("Zoom", #selector(NSWindow.performZoom(_:))))
         // Close belongs in File by convention, and there is no File menu to put it in — an app with
-        // three windows and no documents has nothing else to fill one with.
+        // a few windows and no documents has nothing else to fill one with.
         menu.addItem(responderRow("Close", #selector(NSWindow.performClose(_:)), "w"))
         menu.addItem(.separator())
         menu.addItem(responderRow("Bring All to Front", #selector(NSApplication.arrangeInFront(_:))))

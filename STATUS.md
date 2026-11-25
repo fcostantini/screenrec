@@ -6,14 +6,16 @@
 
 ## Now
 
-- **⏳ M43 FILED (2026-11-25) — the preview answers the keyboard. Plan approved, T1 in progress.**
-  Franco: space closes the Quick Look preview, and he wants Trim's keys there with space as
-  play/pause. It closes because the preview is the system's `QLPreviewPanel`, whose public API has
-  no play, pause or seek (read from the SDK header) — so the plan is the app's own player window
-  for videos. Plan: https://claude.ai/artifact/1JVM3aMhdTvBEQ76fUFRzb
-  ⚠️ **Trim has no space key either** (his M37-T3 ruling); T2 would reverse that, on his word.
-  ✅ **Approved (Franco, 2026-11-25, *"let's go"*)** as recommended. T2 and full screen: not ruled.
-  **Next:** M43-T1.
+- **✅ M43-T1 DONE (2026-11-25) — a recording plays in the app's own window, with the keys.**
+  A movie row reads `Play`: space plays and pauses, ←/→ step a frame, ⇧←/⇧→ a second, Esc and
+  ⌘W close. GIF and audio rows keep `Quick Look` (ADR-025). **1131 tests** (1107 → 1131). Every
+  leg in docs/03 was driven on the deployed build, which is this commit, still labelled 1.23.1.
+  ✅ **Review: 15 points, shown first; Franco took every proposal** (docs/03 lists them).
+  🔴 **Space already plays and pauses in Trim** — the player answers it, the app binds none
+  (docs/07). T2 is rewritten around that; it and full screen are his to rule.
+  🔴 **Two mistakes of mine, both in docs/07:** an unmeasured "the green button zooms" in the
+  plan (it entered full screen), and a first verify on a stale bundle (re-run).
+  **Next: G43** — his look at it, then VERSION 1.24.0, CHANGELOG and README. T2 only on his word.
 
 - **✅ M42 COMPLETE and G42 PASSED (2026-11-25) — every window the app leaves open has a way
   back.** The Quick Look preview (T1) and About (T3) keep the Dock tile, the ⌘-Tab entry and the
@@ -284,9 +286,15 @@
 
 ## Needs Franco (human-only items)
 
-- **M43 (2026-11-25): two rulings still open** (plan:
-  https://claude.ai/artifact/1JVM3aMhdTvBEQ76fUFRzb, approved). Whether Trim takes space too
-  (T2, reversing M37-T3), and whether he uses full screen in the preview, which T1 leaves out.
+- **G43 (2026-11-25): the look is his to judge** — `Play` on a recording: the 70 % opening
+  size, the line of keys under the picture, Esc closing, opening playing. All four were my
+  choices in the plan. On his word: VERSION 1.24.0, CHANGELOG, README.
+- **M43 (2026-11-25): two rulings still open.** Whether Trim's space should be the app's own
+  (T2 — it already works through the player, docs/07), and whether he wants full screen in the
+  preview, which is switched off. ⚠️ Trim's green button *does* enter full screen, and what
+  Trim does there has never been measured.
+- **M43-T1 (2026-11-25): one test clip is in his Trash** — `m43-verify-small.mov`, 90 KB, from
+  the trash leg. Terminal cannot empty it.
 - **v1.23.1 (2026-11-25): publish it?** `Scripts/release.sh` tags `v1.23.1`, pushes the tag and
   publishes the signed bundle as a GitHub release with the CHANGELOG section as its notes.
 - **M42-T4 (2026-11-25):** the upload sheet's two fields are his to check by hand — with no
@@ -385,7 +393,7 @@
 
 | Gate | Status | Evidence |
 |------|--------|----------|
-| G43  | ⏳ not attempted — M43-T1 in progress | — |
+| G43  | ⏳ **open** — T1's legs are driven (docs/03, M43-T1); the human leg, the version bump, CHANGELOG and README are owed | — |
 | G42  | ✅ **passed 2026-11-25** — driven on the deployed 1.23.1 build; the ⌘-Tab and Dock-click legs are Franco's, from T1 | **Preview**, nothing else open: `Quick Look` → `regular`, `Apple · ScreenRec · Edit · Window`, `Dock tile: present`, the panel at layer 9; another app activated → still `regular` with the tile, the panel at layer 0 behind that app's window; ScreenRec activated → the panel ahead again at layer 9; Window ▸ Close → `accessory`, `menu bar: none`, `Dock tile: absent`, the previous app frontmost. **About:** Settings → About → Settings closed → `regular` with bar and tile; another app activated → the same, About behind; About closed → `accessory`. **`Rename…`, no window open** (`accessory`, no bar, no tile): `→` `{9,0}`, ⌘A `{0,9}`, ⌘C copied, ⌘X cut, ⌘Z restored, ⇧⌘Z cut again, ⌘V pasted once; cancelled, nothing renamed. **T2's table** (docs/07): About fixed (T3), the text-field alerts fixed (T4), the two-button alerts and the share sheet ruled out by name (Franco). ⚠️ **Not driven:** the upload sheet's fields — Needs Franco. |
 | G40  | ✅ **passed 2026-11-18** — every leg driven on a deployed 1.23.0 build, with Franco for the two human steps | **Trim → upload:** a 20 s synthetic take, `Trim…` → `Upload to YouTube…` → the sheet (`0:20 · up to 15 MB · H.264 1920 × 1200`, title `ScreenRec test 14`, `Unlisted`; `AXDefaultButton` = `Upload`, so Return presses it) → the menu read `Exporting… 4% → 89%`, then `Uploading to YouTube… 0% → 100%` with `Cancel Upload`, then `Uploaded to YouTube · ScreenRec test 14` ten seconds after the press; notice `Uploaded to YouTube · link copied`; the clipboard was the link; oEmbed `200`, watch page `"isUnlisted":true`. **(human) Franco: it plays, unlisted, and clicking the notice opened it.** **Clipboard rule, the other way:** a 61 MB `.mp4` from its menu row, the clipboard changed one second after the press → notice `Uploaded to YouTube` + *"Your clipboard changed meanwhile, so the link wasn't copied; it is in the menu under Copy Link."*; the clipboard still held the marker; `Copy Link` then put the link there. **`Cancel Upload`:** a 137 MB `.mp4` stopped at 15% → *"Upload to YouTube stopped — YouTube keeps an unfinished entry named …. Delete it in YouTube Studio."*, no failed row, clipboard untouched. **`Disconnect` / reconnect:** `Not connected`, the saved sign-in file gone, the `.mp4` row still offering the upload (it connects first); `Connect…` → `Waiting for Google in your browser…` → Franco through Google's pages → `Connected`, file back at `0600`. **No credentials:** a bundle built with `SCREENREC_YOUTUBE_CLIENT` pointing nowhere — no credentials file, the client id in 0 of its files — shows no `Upload to YouTube…` on `.mp4` rows, the Trim button disabled over *"This build has no YouTube credentials, so it can't use the saved sign-in."*, Settings saying the same with `How to add them` and the visibility menu disabled; no socket at three samples, no upload log line, the sign-in file byte-identical afterwards. ⚠️ Shown beside a saved sign-in, since this Mac had one; the never-connected wording is T2's evidence and the unit tests'. **Secret:** the client secret and the client id in 0 tracked files, 0 commits by `git log --all -S`, 0 objects by `git grep` over all 420 commits on 32 refs. **Docs:** the README's *What ScreenRec sends* lost its "arriving in 1.23" note and the feature is in *Use*; `CHANGELOG.md` has 1.23.0; `VERSION` and `CoreInfo.version` are 1.23.0. **Found at the gate and fixed (M40-T7):** Settings' update-check caption promised "no network requests at all". ⚠️ The legs ran on the build before that one-sentence change; the final build was then read live for the new caption and `Connected`. |
 | G38  | ✅ **passed 2026-09-07** — every leg driven headlessly on the deployed build | Against the deployed build (`1.21.0` code, signed). **Moving the playhead no longer stops the preview:** the *same probe on both binaries* — before, `Play` took the clock 0:00 → 0:02 and five `→` froze it at **0:02** with the button back to `Play`; after, the same presses read 0:02 and **0:04** two seconds later, button still `Pause`. A filmstrip click while playing goes **3:47 → 3:49**; paused, five `→` start nothing (0:26, `Play`, unchanged). ⚠️ **The end-of-clip exception is unit-tested only** — 50 ms at the end of a 5-minute clip, where one filmstrip pixel is 0.18 s. **A seek takes over from Play Range:** out-point at **0:17**, `Play Range`, a filmstrip click at 0:08, and 13 s later **0:21** — past a marker that used to stop it, with no stale observer left installed. **The sound leaves on its own, both ways:** the recents row wrote **300.77 s / 5.6 MB / one AAC track / no video track** from a 1.2 GB take in **1.78 s**, receipt `Saved the audio · … .m4a`; the Trim window's button wrote **27.82 s** for a `Trimmed length ≈ 0:27` range and **dismissed** (0 windows). `--from 2 --to 5` on the CLI → **3.00 s**. **Decoded rather than assumed:** peak **0.231** / rms **0.0145** over the first 20 s, so the file holds sound and not silence. **A take with no sound says so:** recorded `--no-mic --no-system-audio` (3.02 s, video only), `Export Audio` raised a real banner reading **"That recording has no sound / It was captured with no system audio and no microphone, so there's nothing to export."** and **no file was written**. **An `.m4a` row offers no derive at all** — Reveal / Quick Look / Share / Copy, then Rename / Move to Trash, divider gone. 🔴 **MP3 was ruled out on a measurement, not a guess:** `kAudioFormatProperty_Encoders` returns **0** for `kAudioFormatMPEGLayer3` against **1** each for AAC, ALAC, FLAC and Opus, and `afconvert -f MPG3` fails with `('fmt?')`. **841 tests** (821 → 841), release build and signed bundle green. ⚠️ **What the reviews caught that the tests did not:** the audio and MP4 exports rebasing the same range differently, a receipt that would have announced an `.m4a` as an MP4, audio rows re-decoding a thumbnail on every menu open forever, and the Play Range stop above. All four are fixed; the first three had passing tests either side of them. |

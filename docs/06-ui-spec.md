@@ -10,8 +10,8 @@ the UI adds no behavior of its own.
 An AppKit `NSStatusItem` with an `NSMenu`, rebuilt on each open (M28-T2; it was a SwiftUI
 `MenuBarExtra(.menu)` through v1.14.0, and the bridge's limits are what the notes below record).
 `LSUIElement = true`, so the app **launches** with no Dock icon and no main window. Windows that
-exist — Settings (⌘,), Onboarding (first launch / missing permissions only) and Trim — are `NSWindow`s
-hosting SwiftUI views (M28-T1).
+exist — Settings (⌘,), Onboarding (first launch / missing permissions only), Trim and Preview — are
+`NSWindow`s hosting SwiftUI views (M28-T1).
 
 **While any window is open the app is `.regular`** (M37-T1, ADR-023): a Dock icon, a ⌘-Tab entry and a
 menu bar of App / Edit / Window, all three gone again when the last window closes. Without them a
@@ -19,7 +19,9 @@ minimized window had no route back. AppKit fills the Window menu itself, marking
 that menu **is** the route back. ⚠️ First launch therefore shows a Dock icon while Onboarding is up.
 **The Quick Look preview counts as a window here** (M42-T1): it drops behind the other app's windows
 when another app comes in front, and without the Dock icon nothing led back to it. AppKit does not
-list it in the Window menu, so its routes back are the Dock icon and ⌘-Tab.
+list it in the Window menu, so its routes back are the Dock icon and ⌘-Tab. Since M43-T1 only GIF and
+audio rows open it; a movie opens the **Preview window** (below), which is one of the app's own and
+is counted, listed in the Window menu and minimizable like Settings and Trim.
 **So does `About ScreenRec`** (M42-T3), opened from the app menu: closing the last window under it
 leaves the Dock icon, the ⌘-Tab entry and the bar until About itself is closed. Its row is dimmed
 while an alert is up, as `Settings…` and `Quit ScreenRec` beside it are.
@@ -199,11 +201,14 @@ Order and grouping (separators between groups):
     as on disk** — trimming the date out of a row under a dated header would read better and would
     contradict this document's own copy rule, so it stays a separate decision.
     (Franco, 2026-07-15: they read as the folder's contents rather than as more commands.) **M10-T2/T3/T4 made each a submenu**, then **M12-T1 added the share/preview
-    row** — `<name> ▸ { Reveal in Finder · Quick Look · Share… · Copy | Export as MP4 · Save as GIF ·
+    row** — `<name> ▸ { Reveal in Finder · Play · Share… · Copy | Export as MP4 · Save as GIF ·
     Export Audio · Trim… }` (the `|` is a divider: act-on-this-file above, derive-a-new-file below) — so the
     export/share/edit actions have a home; the old direct click-to-reveal moved into the submenu.
-    **Quick Look** opens the system preview panel (`QLPreviewPanel`, space toggles; the app is in the
-    Dock and ⌘-Tab while it is open — M42-T1); **Share…** the OS
+    **Play** (M43-T1, on a movie) opens the Preview window (below). A GIF or an audio file has
+    **Quick Look** in that place instead, which opens the system preview panel (`QLPreviewPanel`,
+    where space and Esc close; the app is in the Dock and ⌘-Tab while it is open — M42-T1). The
+    names differ because the windows do: "Quick Look" is the system's name for a panel whose keys
+    the app cannot change (ADR-025). **Share…** the OS
     share sheet (`NSSharingServicePicker` — AirDrop/Messages/Mail, no screenrec-hosted anything);
     **Copy** writes the file to the pasteboard so ⌘V drops it into Slack/Finder. `Trim…` opens the Trim
     window (below). An export shows an `Exporting <name>…` row while it runs (stamped at open, not ticking
@@ -763,7 +768,9 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   ignores a click is worse than one that isn't there. That makes this row the only transport then —
   hence the readout, which replaces the time the player would otherwise show. **No spacebar**: it
   collides with AppKit's "space activates the focused button", so the shortcut would work only when
-  focus happened to be nowhere.
+  focus happened to be nowhere. ⚠️ The app binds none, but `AVPlayerView` answers space itself:
+  on the deployed build a space sent to this window started and stopped playback (M43-T1, docs/07).
+  Whether it still does while cropping, when the player draws no controls, is not measured.
 - **←/→ step one real frame**, ⇧ makes it a second. The frame comes from the sample table
   (`FrameStep`), not `AVPlayerItem.step(byCount:)`, which assumes a cadence frame-on-change capture
   doesn't have. The keys are claimed by a local `NSEvent` monitor scoped to this window, because a
@@ -879,6 +886,39 @@ design — one in/out, no timeline scrubbing-to-frame, no multi-clip:
   the clip also keeps the frames back to the previous keyframe inside the file; re-encoding drops
   them, takes longer and can produce a larger file. The original is kept either way; this saves a
   new ' trimmed' file."*
+
+## Preview window (M43-T1 — a recording to watch, ADR-025)
+
+Opened from a movie row's `Play`. One window: `Play` on another file swaps the clip into it and
+leaves its frame alone; `Play` on the clip already in it plays it, from the top if it had ended. It
+replaces the system Quick Look panel for movies, whose public API has no call to play, pause or
+seek — so no key could be added to it.
+- **Title: the file's name.** Close, minimize and zoom buttons; resizable; in the Window menu.
+- **The picture is an `AVPlayerView`** with its own inline transport, the one Trim shows, and its own
+  letterbox when the window's shape is not the clip's.
+- **It opens playing.**
+- **One line under the picture states the keys:** *"Space to play or pause · ←/→ a frame · ⇧←/⇧→ a
+  second"* — Trim's caption wording.
+- **Space plays or pauses**; at the end of the clip it plays again from the start. A held space
+  toggles once. **←/→ step one real frame** and **⇧ makes it a second**, with Trim's code
+  (`PlayerTransport`), and moving the playhead does not change whether the clip is running (M38-T1).
+  **Esc closes** the window, as it closed the system panel; ⌘W does too. The keys are claimed by a
+  local `NSEvent` monitor scoped to this window, so the player never sees them.
+- **Size and place** (`PreviewPlacement`). Untouched, it opens centred at the clip's own shape: as
+  large as fits 70 % of the screen's usable area, never past a point per pixel, never under
+  480 × 300. **A move keeps the place and nothing else**, so a window that was only dragged goes on
+  taking each clip's shape, hung from the top-left it was left at and slid back inside the screen
+  where it would run off. **Only a resize, Zoom included, keeps a size.** (Not AppKit's frame
+  autosave, which keeps both together and would freeze the size the first clip opened at.)
+- **A file that cannot be read** — empty, torn — shows *"This recording can't be played."* where the
+  picture would be.
+- **The file being played can be renamed or trashed from its row.** A rename changes the title and
+  the clip plays on; `Move to Trash` closes the window.
+- **Closing stops the player** — it would otherwise go on playing behind the closed window.
+- **No full screen.** The window opts out (`.fullScreenNone`), so the green button zooms. Left to
+  itself a resizable window's green button enters full screen — Trim's does (measured, docs/07) —
+  and Esc, which closes this window, would close it from there instead of leaving.
+- **Left out:** GIFs, which the player cannot open; audio files, which have no frames to step.
 
 ## Naming a take (M21-T3)
 

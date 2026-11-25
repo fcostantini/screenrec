@@ -210,10 +210,30 @@ import Testing
         let row = MenuSnapshot.item(state, titled: "a.mov")
         #expect(row?.view is RecentRowView)          // the thumbnail well (M28-T3)
         #expect(row?.submenu?.items.map(\.title).filter { !$0.isEmpty } == [
-            "Reveal in Finder", "Quick Look", "Share…", "Copy",
+            "Reveal in Finder", "Play", "Share…", "Copy",
             "Export as MP4", "Save as GIF", "Export Audio", "Trim…",
             "Rename…", "Move to Trash",
         ])
+    }
+
+    /// M43-T1: a movie plays in the app's own window; what that window cannot play keeps the
+    /// system panel, under the system's name for it.
+    @Test func aMovieRowOffersPlayAndEveryOtherRowKeepsQuickLook() throws {
+        let directory = try MenuSnapshot.directory([
+            ("a.mov", 0), ("b.mp4", 0), ("c.gif", 0), ("d.m4a", 0),
+        ])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let state = MenuSnapshot.state(directory: directory)
+        state.refreshRecentRecordings()
+
+        for (name, expected, absent) in [
+            ("a.mov", "Play", "Quick Look"), ("b.mp4", "Play", "Quick Look"),
+            ("c.gif", "Quick Look", "Play"), ("d.m4a", "Quick Look", "Play"),
+        ] {
+            let titles = MenuSnapshot.item(state, titled: name)?.submenu?.items.map(\.title) ?? []
+            #expect(titles.dropFirst().first == expected, "\(name): \(titles)")
+            #expect(!titles.contains(absent), "\(name): \(titles)")
+        }
     }
 
     /// M32-T3: the row exists only when there is news, and it sits with Settings/Quit rather than

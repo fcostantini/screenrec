@@ -1,8 +1,9 @@
 import AppCore
 import AppKit
+import RecorderCore
 import SwiftUI
 
-/// The app's three windows, built without a SwiftUI scene.
+/// The app's four windows, built without a SwiftUI scene.
 ///
 /// `@Environment(\.openWindow)` is reachable only from a view inside a scene, so none of these may
 /// depend on one (M28-T2 removes the last). Each window is built on demand and dropped when it
@@ -12,7 +13,7 @@ import SwiftUI
 final class WindowPresenter: NSObject, NSWindowDelegate {
 
     enum Kind {
-        case onboarding, settings, trim
+        case onboarding, settings, trim, preview
     }
 
     /// Set by `AppDelegate.init` before any window can be asked for. Weak — `AppDelegate.state`
@@ -20,6 +21,7 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
     weak var state: AppState?
 
     private var windows: [Kind: NSWindow] = [:]
+    private let previewTarget = PreviewTarget()
     private lazy var guests = GuestWindows { [weak self] in self?.applyActivationPolicyAfterClose() }
 
     /// Opens the window, or brings an open one forward.
@@ -28,6 +30,37 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
         let window = windows[kind] ?? make(kind, state: state)
         windows[kind] = window
         bringForward(window)
+    }
+
+    /// Plays a recording in the Preview window, swapping the clip if the window is already open.
+    func showPreview(_ url: URL) {
+        previewTarget.play(url)
+        Task {
+            // Read before the window exists, so it opens at the clip's shape instead of jumping
+            // to it. An open window keeps the frame it has.
+            let clip = windows[.preview] == nil ? await MediaFile.dimensions(of: url) : nil
+            guard previewTarget.url == url else { return }   // another file was chosen meanwhile
+            let window = windows[.preview] ?? makePreview(fitting: clip)
+            windows[.preview] = window
+            window.title = url.lastPathComponent
+            bringForward(window)
+        }
+    }
+
+    /// The player holds the file, not its name, so a rename only has the title to catch up.
+    func previewFileRenamed(from old: URL, to new: URL) {
+        guard let window = windows[.preview],
+              previewTarget.url?.standardizedFileURL == old.standardizedFileURL
+        else { return }
+        previewTarget.renamed(to: new)
+        window.title = new.lastPathComponent
+    }
+
+    /// A trashed file would go on playing with no row left to reach it by.
+    func closePreviewIfItsFileIsGone() {
+        guard let url = previewTarget.url, !FileManager.default.fileExists(atPath: url.path)
+        else { return }
+        close(.preview)
     }
 
     /// Brings forward a window the presenter did not build — the Quick Look panel, the About
@@ -58,6 +91,30 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
         guard let closing = notification.object as? NSWindow else { return }
         windows = windows.filter { $0.value !== closing }
         applyActivationPolicyAfterClose()
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        guard let window = shownPreview(notification) else { return }
+        PreviewPlacement.userMoved(window)
+    }
+
+    /// A drag is kept once, when it ends; Zoom resizes without one.
+    func windowDidResize(_ notification: Notification) {
+        guard let window = shownPreview(notification), !window.inLiveResize else { return }
+        PreviewPlacement.userResized(window)
+    }
+
+    func windowDidEndLiveResize(_ notification: Notification) {
+        guard let window = shownPreview(notification) else { return }
+        PreviewPlacement.userResized(window)
+    }
+
+    /// The preview once it is on screen: it is placed before then, so a change after is the user's.
+    private func shownPreview(_ notification: Notification) -> NSWindow? {
+        guard let window = notification.object as? NSWindow, window === windows[.preview],
+              window.isVisible
+        else { return nil }
+        return window
     }
 
     /// The policy is set first, so the Dock tile and bar are there when the window arrives; and the
@@ -101,7 +158,21 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
             // that preview mostly letterbox at the fitted size (M37-T2).
             window(trimWindowTitle, autosave: "trim", resizable: true,
                    hosting: TrimView(state: state) { [weak self] in self?.close(.trim) })
+        case .preview:
+            makePreview(fitting: nil)
         }
+    }
+
+    private func makePreview(fitting clip: (width: Int, height: Int)?) -> NSWindow {
+        let window = window(
+            previewTarget.url?.lastPathComponent ?? "", autosave: nil, resizable: true,
+            hosting: PreviewView(target: previewTarget) { [weak self] in self?.close(.preview) })
+        window.identifier = PreviewView.windowIdentifier
+        // Full screen is not built for this window (docs/06), and Esc would close it from there.
+        window.collectionBehavior = .fullScreenNone
+        PreviewPlacement.place(
+            window, fitting: clip.map { CGSize(width: $0.width, height: $0.height) })
+        return window
     }
 
     /// Sizes to its content unless `resizable`, where the content only sets a floor and the user's
@@ -109,7 +180,7 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
     /// autosave name keeps a moved — and now a resized — window where it was put, since these are
     /// rebuilt per open and nothing else would remember.
     private func window(
-        _ title: String, autosave: String, resizable: Bool = false, hosting content: some View
+        _ title: String, autosave: String?, resizable: Bool = false, hosting content: some View
     ) -> NSWindow {
         let controller = NSHostingController(rootView: content)
         controller.sizingOptions = resizable ? [.minSize] : [.preferredContentSize]
@@ -122,7 +193,7 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.center()
-        window.setFrameAutosaveName(autosave)
+        if let autosave { window.setFrameAutosaveName(autosave) }
         return window
     }
 }

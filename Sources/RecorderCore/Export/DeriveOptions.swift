@@ -13,6 +13,9 @@ import Foundation
 /// extension: an `.m4a` this app wrote is a row in the same menu, and three of these derives need a
 /// picture it hasn't got while the fourth would hand back what you already have.
 public struct DeriveOptions: Equatable, Sendable {
+    /// Whether the file has a picture — what the derives below hang off, and what the menu plays
+    /// in the app's own window rather than the system preview (docs/06).
+    public let isMovie: Bool
     public let canExportToMP4: Bool
     public let canSaveAsGIF: Bool
     public let canTrim: Bool
@@ -28,7 +31,7 @@ public struct DeriveOptions: Equatable, Sendable {
         let ext = url.pathExtension.lowercased()
         // Unknown extensions are treated as movies: the exporters fail loudly and honestly, which
         // beats hiding an action that would have worked.
-        let isMovie = ext != "gif" && !Self.audioExtensions.contains(ext)
+        isMovie = ext != "gif" && !Self.audioExtensions.contains(ext)
         canExportToMP4 = isMovie && ext != "mp4" && ext != "m4v"
         canSaveAsGIF = isMovie
         canTrim = isMovie

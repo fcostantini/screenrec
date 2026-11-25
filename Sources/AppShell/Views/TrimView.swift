@@ -1,27 +1,7 @@
 import AVKit
 import AppCore
-import Carbon.HIToolbox
 import RecorderCore
 import SwiftUI
-
-/// AppKit's concrete `AVPlayerView`, wrapped — SwiftUI's generic `VideoPlayer` fatal-errors
-/// instantiating its metadata in a Command-Line-Tools (no-Xcode) SPM build.
-private struct PlayerView: NSViewRepresentable {
-    let player: AVPlayer
-    let controlsStyle: AVPlayerViewControlsStyle
-
-    func makeNSView(context: Context) -> AVPlayerView {
-        let view = AVPlayerView()
-        view.controlsStyle = controlsStyle
-        view.player = player
-        return view
-    }
-
-    func updateNSView(_ view: AVPlayerView, context: Context) {
-        if view.player !== player { view.player = player }
-        if view.controlsStyle != controlsStyle { view.controlsStyle = controlsStyle }
-    }
-}
 
 /// Holds the observers the view installs on its player. A reference so an observer's own closure
 /// can capture it without capturing the view — which would reach the player through `@State` and
@@ -86,6 +66,14 @@ struct TrimView: View {
 
     /// A range worth acting on; below this, Trim & Save and Play Range are meaningless.
     private var hasRange: Bool { outSeconds - inSeconds >= 0.1 }
+
+    /// A seek is the user taking over from Play Range, whose out-point would otherwise still be
+    /// armed and stop playback somewhere they didn't ask for.
+    private var transport: PlayerTransport? {
+        player.map {
+            PlayerTransport(player: $0, duration: durationSeconds, willSeek: disarmRangeStop)
+        }
+    }
 
     /// What the preview is shaped like: the clip's own ratio once its geometry has loaded, so a
     /// wide take spends the window on picture rather than on letterbox. The box's own until then,
@@ -176,7 +164,7 @@ struct TrimView: View {
             // The window's own transport, present in both modes: while cropping the player draws
             // none of its own, and this row is then the only way to play, pause or read the time.
             HStack(spacing: 10) {
-                Button(isPlaying ? "Pause" : "Play") { togglePlayback() }
+                Button(isPlaying ? "Pause" : "Play") { transport?.togglePlayback() }
                     .disabled(durationSeconds <= 0)
                 Text("Click to seek · ←/→ a frame · ⇧←/⇧→ a second")
                     .font(.caption)
@@ -469,64 +457,18 @@ struct TrimView: View {
         return min(max(playhead / durationSeconds, 0), 1)
     }
 
-    /// Exactly one frame — the source's next one, found in the sample table. `step(byCount:)`
-    /// assumes a fixed cadence our frame-on-change capture doesn't have (measured: it moved 0.25 s
-    /// and landed off every source frame, `FrameStep`).
-    private func step(byFrames count: Int) {
-        guard let asset = player?.currentItem?.asset, let url = loadedURL else { return }
-        let from = currentTime()
-        Task {
-            guard let next = await FrameStep.time(in: asset, from: from, by: count),
-                  loadedURL == url                                   // superseded while walking
-            else { return }
-            seek(toSeconds: next)
-        }
-    }
-
-    /// A second either way, for travelling without leaving the keyboard. Zero-tolerance, so the
-    /// playhead lands where the label says rather than at a keyframe up to seconds earlier.
-    private func nudge(bySeconds seconds: Double) {
-        seek(toSeconds: currentTime() + seconds)
-    }
-
     private func seek(toFraction fraction: Double) {
-        seek(toSeconds: durationSeconds * min(max(fraction, 0), 1))
-    }
-
-    /// Moving the playhead doesn't change whether the clip is running (M38-T1) — `TrimSeek` holds
-    /// that rule and its end-of-clip exception. A seek preserves the rate on its own, so only the
-    /// case that must *not* keep playing needs the pause. It also ends any Play Range in flight:
-    /// with playback no longer stopping here, its out-point would otherwise still be armed.
-    private func seek(toSeconds seconds: Double) {
-        guard let player, durationSeconds > 0 else { return }
-        disarmRangeStop()
-        let target = min(max(seconds, 0), durationSeconds)
-        let keepsPlaying = TrimSeek.keepsPlaying(
-            wasPlaying: player.timeControlStatus != .paused, landingAt: target,
-            duration: durationSeconds)
-        if !keepsPlaying { player.pause() }
-        player.seek(
-            to: CMTime(seconds: target, preferredTimescale: 600),
-            toleranceBefore: .zero, toleranceAfter: .zero)
+        transport?.seek(toSeconds: durationSeconds * min(max(fraction, 0), 1))
     }
 
     /// The playhead, clamped into the clip.
     private func currentTime() -> Double {
-        max(0, min(player?.currentTime().seconds ?? 0, durationSeconds))
+        transport?.currentTime ?? 0
     }
 
     private func setIn() {
         inSeconds = min(currentTime(), outSeconds)
         refreshLeadIn()
-    }
-
-    /// Play/pause from the window rather than from the player, which draws no controls while a crop
-    /// is being drawn. A clip sitting at its end restarts, since play would otherwise do nothing.
-    private func togglePlayback() {
-        guard let player, durationSeconds > 0 else { return }
-        guard player.timeControlStatus != .playing else { return player.pause() }
-        if TrimSeek.isAtEnd(currentTime(), duration: durationSeconds) { seek(toSeconds: 0) }
-        player.play()
     }
 
     /// Plays only `[in, out]`: seeks to the in-point and pauses again on the way past the out-point.
@@ -598,33 +540,25 @@ struct TrimView: View {
         isPlaying = false
     }
 
-    /// Claims the arrow keys for the Trim window.
-    ///
-    /// Not `.keyboardShortcut(.leftArrow, …)`: a bare arrow is not a key equivalent, so it is
-    /// delivered as a `keyDown` to the first responder — which is `AVPlayerView`, whose own
-    /// handling scrubs (measured: 90 presses moved the playhead **47.7 s**, ~0.53 s each). The
-    /// monitor takes the event first and returns nil so the player never sees it. Scoped by window
-    /// title, so Settings and the rename alert keep their arrows.
+    /// Claims the arrow keys for the Trim window (`PlaybackKeyMonitor`), which is known by its
+    /// title.
     private func startKeyMonitor() {
         stopKeyMonitor()
-        observers.keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            guard event.window?.title == trimWindowTitle else { return event }
-            let stepsASecond = event.modifierFlags.contains(.shift)
-            switch Int(event.keyCode) {
-            case kVK_LeftArrow:
-                stepsASecond ? nudge(bySeconds: -1) : step(byFrames: -1)
-            case kVK_RightArrow:
-                stepsASecond ? nudge(bySeconds: 1) : step(byFrames: 1)
-            default:
-                return event
-            }
-            return nil
-        }
+        observers.keys = PlaybackKeyMonitor.install(
+            .trim, for: { $0.title == trimWindowTitle }, perform: perform)
     }
 
     private func stopKeyMonitor() {
-        if let monitor = observers.keys { NSEvent.removeMonitor(monitor) }
+        PlaybackKeyMonitor.remove(observers.keys)
         observers.keys = nil
+    }
+
+    private func perform(_ command: PlaybackCommand) {
+        switch command {
+        case .stepFrames(let count): transport?.step(byFrames: count) { transport }
+        case .nudgeSeconds(let seconds): transport?.nudge(bySeconds: seconds)
+        case .togglePlayback, .close: break   // not among `PlaybackKeys.trim`
+        }
     }
 
     /// Drives the strip's playhead. 0.2 s is enough to read as live and assigns to one `@State`,

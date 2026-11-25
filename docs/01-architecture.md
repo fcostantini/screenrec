@@ -43,11 +43,14 @@ screenrec-app/
 │   │   │                     #   AppMain (ScreenRec.run + AppDelegate), StatusItemController +
 │   │   │                     #   MenuBuilder + MenuRow (the NSMenu, M28), StatusIconImage,
 │   │   │                     #   RecentRowView + ProgressRowView (M28-T3/T4),
-│   │   │                     #   WindowPresenter (Settings/Onboarding/Trim, M28) + GuestWindows
-│   │   │                     #   (the Quick Look panel, counted as open — M42), Notifier,
+│   │   │                     #   WindowPresenter (Settings/Onboarding/Trim/Preview, M28) +
+│   │   │                     #   GuestWindows (the Quick Look panel, counted as open — M42),
+│   │   │                     #   PreviewPlacement (where the Preview window opens — M43), Notifier,
 │   │   │                     #   Relaunch, HotkeyCenter (Carbon), RegionSelectionOverlay (M11),
 │   │   │                     #   CountInOverlay (M12), NotificationSettings, LoginItem
-│   │   └── Views/            #   SettingsView, OnboardingView, TrimView, HotkeyRecorderButton,
+│   │   └── Views/            #   SettingsView, OnboardingView, TrimView, PreviewView (M43),
+│   │                         #   PlayerView + PlayerTransport + PlaybackKeys (the player both
+│   │                         #   windows share: play/seek/step, and their keys), HotkeyRecorderButton,
 │   │                         #   ShareActions (pasteboard/share sheet/alerts), Finder,
 │   │                         #   EditShortcutField (an alert's field; ⌘V with no Edit menu)
 │   └── ScreenRecApp/          # The executable: main.swift calls `ScreenRec.run()`, and Resources/

@@ -4473,7 +4473,7 @@ player can be reached from the app's process. The plan as recommended needs neit
 **Filed MINOR (ADR-013)** — a new window. The bump to 1.24.0 and the `CHANGELOG.md` entry land at
 G43.
 
-- [ ] M43-T1 **A video opens in the app's own player window: space plays and pauses, ←/→ step a
+- [x] M43-T1 **A video opens in the app's own player window: space plays and pauses, ←/→ step a
       frame, ⇧←/⇧→ a second** (AppShell). Plan artifact:
       `claude.ai/artifact/1JVM3aMhdTvBEQ76fUFRzb` — approved by Franco 2026-11-25 (*"let's go"*),
       as recommended: the app's own window, the row reading `Play`, Esc closing, opening playing.
@@ -4489,14 +4489,68 @@ G43.
       keeps playing, space at the end restarts, Esc and ⌘W close to `accessory` with nothing still
       playing, the Window menu lists the preview, a `.gif` row still opens the system panel, and
       Trim's arrows and `Play`/`Pause` are unchanged.
-- [ ] M43-T2 **(only on Franco's ruling) Trim takes space too.** Reverses M37-T3's "button only".
-      Proposed rule: space plays or pauses unless a button or a text field holds keyboard focus —
-      the collision that ruling was about. ⚠️ Whether the key monitor can tell that in a
-      SwiftUI-hosted window is not measured; the task starts there.
+      ✅ **Done 2026-11-25. 1131 tests** (1107 → 1131); the suite watched under a live `replayd`
+      stream: no capture session, no dialog. `PlayerView`, `PlayerTransport` and `PlaybackKeys`
+      are what both windows now call, and `TrimView` lost its own copies.
+      ✅ **Measured on the deployed build** — byte-identical to `dist` (`cmp`), nothing in
+      `Sources` newer than it — on a silent 14 s 4112 × 2570 take made with the CLI, keys by
+      `postToPid`, the playhead read off the timeline `AXSlider`:
+      - **Opens** playing, titled with the file's name, 1363 × 910 centred — the clip's shape in
+        70 % of a 2056 × 1260 screen. A 600 × 400 clip opened at 600 × 458.
+      - **Space** 0.9 s after the click paused it in one press (1.442 held across 0.8 s) with the
+        window still open. Held with five repeats it toggled once (the build before the review).
+      - **→ → ← ← →** read 4.451 · 4.472 · 4.451 · 4.430 · 4.451, which are the file's frames at
+        4.450, 4.467, 4.450, 4.433, 4.450 rounded to the slider's 10.4 ms step (docs/07).
+        **⇧→** 4.451 → 5.447, **⇧←** back to 4.451.
+      - **`Play` on the clip already open:** paused at 4.45 it played on (5.85 → 6.27 → 6.68); at
+        the end (14.017, stopped) it started again from the top (1.43 → 1.85 → 2.25).
+      - **Esc** and **⌘W** each closed it to `accessory`, no bar, no Dock tile.
+      - **`Play` on another file** swapped the clip in the open window and kept its frame.
+      - **Where it opens:** untouched, nothing was saved. Moved to 120,90, only the place was
+        saved and a 600 × 400 clip then opened there at its own 600 × 458. Resized to 800 × 600,
+        the size was saved too and the full take opened at 120,90 and 800 × 600.
+      - **The green button** reads `AXZoomButton`; Trim's reads `AXFullScreenButton`.
+      - **A zero-byte `.mov`** opened the window with *"This recording can't be played."*
+      - **Renamed while playing:** the title changed and the clock ran on (2.01 → 5.23 → 5.65);
+        `Play` on the renamed row did not restart it. **Trashed while playing:** the window
+        closed, `accessory`.
+      - **Trim:** ⇧→ ×3 read 0.995 · 2.004 · 3.000; → → ← read the frames at 3.017, 3.050, 3.017;
+        its `Play` button ran the clock and `Pause` held it; ⇧→ while playing went on playing;
+        Esc did nothing; ⌘W closed it.
+      ✅ **Measured on the build before the review's fixes, and not re-run** (the code under
+      them did not change): ⇧→ while playing keeps playing; space at the end restarts; CPU
+      24.5 % playing, 8.1 % paused, 8.4 % after Esc mid-playback; another app in front keeps
+      `regular`, the Dock tile and the clip's name in the Window menu; a `.gif` row reads
+      `Quick Look` and opens the system panel at layer 9.
+      ✅ **Review: 15 points, shown to Franco first; he took every proposal.** Fixed: `Play` on
+      the open clip; space while buffering (pause unless paused — Trim's button too); full screen
+      switched off for this window; the unplayable message; size and centre on one screen; place
+      and size remembered apart; rename followed and trash closing the window; a step before the
+      length loads; Trim's two unreachable key cases; three stale "three windows" lines; access
+      control and comment length. Left, in docs/07: a held arrow on a big take (Trim's since
+      M24-T4), a rotated foreign video, Trim's own rename/trash gap.
+      🔴 **Two things I got wrong on the way.** The plan said the green button zooms, unmeasured;
+      it entered full screen until the fix. And the first verify ran on a bundle one refactor
+      behind the tree — every leg that touched changed code was re-run on the final build.
+      🔴 **Space already plays and pauses in Trim** — `AVPlayerView` answers it, with the app
+      binding none (docs/07). That is what Franco's message assumed. T2 below is rewritten for it.
+      ⚠️ **Not measured:** the picture's look and the 70 % size as a person judges them (G43's
+      human leg); a clip with sound; space pressed while the player is still buffering, which
+      the 0.9 s press may not have caught; a second display; space in Trim while cropping.
+- [ ] M43-T2 **(only on Franco's ruling) Trim's space is the app's, not the player's.** Space
+      already toggles playback in Trim because `AVPlayerView` answers it while it holds the key
+      (measured in T1) — so M37-T3's "button only" describes what the app binds, not what happens.
+      What is open is whether that should be made dependable: bound by the app, so it also works
+      while cropping and wherever focus is. Proposed rule: space plays or pauses unless a button
+      or a text field holds keyboard focus — the collision M37-T3 was about. ⚠️ Not measured:
+      space while cropping, and whether the key monitor can tell a focused button in a
+      SwiftUI-hosted window. The task starts with both.
 
 **Gate G43** — on the deployed build: `Play` on a video opens the app's window; space, the arrows and
 the ⇧-arrows do what the line under the picture says; the window survives space; closing it leaves
 nothing playing and no Dock tile. **(human)** Franco watches a clip with the keys.
+At the gate: VERSION 1.24.0, `CoreInfo.version`, the `CHANGELOG.md` entry, and `README.md`'s
+file-row line, which still offers Quick Look on a recording.
 
 ## Dependency graph
 

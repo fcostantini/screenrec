@@ -295,6 +295,27 @@ window" without answering "let me switch apps mid-trim and come back", which is 
   that window under it left About on screen with no Dock tile. The alerts and the share sheet are
   **not** counted: they stay above other apps' windows and cannot be lost (docs/07).
 
+## ADR-025 ✅ A recording is watched in the app's own window, not the system panel (Franco, 2026-11-25)
+M12-T1 previewed files in the system's `QLPreviewPanel` because it cost nothing. Franco then asked
+for space to play and pause there, and the arrows to step, as in Trim (M43). **Decided: a movie
+opens in a player window the app builds; the system panel stays for what that window cannot play.**
+
+**Why not keep the panel.** Space and Esc are the panel's own close keys, and its public API —
+a data source, a delegate handed the events the panel did not use, full screen, an opaque display
+state — has nothing that plays, pauses or seeks. The keys could only be added by reaching into the
+panel's private views, and a macOS update that rearranged them would bring back "space closes the
+window" with no test of ours noticing.
+
+**Bounds:**
+- **The row says which window it opens.** `Play` on a movie, `Quick Look` on a GIF or an audio
+  file. One name for two windows with different keys would promise the wrong ones.
+- **`DeriveOptions.isMovie` is the one opinion** on which is which, as it is for the derives.
+- **The window is an ordinary one of the presenter's**, so ADR-023 covers it with nothing new.
+- **Given up, knowingly:** the panel's `Open with QuickTime Player` and share buttons — `Reveal in
+  Finder` and `Share…` are rows in the same submenu — and full screen, which the window opts out of
+  until it is built on purpose: Esc closes this window, and would from full screen too.
+- **Trim's keys are not changed by this.** Whether Trim binds space too is M43-T2, his to rule.
+
 ## ADR-024 ✅ The app may upload a clip the user sends to YouTube (Franco, 2026-11-16)
 The brief's non-goals say *"Handing a file off locally — the share sheet, the clipboard — is in;
 uploading it somewhere is not"*, and ADR-020 put anything that sends **a recording** off the machine

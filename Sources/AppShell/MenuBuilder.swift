@@ -465,9 +465,14 @@ struct MenuBuilder {
     /// The per-file submenu shared by recents and every receipt: act on this file (M12-T1), then
     /// derive a new one — and only the derives this file can actually take (M24-T5).
     private func fileActions(_ url: URL) -> [NSMenuItem] {
+        let derives = DeriveOptions(for: url)
         var items = [
             fileAction("Reveal in Finder", url, Finder.reveal),
-            fileAction("Quick Look", url) { ShareActions.quickLook($0, in: windows) },
+            // A movie plays in the app's own window, which takes the playback keys; the system
+            // panel offers no way to give it any (docs/06 "Preview window").
+            derives.isMovie
+                ? fileAction("Play", url) { windows.showPreview($0) }
+                : fileAction("Quick Look", url) { ShareActions.quickLook($0, in: windows) },
             fileAction("Share…", url, ShareActions.share),
             fileAction("Copy", url, ShareActions.copy),
         ]
@@ -480,7 +485,6 @@ struct MenuBuilder {
                 })
         }
 
-        let derives = DeriveOptions(for: url)
         if derives.hasAny {
             items.append(MenuRow.separator())
             if derives.canExportToMP4 {
@@ -503,11 +507,15 @@ struct MenuBuilder {
         items.append(MenuRow.separator())
         // Trash is reversible, so no confirmation; red, because it is the destructive one.
         items.append(fileAction("Rename…", url) { url in
-            ShareActions.rename(url) { state.rename(url, to: $0) }
+            ShareActions.rename(url) {
+                guard let renamed = state.rename(url, to: $0) else { return }
+                windows.previewFileRenamed(from: url, to: renamed)
+            }
         })
         items.append(MenuRow.destructive("Move to Trash") {
             guard state.fileStillExists(url) else { return }
             state.moveToTrash(url)
+            windows.closePreviewIfItsFileIsGone()
         })
         return items
     }

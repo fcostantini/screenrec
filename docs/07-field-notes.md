@@ -7,6 +7,60 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-25 (M43-T1, the Preview window and Trim — the deployed build, keys by `postToPid`):
+  🔴 **`AVPlayerView` answers space itself.** Trim binds no space key (M37-T3), yet a space sent to
+  the Trim window started playback and a second one stopped it. Keyboard focus read
+  `AXCheckBox play/pause` as the window opened. So "space plays in Trim" is the player's doing,
+  and holds only while it has the key — ⚠️ not measured while cropping, where the player draws no
+  controls. It is also why the preview's monitor must claim space: unclaimed, the player would
+  toggle too.
+  🔴 **The timeline `AXSlider`'s value is quantized.** On a 14 s clip it moved in steps of 10.4 ms
+  in a 1363-pt-wide preview (14 / 1351) and 13.8 ms in Trim (14 / 1014) — my reading: one step
+  per point of the slider's length. That still tells 60 fps frames apart on a short clip — each
+  step read back as the next frame's time rounded to a step — and cannot on a long one. Verify
+  frame stepping on a clip of seconds.
+  🔴 **With `controlsStyle = .none` the timeline slider leaves the AX tree altogether** — every
+  read was empty with Trim's crop ticked. The M37-T3 note that it "stays live whether the
+  transport is drawn or not" is about auto-hide, not `.none`. In crop mode read the filmstrip's
+  `accessibilityValue`.
+  ✅ **`keyboardEventAutorepeat` makes a posted key down a repeat** (`NSEvent.isARepeat`). ⚠️ Count
+  the toggles before trusting a held-key test: 1 + 6 repeats leaves a toggle in the same state
+  whether or not repeats are ignored. Post an odd number of repeats.
+  ⚠️ **A silent clip raises no power assertion in the app's pid** while it plays, so `pmset -g
+  assertions` cannot say whether a closed window is still playing. CPU can: 24.5 % playing a
+  4112 × 2570 clip, 8.1 % paused, 8.4 % after Esc mid-playback (armed replay is the floor).
+  ✅ **`menudriver click` takes the first match in menu order**, which for a per-file row is the
+  newest file: `touch` the clip you mean before the click.
+  ✅ **SwiftUI buttons name themselves to AX in `AXDescription`**, with an empty `AXTitle`.
+  🔴 **A resizable titled window's green button enters full screen unless the window opts out.**
+  Trim's reads `AXFullScreenButton`; the preview, built the same way plus
+  `collectionBehavior = .fullScreenNone`, reads `AXZoomButton`. I had written "the green button
+  zooms, as in Trim" into the plan and docs/06 without looking — wrong about both. Read the
+  button's AX subrole before saying what it does. ⚠️ What Trim does *in* full screen is not
+  measured: its layout, its key monitor, the ADR-023 count.
+  ✅ **A file row's AX title is `<name> — <length> · <size>`**, under `Recordings ▸`, and a
+  submenu's children are there without opening it. A click scoped to one row
+  (`title.hasPrefix(name + " — ")`) is what makes `Rename…` and `Move to Trash` safe to drive: a
+  first-match click acts on whichever file is newest.
+  ✅ **An empty or torn `.mov` loads `isPlayable == false`** and throws *"Cannot Open"* for its
+  duration; the Recordings list still shows it, as `— 0 KB`.
+  ✅ **A rename does not disturb a playing `AVPlayer`** — the clock ran on across it (2.01 → 5.23
+  → 5.65 s) with only the window's title to change.
+  ⚠️ **Known and left** (review, 2026-11-25): Trim keeps the old name and file when its clip is
+  renamed or trashed from the menu — the preview follows both, Trim was not touched. And a video
+  with a rotation transform, which this app never writes, would open the preview at its
+  pre-rotation shape: `MediaFile.dimensions` reads `naturalSize`.
+  ⚠️ **From the review's reading, not measured — a held arrow may not travel on a big take.**
+  Every key repeat starts a zero-tolerance seek that cancels the one in flight, and each step is
+  worked out from `player.currentTime()`, which does not move while a seek is pending. Trim has
+  done this since M24-T4 and the preview inherits it. Out of M43-T1's scope; measure it on a
+  4112 × 2570 take with sparse keyframes before deciding it needs one seek in flight at a time.
+  🔴 **I deployed a stale bundle.** `dist` was built before the quality pass's last edit and
+  `ditto` copied it regardless, so every reading above is of the build one refactor back. The
+  `strings | grep` check passed because the copy string it looked for predated that edit. Run
+  `Scripts/bundle.sh` as the step immediately before the swap, and confirm nothing is newer:
+  `find Sources -newer dist/ScreenRec.app/Contents/MacOS/ScreenRec` must print nothing.
+
 - 2026-11-25 (M43, filing — the SDK header and a read of the running app, nothing driven):
   ✅ **`QLPreviewPanel` has no playback API.** `QLPreviewPanel.h` in the macOS 15 SDK: a data
   source, a delegate whose `previewPanel(_:handle:)` is handed only the events the panel did not

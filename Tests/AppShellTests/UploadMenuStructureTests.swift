@@ -338,7 +338,7 @@ import UploadCore
         state.refreshRecentRecordings()
 
         #expect(submenu(state, of: "a trimmed.mp4").filter { $0 != "---" } == [
-            "Reveal in Finder", "Quick Look", "Share…", "Copy", "Upload to YouTube…",
+            "Reveal in Finder", "Play", "Share…", "Copy", "Upload to YouTube…",
             "Save as GIF", "Export Audio", "Trim…",
             "Rename…", "Move to Trash",
         ])
