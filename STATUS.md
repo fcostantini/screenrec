@@ -223,9 +223,6 @@
 - **M43-T1 (2026-11-25): one test clip is in his Trash** — `m43-verify-small.mov`, 90 KB, from
   the trash leg. Terminal cannot empty it. And `~/Movies/Try Play.mov` (15 s, no sound) is the
   clip made for his look; it is his to trash.
-- **2026-11-25, unexplained:** `Recording 2026-11-24 at 19.18.56.mov`, open in his Quick Look at
-  13:53, was not in `~/Movies` by 15:00 and Spotlight does not find it. No command of the
-  session touched it; only he can look in the Trash.
 - **v1.23.1 (2026-11-25): publish it?** `Scripts/release.sh` tags `v1.23.1`, pushes the tag and
   publishes the signed bundle as a GitHub release with the CHANGELOG section as its notes.
 - **M42-T4 (2026-11-25):** the upload sheet's two fields are his to check by hand — with no
