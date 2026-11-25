@@ -7,6 +7,23 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-25 (M43, filing — the SDK header and a read of the running app, nothing driven):
+  ✅ **`QLPreviewPanel` has no playback API.** `QLPreviewPanel.h` in the macOS 15 SDK: a data
+  source, a delegate whose `previewPanel(_:handle:)` is handed only the events the panel did not
+  use, full screen, and an opaque `displayState`. Nothing plays, pauses or seeks, so playback keys
+  cannot be added to the panel without reaching into its private views.
+  ✅ **A surface that is already open can be captured without driving anything:**
+  `CGWindowListCopyWindowInfo` for the window number, then `screencapture -x -o -l <number>` — that
+  window alone, whatever is in front of it. A plan artifact's "before" shot at no cost to Franco's
+  desktop. ⚠️ A preview's picture is his recording; crop to the window's chrome before it goes
+  into an artifact.
+  ⚠️ **Seen once, not chased:** `sips -c 92 3694 --cropOffset 2290 0` left a 3694 × 2382 capture
+  uncropped, where the same call at offset `0 0` cropped. `CGImage.cropping(to:)` in a scratch
+  script did both.
+  ⚠️ **Not measured:** which keys besides space and Esc the panel takes on a video; whether its
+  player view lives in the app's process; whether space reaches `AVPlayerView` in Trim, where the
+  app binds none (M37-T3).
+
 - 2026-11-25 (M42-T4, the editing shortcuts in an alert's field — the deployed build):
   ✅ **A text field can answer the Edit menu's shortcuts itself.** `performKeyEquivalent` on the
   field, sending the menu row's own action to a nil target: with no window open (`accessory`, no

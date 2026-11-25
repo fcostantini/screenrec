@@ -4454,6 +4454,50 @@ two-button alerts and the share sheet ruled out by name (his ruling).
 ⚠️ **v1.23.1 is committed, not published** — `Scripts/release.sh` tags and publishes, and that
 waits for his word.
 
+## M43 — The preview answers the keyboard (from Franco, 2026-11-25)
+
+**Why.** *"on quick look why does pressing space close the window? also how do i navigate playback. i
+think we should have similar controls as trim where space is play/pause and we can use the arrows +
+shift to move forwards/backwards"*. The `Quick Look` row opens the system's `QLPreviewPanel`
+(`ShareActions.swift`, M12-T1), where space and Esc are the panel's own close keys (measured,
+M42-T1) and the app installs no keys of its own; its only transport is the bar under the picture.
+**Read from the SDK header, nothing driven (2026-11-25):** `QLPreviewPanel.h` offers a data source,
+a delegate handed the events the panel did not use, full screen and an opaque `displayState` — no
+call that plays, pauses or seeks. So these keys cannot be added to the panel through public API, and
+the plan is a player window of the app's own for videos, reusing Trim's transport.
+⚠️ **Trim has no space key either** — Franco's own M37-T3 ruling (button only). His message assumes
+it has one; if space works for him there, it is `AVPlayerView` answering it while it holds focus,
+which is not measured. Whether Trim takes space too is T2, on his ruling.
+⚠️ **Not measured:** which keys besides space and Esc the panel takes on a video, and whether its
+player can be reached from the app's process. The plan as recommended needs neither.
+**Filed MINOR (ADR-013)** — a new window. The bump to 1.24.0 and the `CHANGELOG.md` entry land at
+G43.
+
+- [ ] M43-T1 **A video opens in the app's own player window: space plays and pauses, ←/→ step a
+      frame, ⇧←/⇧→ a second** (AppShell). Plan artifact:
+      `claude.ai/artifact/1JVM3aMhdTvBEQ76fUFRzb` — approved by Franco 2026-11-25 (*"let's go"*),
+      as recommended: the app's own window, the row reading `Play`, Esc closing, opening playing.
+      He ruled on neither T2 nor full screen, so both stay out.
+      **Seams:** a fourth `WindowPresenter` window, so ADR-023's count covers it with nothing new;
+      `PlayerView`, `FrameStep`, `TrimSeek` and Trim's window-scoped key monitor, with the
+      play/seek/step code moved out of `TrimView` to one place both windows call; `DeriveOptions`
+      stays the one opinion on what is a movie. `GuestWindows` is untouched — GIF and audio rows
+      keep `Quick Look` and the system panel.
+      **Verify:** the dev loop; the key table and the row's routing as pure helpers, unit-tested;
+      then on the deployed build — space holds and resumes the clock with the window still open,
+      → moves exactly one source frame and ← returns, ⇧→/⇧← move 1.00 s, a step while playing
+      keeps playing, space at the end restarts, Esc and ⌘W close to `accessory` with nothing still
+      playing, the Window menu lists the preview, a `.gif` row still opens the system panel, and
+      Trim's arrows and `Play`/`Pause` are unchanged.
+- [ ] M43-T2 **(only on Franco's ruling) Trim takes space too.** Reverses M37-T3's "button only".
+      Proposed rule: space plays or pauses unless a button or a text field holds keyboard focus —
+      the collision that ruling was about. ⚠️ Whether the key monitor can tell that in a
+      SwiftUI-hosted window is not measured; the task starts there.
+
+**Gate G43** — on the deployed build: `Play` on a video opens the app's window; space, the arrows and
+the ⇧-arrows do what the line under the picture says; the window survives space; closing it leaves
+nothing playing and no Dock tile. **(human)** Franco watches a clip with the keys.
+
 ## Dependency graph
 
 ```
