@@ -7,6 +7,13 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-25 (v1.24.0's install — a one-line swap handed to Franco):
+  🔴 **`open` straight after `kill -9` and a bundle swap fails with `-600`**
+  (`_LSOpenURLsWithCompletionHandler() failed with error -600`): the bundle was replaced and
+  nothing was running. The same `open` three seconds later launched it. Every swap I ran myself
+  had a `sleep 1` after the kill; the one-liner I gave him dropped it. Keep the wait, and check
+  the pid after — a swap that ends without the app running leaves no status item and no replay.
+
 - 2026-11-25 (M43-T1, the Preview window and Trim — the deployed build, keys by `postToPid`):
   🔴 **`AVPlayerView` answers space itself.** Trim binds no space key (M37-T3), yet a space sent to
   the Trim window started playback and a second one stopped it. Keyboard focus read

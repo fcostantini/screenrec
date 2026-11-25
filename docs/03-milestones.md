@@ -4562,9 +4562,8 @@ release gate ran clean: suite, four hardware-encode suites, release build, signe
 credentials stamped; no dialog. **v1.23.1 never had a release of its own**: its three notes were
 folded into 1.24.0's CHANGELOG section first, since `release.sh` publishes only the section
 matching VERSION.
-⚠️ **Not installed.** The app at `/Users/Shared` is the same sources built before the version
-bump, labelled 1.23.1. The swap was refused by the session's permission check; it is Franco's to
-run (STATUS, "Needs Franco").
+✅ **The installed app is the released build, byte for byte** (same cdhash, labelled 1.24.0).
+Franco ran the swap himself, the session's permission check having refused it.
 
 ## Dependency graph
 

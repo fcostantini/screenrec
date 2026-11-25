@@ -13,9 +13,9 @@
   gate ran clean (suite, four hardware-encode suites, release build, signed bundle with the
   credentials stamped; no dialog). **1131 tests.**
   **v1.23.1 never had a release of its own** — its notes were folded into 1.24.0's first.
-  ⚠️ **The installed app is not the released build.** `/Users/Shared/ScreenRec.app` is the same
-  sources built before the bump, labelled 1.23.1. The swap was refused by the session's
-  permission check — see "Needs Franco".
+  **The installed app is the released build, byte for byte** (same cdhash), labelled 1.24.0;
+  replay re-armed on launch. Franco ran the swap himself — the session's permission check had
+  refused it — and the launch needed a second `open` (docs/07).
   **Next:** nothing is open. T2 (Trim's space) and full screen only on his ruling.
 
 - **✅ M43-T1 DONE (2026-11-25) — a recording plays in the app's own window, with the keys.**
@@ -214,11 +214,6 @@
 
 ## Needs Franco (human-only items)
 
-- **v1.24.0 (2026-11-25): install the released build.** It restarts ScreenRec and empties the
-  replay buffer, so not while recording. From the repo, with `dist/` as `release.sh` left it:
-  `kill -9 $(pgrep -f /Users/Shared/ScreenRec.app/Contents/MacOS/ScreenRec); rm -rf
-  /Users/Shared/ScreenRec.app && ditto dist/ScreenRec.app /Users/Shared/ScreenRec.app && open
-  /Users/Shared/ScreenRec.app` — then the two bundles' `codesign -dvvv` CDHash should match.
 - **M43 (2026-11-25): two rulings still open.** Whether Trim's space should be the app's own
   (T2 — it already works through the player, docs/07), and whether he wants full screen in the
   preview, which is switched off. ⚠️ Trim's green button *does* enter full screen, and what
