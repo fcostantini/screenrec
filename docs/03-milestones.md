@@ -4387,7 +4387,29 @@ entry land at G42, as in M37.
       recording` (the same function as `Rename…`), the upload sheet (its default button uploads,
       and Franco was using the machine), and the two-button questions (they need a recording, a
       disconnected account or a first arm) — all the same `NSAlert.runModal()`.
-      ⚠️ **The ruling is still owed** — see STATUS "Needs Franco". T3 is filed from it.
+      ✅ **Franco's ruling (2026-11-25, *"go"* to the proposal he asked for):** fix About by
+      counting it like the preview (T3); make the alerts' text fields answer the editing shortcuts
+      themselves, with no Dock tile or bar raised for an alert (T4); leave the two-button alerts
+      and the share sheet alone; the focus question waits until he sees it himself.
+- [ ] M42-T3 **About ScreenRec keeps the app in the Dock and ⌘-Tab while it is open.** About is
+      opened from the app menu, so a window is open at that moment; closing that window under it
+      must not take the Dock tile while About is still up. It goes through
+      `WindowPresenter.show(guest:)` — T1's seam, and no second place that sets the policy.
+      Plan, with T4's (published 2026-11-25, waits for his OK):
+      https://claude.ai/artifact/Fp5hkArC7SMrs8UAfr5GeS
+      **Verify:** the dev loop; on the deployed build, Settings → About → close Settings reads
+      `regular`, bar and tile, and still does with another app in front; closing About reads
+      `accessory`; the same with About closed first and Settings second; and About opened and
+      closed twice.
+- [ ] M42-T4 **⌘A, ⌘C, ⌘V, ⌘X, ⌘Z and ⇧⌘Z work in `Rename…`, `Name this recording` and the upload
+      sheet with no window open.** The fields answer the shortcuts themselves; nothing is raised
+      for an alert (the ruling: a rename must not flash a Dock icon, and a bar under a modal alert
+      makes ⌘H live — M37-T1).
+      **Verify:** the dev loop, with unit tests for the shortcut mapping; on the deployed build
+      with no window open, T2's key test on `Rename…` reads select-all and paste, and cut, copy
+      and undo are read back from the field and the clipboard; with Settings open one ⌘V pastes
+      once, not twice. The upload sheet's two fields are a **(human)** leg, or an announced
+      hands-off window — its default button uploads.
 
 **Gate G42** — on the deployed build, with nothing else open: the preview raises the Dock tile, the
 ⌘-Tab entry and the bar; switching away and back returns to it; closing it removes all three. T2's

@@ -18,7 +18,9 @@
   🔴 **A probe mistake:** two Esc keys meant for the share picker went to Slack, which was
   frontmost (docs/07). Nothing was renamed, shared or uploaded; the test clip is gone from
   `~/Movies`.
-  **Next: Franco's ruling, then M42-T3 is filed from it** and gets its plan artifact.
+  ✅ **Ruled (Franco, 2026-11-25):** fix About (T3) and the fields' editing shortcuts (T4);
+  leave the two-button alerts and the share sheet alone.
+  **Next: M42-T3.** Its plan, with T4's, is published and waits for his OK — nothing is built.
 
 - **✅ M42-T1 DONE (2026-11-25) — the Quick Look preview has a way back.** Franco: with the
   preview open there was *"no window for that player"* after switching apps. ADR-023 counted only
@@ -252,12 +254,12 @@
 
 ## Needs Franco (human-only items)
 
-- **M42-T2 (2026-11-25): the ruling on docs/07's table.** Proposed: (1) fix About, counted like
-  the preview; (2) fix ⌘A/⌘C/⌘V/⌘X/⌘Z in the three text-field alerts — by fields that answer the
-  shortcuts themselves, or by raising the Dock tile and bar while such an alert is up; (3) leave
-  the two-button alerts and the share sheet alone. And one question: after `Rename…` or a naming
-  prompt, do you have to click your app again before typing? The probe read ScreenRec still
-  frontmost with nothing on screen, but it dismissed the alert through Accessibility.
+- **M42-T3 / T4 (2026-11-25): the plan's OK**, and with it the OK to drive the desktop for each
+  verify. T4's upload-sheet leg is his by hand (⌘V and ⌘A in Title and Description, then Cancel)
+  unless he names a hands-off moment — its default button uploads.
+- **M42-T2 (2026-11-25): one question left open.** After `Rename…` or a naming prompt, do you
+  have to click your app again before typing? The probe read ScreenRec still frontmost with
+  nothing on screen, but it dismissed the alert through Accessibility. Not in T3 or T4.
 - **M42-T1 (2026-11-25): nothing owed.** Franco confirmed a real ⌘-Tab and a click on the Dock
   icon both return to an open preview, and ran the full-screen probe himself (docs/07).
 
