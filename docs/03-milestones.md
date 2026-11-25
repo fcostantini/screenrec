@@ -4447,6 +4447,12 @@ entry land at G42, as in M37.
 **Gate G42** — on the deployed build, with nothing else open: the preview raises the Dock tile, the
 ⌘-Tab entry and the bar; switching away and back returns to it; closing it removes all three. T2's
 table is in docs/07 and every surface on it is either fixed or ruled out by name.
+✅ **PASSED 2026-11-25, on the deployed 1.23.1 build** (evidence in STATUS's gate table). The
+preview, About and `Rename…` legs were driven; the ⌘-Tab and Dock-click legs for the preview are
+Franco's, from T1. On T2's table: About fixed (T3), the three text-field alerts fixed (T4), the
+two-button alerts and the share sheet ruled out by name (his ruling).
+⚠️ **v1.23.1 is committed, not published** — `Scripts/release.sh` tags and publishes, and that
+waits for his word.
 
 ## Dependency graph
 
