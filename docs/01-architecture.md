@@ -43,7 +43,8 @@ screenrec-app/
 │   │   │                     #   AppMain (ScreenRec.run + AppDelegate), StatusItemController +
 │   │   │                     #   MenuBuilder + MenuRow (the NSMenu, M28), StatusIconImage,
 │   │   │                     #   RecentRowView + ProgressRowView (M28-T3/T4),
-│   │   │                     #   WindowPresenter (Settings/Onboarding/Trim, M28), Notifier,
+│   │   │                     #   WindowPresenter (Settings/Onboarding/Trim, M28) + GuestWindows
+│   │   │                     #   (the Quick Look panel, counted as open — M42), Notifier,
 │   │   │                     #   Relaunch, HotkeyCenter (Carbon), RegionSelectionOverlay (M11),
 │   │   │                     #   CountInOverlay (M12), NotificationSettings, LoginItem
 │   │   └── Views/            #   SettingsView, OnboardingView, TrimView, HotkeyRecorderButton,

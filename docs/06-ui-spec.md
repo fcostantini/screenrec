@@ -17,6 +17,9 @@ hosting SwiftUI views (M28-T1).
 menu bar of App / Edit / Window, all three gone again when the last window closes. Without them a
 minimized window had no route back. AppKit fills the Window menu itself, marking minimized windows, so
 that menu **is** the route back. ⚠️ First launch therefore shows a Dock icon while Onboarding is up.
+**The Quick Look preview counts as a window here** (M42-T1): it drops behind the other app's windows
+when another app comes in front, and without the Dock icon nothing led back to it. AppKit does not
+list it in the Window menu, so its routes back are the Dock icon and ⌘-Tab.
 The status item keeps its own ⌘, and ⌘Q, since the app menu is absent whenever no window is open.
 
 ## Status item (the menu-bar icon)
@@ -196,7 +199,8 @@ Order and grouping (separators between groups):
     row** — `<name> ▸ { Reveal in Finder · Quick Look · Share… · Copy | Export as MP4 · Save as GIF ·
     Export Audio · Trim… }` (the `|` is a divider: act-on-this-file above, derive-a-new-file below) — so the
     export/share/edit actions have a home; the old direct click-to-reveal moved into the submenu.
-    **Quick Look** opens the system preview panel (`QLPreviewPanel`, space toggles); **Share…** the OS
+    **Quick Look** opens the system preview panel (`QLPreviewPanel`, space toggles; the app is in the
+    Dock and ⌘-Tab while it is open — M42-T1); **Share…** the OS
     share sheet (`NSSharingServicePicker` — AirDrop/Messages/Mail, no screenrec-hosted anything);
     **Copy** writes the file to the pasteboard so ⌘V drops it into Slack/Finder. `Trim…` opens the Trim
     window (below). An export shows an `Exporting <name>…` row while it runs (stamped at open, not ticking

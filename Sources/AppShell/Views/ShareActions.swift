@@ -32,8 +32,8 @@ enum ShareActions {
     }
 
     /// Previews the file in the system Quick Look panel (space toggles, as in Finder).
-    @MainActor static func quickLook(_ url: URL) {
-        QuickLookController.shared.preview(url)
+    @MainActor static func quickLook(_ url: URL, in windows: WindowPresenter) {
+        QuickLookController.shared.preview(url, in: windows)
     }
 
     /// Prompts for a new base name (M12-T2) with a modal `NSAlert` + text field — an LSUIElement
@@ -342,20 +342,19 @@ private final class UploadFormView: NSView, NSTextFieldDelegate {
 }
 
 /// Drives the system Quick Look panel for one file from the menu-bar app (M12-T1). The panel's data
-/// source is unowned, so this is a held singleton; a `URL` (as `NSURL`) is a `QLPreviewItem`. We're an
-/// LSUIElement agent, so the app is activated to bring the panel forward.
+/// source is unowned, so this is a held singleton; a `URL` (as `NSURL`) is a `QLPreviewItem`. The
+/// panel is shown through `WindowPresenter`, which counts it as one of the app's open windows.
 @MainActor
 private final class QuickLookController: NSObject, QLPreviewPanelDataSource {
     @MainActor static let shared = QuickLookController()
 
     private var url: URL?
 
-    func preview(_ url: URL) {
+    func preview(_ url: URL, in windows: WindowPresenter) {
         self.url = url
         guard let panel = QLPreviewPanel.shared() else { return }
-        NSApp.activate(ignoringOtherApps: true)
         panel.dataSource = self
-        panel.makeKeyAndOrderFront(nil)
+        windows.show(guest: panel)
         panel.reloadData()
     }
 

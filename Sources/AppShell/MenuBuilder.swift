@@ -467,7 +467,7 @@ struct MenuBuilder {
     private func fileActions(_ url: URL) -> [NSMenuItem] {
         var items = [
             fileAction("Reveal in Finder", url, Finder.reveal),
-            fileAction("Quick Look", url, ShareActions.quickLook),
+            fileAction("Quick Look", url) { ShareActions.quickLook($0, in: windows) },
             fileAction("Share…", url, ShareActions.share),
             fileAction("Copy", url, ShareActions.copy),
         ]

@@ -20,21 +20,21 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
     weak var state: AppState?
 
     private var windows: [Kind: NSWindow] = [:]
+    private lazy var guests = GuestWindows { [weak self] in self?.applyActivationPolicyAfterClose() }
 
-    /// Opens the window, or brings an open one forward. The app's windows open behind the frontmost
-    /// app unless it activates, so presenting always does both — and the policy is set first, so the
-    /// Dock tile and menu bar are already there when the window arrives.
-    ///
-    /// `deminiaturize` because `makeKeyAndOrderFront` is a no-op on a miniaturized window: without it
-    /// this row would appear to do nothing when its window is sitting in the Dock.
+    /// Opens the window, or brings an open one forward.
     func show(_ kind: Kind) {
         guard let state else { return }
         let window = windows[kind] ?? make(kind, state: state)
         windows[kind] = window
-        applyActivationPolicy()
-        window.deminiaturize(nil)
-        window.makeKeyAndOrderFront(nil)
-        NSApplication.shared.activate(ignoringOtherApps: true)
+        bringForward(window)
+    }
+
+    /// Brings forward a window the presenter did not build — the Quick Look panel — and counts it
+    /// as open until it closes, so it earns the same Dock tile and ⌘-Tab entry (ADR-023).
+    func show(guest window: NSWindow) {
+        guests.add(window)
+        bringForward(window)
     }
 
     func close(_ kind: Kind) {
@@ -44,9 +44,23 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         guard let closing = notification.object as? NSWindow else { return }
         windows = windows.filter { $0.value !== closing }
-        // Deferred by a turn: dropping to `.accessory` while the closing window is still on screen
-        // leaves the Dock tile and the bar behind. Recomputed when it runs, so opening another
-        // window in the meantime is still correct.
+        applyActivationPolicyAfterClose()
+    }
+
+    /// The policy is set first, so the Dock tile and bar are there when the window arrives; and the
+    /// app activates, or the window opens behind the frontmost app. `deminiaturize` because
+    /// `makeKeyAndOrderFront` is a no-op on a miniaturized window.
+    private func bringForward(_ window: NSWindow) {
+        applyActivationPolicy()
+        window.deminiaturize(nil)
+        window.makeKeyAndOrderFront(nil)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    /// Deferred by a turn: dropping to `.accessory` while the closing window is still on screen
+    /// leaves the Dock tile and the bar behind. Recomputed when it runs, so opening another
+    /// window in the meantime is still correct.
+    private func applyActivationPolicyAfterClose() {
         Task { [weak self] in self?.applyActivationPolicy() }
     }
 
@@ -54,7 +68,7 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
     /// the last (ADR-023) — the bar included, because a bar with nothing drawn still answers its
     /// key equivalents.
     private func applyActivationPolicy() {
-        let policy = WindowPolicy.activationPolicy(openWindows: windows.count)
+        let policy = WindowPolicy.activationPolicy(openWindows: windows.count + guests.count)
         _ = NSApplication.shared.setActivationPolicy(policy)
         guard policy == .regular else { return MainMenu.remove() }
         guard let state else { return }

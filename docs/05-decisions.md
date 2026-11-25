@@ -285,6 +285,11 @@ window" without answering "let me switch apps mid-trim and come back", which is 
   window without closing it — which strands the pick for the life of the process.
 - **The status item is unchanged**, and keeps its own ⌘, and ⌘Q: the app menu exists only while a
   window is open, so the status menu cannot rely on it.
+- **Amended 2026-11-25 (M42-T1): the Quick Look preview is counted too.** It is the system's shared
+  panel rather than one of the three windows the app builds, so the rule above never saw it — and it
+  is the one surface a person watches for minutes, then loses behind another app with no route back.
+  Still one input and one rule: `WindowPresenter` counts a window it is asked to show until that
+  window closes. Which *other* surfaces earn the same is M42-T2's question, not settled here.
 
 ## ADR-024 ✅ The app may upload a clip the user sends to YouTube (Franco, 2026-11-16)
 The brief's non-goals say *"Handing a file off locally — the share sheet, the clipboard — is in;

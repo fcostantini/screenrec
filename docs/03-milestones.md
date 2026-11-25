@@ -4292,6 +4292,92 @@ arming sites in four suites did this, on every `swift test` — and the pre-push
 **Left out, on purpose:** macOS's own periodic re-confirmation of Terminal's screen-recording
 grant. Where it keeps those dates is protected from Terminal, and it is one dialog, not a stack.
 
+## M42 — Every window the app leaves open has a way back (from Franco, 2026-11-25)
+
+**Why.** *"when i use the quick look function to watch a video, there's no window for that player so
+if i change program i can't go back to it easily"*, then *"let's fix it, also verify if there are any
+other windows that need the same treatment"*. ADR-023 gives the app a Dock tile, a ⌘-Tab entry and a
+menu bar while a window is open, and counts only what `WindowPresenter` builds. `QuickLookController`
+(`ShareActions.swift`) orders the system's shared `QLPreviewPanel` front on its own, so the count
+stays at zero and the app stays `.accessory` with a video playing in it.
+**Read from the running app, nothing driven (2026-11-25):** policy `accessory`, and one unnamed
+off-screen window of **1847 × 1191 at window level 9** — a 16:10 take plus a title bar.
+🔴 **What I inferred from that was wrong, and T1's first measurement said so:** the panel does not
+hide when the app deactivates. It drops from level 9 to level 0 and sits *behind* the other app's
+windows, still on screen — so "there's no window" was a window with no Dock tile, no ⌘-Tab entry
+and nothing else that could raise it (docs/07, 2026-11-25).
+**Filed PATCH (ADR-013)** — a fix to a rule the app already has. The bump and the `CHANGELOG.md`
+entry land at G42, as in M37.
+
+- [x] M42-T1 **The Quick Look preview keeps the app in the Dock and ⌘-Tab while it is open**
+      (AppShell). Plan artifact: `claude.ai/artifact/1MZhfo6vw2VLcBTrRZN3TJ` — approved by Franco
+      2026-11-25 (*"go ahead"*).
+      **Seams:** `WindowPresenter` stays the one home of the policy call and `WindowPolicy` the one
+      rule; the presenter gains a way to count a window it did not build until that window closes,
+      and `QuickLookController` presents through it. ADR-023 and docs/06 "Shell" both say *three*
+      windows and are amended in the same commit.
+      🔴 **The one thing this turns on:** the signal that says *closed* must not fire when another
+      app merely comes in front — or the tile would leave at the moment it is needed. Measured
+      first, before the code is written around it: `NSWindow.willCloseNotification` against space,
+      Esc, the close button and ⌘W, and against switching to another app.
+      **Left out:** the header's own rule that a panel's `dataSource` is set only by its controller
+      (`acceptsPreviewPanelControl`) — the app has set it directly since M12-T1; a field note unless
+      the measurement makes it the fix.
+      **Verify:** the tally unit-tested with a real `NSWindow` (counted once, gone on close). On the
+      deployed build, by the M37-T1 probe (`activationPolicy`, `AXMenuBar`): no window → `accessory`;
+      Quick Look → `regular` with App / Edit / Window; another app in front → still `regular`;
+      ScreenRec re-activated → the panel is on screen again; each way of closing → `accessory`,
+      `menu bar: none`; a second file previewed while one is up counts once; with Settings open,
+      closing either leaves `regular` until both are gone.
+      **(human)** one real ⌘-Tab and one Dock click — a synthetic keystroke is not evidence (docs/07,
+      2026-08-18).
+      ✅ **Done 2026-11-25. 1102 tests** (1098 → 1102). `GuestWindows` holds a window the presenter
+      did not build until it posts `willCloseNotification`; `WindowPresenter.show(guest:)` counts
+      the panel and brings it forward the way it does its own windows.
+      ✅ **Measured first, on a scratch accessory app:** one `willCloseNotification` each for space,
+      Esc, the close button and `performClose:`; **none** when another app came in front, on
+      re-activation, or when the open panel was shown again.
+      ✅ **The same probe on both binaries.** Installed 1.23.0, preview open: `accessory`,
+      `menu bar: none`, `Dock tile: absent`; another app in front: the panel at **level 0, second
+      in z-order**, and still nothing leading to it. This build, same steps: `regular`,
+      `Apple · ScreenRec · Edit · Window`, `Dock tile: present`; another app in front: **still
+      `regular` with the tile**; ScreenRec re-activated: the panel back at level 9, first in
+      z-order.
+      ✅ **Every close returns the app to where it was:** space, Esc, the close button and
+      Window ▸ Close each read `accessory`, `menu bar: none`, `Dock tile: absent` 1.5 s later, with
+      the previous app frontmost again. Choosing `Quick Look` a second time while it was open and
+      then closing once did the same, so the panel is counted once.
+      ✅ **With Settings open as well:** closing the preview left `regular`; closing Settings with
+      the preview still up left `regular`; closing the second of them gave `accessory`.
+      ⚠️ **AppKit does not list the panel in Window ▸** — the Dock tile and ⌘-Tab are its routes back.
+      ✅ **After the review's fixes, on the reinstalled build:** open → `regular`; another app in
+      front → `regular`; chosen again and closed once → `accessory`; then reopened and closed by
+      Esc, the close button and Window ▸ Close → `accessory` each time.
+      ✅ **A review finding measured and closed:** showing the panel again 0.05 s and 0.15 s after
+      a close does not reopen it — one close notification, panel not visible — so it cannot end up
+      on screen and uncounted.
+      ⚠️ **Not measured: Quick Look's own full-screen mode** (a review finding, still open). If
+      entering it posts the close notification the Dock tile would leave under a full-screen
+      preview — the worst case is what 1.23.0 does everywhere. And the Dock tile was read through
+      Accessibility, not seen — his Dock auto-hides.
+      ⚠️ **The (human) leg is still owed** — see STATUS "Needs Franco".
+- [ ] M42-T2 **(spike) What the app's other surfaces do when another app comes in front.** Read from
+      the code, these can be up with no window open and are not counted: the three alerts with a text
+      field (`Rename…`, `Name this recording`, the upload sheet), the two-button questions (quit,
+      discard, connect, the first-arm warning), the window a `Share…` service opens, and the About
+      panel once the last window closes under it. For each, on the deployed build: is it still on
+      screen after a switch, is there a route back, does the status item answer while it is up, and
+      — for the text fields — do ⌘V and ⌘A reach them with no Edit menu installed.
+      **Not candidates, with the reason:** the region overlay (a bar over it makes ⌘H live — M37-T1),
+      the count-in (click-through, three seconds), the folder chooser (Settings is open under it),
+      and anything macOS or a browser owns.
+      **Output:** a measured table in docs/07 and a ruling from Franco on which surfaces get the
+      treatment. The fix is filed as T3 from that table, not before.
+
+**Gate G42** — on the deployed build, with nothing else open: the preview raises the Dock tile, the
+⌘-Tab entry and the bar; switching away and back returns to it; closing it removes all three. T2's
+table is in docs/07 and every surface on it is either fixed or ruled out by name.
+
 ## Dependency graph
 
 ```

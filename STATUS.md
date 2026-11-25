@@ -6,6 +6,23 @@
 
 ## Now
 
+- **✅ M42-T1 DONE (2026-11-25) — the Quick Look preview has a way back.** Franco: with the
+  preview open there was *"no window for that player"* after switching apps. ADR-023 counted only
+  the windows `WindowPresenter` builds, and the preview is the system's panel, so the app stayed
+  out of the Dock and ⌘-Tab with a video playing in it. Now the panel is counted until it closes.
+  **1102 tests** (1098 → 1102). Same probe on both binaries: 1.23.0 reads `accessory`, no bar, no
+  Dock tile with the preview open; this build reads `regular`, `Apple · ScreenRec · Edit ·
+  Window`, tile present — still so with another app in front — and `accessory` again after each
+  of space, Esc, the close button and Window ▸ Close (docs/03 has every leg).
+  🔴 **My plan's inference was wrong:** the panel does not hide on deactivation, it drops behind
+  the other app's windows (docs/07).
+  ⚠️ **One review finding is still open: Quick Look's full-screen mode is unmeasured.** Its worst
+  case is 1.23.0's behaviour. The other six findings are fixed or measured away (docs/03).
+  ⚠️ **The installed app at `/Users/Shared` is this tree's build**, still labelled 1.23.0 — the
+  PATCH bump lands at G42.
+  **Next: M42-T2**, the spike on the alerts, the share window and the About panel — it drives his
+  desktop, so it waits for his go-ahead.
+
 - **✅ M41-T1 DONE (2026-11-17) — the tests no longer record the screen.** On 2026-11-17 the
   suite's own captures (tests arming Instant Replay on a real `ReplayController`) left **137**
   macOS confirmation dialogs on Franco's desktop; he clicked through about a hundred. Now an
@@ -221,6 +238,12 @@
 
 
 ## Needs Franco (human-only items)
+
+- **M42-T1 (2026-11-25):** with a recording's `Quick Look` open, switch to another app, then come
+  back once with a real ⌘-Tab and once with a click on the Dock icon. Everything else was measured;
+  these two are the legs a synthetic event cannot stand in for. **And one look at full-screen:**
+  with the preview open, click its full-screen button and say whether the Dock icon and the
+  ScreenRec menu bar are still there, then leave full screen and ⌘-Tab away and back.
 
 **Open:**
 

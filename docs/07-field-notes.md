@@ -7,6 +7,39 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-25 (M42-T1, the Quick Look panel in an accessory app — a scratch probe, then the deployed
+  build):
+  🔴 **`QLPreviewPanel` does not hide when its app deactivates; it changes level.** `level` reads
+  **9** while the app is active and **0** once another app is in front, with `isVisible` still true
+  and `hidesOnDeactivate` false. So the preview stays on screen and drops *behind* the other app's
+  windows (`CGWindowList` z-order 1 → 2). 🔴 **I had inferred the opposite** from a level-9 window
+  that was off screen — that one was simply closed. A window's level read once says nothing about
+  what it does on deactivation; read it in both states.
+  ✅ **`NSWindow.willCloseNotification` is the close signal, and it is exact.** One post each for
+  space, Esc, the close button and `performClose:` (what ⌘W sends), about 0.2 s after the action;
+  **none** on deactivation, on re-activation, or when the open panel is shown again for another
+  file. The shared panel posts it again on every later close.
+  ⚠️ **A plain `NSWindow` that was never ordered in posts it once only** — a second `close()`
+  posts nothing. A unit test cannot close the same window twice and learn anything about the panel.
+  ✅ **The panel is not listed in `NSApp.windowsMenu`** though `isExcludedFromWindowsMenu` is false
+  (`canBecomeMain` is false, `styleMask` is `8`). The Dock tile and ⌘-Tab are its only routes back.
+  ✅ **The responder-chain search for a panel controller reaches the app delegate** even with no
+  other window: `acceptsPreviewPanelControl` was asked of it on every open and every activation.
+  ⚠️ **Out of scope, left as it is:** `QLPreviewPanel.h` says a panel's `dataSource` should be set
+  only by its controller, from `beginPreviewPanelControl`. The app has set it directly since M12-T1
+  and nothing measured here went wrong because of it; no warning from it was found in the log.
+  ✅ **After the last close macOS hands focus back by itself** — `front` read the previous app
+  1.5 s after each close, with the policy already `accessory`, the bar gone and no Dock tile. The
+  one-turn deferral `WindowPresenter` already used was enough, close animation included.
+  ✅ **Showing the panel again inside the close gap does not reopen it — the close wins.** Space,
+  then `makeKeyAndOrderFront` 0.05 s and 0.15 s later: one `willCloseNotification` either way, and
+  the panel **not visible** two seconds on. So a counted panel cannot end up on screen and
+  uncounted that way; the second request is simply lost, as it would be in any app.
+  ⚠️ **Not measured: Quick Look's own full-screen mode** — whether entering or leaving it posts
+  `willCloseNotification`. The probe for it (`enterFullScreenMode`) was not run. If it does post,
+  the app would read `accessory` under a full-screen preview and leave the panel uncounted after —
+  which is what 1.23.0 does in every mode, so the worst case is no worse than before the fix.
+
 - 2026-11-18 (M40, closed by Franco's look in Studio after the release):
   ✅ **An upload that says nothing about audience is not flagged for it.** The app sends no
   "made for kids" declaration; across the test uploads of 2026-11-16 to 2026-11-18, finished
