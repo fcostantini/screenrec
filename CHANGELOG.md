@@ -7,6 +7,20 @@ one file in the repo whose audience is not us.
 Only versions published as releases appear here; several were tagged during development and never
 published. The commit history is in the repository, where it belongs.
 
+## 1.23.1
+
+**A Quick Look preview can't get lost behind another app any more.** While a preview is open,
+ScreenRec is in the Dock and in ⌘-Tab, as it is for Settings and Trim, so you can switch away and
+come back to the video. Before, the preview dropped behind the other app's windows and nothing led
+back to it.
+
+**About ScreenRec stays reachable too.** Closing the last window under it used to leave it on screen
+with no Dock icon.
+
+**Select, copy, paste and undo work wherever you type a name.** ⌘A, ⌘C, ⌘V, ⌘X, ⌘Z and ⇧⌘Z now
+work in **Rename…**, in the naming prompt after a recording, and in the YouTube upload sheet when no
+ScreenRec window is open. They used to do nothing there.
+
 ## 1.23.0
 
 **A trimmed clip can go straight to YouTube.** The Trim window has a new button, **Upload to
