@@ -35,10 +35,19 @@ file every session is required to read.
   then `makeKeyAndOrderFront` 0.05 s and 0.15 s later: one `willCloseNotification` either way, and
   the panel **not visible** two seconds on. So a counted panel cannot end up on screen and
   uncounted that way; the second request is simply lost, as it would be in any app.
-  ⚠️ **Not measured: Quick Look's own full-screen mode** — whether entering or leaving it posts
-  `willCloseNotification`. The probe for it (`enterFullScreenMode`) was not run. If it does post,
-  the app would read `accessory` under a full-screen preview and leave the panel uncounted after —
-  which is what 1.23.0 does in every mode, so the worst case is no worse than before the fix.
+  ✅ **Full screen is three more windows, and the panel's notification stays exact through it**
+  (Franco ran the probe; `enterFullScreenMode` from a scratch process, not the button in the
+  installed app). `QLFullscreenWindow`, `QLBackgroundFullscreenWindow` and
+  `QLFullscreenControlsPanel` each post their own `willCloseNotification` when full screen ends,
+  so an observer has to be registered for the panel object, not for the name alone. Entering
+  posted **nothing** from the panel, from an open panel or directly from closed. Entered from an
+  open panel, full screen ended and left the panel on screen as a window, with no notification;
+  entered directly and left with Esc, the panel posted once and nothing stayed visible. In every
+  sample the panel had posted exactly when the preview was gone.
+  ⚠️ **Two things from that run are unexplained.** The first full screen ended by itself 1.7 s in,
+  with no key sent — the clip is 3 s long and would have reached its end about then, which is a
+  guess. And `exitFullScreenMode` on a panel that was no longer in full screen closed it, 2.2 s
+  later. `isInFullScreenMode` read false throughout, but no sample fell inside full screen.
 
 - 2026-11-18 (M40, closed by Franco's look in Studio after the release):
   ✅ **An upload that says nothing about audience is not flagged for it.** The app sends no

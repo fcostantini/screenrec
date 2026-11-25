@@ -16,8 +16,9 @@
   of space, Esc, the close button and Window ▸ Close (docs/03 has every leg).
   🔴 **My plan's inference was wrong:** the panel does not hide on deactivation, it drops behind
   the other app's windows (docs/07).
-  ⚠️ **One review finding is still open: Quick Look's full-screen mode is unmeasured.** Its worst
-  case is 1.23.0's behaviour. The other six findings are fixed or measured away (docs/03).
+  ✅ **Every review finding is closed.** Full-screen was the last: Franco ran the probe, and the
+  panel's close notification was posted only when the preview left the screen, never on entering
+  full screen (docs/07). ✅ **The human leg passed:** his ⌘-Tab and Dock click both return to it.
   ⚠️ **The installed app at `/Users/Shared` is this tree's build**, still labelled 1.23.0 — the
   PATCH bump lands at G42.
   **Next: M42-T2**, the spike on the alerts, the share window and the About panel — it drives his
@@ -239,11 +240,8 @@
 
 ## Needs Franco (human-only items)
 
-- **M42-T1 (2026-11-25):** with a recording's `Quick Look` open, switch to another app, then come
-  back once with a real ⌘-Tab and once with a click on the Dock icon. Everything else was measured;
-  these two are the legs a synthetic event cannot stand in for. **And one look at full-screen:**
-  with the preview open, click its full-screen button and say whether the Dock icon and the
-  ScreenRec menu bar are still there, then leave full screen and ⌘-Tab away and back.
+- **M42-T1 (2026-11-25): nothing owed.** Franco confirmed a real ⌘-Tab and a click on the Dock
+  icon both return to an open preview, and ran the full-screen probe himself (docs/07).
 
 **Open:**
 

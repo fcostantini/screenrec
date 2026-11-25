@@ -4356,11 +4356,15 @@ entry land at G42, as in M37.
       ✅ **A review finding measured and closed:** showing the panel again 0.05 s and 0.15 s after
       a close does not reopen it — one close notification, panel not visible — so it cannot end up
       on screen and uncounted.
-      ⚠️ **Not measured: Quick Look's own full-screen mode** (a review finding, still open). If
-      entering it posts the close notification the Dock tile would leave under a full-screen
-      preview — the worst case is what 1.23.0 does everywhere. And the Dock tile was read through
-      Accessibility, not seen — his Dock auto-hides.
-      ⚠️ **The (human) leg is still owed** — see STATUS "Needs Franco".
+      ✅ **The last review finding, measured and closed: Quick Look's full-screen mode.** Franco
+      ran the probe (2026-11-25). Entering full screen posted no close notification from the panel;
+      full screen's own three windows post theirs, and the count ignores them. Leaving it either
+      returned to the panel with nothing posted, or closed the preview with one post and nothing
+      left on screen. Driven through `enterFullScreenMode` in a scratch process — the button in the
+      installed app was not pressed (docs/07).
+      ⚠️ The Dock tile was read through Accessibility, not seen — his Dock auto-hides.
+      ✅ **The (human) leg passed** (Franco, 2026-11-25: *"i can confirm 1"*, to the ask for one
+      real ⌘-Tab and one Dock click back to an open preview).
 - [ ] M42-T2 **(spike) What the app's other surfaces do when another app comes in front.** Read from
       the code, these can be up with no window open and are not counted: the three alerts with a text
       field (`Rename…`, `Name this recording`, the upload sheet), the two-button questions (quit,
