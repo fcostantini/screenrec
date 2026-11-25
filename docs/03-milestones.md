@@ -4551,6 +4551,14 @@ the ⇧-arrows do what the line under the picture says; the window survives spac
 nothing playing and no Dock tile. **(human)** Franco watches a clip with the keys.
 At the gate: VERSION 1.24.0, `CoreInfo.version`, the `CHANGELOG.md` entry, and `README.md`'s
 file-row line, which still offers Quick Look on a recording.
+✅ **PASSED 2026-11-25.** The driven legs are T1's, on the deployed build (above). The human leg:
+Franco played a recording in the new window — *"looks great"* — so the 70 % opening size, the line
+of keys, Esc closing and opening playing all stand. VERSION, `CoreInfo.version`, CHANGELOG and README
+say 1.24.0; the dev loop is clean on it (1131 tests, release build, a bundle that reads 1.24.0).
+⚠️ **v1.24.0 is committed, not published and not installed.** `Scripts/release.sh` tags and
+publishes on his word; the app at `/Users/Shared` is this code still labelled 1.23.1, and
+reinstalling restarts it, which is also his word. ⚠️ **v1.23.1 was never published**, and
+`release.sh` publishes only the CHANGELOG section matching VERSION.
 
 ## Dependency graph
 

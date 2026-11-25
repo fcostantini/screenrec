@@ -89,7 +89,8 @@ Everything is in the menu-bar menu:
 - **Stop & Copy MP4** — stops, transcodes to the message-safe profile and leaves the `.mp4` on the
   clipboard, so the next keystroke is ⌘V.
 - **Recent recordings** — from each: **export a shareable MP4 or GIF**, **trim** it (losslessly, or
-  re-encoded to hold only the kept range), rename, reveal, Quick Look. The original is never touched,
+  re-encoded to hold only the kept range), rename, reveal, and **play** it in a window the keyboard
+  drives: space plays and pauses, ←/→ step a frame, ⇧←/⇧→ a second. The original is never touched,
   and the Trim window can write the shareable `.mp4` of a range directly.
 - **Upload to YouTube…** — in the Trim window and on every exported `.mp4`: a title, a description
   and who can watch (unlisted unless you choose otherwise), then the link is on the clipboard. Connect
