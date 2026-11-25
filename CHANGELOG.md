@@ -19,14 +19,10 @@ could move through the video.
 opens at the recording's own shape. Drag it and it opens in that place next time; resize it and it
 keeps that size too.
 
-**GIFs and audio files still open in Quick Look**, and their row still says so.
-
-## 1.23.1
-
-**A Quick Look preview can't get lost behind another app any more.** While a preview is open,
-ScreenRec is in the Dock and in ⌘-Tab, as it is for Settings and Trim, so you can switch away and
-come back to the video. Before, the preview dropped behind the other app's windows and nothing led
-back to it.
+**GIFs and audio files still open in Quick Look, and that preview can't get lost any more.** Their
+row still says Quick Look. While the preview is open, ScreenRec is in the Dock and in ⌘-Tab, as it is
+for Settings and Trim, so you can switch away and come back to it. Before, the preview dropped behind
+the other app's windows and nothing led back to it.
 
 **About ScreenRec stays reachable too.** Closing the last window under it used to leave it on screen
 with no Dock icon.
