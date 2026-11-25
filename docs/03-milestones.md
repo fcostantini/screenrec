@@ -4452,7 +4452,8 @@ preview, About and `Rename…` legs were driven; the ⌘-Tab and Dock-click legs
 Franco's, from T1. On T2's table: About fixed (T3), the three text-field alerts fixed (T4), the
 two-button alerts and the share sheet ruled out by name (his ruling).
 ⚠️ **v1.23.1 is committed, not published** — `Scripts/release.sh` tags and publishes, and that
-waits for his word.
+waits for his word. *(2026-11-25: it was never published on its own; its notes went out in
+v1.24.0's release — M43.)*
 
 ## M43 — The preview answers the keyboard (from Franco, 2026-11-25)
 
@@ -4555,10 +4556,15 @@ file-row line, which still offers Quick Look on a recording.
 Franco played a recording in the new window — *"looks great"* — so the 70 % opening size, the line
 of keys, Esc closing and opening playing all stand. VERSION, `CoreInfo.version`, CHANGELOG and README
 say 1.24.0; the dev loop is clean on it (1131 tests, release build, a bundle that reads 1.24.0).
-⚠️ **v1.24.0 is committed, not published and not installed.** `Scripts/release.sh` tags and
-publishes on his word; the app at `/Users/Shared` is this code still labelled 1.23.1, and
-reinstalling restarts it, which is also his word. ⚠️ **v1.23.1 was never published**, and
-`release.sh` publishes only the CHANGELOG section matching VERSION.
+🚢 **v1.24.0 RELEASED 2026-11-25**, on Franco's word (*"yes let's publish"*) —
+`github.com/fcostantini/screenrec/releases/tag/v1.24.0`, signed bundle attached (1.5 MB). The
+release gate ran clean: suite, four hardware-encode suites, release build, signed bundle with the
+credentials stamped; no dialog. **v1.23.1 never had a release of its own**: its three notes were
+folded into 1.24.0's CHANGELOG section first, since `release.sh` publishes only the section
+matching VERSION.
+⚠️ **Not installed.** The app at `/Users/Shared` is the same sources built before the version
+bump, labelled 1.23.1. The swap was refused by the session's permission check; it is Franco's to
+run (STATUS, "Needs Franco").
 
 ## Dependency graph
 
