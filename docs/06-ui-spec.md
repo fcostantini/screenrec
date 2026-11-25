@@ -218,7 +218,10 @@ Order and grouping (separators between groups):
     **manage** group: **`Rename…`** (an `NSAlert` text field, extension preserved, collisions → ` 2`) and
     **`Move to Trash`** (reversible → no confirmation, red attributed title). Both act on the row's own file
     only — trashing/renaming a derived `.mp4` never touches its `.mov` source. The saved-replay receipt
-    (M9-T2) shares the same submenu.
+    (M9-T2) shares the same submenu. **The alert's field takes ⌘A ⌘C ⌘V ⌘X ⌘Z ⇧⌘Z whether or not a
+    window is open** (M42-T4) — with none open there is no Edit menu to deliver them, so the field
+    answers them itself, and no Dock icon or bar is raised for an alert. The same holds for
+    `Name this recording` and the upload sheet's Title and Description.
     **M24-T5: the derive group is offered only where it applies** (`DeriveOptions`, by container).
     A **`.gif`** gets none of the three — AVFoundation can't read one at all, so every row was a
     failure notice waiting to happen — and its divider goes with them. An **`.mp4`/`.m4v`** loses

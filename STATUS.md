@@ -6,6 +6,15 @@
 
 ## Now
 
+- **✅ M42-T4 DONE (2026-11-25) — the alerts' fields take the editing shortcuts.** `Rename…`,
+  `Name this recording` and the upload sheet's two fields are `EditShortcutField`s, which answer
+  ⌘A ⌘C ⌘V ⌘X ⌘Z ⇧⌘Z themselves; no Dock tile or bar is raised for an alert. **1107 tests.** On
+  the deployed build with no window open all six read back from `Rename…`'s field and the
+  clipboard, and with Settings open one ⌘V pasted once (docs/03).
+  ⚠️ **Not driven:** the upload sheet's fields — his leg, below.
+  **Next: Gate G42** — the PATCH bump to 1.23.1, the CHANGELOG entry and the gate's deployed
+  run. Waits for his go-ahead.
+
 - **✅ M42-T3 DONE (2026-11-25) — About keeps its way back.** The About row now goes through
   `WindowPresenter`, which counts the panel like the preview. **1103 tests.** On the deployed
   build: Settings → About → Settings closed stays `regular` with the bar and the Dock tile, also
@@ -13,7 +22,6 @@
   open behave (docs/03). Both unknowns in the plan were measured first (docs/07).
   ⚠️ **The installed app at `/Users/Shared` is this tree's build**, still labelled 1.23.0 — the
   PATCH bump lands at G42.
-  **Next: M42-T4**, the editing shortcuts in the alerts' fields — waits for his go-ahead.
 
 - **✅ M42-T2 MEASURED (2026-11-25) — two of the other surfaces need a fix; the ruling is
   Franco's.** On the deployed build with no window open (table in docs/07):
@@ -261,9 +269,9 @@
 
 ## Needs Franco (human-only items)
 
-- **M42-T4, once it is built:** the upload sheet's two fields are his to check by hand (⌘V and
-  ⌘A in Title and Description, then Cancel) unless he names a hands-off moment — its default
-  button uploads.
+- **M42-T4 (2026-11-25):** the upload sheet's two fields are his to check by hand — with no
+  window open, `Upload to YouTube…` on a clip, then ⌘A and ⌘V in Title and in Description, then
+  **Cancel**. Its default button uploads, so it was not raised by the probe.
 - **M42-T3 (2026-11-25), a light one:** Settings → `ScreenRec ▸ About ScreenRec` → close Settings,
   then ⌘-Tab away and back. The probe read everything; this is the look a person gives it.
 - **M42-T2 (2026-11-25): one question left open.** After `Rename…` or a naming prompt, do you

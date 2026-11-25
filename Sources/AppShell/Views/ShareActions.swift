@@ -166,7 +166,7 @@ enum ShareActions {
         alert.addButton(withTitle: confirm)
         alert.addButton(withTitle: "Cancel")
 
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        let field = EditShortcutField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
         field.stringValue = url.deletingPathExtension().lastPathComponent
         alert.accessoryView = field
         alert.window.initialFirstResponder = field
@@ -183,8 +183,8 @@ enum ShareActions {
 /// — as the user types, so a title YouTube would refuse can't be sent — and holds none of its own.
 @MainActor
 private final class UploadFormView: NSView, NSTextFieldDelegate {
-    let titleField = NSTextField()
-    private let descriptionField = NSTextField()
+    let titleField: NSTextField = EditShortcutField()
+    private let descriptionField: NSTextField = EditShortcutField()
     private let visibility = NSPopUpButton()
     private let visibilityCaption = NSTextField(wrappingLabelWithString: "")
     private let confirm: NSButton

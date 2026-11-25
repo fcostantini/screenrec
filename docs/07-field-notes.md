@@ -7,6 +7,28 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-25 (M42-T4, the editing shortcuts in an alert's field — the deployed build):
+  ✅ **A text field can answer the Edit menu's shortcuts itself.** `performKeyEquivalent` on the
+  field, sending the menu row's own action to a nil target: with no window open (`accessory`, no
+  bar) ⌘A, ⌘C, ⌘X, ⌘Z, ⇧⌘Z and ⌘V all read back from `Rename…`'s field and the clipboard.
+  ✅ **An alert's field keeps an undo history** — ⌘Z brought a cut name back and ⇧⌘Z cut it again,
+  with nothing done to enable it. `undo:` sent down the chain from the field editor is enough.
+  ✅ **With a bar present the field answers first and the menu never sees the key**: Settings
+  open, one ⌘V left `M42PASTE` in the field, not the text twice.
+  ✅ **Assigning `stringValue` to a field being edited drops its undo history** (a scratch alert
+  whose delegate rewrites the text the way the upload sheet's rules do): after a rewrite
+  `canUndo` is false, later typing undoes back to the rewritten text and no further, and nothing
+  raised. So ⌘Z cannot act on ranges from before a rule ran.
+  ⚠️ **Not measured: a non-Latin layout.** The field matches `NSEvent.characters`, which is the
+  ⌘-level letter. Falling back to `charactersIgnoringModifiers` was rejected unmeasured: on
+  Dvorak – QWERTY ⌘ that is the Dvorak letter, so the key the menu calls ⌘. would paste.
+  ⚠️ **The field sends its action unvalidated**, where a menu row is validated first — ⌘C with
+  nothing selected may beep where the menu path stays silent. Left as it is.
+  ⚠️ **Swift Testing destructures an argument tuple of two, not three**: `@Test(arguments:)` over
+  3-tuples fails with "no exact matches in call to macro 'Test'".
+  ⚠️ **Not driven:** the upload sheet's two fields (its default button uploads — a human leg) and
+  `Name this recording` (the same function as `Rename…`).
+
 - 2026-11-25 (M42-T3, the standard About panel — a scratch probe, then the deployed build):
   ✅ **`orderFrontStandardAboutPanel` has shown the panel by the time it returns**, and it is the
   one window that became visible across the call (the key window too). An `NSPanel` with no title,

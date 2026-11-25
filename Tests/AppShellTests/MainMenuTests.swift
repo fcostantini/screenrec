@@ -42,8 +42,8 @@ import Testing
         #expect(close?.action == #selector(NSWindow.performClose(_:)))
     }
 
-    /// The Edit menu's reason for existing: without a bound ⌘V, the `Rename…` field can't be pasted
-    /// into, because a text field takes the standard editing commands through menu items only.
+    /// The Edit menu's reason for existing: without a bound ⌘V, a window's text field can't be
+    /// pasted into, because it takes the standard editing commands through menu items only.
     @Test func pasteIsBoundSoATextFieldCanTakeIt() {
         let paste = menu("Edit")?.item(withTitle: "Paste")
         #expect(paste?.keyEquivalent == "v")

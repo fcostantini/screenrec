@@ -48,7 +48,8 @@ screenrec-app/
 │   │   │                     #   Relaunch, HotkeyCenter (Carbon), RegionSelectionOverlay (M11),
 │   │   │                     #   CountInOverlay (M12), NotificationSettings, LoginItem
 │   │   └── Views/            #   SettingsView, OnboardingView, TrimView, HotkeyRecorderButton,
-│   │                         #   ShareActions (pasteboard/share sheet/alerts), Finder
+│   │                         #   ShareActions (pasteboard/share sheet/alerts), Finder,
+│   │                         #   EditShortcutField (an alert's field; ⌘V with no Edit menu)
 │   └── ScreenRecApp/          # The executable: main.swift calls `ScreenRec.run()`, and Resources/
 │                             #   (Info.plist, AppIcon.icns) which bundle.sh copies from this path
 ├── Scripts/                   # bundle.sh, devsign.sh, release.sh, smoke.sh (M13), hooks/pre-push

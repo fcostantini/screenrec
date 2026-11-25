@@ -1,11 +1,10 @@
 import AppCore
 import AppKit
 
-/// The menu bar, which the app shows only while a window is open (`WindowPolicy`, ADR-023).
-///
-/// Built by hand because there is no nib: a `.regular` app whose `mainMenu` is nil renders a bar
-/// holding nothing but the Apple menu. Edit is not decoration — the standard editing key equivalents
-/// reach a text field only through menu items, so without it ⌘V cannot paste into `Rename…`.
+/// The menu bar, which the app shows only while a window is open (`WindowPolicy`, ADR-023). Built
+/// by hand, there being no nib: a `.regular` app with a nil `mainMenu` shows only the Apple menu.
+/// Edit is not decoration — a window's text field takes the editing key equivalents only through
+/// its rows. An alert's field, which can be up with no bar, answers them itself (`EditShortcut`).
 @MainActor
 enum MainMenu {
 
@@ -70,17 +69,15 @@ enum MainMenu {
 
     private static func editMenu() -> NSMenu {
         let menu = NSMenu(title: "Edit")
-        // `undo:` and `redo:` are responder actions with no Swift declaration to point `#selector`
-        // at; the rest are declared on `NSText`.
-        menu.addItem(responderRow("Undo", Selector(("undo:")), "z"))
-        let redo = responderRow("Redo", Selector(("redo:")), "z")
+        menu.addItem(responderRow("Undo", EditShortcut.undo.action, "z"))
+        let redo = responderRow("Redo", EditShortcut.redo.action, "z")
         redo.keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(redo)
         menu.addItem(.separator())
-        menu.addItem(responderRow("Cut", #selector(NSText.cut(_:)), "x"))
-        menu.addItem(responderRow("Copy", #selector(NSText.copy(_:)), "c"))
-        menu.addItem(responderRow("Paste", #selector(NSText.paste(_:)), "v"))
-        menu.addItem(responderRow("Select All", #selector(NSText.selectAll(_:)), "a"))
+        menu.addItem(responderRow("Cut", EditShortcut.cut.action, "x"))
+        menu.addItem(responderRow("Copy", EditShortcut.copy.action, "c"))
+        menu.addItem(responderRow("Paste", EditShortcut.paste.action, "v"))
+        menu.addItem(responderRow("Select All", EditShortcut.selectAll.action, "a"))
         return menu
     }
 

@@ -4416,7 +4416,7 @@ entry land at G42, as in M37.
       ✅ **Review: no bug, three nits** (shown to Franco first). The About row is now dimmed under
       an alert, which docs/06 says; the panel's detection has no unit test because one would open
       a real About panel on every run; the version bump stays at G42.
-- [ ] M42-T4 **⌘A, ⌘C, ⌘V, ⌘X, ⌘Z and ⇧⌘Z work in `Rename…`, `Name this recording` and the upload
+- [x] M42-T4 **⌘A, ⌘C, ⌘V, ⌘X, ⌘Z and ⇧⌘Z work in `Rename…`, `Name this recording` and the upload
       sheet with no window open.** The fields answer the shortcuts themselves; nothing is raised
       for an alert (the ruling: a rename must not flash a Dock icon, and a bar under a modal alert
       makes ⌘H live — M37-T1).
@@ -4425,6 +4425,24 @@ entry land at G42, as in M37.
       and undo are read back from the field and the clipboard; with Settings open one ⌘V pastes
       once, not twice. The upload sheet's two fields are a **(human)** leg, or an announced
       hands-off window — its default button uploads.
+      ✅ **Go-ahead** (Franco, 2026-11-25). **1107 tests** (1103 → 1107).
+      ✅ **On the deployed build, no window open** (`accessory`, no bar, no Dock tile), `Rename…`
+      on a test clip, keys posted to the app only: `→` moved the caret; ⌘A selected all nine
+      characters; ⌘C put the name on the clipboard; ⌘X emptied the field and did the same; ⌘Z
+      brought the name back; ⇧⌘Z emptied it again; ⌘V left exactly the pasted text.
+      ✅ **With Settings open** (`regular`, the Edit menu present) the same seven reads, and one
+      ⌘V pasted once.
+      ✅ Cancelled each time: nothing renamed, the test clip removed, the clipboard put back.
+      ⚠️ **Not driven:** `Name this recording` (the same function) and the upload sheet's Title
+      and Description — **(human)**, see STATUS "Needs Franco".
+      ✅ **Review: five points** (shown to Franco first). Undo after a rule rewrites the upload
+      sheet's text was measured in a scratch alert and is no defect — the rewrite drops the undo
+      history. The Edit menu's rows are now built from the field's own table, and a comment was
+      trimmed. Left, with the reason in docs/07: non-Latin layouts (not measurable here) and
+      validation before sending.
+      ✅ **After the review's fixes, on the reinstalled build:** the same seven reads with no
+      window open; and with Settings open, `Edit ▸ Select All` chosen from the bar took the
+      field's selection from `{9,0}` to `{0,9}` — the menu's rows still reach it.
 
 **Gate G42** — on the deployed build, with nothing else open: the preview raises the Dock tile, the
 ⌘-Tab entry and the bar; switching away and back returns to it; closing it removes all three. T2's
