@@ -20,6 +20,9 @@ that menu **is** the route back. ⚠️ First launch therefore shows a Dock icon
 **The Quick Look preview counts as a window here** (M42-T1): it drops behind the other app's windows
 when another app comes in front, and without the Dock icon nothing led back to it. AppKit does not
 list it in the Window menu, so its routes back are the Dock icon and ⌘-Tab.
+**So does `About ScreenRec`** (M42-T3), opened from the app menu: closing the last window under it
+leaves the Dock icon, the ⌘-Tab entry and the bar until About itself is closed. Its row is dimmed
+while an alert is up, as `Settings…` and `Quit ScreenRec` beside it are.
 The status item keeps its own ⌘, and ⌘Q, since the app menu is absent whenever no window is open.
 
 ## Status item (the menu-bar icon)

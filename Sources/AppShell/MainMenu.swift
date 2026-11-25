@@ -49,8 +49,7 @@ enum MainMenu {
     /// bar item takes, and how the tests find it.
     private static func appMenu(state: AppState, windows: WindowPresenter) -> NSMenu {
         let menu = NSMenu(title: appName)
-        menu.addItem(responderRow(
-            "About \(appName)", #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
+        menu.addItem(MenuRow.action("About \(appName)") { windows.showAbout() })
         menu.addItem(.separator())
         let settings = MenuRow.action("Settings…") { windows.show(.settings) }
         settings.keyEquivalent = ","

@@ -7,6 +7,20 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-25 (M42-T3, the standard About panel — a scratch probe, then the deployed build):
+  ✅ **`orderFrontStandardAboutPanel` has shown the panel by the time it returns**, and it is the
+  one window that became visible across the call (the key window too). An `NSPanel` with no title,
+  level 0, `styleMask` 3, `canBecomeMain` false, `isReleasedWhenClosed` false.
+  ⚠️ **AppKit builds a new panel for every open.** The second open was a different object, and the
+  closed one was still in `NSApp.windows`. A reference kept from one open says nothing about the
+  next; identify the panel per call.
+  ✅ **Chosen again while open, nothing becomes newly visible** — AppKit brings the open panel
+  forward itself.
+  ✅ **It posts `willCloseNotification` once per close**: `performClose:`, the close button and
+  `close()`, over three opens.
+  ✅ **Closing it last hands focus back**, as the preview does: the previous app was frontmost
+  1.8 s later with the policy `accessory`.
+
 - 2026-11-25 (M42-T2, a spike: the app's alerts, share sheet and About panel when another app comes
   in front — the deployed build, no window open unless said, driven through Accessibility):
 

@@ -1,8 +1,8 @@
 import AppKit
 
-/// Windows the app counts as open without having built them (ADR-023) — the Quick Look panel,
-/// which is the system's. One is counted until it closes: `willCloseNotification` is not posted
-/// when another app comes in front, so the panel stays counted behind it (docs/07).
+/// Windows the app counts as open without having built them (ADR-023) — the Quick Look panel and
+/// the About panel, which are the system's. One is counted until it closes: `willCloseNotification`
+/// is not posted when another app comes in front, so it stays counted behind that app (docs/07).
 @MainActor
 final class GuestWindows: NSObject {
 

@@ -290,6 +290,10 @@ window" without answering "let me switch apps mid-trim and come back", which is 
   is the one surface a person watches for minutes, then loses behind another app with no route back.
   Still one input and one rule: `WindowPresenter` counts a window it is asked to show until that
   window closes. Which *other* surfaces earn the same is M42-T2's question, not settled here.
+- **Amended 2026-11-25 (M42-T3): the About panel is counted too** (Franco's ruling on M42-T2's
+  table). It is opened from the app menu, so a window is always open at that moment — and closing
+  that window under it left About on screen with no Dock tile. The alerts and the share sheet are
+  **not** counted: they stay above other apps' windows and cannot be lost (docs/07).
 
 ## ADR-024 ✅ The app may upload a clip the user sends to YouTube (Franco, 2026-11-16)
 The brief's non-goals say *"Handing a file off locally — the share sheet, the clipboard — is in;

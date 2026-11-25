@@ -30,11 +30,24 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
         bringForward(window)
     }
 
-    /// Brings forward a window the presenter did not build — the Quick Look panel — and counts it
-    /// as open until it closes, so it earns the same Dock tile and ⌘-Tab entry (ADR-023).
+    /// Brings forward a window the presenter did not build — the Quick Look panel, the About
+    /// panel — and counts it as open until it closes, so it earns the same Dock tile and ⌘-Tab
+    /// entry (ADR-023).
     func show(guest window: NSWindow) {
         guests.add(window)
         bringForward(window)
+    }
+
+    /// AppKit returns no reference to its About panel and builds a new one per open, so the panel
+    /// is the window the call made visible. Chosen again while open, there is none: it is counted.
+    func showAbout() {
+        let app = NSApplication.shared
+        let visible = app.windows.filter(\.isVisible)
+        app.orderFrontStandardAboutPanel(nil)
+        guard let panel = app.windows.first(where: { window in
+            window.isVisible && !visible.contains { $0 === window }
+        }) else { return }
+        show(guest: panel)
     }
 
     func close(_ kind: Kind) {

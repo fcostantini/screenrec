@@ -55,6 +55,11 @@ import Testing
         #expect(edit?.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.target == nil } == true)
     }
 
+    /// A row sent straight to AppKit opens a panel the app never counts (ADR-023).
+    @Test func aboutGoesThroughTheAppSoItsPanelIsCounted() {
+        #expect(menu("ScreenRec")?.item(withTitle: "About ScreenRec") is ActionMenuItem)
+    }
+
     @Test func settingsAndQuitCarryTheSameShortcutsAsTheStatusMenu() {
         let app = menu("ScreenRec")
         #expect(app?.item(withTitle: "Settings…")?.keyEquivalent == ",")

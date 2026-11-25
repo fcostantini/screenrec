@@ -4391,16 +4391,31 @@ entry land at G42, as in M37.
       counting it like the preview (T3); make the alerts' text fields answer the editing shortcuts
       themselves, with no Dock tile or bar raised for an alert (T4); leave the two-button alerts
       and the share sheet alone; the focus question waits until he sees it himself.
-- [ ] M42-T3 **About ScreenRec keeps the app in the Dock and ⌘-Tab while it is open.** About is
+- [x] M42-T3 **About ScreenRec keeps the app in the Dock and ⌘-Tab while it is open.** About is
       opened from the app menu, so a window is open at that moment; closing that window under it
       must not take the Dock tile while About is still up. It goes through
       `WindowPresenter.show(guest:)` — T1's seam, and no second place that sets the policy.
-      Plan, with T4's (published 2026-11-25, waits for his OK):
-      https://claude.ai/artifact/Fp5hkArC7SMrs8UAfr5GeS
+      Plan, with T4's: https://claude.ai/artifact/Fp5hkArC7SMrs8UAfr5GeS
       **Verify:** the dev loop; on the deployed build, Settings → About → close Settings reads
       `regular`, bar and tile, and still does with another app in front; closing About reads
       `accessory`; the same with About closed first and Settings second; and About opened and
       closed twice.
+      ✅ **Approved** (Franco, 2026-11-25: *"let's go"*). **1103 tests** (1102 → 1103).
+      ✅ **The plan's two unknowns, measured first** (a scratch probe, docs/07): the panel is the
+      one window the call makes visible, a new object on every open; and it posts the close
+      notification on every close.
+      ✅ **On the deployed build.** Settings → About → Settings closed: `regular`,
+      `Apple · ScreenRec · Edit · Window`, `Dock tile: present`, About on screen. Another app
+      activated: still `regular` with the tile, About behind that app's window. ScreenRec
+      activated: About ahead again. About closed: `accessory`, no bar, no tile, the previous app
+      frontmost.
+      ✅ **The other order and the count:** About closed first left `regular` until Settings
+      closed, then `accessory`. About chosen twice and closed once, two rounds running, read
+      `accessory` each time.
+      ⚠️ The Dock tile was read through Accessibility, as in T1 — his Dock auto-hides.
+      ✅ **Review: no bug, three nits** (shown to Franco first). The About row is now dimmed under
+      an alert, which docs/06 says; the panel's detection has no unit test because one would open
+      a real About panel on every run; the version bump stays at G42.
 - [ ] M42-T4 **⌘A, ⌘C, ⌘V, ⌘X, ⌘Z and ⇧⌘Z work in `Rename…`, `Name this recording` and the upload
       sheet with no window open.** The fields answer the shortcuts themselves; nothing is raised
       for an alert (the ruling: a rename must not flash a Dock icon, and a bar under a modal alert

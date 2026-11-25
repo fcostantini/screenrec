@@ -6,6 +6,15 @@
 
 ## Now
 
+- **✅ M42-T3 DONE (2026-11-25) — About keeps its way back.** The About row now goes through
+  `WindowPresenter`, which counts the panel like the preview. **1103 tests.** On the deployed
+  build: Settings → About → Settings closed stays `regular` with the bar and the Dock tile, also
+  with another app in front; closing About reads `accessory`; either closing order and a repeat
+  open behave (docs/03). Both unknowns in the plan were measured first (docs/07).
+  ⚠️ **The installed app at `/Users/Shared` is this tree's build**, still labelled 1.23.0 — the
+  PATCH bump lands at G42.
+  **Next: M42-T4**, the editing shortcuts in the alerts' fields — waits for his go-ahead.
+
 - **✅ M42-T2 MEASURED (2026-11-25) — two of the other surfaces need a fix; the ruling is
   Franco's.** On the deployed build with no window open (table in docs/07):
   🔴 **About is lost** the way the preview was — close the last window under it and it stays on
@@ -20,7 +29,7 @@
   `~/Movies`.
   ✅ **Ruled (Franco, 2026-11-25):** fix About (T3) and the fields' editing shortcuts (T4);
   leave the two-button alerts and the share sheet alone.
-  **Next: M42-T3.** Its plan, with T4's, is published and waits for his OK — nothing is built.
+  The plan for both: https://claude.ai/artifact/Fp5hkArC7SMrs8UAfr5GeS (approved 2026-11-25).
 
 - **✅ M42-T1 DONE (2026-11-25) — the Quick Look preview has a way back.** Franco: with the
   preview open there was *"no window for that player"* after switching apps. ADR-023 counted only
@@ -35,8 +44,6 @@
   ✅ **Every review finding is closed.** Full-screen was the last: Franco ran the probe, and the
   panel's close notification was posted only when the preview left the screen, never on entering
   full screen (docs/07). ✅ **The human leg passed:** his ⌘-Tab and Dock click both return to it.
-  ⚠️ **The installed app at `/Users/Shared` is this tree's build**, still labelled 1.23.0 — the
-  PATCH bump lands at G42.
 
 - **✅ M41-T1 DONE (2026-11-17) — the tests no longer record the screen.** On 2026-11-17 the
   suite's own captures (tests arming Instant Replay on a real `ReplayController`) left **137**
@@ -254,9 +261,11 @@
 
 ## Needs Franco (human-only items)
 
-- **M42-T3 / T4 (2026-11-25): the plan's OK**, and with it the OK to drive the desktop for each
-  verify. T4's upload-sheet leg is his by hand (⌘V and ⌘A in Title and Description, then Cancel)
-  unless he names a hands-off moment — its default button uploads.
+- **M42-T4, once it is built:** the upload sheet's two fields are his to check by hand (⌘V and
+  ⌘A in Title and Description, then Cancel) unless he names a hands-off moment — its default
+  button uploads.
+- **M42-T3 (2026-11-25), a light one:** Settings → `ScreenRec ▸ About ScreenRec` → close Settings,
+  then ⌘-Tab away and back. The probe read everything; this is the look a person gives it.
 - **M42-T2 (2026-11-25): one question left open.** After `Rename…` or a naming prompt, do you
   have to click your app again before typing? The probe read ScreenRec still frontmost with
   nothing on screen, but it dismissed the alert through Accessibility. Not in T3 or T4.
