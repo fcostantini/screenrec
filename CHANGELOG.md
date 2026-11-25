@@ -7,6 +7,20 @@ one file in the repo whose audience is not us.
 Only versions published as releases appear here; several were tagged during development and never
 published. The commit history is in the repository, where it belongs.
 
+## 1.24.0
+
+**A recording now plays in ScreenRec's own window, and the keyboard drives it.** Choose **Play** on
+a recording: **space** plays and pauses, **←** and **→** step one frame, and **⇧←** and **⇧→** move a
+second. These are the Trim window's keys, with space added. Esc or ⌘W closes the window. Before, a
+recording opened in the system's Quick Look panel, where space closed the window and only the mouse
+could move through the video.
+
+**It behaves like ScreenRec's other windows.** It is in the Window menu and can be minimized. It
+opens at the recording's own shape. Drag it and it opens in that place next time; resize it and it
+keeps that size too.
+
+**GIFs and audio files still open in Quick Look**, and their row still says so.
+
 ## 1.23.1
 
 **A Quick Look preview can't get lost behind another app any more.** While a preview is open,
