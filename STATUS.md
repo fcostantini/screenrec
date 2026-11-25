@@ -6,6 +6,20 @@
 
 ## Now
 
+- **✅ M42-T2 MEASURED (2026-11-25) — two of the other surfaces need a fix; the ruling is
+  Franco's.** On the deployed build with no window open (table in docs/07):
+  🔴 **About is lost** the way the preview was — close the last window under it and it stays on
+  screen behind the next app, with no Dock tile. 🔴 **⌘A and ⌘V do nothing in `Rename…`'s field**;
+  with Settings open they work in the same alert, so it is the missing Edit menu.
+  ✅ **Alerts and the share sheet are not lost**: they stay above other apps' windows, and the
+  status item still opens under an alert.
+  ⚠️ **Driven:** `Rename…`, the share picker, Share ▸ Notes, About. The other alerts are the same
+  `NSAlert.runModal()` and were not raised (docs/03 says why for each).
+  🔴 **A probe mistake:** two Esc keys meant for the share picker went to Slack, which was
+  frontmost (docs/07). Nothing was renamed, shared or uploaded; the test clip is gone from
+  `~/Movies`.
+  **Next: Franco's ruling, then M42-T3 is filed from it** and gets its plan artifact.
+
 - **✅ M42-T1 DONE (2026-11-25) — the Quick Look preview has a way back.** Franco: with the
   preview open there was *"no window for that player"* after switching apps. ADR-023 counted only
   the windows `WindowPresenter` builds, and the preview is the system's panel, so the app stayed
@@ -21,8 +35,6 @@
   full screen (docs/07). ✅ **The human leg passed:** his ⌘-Tab and Dock click both return to it.
   ⚠️ **The installed app at `/Users/Shared` is this tree's build**, still labelled 1.23.0 — the
   PATCH bump lands at G42.
-  **Next: M42-T2**, the spike on the alerts, the share window and the About panel — it drives his
-  desktop, so it waits for his go-ahead.
 
 - **✅ M41-T1 DONE (2026-11-17) — the tests no longer record the screen.** On 2026-11-17 the
   suite's own captures (tests arming Instant Replay on a real `ReplayController`) left **137**
@@ -240,6 +252,12 @@
 
 ## Needs Franco (human-only items)
 
+- **M42-T2 (2026-11-25): the ruling on docs/07's table.** Proposed: (1) fix About, counted like
+  the preview; (2) fix ⌘A/⌘C/⌘V/⌘X/⌘Z in the three text-field alerts — by fields that answer the
+  shortcuts themselves, or by raising the Dock tile and bar while such an alert is up; (3) leave
+  the two-button alerts and the share sheet alone. And one question: after `Rename…` or a naming
+  prompt, do you have to click your app again before typing? The probe read ScreenRec still
+  frontmost with nothing on screen, but it dismissed the alert through Accessibility.
 - **M42-T1 (2026-11-25): nothing owed.** Franco confirmed a real ⌘-Tab and a click on the Dock
   icon both return to an open preview, and ran the full-screen probe himself (docs/07).
 

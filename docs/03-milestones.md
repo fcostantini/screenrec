@@ -4365,7 +4365,7 @@ entry land at G42, as in M37.
       ⚠️ The Dock tile was read through Accessibility, not seen — his Dock auto-hides.
       ✅ **The (human) leg passed** (Franco, 2026-11-25: *"i can confirm 1"*, to the ask for one
       real ⌘-Tab and one Dock click back to an open preview).
-- [ ] M42-T2 **(spike) What the app's other surfaces do when another app comes in front.** Read from
+- [x] M42-T2 **(spike) What the app's other surfaces do when another app comes in front.** Read from
       the code, these can be up with no window open and are not counted: the three alerts with a text
       field (`Rename…`, `Name this recording`, the upload sheet), the two-button questions (quit,
       discard, connect, the first-arm warning), the window a `Share…` service opens, and the About
@@ -4377,6 +4377,17 @@ entry land at G42, as in M37.
       and anything macOS or a browser owns.
       **Output:** a measured table in docs/07 and a ruling from Franco on which surfaces get the
       treatment. The fix is filed as T3 from that table, not before.
+      ✅ **Measured (2026-11-25, table in docs/07).** Two defects. 🔴 **The About panel is lost**
+      exactly as the preview was: close the last window under it and it stays on screen behind the
+      next app, with no Dock tile. 🔴 **⌘A and ⌘V do nothing in `Rename…`'s field with no window
+      open**; with Settings open both work in the same alert. ✅ **The alerts and the share sheet
+      are not lost** — an alert stays at level 8 and the Notes share sheet at level 3, both ahead
+      of every other app's window — and the status item still opens under an alert.
+      ⚠️ **Driven:** `Rename…`, the share picker, Share ▸ Notes, About. **Not driven:** `Name this
+      recording` (the same function as `Rename…`), the upload sheet (its default button uploads,
+      and Franco was using the machine), and the two-button questions (they need a recording, a
+      disconnected account or a first arm) — all the same `NSAlert.runModal()`.
+      ⚠️ **The ruling is still owed** — see STATUS "Needs Franco". T3 is filed from it.
 
 **Gate G42** — on the deployed build, with nothing else open: the preview raises the Dock tile, the
 ⌘-Tab entry and the bar; switching away and back returns to it; closing it removes all three. T2's

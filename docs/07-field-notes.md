@@ -7,6 +7,41 @@ most re-read artefact in the repo: most entries exist because something cost hou
 Append newest-first. Promoted out of STATUS.md by M15-T5, where it had grown to 1,229 lines inside a
 file every session is required to read.
 
+- 2026-11-25 (M42-T2, a spike: the app's alerts, share sheet and About panel when another app comes
+  in front — the deployed build, no window open unless said, driven through Accessibility):
+
+  | Surface | With another app in front | Way back | Finding |
+  |---|---|---|---|
+  | `Rename…` alert — measured | on screen at **layer 8**, ahead of every other app's window | a click on it re-activates the app; the status item opens its menu meanwhile and does not raise it | not lost. 🔴 **⌘A and ⌘V do nothing in its field** |
+  | `Name this recording`, the upload sheet, quit, discard, connect, first-arm — **not driven** | the same `NSAlert.runModal()` after `NSApp.activate` | — | as above by construction; the two with text fields share the ⌘A/⌘V defect |
+  | `Share…` picker — measured | a popover at layer 101 at the pointer; the app is not activated and it takes no keyboard focus; it stays up | — | not lost |
+  | `Share…` ▸ Notes — measured | four screen-sized windows at **layer 3**, ahead of every other app's window | it is on top | not lost. No other service was driven |
+  | About panel, last window closed under it — measured | 🔴 on screen at layer 0, **behind** the other app's window; `accessory`, no bar, no Dock tile | none: the status-item menu opens and does not raise it | **lost — the defect T1 fixed for the preview** |
+
+  🔴 **⌘A and ⌘V need the Edit menu inside an alert too.** `Rename…` with no window open: `→` moved
+  the caret (selection `{0,9}` → `{9,0}`), ⌘A left it at `{9,0}`, ⌘V left the text as it was. The
+  same alert with Settings open, so `MainMenu` installed: ⌘A gave `{0,9}` and ⌘V pasted. That is
+  why M37's "⌘V works in Rename…" and this reading disagree — a window was open then.
+  ✅ **A modal alert keeps level 8 while its app is inactive**, unlike the Quick Look panel (9 → 0).
+  It cannot be lost behind another app; it sits on top of it.
+  ✅ **The status item answers during a modal session** — a real click opened the menu with the
+  alert up, and the app stayed inactive. What its rows do then was not tried.
+  🔴 **About outlives the policy.** Closing Settings under it gave `accessory`, focus went to the
+  previous app by itself, and the panel was left at layer 0 behind that app's window.
+  ⚠️ **After an alert is dismissed the app is still frontmost with nothing on screen** (read 1.2 s
+  after Cancel) — the previous app is not re-activated as it is when the policy drops from
+  `regular`. Dismissed by AXPress, not a real click, so a person may see otherwise.
+  ⚠️ **The system-wide `AXFocusedApplication` read fails here with −25204** about as often as not.
+  Ask the app element for `AXFrontmost` instead.
+  ✅ **`CGEvent.postToPid` is the way to key-test an app's own field** — the key can reach only
+  that app. The `→` control and the Settings-open control show the events are handled as real ones.
+  🔴 **A layer-101 window is not proof of a menu that holds the keyboard.** The share picker is one
+  and holds none: two Esc keys I posted through the HID tap to dismiss it went to the frontmost app
+  (Slack) instead. Post a HID key only when the target app is frontmost, or use `postToPid`.
+  ⚠️ **Not measured:** the upload sheet and the two-button alerts on screen, any share service but
+  Notes, typing or pasting inside the share sheet, whether a click passes through its screen-sized
+  windows, and what the status menu's rows do under a modal alert.
+
 - 2026-11-25 (M42-T1, the Quick Look panel in an accessory app — a scratch probe, then the deployed
   build):
   🔴 **`QLPreviewPanel` does not hide when its app deactivates; it changes level.** `level` reads
